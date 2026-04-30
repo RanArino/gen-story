@@ -351,6 +351,86 @@
             - ストーリーボードJSONの修正。
             - 画像生成プロンプトの一括調整。
             - フェーズ2用動画プロンプト生成。
-- [ ] 基本的なアーキテクチャは、シンプルなJexagonal Architecture ＆ Clean Architecture & Domain Driven Designで行う。レポジトリ構成、使用言語、その他諸々は議論の必要あり。
+- [x] 基本的なアーキテクチャは、シンプルなHexagonal Architecture ＆ Clean Architecture & Domain Driven Designで行う。レポジトリ構成、使用言語、その他諸々は議論の必要あり。
+    - 基本方針
+        - 旧記載の `Jexagonal Architecture` は、`Hexagonal Architecture` の誤記として扱う。
+        - シンプルなHexagonal Architecture、Clean Architecture、Domain Driven Designを組み合わせる。
+        - 外部サービスやフレームワークに依存しすぎない構成にする。
+        - ただし、初期実装では過度に複雑な抽象化を避ける。
+    - 使用言語
+        - 初期実装の言語は、要件と実装容易性に応じて選択する。
+        - 初期バックエンドはTypeScriptを第一候補とする。
+        - Goは将来的な選択肢として残すが、初期実装ではTypeScriptに寄せる。
+        - 特定サービスがPython系SDKしか提供していない場合は、Pythonの使用も可能とする。
+        - 複数言語を採用する場合は、複雑性が増えるため、境界と責務を明確にする。
+    - 初期アプリ形態
+        - 初期アプリは、ローカルで動くWebアプリとする。
+        - フロントエンドはNext.jsを使用する。
+        - 初期構成は、フロントエンドとバックエンドAPIを分ける。
+        - ただし、UIモック段階ではNext.jsのみで作成してよい。
+        - 将来的にデスクトップアプリ、モバイルアプリへ拡張可能なアーキテクチャにする。
+        - 将来拡張を見据えるが、初期段階ではローカルWebアプリとして成立することを優先する。
+    - レポジトリ方針
+        - 初期はモノレポ構成を基本とする。
+        - 複数言語にまたがり複雑性が増す場合は、複数リポジトリへの分割も想定する。
+        - モノレポ/複数リポジトリの詳細な非機能要件は、後続の議論で決定する。
+        - 初期のパッケージ構成案
+            - `apps/web`
+                - Next.jsによるフロントエンド。
+                - UIモック段階では、このアプリのみで進めてよい。
+            - `apps/api`
+                - TypeScriptによるバックエンドAPI。
+                - 初期はInfrastructure実装を `apps/api` 内に置いてもよい。
+            - `packages/domain`
+                - Entity、Value Object、Domain Service、Domain Event、不変条件を扱う。
+            - `packages/application`
+                - UseCase、Input Port、Output Port、Application Serviceを扱う。
+            - `packages/infrastructure`
+                - DB、外部API、ストレージ、認証などのAdapter実装を扱う。
+                - 初期段階では必須分割ではなく、複雑性が増えた時点で `apps/api` から切り出してよい。
+            - `packages/shared`
+                - フロントエンドとバックエンドで共有する型、スキーマ、定数を扱う。
+    - DDD方針
+        - DDDの主要ドメインや集約境界は、ベストプラクティスに従って決定する。
+        - 初期段階では、実装前に過剰に細かい集約へ分割しすぎない。
+        - Project、Photo、Storyboard、Scene、GeneratedImage、Style、GenerationRequest、Userなどの概念を候補として扱う。
+        - 実際の集約境界は、状態遷移、ライフサイクル、不変条件、ユースケースの責務をもとに決める。
+        - 拡張性を担保できるなら、具体的な集約分割はベストプラクティスに従って決める。
+        - 初期案としては、Projectを中心にしつつ、Storyboard、Scene、PhotoAsset、GenerationJob、StylePresetなどを必要に応じて分ける。
+        - `domain` 層は、外部ライブラリ非依存を原則にする。
+        - `domain` 層は、DB ORM、HTTP、OpenAI SDK、Next.js、Zodなどに依存しない。
+        - Domainの不変条件は、Domain内で管理する。
+    - API設計
+        - 初期APIはREST中心とする。
+        - ZodやOpenAPIなどを用いてスキーマを管理する。
+        - フロントエンドとバックエンド間の契約を明確にし、将来のクライアント追加に備える。
+        - API入力のバリデーションはZodを基本とする。
+        - API入力検証とDomain不変条件は分けて管理する。
+    - 認証設計
+        - 初期からWorkOSを採用することは可能とする。
+        - 認証はApplicationの外側にあるAdapterとして扱う。
+        - ローカル自動テストでは、WorkOSを完全にバイパスできる設計にする。
+        - `userId` と `organizationId` の内部モデルを先に持つ。
+        - `local/test auth adapter` を先に作る。
+        - `WorkOS adapter` は後から差し替え可能にする。
+        - WorkOSの実ログインを伴うE2Eテストは、少数のsmoke testに限定する。
+    - 差し替え可能にする外部依存
+        - DB。
+        - 画像生成。
+        - 動画生成。
+        - ストレージ。
+        - 認証。
+        - 決済/コイン。
+        - BGM生成。
+    - 完了条件
+        - 初期アーキテクチャ方針を記録する。
+        - 使用言語を記録する。
+        - 初期アプリ形態を記録する。
+        - モノレポ方針を記録する。
+        - DDD方針を記録する。
+        - 差し替え対象を記録する。
+        - API設計を記録する。
+        - 認証Adapter方針を記録する。
+        - 簡易レポジトリ構成案を記録する。
 - [ ] UIが未決定なので、先に簡易的なモックを作成してから、細かなDB設計やUI設計を行なっていく。モックの作成には、Typescriptを使用予定であるが、フロントエンド、モバイルアプリ、Webアプリ、デスクトップアプリなど、様々なプラットフォームで使用できるフレームワークであり、将来の拡張性を担保し、対応できるようにすること）。
 - [ ] データベースは、ローカルではSQLLiteを使用。プロダクト環境時のDBは未決定（Clean Architectureによって、DBは外部に依存しないようにすることで、将来柔軟に対応できるようにすること）。
