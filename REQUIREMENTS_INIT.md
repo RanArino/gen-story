@@ -432,5 +432,368 @@
         - API設計を記録する。
         - 認証Adapter方針を記録する。
         - 簡易レポジトリ構成案を記録する。
-- [ ] UIが未決定なので、先に簡易的なモックを作成してから、細かなDB設計やUI設計を行なっていく。モックの作成には、Typescriptを使用予定であるが、フロントエンド、モバイルアプリ、Webアプリ、デスクトップアプリなど、様々なプラットフォームで使用できるフレームワークであり、将来の拡張性を担保し、対応できるようにすること）。
-- [ ] データベースは、ローカルではSQLLiteを使用。プロダクト環境時のDBは未決定（Clean Architectureによって、DBは外部に依存しないようにすることで、将来柔軟に対応できるようにすること）。
+- [x] UIが未決定なので、先に簡易的なモックを作成してから、細かなDB設計やUI設計を行なっていく。モックの作成には、Typescriptを使用予定であるが、フロントエンド、モバイルアプリ、Webアプリ、デスクトップアプリなど、様々なプラットフォームで使用できるフレームワークであり、将来の拡張性を担保し、対応できるようにすること）。
+    - UIモックの目的
+        - 初期モックでは、画面遷移とUX確認を優先する。
+        - ユーザーが迷わず素材を入れて、感情や構成を選び、ストーリー/画像生成まで進めるかを確認する。
+        - 実装に近いプロトタイプは、主要フローが固まってから作成する。
+    - 初期モックに含める画面
+        - プロジェクト一覧。
+        - プロジェクト作成。
+        - 写真アップロード。
+        - 写真管理。
+        - 感情選択。
+        - ストーリーボード編集。
+        - 生成画像比較。
+    - データ方針
+        - 初期モックでは、実際のAI生成やDB保存は行わない。
+        - 初期モックはすべてモックデータで構成する。
+    - 技術スタック
+        - Next.js、TypeScript、Tailwind CSSを使用する。
+        - Next.jsは、画面遷移と将来実装への接続を見据えて使用する。
+        - TypeScriptは、状態やモックデータの型安全性を担保するために使用する。
+        - Tailwind CSSは、UI調整を素早く行うために使用する。
+    - UIコンポーネント
+        - shadcn/uiを使用する。
+        - 初期導入は必要最小限にする。
+        - 初期導入するコンポーネント
+            - Button。
+            - Input。
+            - Textarea。
+            - Select。
+            - Tabs。
+            - Dialog。
+            - Dropdown Menu。
+            - Badge。
+            - Card。
+            - Progress。
+            - Separator。
+        - データテーブル、Command、複雑なフォーム系コンポーネントは初期では不要とする。
+        - モックでも操作感を確認したいため、ボタン、タブ、ダイアログ、セレクトなどのアクセシビリティや状態管理はshadcn/uiに寄せる。
+    - 画面遷移
+        - UIモックでは、クリック可能な画面遷移まで作成する。
+        - サイドバー、ステップナビ、主要ボタンなどから各画面へ移動できるようにする。
+        - フェーズ1の流れを、モックデータで最後まで確認できるようにする。
+    - 写真アップロードモック
+        - 実ファイル選択に対応する。
+        - 選択した画像のローカルプレビューを表示できるようにする。
+        - 初期モックでは、実アップロードやDB保存は行わない。
+    - モック画像
+        - ユーザーが画像を選ばなくても一通り確認できるようにする。
+        - 初期表示では、プレースホルダーまたはサンプル画像を使用する。
+        - アップロード画面では、ユーザーが選択したローカル画像をプレビューする。
+        - 比較画面では、固定の生成結果サンプル画像を使用する。
+        - サンプル画像の配置例
+            - `public/mock/sample-family-01.jpg`
+            - `public/mock/sample-family-02.jpg`
+            - `public/mock/generated-01.jpg`
+            - `public/mock/generated-02.jpg`
+    - ストーリーボード編集モック
+        - 初期モックでは、ドラッグ&ドロップ並び替えは不要とする。
+        - ストーリーボードの見た目を確認できるようにする。
+        - シーンの上下移動ボタンで、並び順の調整イメージを確認できるようにする。
+    - 生成画像比較モック
+        - 元写真と生成画像の左右比較を優先する。
+        - 採用/未採用の切り替え操作を配置する。
+        - 再生成ボタンの配置を確認できるようにする。
+    - デザイン方向性
+        - 全体としては、Canva + CapCut寄りの体験を参考にする。
+        - Canvaからは、素材を選ぶ、見比べる、完成物を作る感覚を参考にする。
+        - CapCutからは、タイムライン、ストーリーボード編集、生成結果比較の体験を参考にする。
+        - Notionからは、プロジェクト整理やメタ情報管理のみ参考にする。
+        - Linearからは、設定、ジョブ状態、履歴管理の落ち着いたUIのみ参考にする。
+        - ただし、作業UIとしては落ち着いた見た目にする。
+    - レスポンシブ方針
+        - 初期はデスクトップ優先とする。
+        - 最低限、タブレット幅まで崩れないようにする。
+        - スマホ対応は、将来的な閲覧・簡易確認を想定する。
+        - 初期段階では、スマホでの本格編集は必須としない。
+    - 多言語対応
+        - 初期モックでは、多言語切り替えUIは入れない。
+        - 将来の多言語対応を邪魔しない程度に留める。
+    - 完了条件
+        - 主要7画面を行き来できる。
+        - フェーズ1の一連の流れをモックデータで最後まで確認できる。
+- [x] データベースは、ローカルではSQLiteを使用。プロダクト環境時のDBは未決定（Clean Architectureによって、DBは外部に依存しないようにすることで、将来柔軟に対応できるようにすること）。
+    - 基本方針
+        - ローカルDBはSQLiteを使用する。
+        - 本番DBは現時点では確定しない。
+        - 本番DBの第一候補はPostgreSQLとする。
+        - Clean Architectureによって、DB実装はRepository Adapterとして扱う。
+        - Domain層はDB、ORM、クエリビルダに依存しない。
+    - ORM/クエリビルダ
+        - TypeScript実装ではDrizzleを使用する。
+        - Drizzleの薄いORMとしての性質が、初期プロダクトに合うため採用する。
+        - Drizzleは `apps/api` のRepository Adapter内だけで使用する。
+        - DomainやApplicationをDrizzleに依存させない。
+    - 初期保存対象
+        - Phase 1に必要なものだけを初期保存対象にする。
+        - 初期保存対象
+            - User。
+            - Organization。
+            - Membership。
+            - Project。
+            - PhotoAsset。
+            - Storyboard。
+            - Scene。
+            - StylePreset。
+            - GenerationRequest。
+            - GeneratedImage。
+        - User/Organizationは、WorkOSや将来認証に備えて最小形のみ持つ。
+        - 後回しにする保存対象
+            - GenerationVersion。
+            - Coin/Credit履歴。
+    - Storyboard / Scene設計
+        - `storyboards` と `scenes` は別テーブルにする。
+        - `storyboards` は、ストーリーボード全体の設定や構成単位を扱う。
+        - `scenes` は、各シーンの順序、説明、プロンプト、生成対象を扱う。
+        - シーン単位で生成、失敗、再生成、順序変更、写真紐づけ、生成画像比較を行うため、JSONだけで1テーブルにまとめない。
+        - 初期段階では、`ScenePrompt` や `SceneTextBlock` のような細かいテーブル分割は不要とする。
+        - `storyboards` の主な項目例
+            - `id`。
+            - `projectId`。
+            - `title`。
+            - `status`。
+            - `stylePresetId`。
+            - `tone`。
+            - `createdAt`。
+            - `updatedAt`。
+            - `deletedAt`。
+        - `scenes` の主な項目例
+            - `id`。
+            - `storyboardId`。
+            - `orderIndex`。
+            - `title`。
+            - `description`。
+            - `prompt`。
+            - `status`。
+            - `createdAt`。
+            - `updatedAt`。
+            - `deletedAt`。
+    - GenerationRequest / GeneratedImage設計
+        - `generation_requests` は、画像生成、将来の動画生成、将来のBGM生成を共通で扱うジョブテーブルとする。
+        - 初期の生成結果テーブルは `generated_images` のみ作成する。
+        - 将来的に動画生成やBGM生成に対応する場合は、`generated_videos` や `generated_bgms` を追加する。
+        - 生成リクエストは共通化するが、生成結果テーブルは無理に共通化しない。
+        - 生成結果を最初から1つの `generated_assets` に押し込まず、nullableな項目が増えすぎることを避ける。
+        - `generation_requests` の主な項目例
+            - `id`。
+            - `projectId`。
+            - `storyboardId`。
+            - `sceneId`。
+                - BGMなどシーンに紐づかない生成ではnullableにする。
+            - `type`。
+                - `image`。
+                - `video`。
+                - `bgm`。
+            - `status`。
+                - `queued`。
+                - `running`。
+                - `succeeded`。
+                - `failed`。
+                - `canceled`。
+            - `provider`。
+            - `model`。
+            - `inputJson`。
+            - `errorMessage`。
+            - `startedAt`。
+            - `completedAt`。
+            - `createdAt`。
+        - `generated_images` の主な項目例
+            - `id`。
+            - `generationRequestId`。
+            - `projectId`。
+            - `storyboardId`。
+            - `sceneId`。
+            - `storageKey`。
+            - `width`。
+            - `height`。
+            - `mimeType`。
+            - `seed`。
+            - `isAdopted`。
+            - `createdAt`。
+            - `deletedAt`。
+    - StylePreset設計
+        - システムプリセットとユーザー作成カスタムスタイルは、同じ `style_presets` テーブルで扱う。
+        - `scope` とowner情報で利用範囲を分ける。
+        - `style_presets` の主な項目例
+            - `id`。
+            - `name`。
+            - `description`。
+            - `promptTemplate`。
+            - `scope`。
+                - `system`。
+                - `organization`。
+                - `user`。
+            - `ownerUserId`。
+            - `organizationId`。
+            - `isActive`。
+            - `createdAt`。
+            - `updatedAt`。
+        - `system` のStylePresetはユーザーが直接編集できないようにする。
+        - システムプリセットをカスタム化する場合は、複製してユーザー用プリセットとして保存する。
+            - `system preset`。
+            - `duplicate`。
+            - `user custom preset`。
+    - PhotoAsset / ScenePhotoAsset設計
+        - `PhotoAsset` には、写真自体の管理状態を持つ。
+        - 実際の使用/参考は、`ScenePhotoAsset` でSceneとの関係として持つ。
+        - 写真の使用状態は文脈依存であり、Photo単体だけで完全には決めない。
+        - 同じ写真が、あるSceneでは主素材、別のSceneでは参考画像、別のStoryboardでは未使用になる可能性を考慮する。
+        - `photo_assets` の主な項目例
+            - `id`。
+            - `projectId`。
+            - `storageKey`。
+            - `originalFileName`。
+            - `mimeType`。
+            - `width`。
+            - `height`。
+            - `curationStatus`。
+                - `candidate`。
+                - `excluded`。
+                - `reference`。
+            - `createdAt`。
+            - `deletedAt`。
+        - `scene_photo_assets` の主な項目例
+            - `id`。
+            - `sceneId`。
+            - `photoAssetId`。
+            - `role`。
+                - `primary`。
+                - `reference`。
+            - `orderIndex`。
+            - `createdAt`。
+        - 1つのSceneには、複数のPhotoAssetを紐づけられるようにする。
+        - 主素材1枚 + 参考複数枚を扱える設計にする。
+        - `primary` は1シーンにつき最大1枚とする。
+        - `reference` は1シーンに複数紐づけ可能とする。
+        - DB制約で完全に守れる場合はDB制約を利用する。
+        - SQLiteで部分ユニーク制約などの扱いが難しい場合は、RepositoryまたはApplication側で制約を保証する。
+        - UI上の判定
+            - 未使用は、`scene_photo_assets` に紐づいていない状態として扱う。
+            - 使用は、`role: primary` で紐づいている状態として扱う。
+            - 参考のみは、`role: reference` で紐づいている状態として扱う。
+        - 写真管理画面でのざっくり分類には、`photo_assets.curationStatus` を使用してよい。
+    - 採用画像
+        - 採用画像は `generated_images.isAdopted` で管理する。
+        - 1シーンにつき採用画像は原則1枚とする。
+        - `sceneId` ごとに `isAdopted = true` は最大1件に制限する。
+        - DB制約で完全に守れる場合はDB制約を利用する。
+        - DB制約が扱いにくい場合は、Application側で保証する。
+        - 採用切替はトランザクションで行う。
+            - 同じ `sceneId` の既存採用画像を `false` にする。
+            - 対象画像を `true` にする。
+        - 将来的に1シーン複数カットや複数採用候補が必要になった場合は、`adoptionGroup` や `slot` の追加を検討する。
+    - 画像ファイルの保存方針
+        - 元写真や生成画像のバイナリ本体はDBに入れない。
+        - 画像本体は、ファイルストレージまたは将来のオブジェクトストレージに保存する。
+        - DBには画像メタデータとstorage keyを保存する。
+        - DBに保存する画像メタデータ例
+            - `storageKey`。
+            - `mimeType`。
+            - `size`。
+            - `width`。
+            - `height`。
+            - `checksum`。
+            - `sourceKind`。
+            - `createdAt`。
+        - ローカル保存先の例
+            - `data/uploads/originals/...`
+            - `data/uploads/generated/...`
+        - 将来S3、R2、GCSなどに差し替えられるように、DBには絶対パスではなくstorage keyを保存する。
+        - `photo_assets.storageKey` や `generated_images.storageKey` のような形で管理する。
+    - 削除/復元
+        - 削除はsoft deleteを基本にする。
+        - DB上では `deletedAt` を持つ方針とする。
+        - 削除後7日以内は復元できるようにする。
+        - 復元期間を過ぎたデータは完全削除対象にする。
+    - 状態管理
+        - 状態は1箇所にすべて押し込まず、責務ごとに分けて持つ。
+        - `projects.status` は、プロジェクト全体のライフサイクルを扱う。
+            - `draft`。
+            - `active`。
+            - `completed`。
+            - `archived`。
+        - `storyboards.status` は、ストーリーボード編集状態を扱う。
+            - `draft`。
+            - `editing`。
+            - `ready`。
+            - `completed`。
+        - `scenes.status` は、シーン単位の編集/生成準備状態を扱う。
+            - `draft`。
+            - `ready`。
+            - `completed`。
+        - `generation_requests.status` は、生成ジョブの実行状態を扱う。
+            - `queued`。
+            - `running`。
+            - `succeeded`。
+            - `failed`。
+            - `canceled`。
+        - 生成失敗は、原則として `generation_requests.status` に閉じる。
+        - `storyboards.status` に生成失敗を直接持たせない。
+        - UIでプロジェクトやストーリーボードの生成失敗を表示する場合は、最新の `generation_requests.status` から計算する。
+        - 必要になった場合のみ、将来的に `projects.lastGenerationStatus` のような表示用キャッシュ列を検討する。
+        - 初期段階では、同じ意味の状態を複数箇所で二重管理しない。
+    - GenerationRequestの入力保存
+        - `generation_requests.inputJson` には、生成入力の詳細を丸ごと保存する。
+        - 再現性、デバッグ、将来の比較、監査のために保存する。
+        - `inputJson` に保存する項目例
+            - `prompt`。
+            - `negativePrompt`。
+            - `model`。
+            - `provider`。
+            - `size`。
+            - `quality`。
+            - `format`。
+            - `seed`。
+            - `stylePresetId`。
+            - `sceneId`。
+            - `referencePhotoAssetIds`。
+            - `inputGeneratedImageIds`。
+            - `parameters`。
+        - 検索、一覧、フィルター、状態管理に使う項目は別カラムにも持つ。
+            - `type`。
+            - `status`。
+            - `provider`。
+            - `model`。
+            - `storyboardId`。
+            - `sceneId`。
+        - 検索や状態管理に使うものはカラムで扱う。
+        - 再現、監査、詳細設定に使うものは `inputJson` で扱う。
+    - DBマイグレーション
+        - DBマイグレーションはDrizzle Kitで管理する。
+        - schema定義はTypeScriptで行う。
+        - migration生成はDrizzle Kitで行う。
+        - migration適用はDrizzle Kitまたはcustom scriptで行う。
+        - ローカルSQLiteでも初期からマイグレーションを残す。
+        - 推奨配置例
+            - `packages/db` または `apps/api/src/db/schema.ts`。
+            - `drizzle/migrations/`。
+        - Domain層はDrizzle schemaをimportしない。
+        - Drizzle schemaはInfrastructure/Adapter側に閉じる。
+    - 初期DBテスト方針
+        - Repository単位でSQLiteに対して確認する。
+        - Storyboardを削除した場合、Sceneが通常一覧から消えることを確認する。
+        - Sceneの `orderIndex` で順序が再現できることを確認する。
+        - GenerationRequest失敗時に、Storyboard自体がfailedにならないことを確認する。
+        - PhotoAssetの未使用/使用/参考のみが正しく判定されることを確認する。
+        - system StylePresetを直接編集できないことを確認する。
+    - 将来差し替え
+        - 初期はSQLite + Drizzleで実装する。
+        - DBアクセスはRepository経由に留める。
+        - 将来的にPostgreSQLなどへ移行しやすい設計にする。
+    - 完了条件
+        - ローカルDB方針を記録する。
+        - 本番DB候補と未確定方針を記録する。
+        - Drizzle採用方針を記録する。
+        - 初期保存対象を記録する。
+        - Storyboard/Scene分離方針を記録する。
+        - GenerationRequest/GeneratedImage設計を記録する。
+        - StylePreset設計を記録する。
+        - PhotoAsset/ScenePhotoAsset設計を記録する。
+        - 採用画像の管理方針を記録する。
+        - 画像バイナリとメタデータの保存方針を記録する。
+        - soft deleteと7日復元方針を記録する。
+        - 状態管理方針を記録する。
+        - GenerationRequestの入力保存方針を記録する。
+        - Drizzle Kitによるマイグレーション方針を記録する。
