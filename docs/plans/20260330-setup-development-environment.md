@@ -21,7 +21,7 @@ This is Phase 0 from `IMPLEMENTATION_PLAN.md`: repository and development baseli
 - [x] (2026-04-30 12:29Z) Scaffold `apps/web`, `apps/api`, `packages/domain`, `packages/application`, and `packages/shared`; omitted `packages/infrastructure` because Phase 0 has no adapter implementation yet.
 - [x] (2026-04-30 12:29Z) Add minimal lint, format, typecheck, test, and dev commands.
 - [x] (2026-04-30 12:29Z) Add local environment examples and setup documentation.
-- [ ] Run the verification commands and record results in this plan.
+- [x] (2026-04-30 12:39Z) Run the verification commands and record results in this plan.
 
 
 ## Surprises & Discoveries
@@ -31,6 +31,12 @@ This is Phase 0 from `IMPLEMENTATION_PLAN.md`: repository and development baseli
 
 - Observation: Node.js is available, but `pnpm` and `corepack` are not installed in the current shell.
   Evidence: `node --version` returned `v25.2.1`; `pnpm --version` and `corepack --version` returned `command not found`.
+
+- Observation: The first `pnpm install` attempt failed under the restricted sandbox because DNS access to the npm registry was blocked.
+  Evidence: The command ended with `ERR_PNPM_META_FETCH_FAIL` and `getaddrinfo ENOTFOUND registry.npmjs.org`.
+
+- Observation: `pnpm dev:api` needs permissions to bind the IPC socket used by `tsx` in this environment.
+  Evidence: The sandboxed attempt failed with `listen EPERM` for a `/var/folders/.../tsx-501/...pipe`; the approved rerun started `gen-story-api listening on http://localhost:4000`.
 
 
 ## Decision Log
@@ -58,7 +64,46 @@ This is Phase 0 from `IMPLEMENTATION_PLAN.md`: repository and development baseli
 
 ## Outcomes & Retrospective
 
-Not started. Update this section after the environment baseline is implemented and verified. Include commands run, pass/fail status, and any gaps such as missing network access or dependency installation failures.
+Completed. The Phase 0 baseline now includes a pnpm TypeScript workspace, a minimal Next.js web app, a minimal Node HTTP API app with `/health`, pure `domain`, `application`, and `shared` packages, environment examples, and setup documentation.
+
+Verification results:
+
+    pnpm install
+    Passed after rerunning with network access. Created pnpm-lock.yaml.
+
+    pnpm format
+    Passed. Formatting is intentionally scoped to Phase 0 code and config so pre-existing requirements Markdown is not reformatted.
+
+    pnpm typecheck
+    Passed across apps and packages.
+
+    pnpm lint
+    Passed across apps and packages after limiting package lint scripts to source files and avoiding generated `.next` output.
+
+    pnpm test
+    Passed. API health test and domain tests ran successfully; packages without tests use `--passWithNoTests`.
+
+    pnpm build
+    Passed. Next.js built the minimal web app, and TypeScript packages emitted build output.
+
+    rg "from ['\"](next|drizzle|openai|@workos|@google|aws-sdk|zod|express|fastify|hono|\.\./\.\./apps)" packages/domain packages/application
+    Passed with no matches. The command exits with code 1 because `rg` found no forbidden imports.
+
+Manual server verification:
+
+    pnpm dev:api
+    Started on http://localhost:4000 after approval for local socket binding.
+
+    curl -s -i http://localhost:4000/health
+    Returned HTTP 200 with body {"status":"ok","service":"gen-story-api"}.
+
+    pnpm dev:web
+    Started on http://localhost:3000 after approval for local socket binding.
+
+    curl -s -i http://localhost:3000
+    Returned HTTP 200 and HTML containing "Gen Story" and "Phase 0 development baseline is running."
+
+Known gaps: `pnpm install` and local server/curl checks needed approval in this sandboxed session. On a normal local machine, they should run directly once pnpm is installed.
 
 
 ## Context and Orientation
