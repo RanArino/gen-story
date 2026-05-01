@@ -22,6 +22,7 @@ This is Phase 0 from `IMPLEMENTATION_PLAN.md`: repository and development baseli
 - [x] (2026-04-30 12:29Z) Add minimal lint, format, typecheck, test, and dev commands.
 - [x] (2026-04-30 12:29Z) Add local environment examples and setup documentation.
 - [x] (2026-04-30 12:39Z) Run the verification commands and record results in this plan.
+- [x] (2026-05-01 02:07Z) Fixed API startup so `apps/api/.env` is loaded before `startServer()`, preserving exported shell variables.
 
 
 ## Surprises & Discoveries
