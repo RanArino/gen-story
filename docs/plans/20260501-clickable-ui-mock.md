@@ -4,26 +4,24 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This plan follows `PLANS.md` at `/Users/ran/my-app/PLANS.md`.
 
-
 ## Purpose / Big Picture
 
 Build the Phase 1 clickable UI mock for `gen-story` so the core product flow can be reviewed before persistence, authentication, file storage, or AI generation are implemented. After this work, a user should be able to open the web app, move through the seven planned screens, select local photo files for preview, edit mocked storyboard content, and reach a generated image comparison screen using only browser state and mock data.
 
 This is Phase 1 and initial milestone M1 from `IMPLEMENTATION_PLAN.md`. It intentionally does not add real database persistence, REST API calls, authentication, image preprocessing, image generation, upload storage, or backend changes. The goal is to validate navigation, screen structure, and user flow with the smallest useful frontend implementation.
 
-
 ## Progress
 
 - [x] (2026-05-01 02:24Z) Read `IMPLEMENTATION_PLAN.md`, `/Users/ran/my-app/PLANS.md`, and the completed Phase 0 plan at `docs/plans/20260330-setup-development-environment.md`.
 - [x] (2026-05-01 02:24Z) Confirmed Phase 0 created the workspace, minimal Next.js web app, API health server, and package boundaries.
 - [x] (2026-05-01 02:24Z) Created this ExecPlan for Phase 1 / M1.
-- [ ] Replace the Phase 0 placeholder page with the clickable mock application shell.
-- [ ] Implement the seven core mock screens and navigation between them.
-- [ ] Add browser-only local photo selection and preview for the mock upload and photo management screens.
-- [ ] Add mock storyboard editing, generated image candidates, and image adoption interactions.
-- [ ] Run `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build`.
-- [ ] Start `pnpm dev:web` and manually verify the full mocked flow at `http://localhost:3000`.
-
+- [x] (2026-05-01 02:47Z) Replace the Phase 0 placeholder page with the clickable mock application shell.
+- [x] (2026-05-01 02:47Z) Implement the seven core mock screens and navigation between them.
+- [x] (2026-05-01 02:47Z) Add browser-only local photo selection and preview for the mock upload and photo management screens.
+- [x] (2026-05-01 02:47Z) Add mock storyboard editing, generated image candidates, and image adoption interactions.
+- [x] (2026-05-01 02:47Z) Run `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build`.
+- [x] (2026-05-01 02:47Z) Start `pnpm dev:web` and verify `http://localhost:3000` returns HTTP 200.
+- [ ] Complete a GUI browser click-through at 1440px and 768px viewports.
 
 ## Surprises & Discoveries
 
@@ -33,6 +31,8 @@ This is Phase 1 and initial milestone M1 from `IMPLEMENTATION_PLAN.md`. It inten
 - Observation: The root workspace already has the commands needed to verify this UI milestone.
   Evidence: `package.json` defines `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and `pnpm dev:web`.
 
+- Observation: Starting the Next.js dev server inside the default sandbox could not bind port `3000`.
+  Evidence: `pnpm dev:web` failed with `listen EPERM: operation not permitted 0.0.0.0:3000`; rerunning the same command with approved escalation started the server at `http://localhost:3000`.
 
 ## Decision Log
 
@@ -56,11 +56,25 @@ This is Phase 1 and initial milestone M1 from `IMPLEMENTATION_PLAN.md`. It inten
   Rationale: App Router pages are Server Components by default, while this milestone needs React state, file input handling, and browser APIs such as `URL.createObjectURL`. A dedicated client component keeps the route boundary explicit.
   Date/Author: 2026-05-01 / Codex
 
-
 ## Outcomes & Retrospective
 
-Not started beyond planning. Update this section after the implementation and verification commands complete.
+Implemented the Phase 1 clickable mock inside `apps/web` without adding dependencies or touching backend/package code. `apps/web/src/app/page.tsx` remains a Server Component and renders `apps/web/src/components/mock-flow/MockFlowClient.tsx`, which is the browser-only client component that owns React state, file input handling, `URL.createObjectURL` previews, photo usage controls, tone selection, storyboard editing, and generated image candidate adoption. Styling lives in `apps/web/src/components/mock-flow/MockFlowClient.module.css`.
 
+The root layout metadata now describes the clickable mock and sets body margin to `0` so the app shell fills the viewport cleanly.
+
+Verification completed:
+
+    pnpm --filter @gen-story/web typecheck
+    pnpm --filter @gen-story/web lint
+    pnpm --filter @gen-story/web test
+    pnpm format
+    pnpm typecheck
+    pnpm lint
+    pnpm test
+    pnpm build
+    rg "from ['\\\"](next|drizzle|openai|@workos|@google|aws-sdk|zod|express|fastify|hono|\\.\\./\\.\\./apps)" packages/domain packages/application
+
+All verification commands passed. The architecture boundary check returned no matches, which is the expected clean result. `pnpm dev:web` is running at `http://localhost:3000`, and `curl -s -i http://localhost:3000` returned HTTP 200 with the Gen Story clickable mock HTML. A GUI browser click-through across the full flow and the 1440px/768px viewport checks remain for reviewer verification because the repo does not currently include browser automation tooling.
 
 ## Context and Orientation
 
@@ -90,7 +104,6 @@ Repository terms used in this plan:
 
 `Generated image candidate` in this mock means a static visual placeholder associated with a scene. It should let the user compare options and mark one as adopted, but it must not call any image generation service.
 
-
 ## Plan of Work
 
 First, replace the Phase 0 placeholder route in `apps/web/src/app/page.tsx` with a Server Component that renders a dedicated client component for the interactive mock. Add `"use client"` at the top of that client component because it will own React state, file input handling, and browser APIs such as `URL.createObjectURL`. If the client component becomes hard to read, split only the necessary local components into files under `apps/web/src/components/`. Keep the implementation inside `apps/web`; do not modify `apps/api` or `packages/*`.
@@ -108,7 +121,6 @@ Sixth, implement generated image comparison. Use static styled placeholders or s
 Seventh, keep styling local and maintainable. The app should be desktop-first and usable at tablet widths. Use stable dimensions for repeated cards, controls, preview grids, and storyboard rows so labels and dynamic content do not shift the layout unexpectedly. Keep the visual style restrained and workflow-oriented.
 
 Finally, run the repository verification commands. Update this ExecPlan with command results, manual verification notes, and any decisions made during implementation.
-
 
 ## Concrete Steps
 
@@ -166,7 +178,6 @@ If command-line verification is needed while the dev server is running, use:
 
 Expected observable result: HTTP 200 and HTML for the Gen Story mock app.
 
-
 ## Validation and Acceptance
 
 This milestone is accepted only when the following behavior is observable in the browser at `http://localhost:3000`:
@@ -205,7 +216,6 @@ The architecture boundary check remains clean:
 
 Expected result: no matches. The command may exit with code 1 when there are no matches.
 
-
 ## Idempotence and Recovery
 
 This milestone is safe to resume because it edits frontend source files and stores no external state. Re-running typecheck, lint, tests, build, and the dev server is safe.
@@ -221,7 +231,6 @@ If `pnpm dev:web` cannot bind port `3000`, stop the existing process or temporar
 Record `http://localhost:3001` or any other alternate URL in this plan if it is used for verification.
 
 If `pnpm build` fails because browser-only APIs are being used during server rendering, move those APIs back inside `apps/web/src/components/mock-flow/MockFlowClient.tsx` or another file with `"use client"` at the top.
-
 
 ## Artifacts and Notes
 
@@ -240,6 +249,14 @@ Current Phase 0 web page before this milestone:
 
 Update this section with concise command results and any important screenshots or manual verification notes after implementation.
 
+Implemented artifacts:
+
+    apps/web/src/app/layout.tsx
+    apps/web/src/app/page.tsx
+    apps/web/src/components/mock-flow/MockFlowClient.tsx
+    apps/web/src/components/mock-flow/MockFlowClient.module.css
+
+Manual verification note: `http://localhost:3000` responds with HTTP 200 and server-rendered HTML for the project list screen. The running dev server logs `GET / 200`.
 
 ## Interfaces and Dependencies
 
