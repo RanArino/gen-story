@@ -1,1 +1,15 @@
+node_modules/
+.next/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+
+data/uploads/
+
 ToDo
+PR*.md
