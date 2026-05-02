@@ -3,7 +3,11 @@
   "compilerOptions": {
     "declaration": true,
     "outDir": "dist",
-    "types": ["node", "vitest"]
+    "types": ["node", "vitest"],
+    "paths": {
+      "@gen-story/application": ["../../packages/application/src/index.ts"],
+      "@gen-story/domain": ["../../packages/domain/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
