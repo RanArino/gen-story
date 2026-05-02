@@ -18,14 +18,16 @@ This new plan intentionally leaves `docs/plans/20260501-clickable-ui-mock.md` in
 - [x] (2026-05-01 03:11Z) Read the completed first mock plan at `docs/plans/20260501-clickable-ui-mock.md`.
 - [x] (2026-05-01 03:11Z) Read the relevant Phase 1 requirements in `REQUIREMENTS_INIT.md` and `USER_EXPERIENCE_FLOW.md`.
 - [x] (2026-05-01 03:11Z) Created this review-driven ExecPlan.
-- [ ] Refine navigation so back buttons and step navigation preserve expected flow history.
-- [ ] Redesign project creation occasion input as expandable occasion/theme choices.
-- [ ] Redesign Step 4 from generic photo management into understandable mock AI photo analysis and curation.
-- [ ] Add tone/style visual previews to the emotion/style step.
-- [ ] Add image previews and multiple view modes to the storyboard step.
-- [ ] Clarify the generated result review step with original-vs-generated comparisons, adopt controls, and retry affordances.
-- [ ] Run `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and the architecture boundary check.
-- [ ] Start `pnpm dev:web` and manually verify the revised flow at desktop and tablet widths.
+- [x] (2026-05-02 06:03Z) Refined navigation so back buttons and step navigation preserve expected flow history.
+- [x] (2026-05-02 06:03Z) Redesigned project creation occasion input as expandable occasion/theme choices.
+- [x] (2026-05-02 06:03Z) Redesigned Step 4 from generic photo management into understandable mock AI photo analysis and curation.
+- [x] (2026-05-02 06:03Z) Added tone/style visual previews to the emotion/style step.
+- [x] (2026-05-02 06:03Z) Added image previews and multiple view modes to the storyboard step.
+- [x] (2026-05-02 06:03Z) Clarified the generated result review step with original-vs-generated comparisons, adopt controls, and retry affordances.
+- [x] (2026-05-02 06:03Z) Ran focused web checks: `pnpm --filter @gen-story/web typecheck`, `pnpm --filter @gen-story/web lint`, and `pnpm --filter @gen-story/web test`.
+- [x] (2026-05-02 06:06Z) Ran `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and the architecture boundary check.
+- [x] (2026-05-02 06:06Z) Started `pnpm dev:web` at `http://localhost:3000` and verified the page returns HTTP 200.
+- [x] (2026-05-02 06:11Z) User manually verified the revised flow in the browser.
 
 ## Surprises & Discoveries
 
@@ -40,6 +42,18 @@ This new plan intentionally leaves `docs/plans/20260501-clickable-ui-mock.md` in
 
 - Observation: Markdown and PDF storyboard output should not be included in this milestone.
   Evidence: `REQUIREMENTS_INIT.md` says JSON output is needed, and "現時点では、Markdown出力やPDF出力は不要とする."
+
+- Observation: The focused web checks pass after the first implementation draft.
+  Evidence: `pnpm --filter @gen-story/web typecheck`, `pnpm --filter @gen-story/web lint`, and `pnpm --filter @gen-story/web test` exited successfully on 2026-05-02.
+
+- Observation: The full workspace verification set passes after the implementation.
+  Evidence: `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build` exited successfully on 2026-05-02. The architecture boundary grep returned no matches, with exit code 1 as expected.
+
+- Observation: The local dev server required elevated execution in this sandbox, but the app served successfully once started.
+  Evidence: sandboxed `pnpm dev:web` failed with `listen EPERM: operation not permitted 0.0.0.0:3000`; the elevated retry started Next.js at `http://localhost:3000`, and `curl -s -i http://localhost:3000` returned `HTTP/1.1 200 OK`.
+
+- Observation: Browser flow verification is complete.
+  Evidence: The user manually verified the revised clickable flow after the local app was served at `http://localhost:3000`.
 
 ## Decision Log
 
@@ -63,9 +77,13 @@ This new plan intentionally leaves `docs/plans/20260501-clickable-ui-mock.md` in
   Rationale: This milestone must remain offline and deterministic. Static CSS-backed panels and existing browser-selected previews are sufficient to communicate the workflow.
   Date/Author: 2026-05-01 / Codex
 
+- Decision: Keep the revision in the existing client component and CSS module.
+  Rationale: The change is still a single frontend mock surface. Splitting files now would add review overhead without creating clearer ownership boundaries.
+  Date/Author: 2026-05-02 / Codex
+
 ## Outcomes & Retrospective
 
-Implementation has not started. This document defines the planned second mock iteration and the requirements coverage checklist that should guide the UI changes.
+Implementation is complete. The clickable mock now includes structured occasion/theme choices, explicit history-aware navigation, mock AI photo analysis and curation, tone/style previews, richer storyboard editing with source image previews and multiple views, and generated result review with original-vs-generated comparison. Automated checks passed, the local app returned HTTP 200, and the user manually verified the revised browser flow.
 
 ## Context and Orientation
 
@@ -95,20 +113,20 @@ The review raised these issues:
 
 ## Requirements Coverage Checklist
 
-- [~] Project list and project creation are reflected. Current mock has both, but occasion is a free-text field and should become expandable structured choices.
+- [x] Project list and project creation are reflected. Project creation now uses structured occasion/theme options plus a custom label for `Other`.
 - [x] Local photo file selection and browser preview are reflected.
-- [~] Photo notes and usage state are partial. Current mock has usage controls but no per-photo memo, no `使用` / `未使用` / `参考のみ` language, and no clear AI analysis framing.
-- [~] User-controlled photo ordering is partial. Current mock supports scene ordering but not photo ordering or an AI recommended order toggle.
-- [ ] Mock AI emotion candidates and scene structure suggestions are missing. The tone step currently only offers manually selected tone cards.
-- [~] Emotion/tone selection is partial. Current mock has tone options but lacks visual previews and generated suggestion context.
-- [ ] Project-wide image style selection with preview examples is missing.
-- [ ] Model selection UI with default `gpt-image-2` is missing.
-- [ ] Test generation preview with three patterns is missing.
-- [~] Storyboard editing is partial. Current mock edits title, prompt, order, and primary photo, but lacks image previews, scene description, delivered emotion, camera work, lighting, motion direction, and user-facing edit notes.
-- [ ] AI補完シーン insertion between scenes is missing.
-- [~] Storyboard view formats are partial. Current mock has one editing layout only; card, timeline/list, image-only, and table views should be added.
-- [~] Generated image comparison is partial. Current mock selects candidates but does not show original-vs-generated side-by-side, adopt/unadopt labels, retry placement, or scene-level generated history.
-- [ ] JSON output or structured handoff affordance is missing.
+- [x] Photo notes and usage state are reflected. Step 4 now shows mock AI analysis cues, per-photo memo fields, and `Use` / `Reference only` / `Do not use` curation controls.
+- [x] User-controlled photo ordering is reflected. Step 4 supports manual photo ordering when AI recommended order is off, and visibly toggles the AI recommended order.
+- [~] Mock AI emotion candidates and scene structure suggestions are partial. The style step now presents static AI emotion candidates, and the storyboard supports inserted AI bridge scenes, but there is no generated scene-structure proposal workflow yet.
+- [x] Emotion/tone selection is reflected with visual previews and generated suggestion context.
+- [x] Project-wide image style selection with preview examples is reflected.
+- [~] Model selection UI with default `gpt-image-2` is partial. The mock displays the default model in the style and generated review steps, but it does not yet provide a model dropdown.
+- [x] Test generation preview with three patterns is reflected as static mock preview candidates.
+- [x] Storyboard editing is reflected with source image previews, scene description, delivered emotion, camera work, lighting, motion direction, and user-facing edit notes.
+- [x] AI補完シーン insertion between scenes is reflected as an `Insert AI scene` action.
+- [x] Storyboard view formats are reflected with card, timeline/list, image-only gallery, and table views.
+- [x] Generated image comparison is reflected with original-vs-generated side-by-side review, adopt/unadopt state, retry placement, and scene-level retry count.
+- [~] JSON output or structured handoff affordance is partial. The generated review step now shows a structured storyboard JSON readiness label, but does not output actual JSON.
 - [x] Markdown/PDF export is correctly out of scope for this milestone.
 - [x] Backend persistence, real upload storage, auth, and real AI generation are correctly absent for the UI mock phase.
 
