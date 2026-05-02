@@ -1,10 +1,32 @@
-import { createProjectSummary, type ProjectSummary } from "@gen-story/domain";
-
-export type CreateProjectInput = {
-  id: string;
-  name: string;
-};
-
-export function createProject(input: CreateProjectInput): ProjectSummary {
-  return createProjectSummary(input.id, input.name);
-}
+export type {
+  ApplicationDependencies,
+  AuthContextPort,
+  AuthPrincipal,
+  GeneratedImageRepositoryPort,
+  GenerationRequestRepositoryPort,
+  ImageGenerationPort,
+  ImagePreprocessingPort,
+  JobQueuePort,
+  ObjectStoragePort,
+  OrganizationRepositoryPort,
+  PhotoAssetRepositoryPort,
+  ProgressEventPort,
+  ProjectRepositoryPort,
+  SceneRepositoryPort,
+  StoryboardRepositoryPort,
+  StylePresetRepositoryPort,
+  UseCaseError,
+  UseCaseErrorCode,
+  UseCaseResult,
+  UserRepositoryPort,
+} from "./ports";
+export {
+  assignPhotosToScene,
+  createGenerationRequestUseCase,
+  createProjectUseCase,
+  markGeneratedImageAdopted,
+  registerPhotoAsset,
+  retryFailedGenerationRequest,
+  upsertScenes,
+  upsertStoryboard,
+} from "./use-cases";

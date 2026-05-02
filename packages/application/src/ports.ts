@@ -1,0 +1,158 @@
+import type {
+  GeneratedImage,
+  GenerationRequest,
+  Organization,
+  PhotoAsset,
+  Project,
+  Scene,
+  Storyboard,
+  StylePreset,
+  User,
+} from "@gen-story/domain";
+
+export type AuthPrincipal = {
+  user: User;
+  organization: Organization;
+};
+
+export interface UserRepositoryPort {
+  findById(userId: string): Promise<User | null>;
+  save(user: User): Promise<void>;
+}
+
+export interface OrganizationRepositoryPort {
+  findById(organizationId: string): Promise<Organization | null>;
+  save(organization: Organization): Promise<void>;
+}
+
+export interface ProjectRepositoryPort {
+  findById(projectId: string): Promise<Project | null>;
+  save(project: Project): Promise<void>;
+}
+
+export interface PhotoAssetRepositoryPort {
+  findById(photoAssetId: string): Promise<PhotoAsset | null>;
+  findByProjectId(projectId: string): Promise<PhotoAsset[]>;
+  save(photoAsset: PhotoAsset): Promise<void>;
+}
+
+export interface StoryboardRepositoryPort {
+  findById(storyboardId: string): Promise<Storyboard | null>;
+  findByProjectId(projectId: string): Promise<Storyboard[]>;
+  save(storyboard: Storyboard): Promise<void>;
+}
+
+export interface SceneRepositoryPort {
+  findById(sceneId: string): Promise<Scene | null>;
+  findByStoryboardId(storyboardId: string): Promise<Scene[]>;
+  save(scene: Scene): Promise<void>;
+}
+
+export interface StylePresetRepositoryPort {
+  findById(stylePresetId: string): Promise<StylePreset | null>;
+  save(stylePreset: StylePreset): Promise<void>;
+}
+
+export interface GenerationRequestRepositoryPort {
+  findById(generationRequestId: string): Promise<GenerationRequest | null>;
+  findBySceneId(sceneId: string): Promise<GenerationRequest[]>;
+  save(generationRequest: GenerationRequest): Promise<void>;
+}
+
+export interface GeneratedImageRepositoryPort {
+  findById(generatedImageId: string): Promise<GeneratedImage | null>;
+  findBySceneId(sceneId: string): Promise<GeneratedImage[]>;
+  save(generatedImage: GeneratedImage): Promise<void>;
+}
+
+export interface ObjectStoragePort {
+  putObject(input: {
+    key: string;
+    body: Uint8Array;
+    contentType: string;
+  }): Promise<void>;
+  getObject(key: string): Promise<Uint8Array | null>;
+  deleteObject(key: string): Promise<void>;
+}
+
+export interface ImagePreprocessingPort {
+  preprocess(input: {
+    projectId: string;
+    storyboardId: string;
+    sceneId: string;
+    inputJson: Record<string, unknown>;
+  }): Promise<Record<string, unknown>>;
+}
+
+export interface ImageGenerationPort {
+  generate(input: {
+    requestId: string;
+    inputJson: Record<string, unknown>;
+  }): Promise<{
+    storageKey: string;
+    mimeType: string;
+    size: number;
+    width: number | null;
+    height: number | null;
+    checksum: string;
+  }>;
+}
+
+export interface JobQueuePort {
+  enqueue(job: {
+    kind: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ jobId: string }>;
+}
+
+export interface ProgressEventPort {
+  publish(event: {
+    kind: string;
+    entityType: string;
+    entityId: string;
+    payload?: Record<string, unknown>;
+  }): Promise<void>;
+}
+
+export interface AuthContextPort {
+  getCurrentPrincipal(): Promise<AuthPrincipal | null>;
+}
+
+export interface ApplicationDependencies {
+  users: UserRepositoryPort;
+  organizations: OrganizationRepositoryPort;
+  projects: ProjectRepositoryPort;
+  photoAssets: PhotoAssetRepositoryPort;
+  storyboards: StoryboardRepositoryPort;
+  scenes: SceneRepositoryPort;
+  stylePresets: StylePresetRepositoryPort;
+  generationRequests: GenerationRequestRepositoryPort;
+  generatedImages: GeneratedImageRepositoryPort;
+  objectStorage: ObjectStoragePort;
+  imagePreprocessing: ImagePreprocessingPort;
+  imageGeneration: ImageGenerationPort;
+  jobQueue: JobQueuePort;
+  progressEvents: ProgressEventPort;
+  authContext: AuthContextPort;
+}
+
+export type UseCaseErrorCode =
+  | "validation_error"
+  | "not_found"
+  | "conflict"
+  | "invalid_state";
+
+export type UseCaseError = {
+  code: UseCaseErrorCode;
+  message: string;
+};
+
+export type UseCaseResult<T> =
+  | {
+      ok: true;
+      value: T;
+    }
+  | {
+      ok: false;
+      error: UseCaseError;
+    };
