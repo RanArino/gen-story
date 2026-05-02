@@ -20,23 +20,26 @@ The result is not a user-visible UI change. The observable outcome is that domai
 - [x] (2026-05-02 06:45Z) Read `IMPLEMENTATION_PLAN.md`, `REQUIREMENTS_INIT.md`, `/Users/ran/my-app/PLANS.md`, and the two completed clickable UI mock ExecPlans.
 - [x] (2026-05-02 06:45Z) Inspected the current `packages/domain` and `packages/application` baseline.
 - [x] (2026-05-02 06:45Z) Created this ExecPlan for Phase 2 / Domain And Application Skeleton.
-- [ ] Replace the placeholder domain model with core entities, value types, state types, and pure transition helpers.
-- [ ] Add domain unit tests for scene ordering, photo usage, primary photo assignment, generated image adoption, and generation request state transitions.
-- [ ] Add application ports for repositories, storage, preprocessing, generation, queueing, progress events, and auth context.
-- [ ] Add application use cases with in-memory test doubles for the Phase 1 workflow boundaries.
-- [ ] Run focused domain and application checks.
-- [ ] Run workspace verification: `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and the architecture boundary check.
+- [x] (2026-05-02 07:10Z) Replaced the placeholder domain model with explicit entities, value types, state unions, and pure transition helpers.
+- [x] (2026-05-02 07:10Z) Added domain unit tests for scene ordering, photo usage, primary photo assignment, generated image adoption, and generation request state transitions.
+- [x] (2026-05-02 07:10Z) Added application ports for repositories, storage, preprocessing, generation, queueing, progress events, and auth context.
+- [x] (2026-05-02 07:10Z) Added application use cases with in-memory test doubles for the Phase 1 workflow boundaries.
+- [x] (2026-05-02 07:15Z) Ran focused domain and application checks.
+- [x] (2026-05-02 07:20Z) Ran workspace verification: `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, and the architecture boundary check.
 
 ## Surprises & Discoveries
 
-- Observation: The current domain package is still a Phase 0 placeholder.
-  Evidence: `packages/domain/src/index.ts` only exports `ProjectId`, `ProjectSummary`, and `createProjectSummary`.
+- Observation: The current domain package started as a Phase 0 placeholder, so the phase needed a full replacement rather than an incremental extension.
+  Evidence: The baseline `packages/domain/src/index.ts` only exported `ProjectId`, `ProjectSummary`, and `createProjectSummary` before implementation.
 
-- Observation: The current application package is also a placeholder.
-  Evidence: `packages/application/src/index.ts` only wraps `createProjectSummary` in a `createProject` function and has no use case tests.
+- Observation: The current application package was also a placeholder and needed explicit ports plus orchestration tests.
+  Evidence: The baseline `packages/application/src/index.ts` only wrapped `createProjectSummary` in a `createProject` function and had no use case tests.
 
 - Observation: The next implementation sequence step is explicitly domain and application skeleton work, while the later initial milestone M2 includes persistence and API integration.
   Evidence: `IMPLEMENTATION_PLAN.md` lists Phase 2 as `Domain And Application Skeleton`, then Phase 3 as `SQLite And Drizzle Persistence`, and later summarizes M2 as persisted workspace functionality.
+
+- Observation: The workspace verification passed after the phase implementation without introducing forbidden framework or SDK imports into `packages/domain` or `packages/application`.
+  Evidence: `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build` completed successfully; `rg "from ['\\\"](next|drizzle|openai|@workos|@google|aws-sdk|zod|express|fastify|hono|\\.\\./\\.\\./apps)" packages/domain packages/application` returned no matches.
 
 ## Decision Log
 
@@ -60,9 +63,42 @@ The result is not a user-visible UI change. The observable outcome is that domai
   Rationale: Phase 2 needs executable use case tests, but real storage, database adapters, image preprocessing, auth providers, and image generation providers belong to later phases.
   Date/Author: 2026-05-02 / Codex
 
+- Decision: Treat failed generation requests as retryable by creating a new queued request derived from the failed one.
+  Rationale: This keeps the original failure record intact for debugging while giving the application layer a clean retry path for later queue adapters.
+  Date/Author: 2026-05-02 / Codex
+
 ## Outcomes & Retrospective
 
-Not started beyond planning. Update this section after implementation with the final file list, command results, any remaining gaps, and whether later persistence/API plans need adjustment.
+Phase 2 is complete. The repository now has a dependency-free domain model, pure domain rules, application ports, and application use cases backed by in-memory tests.
+
+Final implementation files:
+
+    packages/domain/src/model.ts
+    packages/domain/src/rules.ts
+    packages/domain/src/index.ts
+    packages/domain/src/model.test.ts
+    packages/domain/src/rules.test.ts
+    packages/application/src/ports.ts
+    packages/application/src/use-cases.ts
+    packages/application/src/index.ts
+    packages/application/src/use-cases.test.ts
+
+Verification completed successfully:
+
+    pnpm --filter @gen-story/domain typecheck
+    pnpm --filter @gen-story/domain lint
+    pnpm --filter @gen-story/domain test
+    pnpm --filter @gen-story/application typecheck
+    pnpm --filter @gen-story/application lint
+    pnpm --filter @gen-story/application test
+    pnpm format
+    pnpm typecheck
+    pnpm lint
+    pnpm test
+    pnpm build
+    rg "from ['\\\"](next|drizzle|openai|@workos|@google|aws-sdk|zod|express|fastify|hono|\\.\\./\\.\\./apps)" packages/domain packages/application
+
+No remaining gaps are known for this phase. Phase 3 can now build on the exported vocabulary and port contracts without needing to reinterpret the domain model.
 
 ## Context and Orientation
 
