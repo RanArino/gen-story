@@ -17,12 +17,12 @@ The observable user-facing outcome is that the mock UI has real API contracts av
 - [x] (2026-05-04 02:59Z) Read `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, `REQUIREMENTS_INIT.md`, `/Users/ran/my-app/PLANS.md`, and the completed Phase 3 and Phase 4 ExecPlans.
 - [x] (2026-05-04 02:59Z) Inspected the current API server, application ports and use cases, SQLite repositories, Phase 4 ingestion service, package manifests, and existing shared DTO package.
 - [x] (2026-05-04 02:59Z) Created this ExecPlan for Phase 5 / REST API And Local Authentication.
-- [ ] Add shared REST DTO types and API-boundary Zod schemas.
-- [ ] Add local auth principal seeding and request-scoped auth context.
-- [ ] Add API composition helpers that wire SQLite repositories, local object storage, image preprocessing, local auth, no-op progress events, and a deterministic local job queue.
-- [ ] Add REST routes for projects, photo assets, storyboards, scenes, style presets, generation requests, and generated images.
-- [ ] Add API integration tests for validation, auth scoping, DTO shape, and main write/read flows.
-- [ ] Run focused API/shared checks, workspace checks, and the architecture boundary check.
+- [x] (2026-05-04) Added shared REST DTO types (`packages/shared/src/index.ts`) and API-boundary Zod schemas (`apps/api/src/http/schemas.ts`).
+- [x] (2026-05-04) Added local auth principal seeding (`apps/api/src/auth/local-auth.ts`) and `LocalAuthContext` wired into in-memory and real API contexts.
+- [x] (2026-05-04) Added API composition helpers (`apps/api/src/app/create-api-context.ts`) that wire SQLite repositories, local object storage, image preprocessing, local auth, no-op progress events, and a no-op job queue.
+- [x] (2026-05-04) Added all 18 REST routes (`apps/api/src/http/routes.ts`) for projects, photo assets, storyboards, scenes, style presets, generation requests, and generated images.
+- [x] (2026-05-04) Added integration tests for validation, auth scoping, DTO shape, and main write/read flows (`apps/api/src/auth/local-auth.test.ts`, `apps/api/src/http/routes.test.ts`).
+- [x] (2026-05-04) All workspace checks pass: `pnpm format`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (48/48), `pnpm build`, architecture boundary check.
 
 ## Surprises & Discoveries
 
