@@ -15,6 +15,7 @@ import type {
   StylePresetRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
+import { LocalAuthContext } from "../auth/local-auth";
 import type {
   GeneratedImage,
   GenerationRequest,
@@ -80,6 +81,12 @@ class InMemoryProjectRepository implements ProjectRepositoryPort {
 
   async findById(projectId: string): Promise<Project | null> {
     return this.store.findById(projectId);
+  }
+
+  async findByOrganizationId(organizationId: string): Promise<Project[]> {
+    return this.store
+      .values()
+      .filter((p) => p.organizationId === organizationId);
   }
 
   async save(project: Project): Promise<void> {
@@ -161,6 +168,10 @@ class InMemoryStylePresetRepository implements StylePresetRepositoryPort {
 
   async findById(stylePresetId: string): Promise<StylePreset | null> {
     return this.store.findById(stylePresetId);
+  }
+
+  async findAll(): Promise<StylePreset[]> {
+    return this.store.values();
   }
 
   async save(stylePreset: StylePreset): Promise<void> {
@@ -317,11 +328,10 @@ export function createInMemoryApplicationDependencies(
     imageGeneration: new InMemoryImageGeneration(),
     jobQueue: new InMemoryJobQueue(),
     progressEvents: new InMemoryProgressEvents(),
-    authContext: {
-      async getCurrentPrincipal() {
-        return null;
-      },
-    },
+    authContext: new LocalAuthContext({
+      users: new InMemoryUserRepository(stores.users),
+      organizations: new InMemoryOrganizationRepository(stores.organizations),
+    }),
     ...overrides,
   };
 
