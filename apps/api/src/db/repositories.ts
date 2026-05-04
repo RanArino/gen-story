@@ -431,6 +431,25 @@ export class SqlitePhotoAssetRepository implements PhotoAssetRepositoryPort {
     return rows.map(mapPhotoAsset);
   }
 
+  async findByProjectIdAndChecksum(
+    projectId: string,
+    checksum: string,
+  ): Promise<PhotoAsset | null> {
+    const row = await this.db
+      .select()
+      .from(photoAssets)
+      .where(
+        and(
+          eq(photoAssets.projectId, projectId),
+          eq(photoAssets.checksum, checksum),
+          isNull(photoAssets.deletedAt),
+        ),
+      )
+      .get();
+
+    return row == null ? null : mapPhotoAsset(row);
+  }
+
   async save(photoAsset: PhotoAsset): Promise<void> {
     await this.db
       .insert(photoAssets)

@@ -250,6 +250,33 @@ describe("SQLite persistence", () => {
     });
   });
 
+  it("finds active photo assets by project checksum and ignores soft deletes", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.photoAssets.save(buildPhotoAsset("photo_1"));
+
+      await expect(
+        repositories.photoAssets.findByProjectIdAndChecksum(
+          "project_1",
+          "checksum-photo_1",
+        ),
+      ).resolves.toMatchObject({ id: "photo_1" });
+
+      await repositories.photoAssets.softDelete("photo_1", later);
+      await repositories.photoAssets.save({
+        ...buildPhotoAsset("photo_2"),
+        checksum: "checksum-photo_1",
+      });
+
+      await expect(
+        repositories.photoAssets.findByProjectIdAndChecksum(
+          "project_1",
+          "checksum-photo_1",
+        ),
+      ).resolves.toMatchObject({ id: "photo_2" });
+    });
+  });
+
   it("switches generated image adoption atomically through the adapter helper", async () => {
     await withDatabase(async ({ db, repositories }) => {
       await seedGenerationFixture(repositories);
