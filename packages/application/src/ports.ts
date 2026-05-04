@@ -27,6 +27,7 @@ export interface OrganizationRepositoryPort {
 
 export interface ProjectRepositoryPort {
   findById(projectId: string): Promise<Project | null>;
+  findByOrganizationId(organizationId: string): Promise<Project[]>;
   save(project: Project): Promise<void>;
 }
 
@@ -54,6 +55,7 @@ export interface SceneRepositoryPort {
 
 export interface StylePresetRepositoryPort {
   findById(stylePresetId: string): Promise<StylePreset | null>;
+  findAll(): Promise<StylePreset[]>;
   save(stylePreset: StylePreset): Promise<void>;
 }
 
