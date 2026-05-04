@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 
 import {
   createGeneratedImage,
@@ -359,6 +359,21 @@ export class SqliteProjectRepository implements ProjectRepositoryPort {
       .get();
 
     return row == null ? null : mapProject(row);
+  }
+
+  async findByOrganizationId(organizationId: string): Promise<Project[]> {
+    const rows = await this.db
+      .select()
+      .from(projects)
+      .where(
+        and(
+          eq(projects.organizationId, organizationId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .orderBy(asc(projects.createdAt), asc(projects.id));
+
+    return rows.map(mapProject);
   }
 
   async save(project: Project): Promise<void> {
@@ -780,6 +795,20 @@ export class SqliteStylePresetRepository implements StylePresetRepositoryPort {
       .get();
 
     return row == null ? null : mapStylePreset(row);
+  }
+
+  async findAll(): Promise<StylePreset[]> {
+    const rows = await this.db
+      .select()
+      .from(stylePresets)
+      .where(isNull(stylePresets.deletedAt))
+      .orderBy(
+        asc(stylePresets.scope),
+        asc(stylePresets.name),
+        asc(stylePresets.id),
+      );
+
+    return rows.map(mapStylePreset);
   }
 
   async save(stylePreset: StylePreset): Promise<void> {
