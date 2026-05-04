@@ -7,6 +7,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { createApiContext } from "./app/create-api-context";
+import { seedLocalPrincipal } from "./auth/local-auth";
+import { openDatabase, migrateDatabase } from "./db";
+import { buildRouter, handleApiRequest } from "./http/routes";
+import { sendJson } from "./http/json";
+
+import type { Router } from "./http/router";
+
 export type HealthResponse = {
   status: "ok";
   service: "gen-story-api";
@@ -68,27 +76,34 @@ function stripEnvValueQuotes(value: string) {
   return value;
 }
 
-function sendJson(response: ServerResponse, statusCode: number, body: unknown) {
-  response.writeHead(statusCode, {
-    "content-type": "application/json; charset=utf-8",
-  });
-  response.end(JSON.stringify(body));
+export function makeHandleRequest(router: Router) {
+  return async function handleRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+  ) {
+    if (request.method === "GET" && request.url === "/health") {
+      sendJson(response, 200, buildHealthResponse());
+      return;
+    }
+
+    const handled = await handleApiRequest(request, response, router);
+    if (!handled) {
+      sendJson(response, 404, {
+        error: { code: "not_found", message: "Not found." },
+      });
+    }
+  };
 }
 
-export function handleRequest(
-  request: IncomingMessage,
-  response: ServerResponse,
-) {
-  if (request.method === "GET" && request.url === "/health") {
-    sendJson(response, 200, buildHealthResponse());
-    return;
-  }
+export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
+  const client = openDatabase();
+  migrateDatabase(client.db);
 
-  sendJson(response, 404, { error: "not_found" });
-}
+  const deps = createApiContext(client);
+  await seedLocalPrincipal(deps);
 
-export function startServer(port = Number(process.env.API_PORT ?? 4000)) {
-  const server = createServer(handleRequest);
+  const router = buildRouter(deps);
+  const server = createServer(makeHandleRequest(router));
 
   server.listen(port, () => {
     console.log(`gen-story-api listening on http://localhost:${port}`);
