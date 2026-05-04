@@ -105,6 +105,12 @@ class InMemoryProjectRepository implements ProjectRepositoryPort {
     return this.store.findById(projectId);
   }
 
+  async findByOrganizationId(organizationId: string): Promise<Project[]> {
+    return this.store
+      .values()
+      .filter((p) => p.organizationId === organizationId);
+  }
+
   async save(project: Project): Promise<void> {
     await this.store.save(project);
   }
@@ -184,6 +190,10 @@ class InMemoryStylePresetRepository implements StylePresetRepositoryPort {
 
   async findById(stylePresetId: string): Promise<StylePreset | null> {
     return this.store.findById(stylePresetId);
+  }
+
+  async findAll(): Promise<StylePreset[]> {
+    return this.store.values();
   }
 
   async save(stylePreset: StylePreset): Promise<void> {
