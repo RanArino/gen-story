@@ -123,6 +123,21 @@ class InMemoryPhotoAssetRepository implements PhotoAssetRepositoryPort {
       .filter((photoAsset) => photoAsset.projectId === projectId);
   }
 
+  async findByProjectIdAndChecksum(
+    projectId: string,
+    checksum: string,
+  ): Promise<PhotoAsset | null> {
+    return (
+      this.store
+        .values()
+        .find(
+          (photoAsset) =>
+            photoAsset.projectId === projectId &&
+            photoAsset.checksum === checksum,
+        ) ?? null
+    );
+  }
+
   async save(photoAsset: PhotoAsset): Promise<void> {
     await this.store.save(photoAsset);
   }
@@ -504,6 +519,143 @@ describe("application use cases", () => {
     if (updateResult.ok) {
       expect(updateResult.value.usage).toBe("excluded");
     }
+  });
+
+  it("rejects duplicate photo checksums within the same project", async () => {
+    const deps = createDependencies({
+      users: [
+        createUser({
+          id: "user_1",
+          organizationId: "org_1",
+          displayName: "Ran",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      organizations: [
+        createOrganization({
+          id: "org_1",
+          name: "Family Studio",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_1",
+          projectId: "project_1",
+          name: "Snapshot",
+          storageKey: "data/uploads/originals/projects/project_1/photo_1.jpg",
+          mimeType: "image/jpeg",
+          size: 2048,
+          width: 1000,
+          height: 800,
+          checksum: "same-checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const result = await registerPhotoAsset(deps, {
+      photoAssetId: "photo_2",
+      projectId: "project_1",
+      name: "Snapshot copy",
+      storageKey: "data/uploads/originals/projects/project_1/photo_2.jpg",
+      mimeType: "image/jpeg",
+      size: 2048,
+      width: 1000,
+      height: 800,
+      checksum: "same-checksum",
+      sourceKind: "upload",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "conflict" },
+    });
+  });
+
+  it("allows the same photo checksum in a different project", async () => {
+    const deps = createDependencies({
+      users: [
+        createUser({
+          id: "user_1",
+          organizationId: "org_1",
+          displayName: "Ran",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      organizations: [
+        createOrganization({
+          id: "org_1",
+          name: "Family Studio",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+        createProject({
+          id: "project_2",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Second Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_1",
+          projectId: "project_1",
+          name: "Snapshot",
+          storageKey: "data/uploads/originals/projects/project_1/photo_1.jpg",
+          mimeType: "image/jpeg",
+          size: 2048,
+          width: 1000,
+          height: 800,
+          checksum: "same-checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const result = await registerPhotoAsset(deps, {
+      photoAssetId: "photo_2",
+      projectId: "project_2",
+      name: "Snapshot",
+      storageKey: "data/uploads/originals/projects/project_2/photo_2.jpg",
+      mimeType: "image/jpeg",
+      size: 2048,
+      width: 1000,
+      height: 800,
+      checksum: "same-checksum",
+      sourceKind: "upload",
+    });
+
+    expect(result.ok).toBe(true);
   });
 
   it("creates a storyboard and ordered scenes", async () => {

@@ -33,6 +33,10 @@ export interface ProjectRepositoryPort {
 export interface PhotoAssetRepositoryPort {
   findById(photoAssetId: string): Promise<PhotoAsset | null>;
   findByProjectId(projectId: string): Promise<PhotoAsset[]>;
+  findByProjectIdAndChecksum(
+    projectId: string,
+    checksum: string,
+  ): Promise<PhotoAsset | null>;
   save(photoAsset: PhotoAsset): Promise<void>;
 }
 

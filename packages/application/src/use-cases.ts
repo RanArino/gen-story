@@ -234,6 +234,16 @@ export async function registerPhotoAsset(
       return failure("conflict", "Photo asset already exists.");
     }
 
+    const duplicatePhotoAsset =
+      await deps.photoAssets.findByProjectIdAndChecksum(
+        input.projectId,
+        input.checksum,
+      );
+
+    if (duplicatePhotoAsset != null) {
+      return failure("conflict", "Photo asset already exists in this project.");
+    }
+
     const photoAsset = createPhotoAsset({
       id: input.photoAssetId,
       projectId: input.projectId,
