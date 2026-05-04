@@ -27,6 +27,8 @@ export {
   markGeneratedImageAdopted,
   registerPhotoAsset,
   retryFailedGenerationRequest,
+  updatePhotoCuration,
   upsertScenes,
   upsertStoryboard,
 } from "./use-cases";
+export type { UpdatePhotoCurationInput } from "./use-cases";
