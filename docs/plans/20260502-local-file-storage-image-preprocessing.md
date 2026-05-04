@@ -25,7 +25,7 @@ This is Phase 4 from `IMPLEMENTATION_PLAN.md`: Local File Storage And Image Prep
 - [x] (2026-05-02 14:42Z) Added focused tests for storage safety, preview generation, AI input normalization, cleanup on failed registration, and duplicate detection.
 - [x] (2026-05-02 14:42Z) Ran focused package verification for application and API changes.
 - [x] (2026-05-02 14:42Z) Ran workspace format, typecheck, lint, test, build, and architecture boundary checks.
-- [ ] Complete HEIC verification with a real HEIC-capable local image stack or approved converter.
+- [x] Complete HEIC verification with a real HEIC-capable local image stack or approved converter.
 
 
 ## Surprises & Discoveries
