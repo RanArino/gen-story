@@ -6,7 +6,8 @@
     "types": ["node", "vitest"],
     "paths": {
       "@gen-story/application": ["../../packages/application/src/index.ts"],
-      "@gen-story/domain": ["../../packages/domain/src/index.ts"]
+      "@gen-story/domain": ["../../packages/domain/src/index.ts"],
+      "@gen-story/shared": ["../../packages/shared/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],
