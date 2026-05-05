@@ -194,6 +194,8 @@ export const generationRequests = sqliteTable(
     inputJson: text("input_json").notNull(),
     errorMessage: text("error_message"),
     sourceGenerationRequestId: text("source_generation_request_id"),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     deletedAt: text("deleted_at"),
