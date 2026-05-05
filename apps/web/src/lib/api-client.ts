@@ -1,0 +1,261 @@
+import type {
+  GeneratedImageDto,
+  GenerationRequestDto,
+  MeDto,
+  PhotoAssetDto,
+  ProjectDto,
+  SceneDto,
+  StylePresetDto,
+  StoryboardDto,
+} from "@gen-story/shared";
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+function apiBase(): string {
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const res = await fetch(`${apiBase()}${path}`, {
+    method,
+    headers: body != null ? { "Content-Type": "application/json" } : undefined,
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    let code = "UNKNOWN";
+    let message = res.statusText;
+    try {
+      const json = (await res.json()) as {
+        error?: { code?: string; message?: string };
+      };
+      code = json.error?.code ?? code;
+      message = json.error?.message ?? message;
+    } catch {
+      // ignore parse failure
+    }
+    throw new ApiError(res.status, code, message);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export async function getMe(): Promise<MeDto> {
+  return request<MeDto>("GET", "/api/me");
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export async function listProjects(): Promise<ProjectDto[]> {
+  const data = await request<{ projects: ProjectDto[] }>("GET", "/api/projects");
+  return data.projects;
+}
+
+export async function createProject(
+  name: string,
+  occasion?: string,
+): Promise<ProjectDto> {
+  return request<ProjectDto>("POST", "/api/projects", { name, occasion });
+}
+
+// ── Photo Assets ──────────────────────────────────────────────────────────────
+
+export async function listPhotoAssets(
+  projectId: string,
+): Promise<PhotoAssetDto[]> {
+  const data = await request<{ photoAssets: PhotoAssetDto[] }>(
+    "GET",
+    `/api/projects/${projectId}/photo-assets`,
+  );
+  return data.photoAssets;
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // strip the data URL prefix (e.g. "data:image/jpeg;base64,")
+      resolve(result.split(",")[1] ?? result);
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function uploadPhotoAsset(
+  projectId: string,
+  file: File,
+  notes?: string,
+): Promise<PhotoAssetDto> {
+  const contentBase64 = await fileToBase64(file);
+  return request<PhotoAssetDto>(
+    "POST",
+    `/api/projects/${projectId}/photo-assets`,
+    {
+      name: file.name,
+      mimeType: file.type || "image/jpeg",
+      contentBase64,
+      notes: notes ?? null,
+    },
+  );
+}
+
+export type PhotoUsage = "candidate" | "excluded" | "reference";
+
+export async function patchPhotoAsset(
+  photoAssetId: string,
+  usage: PhotoUsage,
+): Promise<PhotoAssetDto> {
+  return request<PhotoAssetDto>("PATCH", `/api/photo-assets/${photoAssetId}`, {
+    usage,
+  });
+}
+
+// ── Storyboards ───────────────────────────────────────────────────────────────
+
+export async function listStoryboards(
+  projectId: string,
+): Promise<StoryboardDto[]> {
+  const data = await request<{ storyboards: StoryboardDto[] }>(
+    "GET",
+    `/api/projects/${projectId}/storyboards`,
+  );
+  return data.storyboards;
+}
+
+export async function upsertStoryboard(
+  storyboardId: string,
+  input: {
+    projectId: string;
+    tone: string;
+    stylePresetId?: string | null;
+    status?: string;
+  },
+): Promise<StoryboardDto> {
+  return request<StoryboardDto>("PUT", `/api/storyboards/${storyboardId}`, input);
+}
+
+// ── Scenes ────────────────────────────────────────────────────────────────────
+
+export async function listScenes(storyboardId: string): Promise<SceneDto[]> {
+  const data = await request<{ scenes: SceneDto[] }>(
+    "GET",
+    `/api/storyboards/${storyboardId}/scenes`,
+  );
+  return data.scenes;
+}
+
+export type UpsertSceneInput = {
+  sceneId?: string;
+  orderIndex: number;
+  title: string;
+  description: string;
+  imagePrompt: string;
+  emotion: string;
+  cameraDirection: string;
+  lightingDirection: string;
+  motionDirection: string;
+  notes?: string;
+};
+
+export async function upsertScenes(
+  storyboardId: string,
+  scenes: UpsertSceneInput[],
+): Promise<SceneDto[]> {
+  const data = await request<{ scenes: SceneDto[] }>(
+    "PUT",
+    `/api/storyboards/${storyboardId}/scenes`,
+    { scenes },
+  );
+  return data.scenes;
+}
+
+export async function assignPhotosToScene(
+  sceneId: string,
+  photoAssets: { photoAssetId: string; role: "primary" | "reference" }[],
+): Promise<SceneDto> {
+  return request<SceneDto>("PUT", `/api/scenes/${sceneId}/photo-assets`, {
+    photoAssets,
+  });
+}
+
+// ── Style Presets ─────────────────────────────────────────────────────────────
+
+export async function listStylePresets(): Promise<StylePresetDto[]> {
+  const data = await request<{ stylePresets: StylePresetDto[] }>(
+    "GET",
+    "/api/style-presets",
+  );
+  return data.stylePresets;
+}
+
+// ── Generation Requests ───────────────────────────────────────────────────────
+
+export async function createGenerationRequest(
+  sceneId: string,
+  inputJson: Record<string, unknown>,
+): Promise<GenerationRequestDto> {
+  return request<GenerationRequestDto>(
+    "POST",
+    `/api/scenes/${sceneId}/generation-requests`,
+    { inputJson },
+  );
+}
+
+export async function listGenerationRequests(
+  sceneId: string,
+): Promise<GenerationRequestDto[]> {
+  const data = await request<{ generationRequests: GenerationRequestDto[] }>(
+    "GET",
+    `/api/scenes/${sceneId}/generation-requests`,
+  );
+  return data.generationRequests;
+}
+
+export async function retryGenerationRequest(
+  generationRequestId: string,
+): Promise<GenerationRequestDto> {
+  return request<GenerationRequestDto>(
+    "POST",
+    `/api/generation-requests/${generationRequestId}/retry`,
+  );
+}
+
+// ── Generated Images ──────────────────────────────────────────────────────────
+
+export async function listGeneratedImages(
+  sceneId: string,
+): Promise<GeneratedImageDto[]> {
+  const data = await request<{ generatedImages: GeneratedImageDto[] }>(
+    "GET",
+    `/api/scenes/${sceneId}/generated-images`,
+  );
+  return data.generatedImages;
+}
+
+export async function adoptGeneratedImage(
+  sceneId: string,
+  generatedImageId: string,
+): Promise<void> {
+  return request<void>(
+    "POST",
+    `/api/scenes/${sceneId}/generated-images/${generatedImageId}/adopt`,
+  );
+}
