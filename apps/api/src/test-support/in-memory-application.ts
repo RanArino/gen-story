@@ -15,6 +15,7 @@ import type {
   StylePresetRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
+import type { GenerationRequestStatus } from "@gen-story/domain";
 import { LocalAuthContext } from "../auth/local-auth";
 import type {
   GeneratedImage,
@@ -189,7 +190,30 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
   }
 
   async findBySceneId(sceneId: string): Promise<GenerationRequest[]> {
-    return this.store.values().filter((request) => request.sceneId === sceneId);
+    return this.store.values().filter((r) => r.sceneId === sceneId);
+  }
+
+  async findRunningCountByProjectId(projectId: string): Promise<number> {
+    return this.store
+      .values()
+      .filter((r) => r.projectId === projectId && r.status === "running")
+      .length;
+  }
+
+  async findByProjectIdAndStatus(
+    projectId: string,
+    status: GenerationRequestStatus,
+  ): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.projectId === projectId && r.status === status);
+  }
+
+  async findQueued(): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.status === "queued")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   async save(generationRequest: GenerationRequest): Promise<void> {
