@@ -1,4 +1,6 @@
+import { createReadStream, existsSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { resolve, sep } from "node:path";
 
 import {
   assignPhotosToScene,
@@ -791,6 +793,39 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       sendJson(res, 200, toSceneDto(result.value));
     },
   );
+
+  const uploadsRoot = resolve(process.cwd(), "data", "uploads");
+
+  const MIME_MAP: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+  };
+
+  router.add("GET", "/files/*", async (_req, res, params) => {
+    const tail = getParam(params, "*");
+    const safePath = resolve(uploadsRoot, ...tail.split("/").filter(Boolean));
+
+    if (
+      safePath !== uploadsRoot &&
+      !safePath.startsWith(`${uploadsRoot}${sep}`)
+    ) {
+      sendJson(res, 403, errorBody("FORBIDDEN", "Access denied"));
+      return;
+    }
+
+    if (!existsSync(safePath)) {
+      sendJson(res, 404, notFoundBody("File not found"));
+      return;
+    }
+
+    const ext = safePath.slice(safePath.lastIndexOf(".")).toLowerCase();
+    const contentType = MIME_MAP[ext] ?? "application/octet-stream";
+    res.writeHead(200, { "Content-Type": contentType });
+    createReadStream(safePath).pipe(res);
+  });
 
   return router;
 }
