@@ -99,6 +99,8 @@ export type GenerationRequestDto = {
   inputJson: Record<string, unknown>;
   errorMessage: string | null;
   sourceGenerationRequestId: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

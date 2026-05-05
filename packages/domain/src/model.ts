@@ -121,6 +121,8 @@ export type GenerationRequest = {
   inputJson: Record<string, unknown>;
   errorMessage: string | null;
   sourceGenerationRequestId: GenerationRequestId | null;
+  startedAt: Timestamp | null;
+  completedAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -235,6 +237,8 @@ export type CreateGenerationRequestInput = {
   status?: GenerationRequestStatus;
   errorMessage?: string | null;
   sourceGenerationRequestId?: GenerationRequestId | null;
+  startedAt?: Timestamp | null;
+  completedAt?: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -391,6 +395,8 @@ export function createGenerationRequest(
     inputJson: { ...input.inputJson },
     errorMessage: trimOptionalText(input.errorMessage) || null,
     sourceGenerationRequestId: input.sourceGenerationRequestId ?? null,
+    startedAt: input.startedAt ?? null,
+    completedAt: input.completedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
