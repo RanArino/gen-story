@@ -8,14 +8,17 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src next.config.ts",
     "test": "vitest run --passWithNoTests",
-    "build": "next build"
+    "build": "next build",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@gen-story/shared": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0"
   }
