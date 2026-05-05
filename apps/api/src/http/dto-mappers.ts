@@ -122,6 +122,8 @@ export function toGenerationRequestDto(
     inputJson: req.inputJson,
     errorMessage: req.errorMessage,
     sourceGenerationRequestId: req.sourceGenerationRequestId,
+    startedAt: req.startedAt,
+    completedAt: req.completedAt,
     createdAt: req.createdAt,
     updatedAt: req.updatedAt,
   };
