@@ -18,38 +18,93 @@ The observable outcome is: after calling `POST /api/scenes/:sceneId/generation-r
 ## Progress
 
 
-- [ ] Read `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, `REQUIREMENTS_INIT.md`, `/Users/ran/my-app/PLANS.md`, and the completed Phase 4 and Phase 5 ExecPlans.
-- [ ] Inspect current application ports, use cases, SQLite repositories, API context composition, HTTP routes, and test-support module.
-- [ ] Created this ExecPlan for Phase 6 / Image Generation Jobs.
-- [ ] Add `findRunningCountByProjectId` to `GenerationRequestRepositoryPort`, implement it in `SqliteGenerationRequestRepository` and the in-memory test double.
-- [ ] Add `GenerationConcurrencyPolicy` in the application layer that checks the running count before allowing a new request to start.
-- [ ] Add `MockImageGenerationAdapter` in `apps/api/src/generation/mock-image-generation.ts`.
-- [ ] Add `OpenAiImageGenerationAdapter` in `apps/api/src/generation/openai-image-generation.ts`.
-- [ ] Add `LocalJobWorker` in `apps/api/src/generation/local-job-worker.ts` with execute, concurrency enforcement, and background polling.
-- [ ] Wire `LocalJobWorker` into the API server startup and graceful shutdown.
-- [ ] Add `updateGenerationRequest` use case for worker-side state transitions.
-- [ ] Add `saveGeneratedImage` use case for persisting generation results.
-- [ ] Update `createApiContext` to use the correct `ImageGenerationPort` adapter based on environment.
-- [ ] Add focused unit and integration tests for state transitions, concurrency cap, retry, and storage.
-- [ ] Run workspace format, typecheck, lint, test, build, and architecture boundary checks.
+- [x] Read `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, `REQUIREMENTS_INIT.md`, `/Users/ran/my-app/PLANS.md`, and the completed Phase 4 and Phase 5 ExecPlans. _(2026-05-04)_
+- [x] Inspect current application ports, use cases, SQLite repositories, API context composition, HTTP routes, and test-support module. _(2026-05-04)_
+- [x] Created this ExecPlan for Phase 6 / Image Generation Jobs. _(2026-05-04)_
+- [x] Add `findRunningCountByProjectId` to `GenerationRequestRepositoryPort`, implement it in `SqliteGenerationRequestRepository` and the in-memory test double. _(2026-05-04)_
+- [x] Add `GenerationConcurrencyPolicy` in the application layer that checks the running count before allowing a new request to start. _(2026-05-04)_
+- [x] Add `MockImageGenerationAdapter` in `apps/api/src/generation/mock-image-generation.ts`. _(2026-05-04)_
+- [x] Add `OpenAiImageGenerationAdapter` in `apps/api/src/generation/openai-image-generation.ts`. _(2026-05-04)_
+- [x] Add `LocalJobWorker` in `apps/api/src/generation/local-job-worker.ts` with execute, concurrency enforcement, and background polling. _(2026-05-04)_
+- [x] Wire `LocalJobWorker` into the API server startup and graceful shutdown. _(2026-05-04)_
+- [x] Add `markGenerationRequestRunning`, `markGenerationRequestCompleted`, `markGenerationRequestFailed` use cases for worker-side state transitions. _(2026-05-04)_
+- [x] Add `markGenerationRequestCompleted` use case that creates a `GeneratedImage` record and transitions request to `succeeded`. _(2026-05-04)_
+- [x] Update `createApiContext` to use the correct `ImageGenerationPort` adapter based on environment. _(2026-05-04)_
+- [x] Add focused unit and integration tests for state transitions, concurrency cap, retry, and storage. _(2026-05-04)_
+- [x] Run workspace format, typecheck, lint, test, build, and architecture boundary checks. _(2026-05-04)_
 
 
 ## Surprises & Discoveries
 
 
-This section is intentionally empty until implementation starts. Update it as work proceeds.
+**`drizzle-kit generate` path resolution bug** — Running `pnpm drizzle-kit generate` on macOS produced a `ENOENT: './/Users/ran/...'` error (double-slash in path). Migrated by writing the SQL, journal JSON, and snapshot JSON manually. The same bug has been seen before in this repo; the workaround is now established.
+
+**`GenerationRequest` domain type was missing `startedAt`/`completedAt`** — The plan assumed these timestamp fields already existed in the domain model. They did not. `startedAt: Timestamp | null` and `completedAt: Timestamp | null` had to be added to the `GenerationRequest` type, `CreateGenerationRequestInput`, and the `createGenerationRequest` factory before the use cases could be written.
+
+**`findRunningCountByProjectId` uses synchronous `.get()`** — Drizzle's SQLite adapter returns the count result synchronously from `.get()`, not as a `Promise`. Placing `await` on it causes TypeScript to infer the wrong type. The implementation omits `await` and casts directly.
+
+**`adoptedAt` not `isAdopted`** — The plan and validation criteria used the phrase `isAdopted: true`. The actual `GeneratedImageDto` in `packages/shared` tracks adoption as an ISO timestamp field `adoptedAt: string | null`. Route test assertions and validation criteria updated accordingly.
+
+**`trimRequiredText` domain validation rejects empty strings** — The `createScene` domain factory calls `trimRequiredText` on `description`, `imagePrompt`, `emotion`, `cameraDirection`, `lightingDirection`, and `motionDirection`. Passing empty strings to any of these in tests throws a domain validation error ("Scene description is required", etc.). All test fixtures now provide real non-empty values.
 
 
 ## Decision Log
 
 
-This section is intentionally empty until implementation starts. Update it as work proceeds.
+**Manual migration instead of `drizzle-kit generate`** — Due to the macOS path-resolution bug in `drizzle-kit`, the migration for `started_at` and `completed_at` columns was written by hand. The SQL file, journal entry, and Drizzle snapshot JSON were created directly. This approach is repeatable and avoids a tool dependency that is currently broken on this machine.
+
+**Keep `NoOpJobQueue`; worker polls the DB directly** — The `JobQueuePort` in `ApplicationDependencies` remains wired to a no-op. The `LocalJobWorker` discovers jobs by polling `findQueued()` on the DB rather than consuming queue messages. This keeps the queue abstraction in place for future replacement (e.g. Cloud Tasks) without requiring a real queue for local development.
+
+**`MockImageGenerationAdapter` as the default for all tests** — Any test that instantiates the API application dependencies uses the mock adapter, never the OpenAI adapter. The mock writes a deterministic 1×1 JPEG to an in-memory object store. This guarantees fast, network-free, reproducible tests.
+
+**No `updateGenerationRequest` general-purpose use case** — Instead of a generic "update any field" use case, three purpose-named use cases (`markGenerationRequestRunning`, `markGenerationRequestCompleted`, `markGenerationRequestFailed`) were added. Each one encapsulates the state assertion, field mutations, and side effects specific to its transition. This keeps the domain state machine explicit and prevents incorrect state transitions at the use-case boundary.
+
+**Concurrency enforcement in `checkConcurrencyAllowed`, not in `markGenerationRequestRunning`** — The concurrency cap check happens in the worker before calling `markGenerationRequestRunning`. `markGenerationRequestRunning` itself only guards against non-`queued` status. This separation means the policy can be unit-tested independently and changed (e.g. to per-account limits) without touching the transition use case.
 
 
 ## Outcomes & Retrospective
 
 
-This section is intentionally empty until implementation starts. Update it after each milestone.
+### What was delivered
+
+All nine planned steps were completed on 2026-05-04:
+
+- `GenerationRequest` domain type extended with `startedAt` and `completedAt` timestamps.
+- `GenerationRequestRepositoryPort` extended with `findRunningCountByProjectId`, `findByProjectIdAndStatus`, and `findQueued`.
+- `checkConcurrencyAllowed` concurrency policy helper in `packages/application/src/concurrency-policy.ts`.
+- Three worker-side use cases: `markGenerationRequestRunning`, `markGenerationRequestCompleted`, `markGenerationRequestFailed`.
+- `MockImageGenerationAdapter` — deterministic 1×1 JPEG, no network, SHA-256 checksum.
+- `OpenAiImageGenerationAdapter` — calls `gpt-image-2` via `images.generate` or `images.edit` depending on whether input photos are provided.
+- `LocalJobWorker` — 500 ms poller, enforces 5-job-per-project concurrency cap, catches errors and transitions to `failed`.
+- Worker wired into `apps/api/src/server.ts` with SIGTERM/SIGINT graceful shutdown.
+- `createApiContext` selects `OpenAiImageGenerationAdapter` when `OPENAI_API_KEY` is set; otherwise falls back to `MockImageGenerationAdapter`.
+- `GenerationRequestDto` in `packages/shared` updated with `startedAt` and `completedAt`.
+- DB migration `0001_add_generation_request_timestamps.sql` applied.
+- Route tests extended for DTO timestamp fields and image adoption via `adoptedAt`.
+
+### Verification results (2026-05-04)
+
+| Check | Result |
+|---|---|
+| `pnpm format` | ✓ all files conform |
+| `pnpm typecheck` | ✓ 5/5 packages clean |
+| `pnpm lint` | ✓ no errors or warnings |
+| `pnpm test` | ✓ 57/57 tests pass across 10 test files |
+| `pnpm build` | ✓ |
+| Architecture boundary (`rg` for forbidden imports in `packages/`) | ✓ no matches |
+
+### What was not delivered (deferred to later phases)
+
+- Browser-visible progress streaming (SSE/WebSocket).
+- Stale `running` recovery after unclean process exit.
+- Per-account or global concurrency limits beyond per-project.
+- Phase 7 UI integration replacing the mock storyboard flow.
+
+### Notes for the next phase
+
+- The `drizzle-kit generate` path bug will recur for the next migration; use the manual approach.
+- `trimRequiredText` in the domain rejects empty strings for scene fields — always provide real test values.
+- The `LocalJobWorker` has no back-pressure against very large queues; if `findQueued()` returns thousands of rows, the worker still iterates all of them per tick to check the concurrency cap. A `LIMIT` clause could be added in a future iteration.
 
 
 ## Context and Orientation
