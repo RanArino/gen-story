@@ -12,6 +12,7 @@ import {
   createUser,
   type GeneratedImage,
   type GenerationRequest,
+  type GenerationRequestStatus,
   type Organization,
   type PhotoAsset,
   type Project,
@@ -204,14 +205,35 @@ class InMemoryStylePresetRepository implements StylePresetRepositoryPort {
 class InMemoryGenerationRequestRepository implements GenerationRequestRepositoryPort {
   constructor(private readonly store: MemoryStore<GenerationRequest>) {}
 
-  async findById(
-    generationRequestId: string,
-  ): Promise<GenerationRequest | null> {
-    return this.store.findById(generationRequestId);
+  async findById(id: string): Promise<GenerationRequest | null> {
+    return this.store.findById(id);
   }
 
   async findBySceneId(sceneId: string): Promise<GenerationRequest[]> {
-    return this.store.values().filter((request) => request.sceneId === sceneId);
+    return this.store.values().filter((r) => r.sceneId === sceneId);
+  }
+
+  async findRunningCountByProjectId(projectId: string): Promise<number> {
+    return this.store
+      .values()
+      .filter((r) => r.projectId === projectId && r.status === "running")
+      .length;
+  }
+
+  async findByProjectIdAndStatus(
+    projectId: string,
+    status: GenerationRequestStatus,
+  ): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.projectId === projectId && r.status === status);
+  }
+
+  async findQueued(): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.status === "queued")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   async save(generationRequest: GenerationRequest): Promise<void> {
