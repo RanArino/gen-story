@@ -20,7 +20,8 @@ export type RouteHandler = (
 
 type RouteSegment =
   | { type: "static"; value: string }
-  | { type: "param"; name: string };
+  | { type: "param"; name: string }
+  | { type: "wildcard" };
 
 type Route = {
   method: HttpMethod;
@@ -33,6 +34,9 @@ function parsePattern(pattern: string): RouteSegment[] {
     .split("/")
     .filter(Boolean)
     .map((seg) => {
+      if (seg === "*") {
+        return { type: "wildcard" as const };
+      }
       if (seg.startsWith(":")) {
         return { type: "param" as const, name: seg.slice(1) };
       }
@@ -65,15 +69,23 @@ export class Router {
         continue;
       }
 
-      if (route.segments.length !== pathSegments.length) {
-        continue;
+      const lastSeg = route.segments[route.segments.length - 1];
+      const hasWildcard = lastSeg?.type === "wildcard";
+      const fixedSegments = hasWildcard
+        ? route.segments.slice(0, -1)
+        : route.segments;
+
+      if (hasWildcard) {
+        if (pathSegments.length < fixedSegments.length) continue;
+      } else {
+        if (route.segments.length !== pathSegments.length) continue;
       }
 
       const map = new Map<string, string>();
       let matched = true;
 
-      for (let i = 0; i < route.segments.length; i++) {
-        const seg = route.segments[i]!;
+      for (let i = 0; i < fixedSegments.length; i++) {
+        const seg = fixedSegments[i]!;
         const pathSeg = pathSegments[i]!;
 
         if (seg.type === "static") {
@@ -81,12 +93,16 @@ export class Router {
             matched = false;
             break;
           }
-        } else {
+        } else if (seg.type === "param") {
           map.set(seg.name, decodeURIComponent(pathSeg));
         }
       }
 
       if (matched) {
+        if (hasWildcard) {
+          const tail = pathSegments.slice(fixedSegments.length).join("/");
+          map.set("*", tail);
+        }
         return { handler: route.handler, params: { _params: map } };
       }
     }
