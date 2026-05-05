@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createApiContext } from "./app/create-api-context";
 import { seedLocalPrincipal } from "./auth/local-auth";
 import { openDatabase, migrateDatabase } from "./db";
+import { LocalJobWorker } from "./generation/local-job-worker";
 import { buildRouter, handleApiRequest } from "./http/routes";
 import { sendJson } from "./http/json";
 
@@ -101,6 +102,16 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
 
   const deps = createApiContext(client);
   await seedLocalPrincipal(deps);
+
+  const worker = new LocalJobWorker(deps);
+  worker.start();
+
+  const shutdown = () => {
+    worker.stop();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 
   const router = buildRouter(deps);
   const server = createServer(makeHandleRequest(router));
