@@ -68,3 +68,55 @@
   font-size: 12px;
   color: #8898aa;
 }
+
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.projectCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  color: #8898aa;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 0;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.deleteBtn:hover {
+  color: #dc3545;
+}
+
+.projectCardDeleted {
+  opacity: 0.7;
+}
+
+.deletedSection {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e9f0;
+}
+
+.deletedTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5a6a7e;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.deletedHint {
+  font-size: 12px;
+  color: #8898aa;
+  margin: 0 0 16px;
+}
