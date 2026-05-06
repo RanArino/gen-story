@@ -15,6 +15,7 @@ import {
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
+import { ErrorAlert } from "../ErrorAlert";
 import styles from "./StoryboardPage.module.css";
 
 const TONES = [
@@ -213,7 +214,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           <h2>Storyboard</h2>
           <p>No storyboard yet — initialize one to start building scenes.</p>
         </div>
-        {error && <p className="error-msg">{error}</p>}
+        {error && <ErrorAlert message={error} />}
         <button className="btn btn-primary" onClick={initStoryboard}>
           Initialize storyboard
         </button>
@@ -228,7 +229,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         <p>Choose an emotion &amp; style, then edit your scenes.</p>
       </div>
 
-      {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <ErrorAlert message={error} />}
 
       {/* Tone selector */}
       <section className={styles.section}>
