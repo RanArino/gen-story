@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import {
   createGeneratedImage,
@@ -108,6 +108,7 @@ function mapProject(row: ProjectRow): Project {
     ownerUserId: row.ownerUserId,
     name: row.name,
     status: row.status as ProjectStatus,
+    deletedAt: row.deletedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -127,6 +128,7 @@ function mapPhotoAsset(row: PhotoAssetRow): PhotoAsset {
     checksum: row.checksum,
     sourceKind: row.sourceKind,
     notes: row.notes,
+    deletedAt: row.deletedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -363,15 +365,27 @@ export class SqliteProjectRepository implements ProjectRepositoryPort {
     return row == null ? null : mapProject(row);
   }
 
-  async findByOrganizationId(organizationId: string): Promise<Project[]> {
+  async findByOrganizationId(organizationId: string, includeDeleted = false): Promise<Project[]> {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const rows = await this.db
       .select()
       .from(projects)
       .where(
-        and(
-          eq(projects.organizationId, organizationId),
-          isNull(projects.deletedAt),
-        ),
+        includeDeleted
+          ? and(
+              eq(projects.organizationId, organizationId),
+              or(
+                isNull(projects.deletedAt),
+                and(
+                  isNotNull(projects.deletedAt),
+                  gte(projects.deletedAt, sevenDaysAgo),
+                ),
+              ),
+            )
+          : and(
+              eq(projects.organizationId, organizationId),
+              isNull(projects.deletedAt),
+            ),
       )
       .orderBy(asc(projects.createdAt), asc(projects.id));
 
@@ -433,15 +447,27 @@ export class SqlitePhotoAssetRepository implements PhotoAssetRepositoryPort {
     return row == null ? null : mapPhotoAsset(row);
   }
 
-  async findByProjectId(projectId: string): Promise<PhotoAsset[]> {
+  async findByProjectId(projectId: string, includeDeleted = false): Promise<PhotoAsset[]> {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const rows = await this.db
       .select()
       .from(photoAssets)
       .where(
-        and(
-          eq(photoAssets.projectId, projectId),
-          isNull(photoAssets.deletedAt),
-        ),
+        includeDeleted
+          ? and(
+              eq(photoAssets.projectId, projectId),
+              or(
+                isNull(photoAssets.deletedAt),
+                and(
+                  isNotNull(photoAssets.deletedAt),
+                  gte(photoAssets.deletedAt, sevenDaysAgo),
+                ),
+              ),
+            )
+          : and(
+              eq(photoAssets.projectId, projectId),
+              isNull(photoAssets.deletedAt),
+            ),
       )
       .orderBy(photoAssets.createdAt, photoAssets.id);
 
@@ -950,6 +976,16 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
         ),
       )
       .orderBy(generationRequests.createdAt, generationRequests.id);
+
+    return rows.map(mapGenerationRequest);
+  }
+
+  async findRecent(limit: number): Promise<GenerationRequest[]> {
+    const rows = await this.db
+      .select()
+      .from(generationRequests)
+      .orderBy(generationRequests.createdAt)
+      .limit(limit);
 
     return rows.map(mapGenerationRequest);
   }
