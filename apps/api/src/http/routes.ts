@@ -960,12 +960,14 @@ export async function handleApiRequest(
   const startMs = Date.now();
   try {
     const handled = await router.handle(req, res);
-    logRequest(
-      req.method ?? "GET",
-      req.url ?? "/",
-      res.statusCode,
-      Date.now() - startMs,
-    );
+    if (handled) {
+      logRequest(
+        req.method ?? "GET",
+        req.url ?? "/",
+        res.statusCode,
+        Date.now() - startMs,
+      );
+    }
     return handled;
   } catch (err) {
     console.error("Unhandled route error:", err);
