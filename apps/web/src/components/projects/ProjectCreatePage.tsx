@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createProject } from "../../lib/api-client";
 import { AppShell } from "../AppShell";
+import { ErrorAlert } from "../ErrorAlert";
 import styles from "./ProjectCreatePage.module.css";
 
 const OCCASIONS = [
@@ -82,7 +83,7 @@ export function ProjectCreatePage() {
           </select>
         </div>
 
-        {error && <p className="error-msg">{error}</p>}
+        {error && <ErrorAlert message={error} />}
 
         <div className={styles.actions}>
           <button
