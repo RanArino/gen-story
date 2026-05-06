@@ -62,9 +62,18 @@ export async function getMe(): Promise<MeDto> {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
-export async function listProjects(): Promise<ProjectDto[]> {
-  const data = await request<{ projects: ProjectDto[] }>("GET", "/api/projects");
+export async function listProjects(includeDeleted = false): Promise<ProjectDto[]> {
+  const qs = includeDeleted ? "?includeDeleted=true" : "";
+  const data = await request<{ projects: ProjectDto[] }>("GET", `/api/projects${qs}`);
   return data.projects;
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  return request<void>("DELETE", `/api/projects/${projectId}`);
+}
+
+export async function restoreProject(projectId: string): Promise<ProjectDto> {
+  return request<ProjectDto>("POST", `/api/projects/${projectId}/restore`);
 }
 
 export async function createProject(
@@ -78,12 +87,22 @@ export async function createProject(
 
 export async function listPhotoAssets(
   projectId: string,
+  includeDeleted = false,
 ): Promise<PhotoAssetDto[]> {
+  const qs = includeDeleted ? "?includeDeleted=true" : "";
   const data = await request<{ photoAssets: PhotoAssetDto[] }>(
     "GET",
-    `/api/projects/${projectId}/photo-assets`,
+    `/api/projects/${projectId}/photo-assets${qs}`,
   );
   return data.photoAssets;
+}
+
+export async function deletePhotoAsset(photoAssetId: string): Promise<void> {
+  return request<void>("DELETE", `/api/photo-assets/${photoAssetId}`);
+}
+
+export async function restorePhotoAsset(photoAssetId: string): Promise<PhotoAssetDto> {
+  return request<PhotoAssetDto>("POST", `/api/photo-assets/${photoAssetId}/restore`);
 }
 
 async function fileToBase64(file: File): Promise<string> {
