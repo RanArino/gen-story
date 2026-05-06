@@ -16,17 +16,25 @@ The current state (after Phase 7) is: all seven screens are connected to the rea
 ## Progress
 
 
-- [ ] M1 — Error display cleanup + API request logging
-- [ ] M2 — Delete & restore behavior (API + web UI)
-- [ ] M3 — Cleanup scripts (orphan detection + expired record purge)
-- [ ] M4 — Debug endpoint + seed script
-- [ ] M5 — README + known limitations document
+- [x] M1 — Error display cleanup + API request logging
+- [x] M2 — Delete & restore behavior (API + web UI)
+- [x] M3 — Cleanup scripts (orphan detection + expired record purge)
+- [x] M4 — Debug endpoint + seed script
+- [x] M5 — README + known limitations document
 
 
 ## Surprises & Discoveries
 
 
-*(fill in as work proceeds)*
+- **`deletedAt` belongs in the domain model, not just the DTO layer.** The plan assumed the `deletedAt` column was already plumbed into domain types and only missing from shared DTOs. In practice, `Project` and `PhotoAsset` in `packages/domain/src/model.ts` had no `deletedAt` field at all. Adding it required touching the domain type, the `Create*Input` type, the factory function, the DTO mapper, the shared DTO, and test fixtures — a larger ripple than anticipated.
+
+- **Port interfaces lagged behind repository implementations.** `softDelete` and `restore` existed on the concrete Drizzle repositories but were absent from `PhotoAssetRepositoryPort` and `ProjectRepositoryPort` in `packages/application/src/ports.ts`. The use-case layer could not call them until the ports were updated first. The plan noted "verify the port interfaces declare them" — they did not.
+
+- **In-memory test doubles had to be updated in two places.** Both `packages/application/src/use-cases.test.ts` and `apps/api/src/test-support/in-memory-application.ts` maintain their own in-memory repository stubs. Both needed `softDelete`, `restore`, `findRecent`, and updated `findByOrganizationId` / `findByProjectId` signatures to satisfy the updated port interfaces. The plan only mentioned updating the use-case tests.
+
+- **`GenerationRequest` debug route: `provider` and `model` columns do not exist on the domain type.** The plan spec listed those fields for the `/api/debug/generation-requests` response. The `GenerationRequest` domain type carries no provider/model metadata (those are generation-adapter concerns, not domain concerns), so those fields were omitted from the response object without issue.
+
+- **`scripts/tsconfig.json` was needed but not on the original file list.** The scripts import from `apps/api/src/…` and `packages/…` using TypeScript paths. Without a `tsconfig.json` in `scripts/`, `tsx` picked up the root config, which works, but an explicit one makes the boundary clear.
 
 
 ## Decision Log
@@ -52,7 +60,18 @@ The current state (after Phase 7) is: all seven screens are connected to the rea
 ## Outcomes & Retrospective
 
 
-*(fill in at completion)*
+All five milestones completed on 2026-05-06. Final validation results:
+
+- `pnpm typecheck` — ✅ zero errors across all packages
+- `pnpm lint` — ✅ zero warnings
+- `pnpm test` — ✅ 82 tests pass (16 domain + 9 application + 57 API integration)
+- `pnpm build` — ✅ 8 Next.js routes built; API compiled
+
+**What went well:** The milestone sequencing was correct — M1 (ErrorAlert + logging) was purely additive and a good warm-up before M2 (delete/restore), which had the most cross-layer surface area. The domain model change in M2 rippled cleanly outward once identified.
+
+**What to do differently next time:** When a plan says "verify X already exists," the verification step should be explicit (grep or read the file) rather than assumed. The port interface gap and missing domain fields would have been caught immediately with a 30-second grep before coding started.
+
+**Scope:** No new external dependencies were added. All implementation uses existing patterns (Drizzle, `tsx`, React `useState`). The `scripts/` directory follows the same import style as the existing `scripts/seed.ts`.
 
 
 ## Context and Orientation
@@ -437,7 +456,27 @@ The following observable behaviors confirm Phase 8 is complete:
 ## Artifacts and Notes
 
 
-*(populate as work proceeds)*
+**New files created:**
+- `apps/web/src/components/ErrorAlert.tsx` — shared error display component
+- `apps/web/src/components/ErrorAlert.module.css` — styles for ErrorAlert
+- `apps/api/src/http/request-logger.ts` — `logRequest()` middleware helper
+- `scripts/tsconfig.json` — TypeScript config for scripts directory
+- `scripts/cleanup-expired.ts` — purges soft-deleted records and files older than 7 days; supports `--dry-run`
+- `scripts/detect-orphans.ts` — lists files under `data/uploads/` with no matching DB `storageKey`
+- `docs/known-limitations.md` — 16 out-of-scope features with status notes
+
+**Files with significant changes:**
+- `packages/domain/src/model.ts` — added `deletedAt: string | null` to `Project` and `PhotoAsset` types
+- `packages/application/src/ports.ts` — added `softDelete`, `restore`, `findRecent`; updated `findByOrganizationId` and `findByProjectId` signatures
+- `packages/application/src/use-cases.ts` — added `deletePhotoAsset`, `restorePhotoAsset`, `deleteProject`, `restoreProject`
+- `packages/shared/src/index.ts` — added `deletedAt` to `ProjectDto` and `PhotoAssetDto`
+- `apps/api/src/db/repositories.ts` — updated mappers; added `includeDeleted` support and `findRecent`
+- `apps/api/src/http/routes.ts` — added 4 delete/restore routes, debug route, `includeDeleted` query param, request logging
+- `apps/api/src/generation/local-job-worker.ts` — added state-transition log lines
+- `apps/web/src/lib/api-client.ts` — added `deleteProject`, `restoreProject`, `deletePhotoAsset`, `restorePhotoAsset`; `includeDeleted` on list calls
+- `apps/web/src/components/photos/PhotosPage.tsx` — delete button + "Recently deleted" section with restore
+- `apps/web/src/components/projects/ProjectListPage.tsx` — delete button + "Recently deleted" section with restore
+- `README.md` — full rewrite covering setup, env vars, migrations, seed, tests, maintenance, debug, troubleshooting
 
 
 ## Interfaces and Dependencies
