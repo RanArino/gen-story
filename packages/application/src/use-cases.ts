@@ -727,6 +727,42 @@ export async function retryFailedGenerationRequest(
   }
 }
 
+export async function deletePhotoAsset(
+  deps: ApplicationDependencies,
+  photoAssetId: string,
+): Promise<UseCaseResult<void>> {
+  const photoAsset = await deps.photoAssets.findById(photoAssetId);
+  if (photoAsset == null) return failure("not_found", "Photo asset not found.");
+  await deps.photoAssets.softDelete(photoAssetId, now());
+  return success(undefined);
+}
+
+export async function restorePhotoAsset(
+  deps: ApplicationDependencies,
+  photoAssetId: string,
+): Promise<UseCaseResult<void>> {
+  await deps.photoAssets.restore(photoAssetId, now());
+  return success(undefined);
+}
+
+export async function deleteProject(
+  deps: ApplicationDependencies,
+  projectId: string,
+): Promise<UseCaseResult<void>> {
+  const project = await deps.projects.findById(projectId);
+  if (project == null) return failure("not_found", "Project not found.");
+  await deps.projects.softDelete(projectId, now());
+  return success(undefined);
+}
+
+export async function restoreProject(
+  deps: ApplicationDependencies,
+  projectId: string,
+): Promise<UseCaseResult<void>> {
+  await deps.projects.restore(projectId, now());
+  return success(undefined);
+}
+
 export type MarkGenerationRequestRunningInput = {
   generationRequestId: string;
   startedAt: string;
