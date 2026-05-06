@@ -917,6 +917,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
   });
 
   const uploadsRoot = resolve(process.cwd(), "data", "uploads");
+  const repoRoot = resolve(process.cwd());
 
   const MIME_MAP: Record<string, string> = {
     ".jpg": "image/jpeg",
@@ -928,7 +929,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
 
   router.add("GET", "/files/*", async (_req, res, params) => {
     const tail = getParam(params, "*");
-    const safePath = resolve(uploadsRoot, ...tail.split("/").filter(Boolean));
+    const safePath = resolve(repoRoot, ...tail.split("/").filter(Boolean));
 
     if (
       safePath !== uploadsRoot &&
