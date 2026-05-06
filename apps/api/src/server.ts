@@ -13,6 +13,7 @@ import { openDatabase, migrateDatabase } from "./db";
 import { LocalJobWorker } from "./generation/local-job-worker";
 import { buildRouter, handleApiRequest } from "./http/routes";
 import { sendJson } from "./http/json";
+import { logRequest } from "./http/request-logger";
 
 import type { Router } from "./http/router";
 
@@ -82,6 +83,22 @@ export function makeHandleRequest(router: Router) {
     request: IncomingMessage,
     response: ServerResponse,
   ) {
+    const startMs = Date.now();
+    const corsOrigin = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+    response.setHeader("Access-Control-Allow-Origin", corsOrigin);
+    response.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    );
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (request.method === "OPTIONS") {
+      response.writeHead(204);
+      response.end();
+      logRequest("OPTIONS", request.url ?? "/", 204, Date.now() - startMs);
+      return;
+    }
+
     if (request.method === "GET" && request.url === "/health") {
       sendJson(response, 200, buildHealthResponse());
       return;
@@ -92,6 +109,12 @@ export function makeHandleRequest(router: Router) {
       sendJson(response, 404, {
         error: { code: "not_found", message: "Not found." },
       });
+      logRequest(
+        request.method ?? "GET",
+        request.url ?? "/",
+        404,
+        Date.now() - startMs,
+      );
     }
   };
 }
