@@ -1,3 +1,4 @@
+import convert from "heic-convert";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
 
@@ -6,6 +7,12 @@ import { AI_INPUT_PRESET, PREVIEW_640_PRESET } from "../storage/storage-keys";
 
 export const PREVIEW_MAX_EDGE = 640;
 export const AI_INPUT_MAX_EDGE = 1536;
+
+export async function convertHeicToJpeg(body: Uint8Array): Promise<Uint8Array> {
+  const arrayBuffer = body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength);
+  const output = await convert({ buffer: arrayBuffer, format: "JPEG", quality: 0.95 });
+  return new Uint8Array(output);
+}
 
 export type SupportedImageType = {
   extension: "jpg" | "png" | "webp" | "heic" | "heif";
