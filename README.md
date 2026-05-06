@@ -1,42 +1,86 @@
 # Gen Story
 
-Local development baseline for the `gen-story` application.
+A local personal-use app for generating AI-powered photo story videos. Upload photos, build a storyboard, generate AI images per scene, and review the results.
 
 ## Prerequisites
 
-- Node.js
-- pnpm
+- Node.js ≥ 22
+- pnpm ≥ 9
 
-If pnpm is unavailable, install it before running the workspace commands.
-
-## Install
+Install pnpm if needed:
 
 ```sh
+npm install -g pnpm
+```
+
+## Clone and Install
+
+```sh
+git clone <repo-url>
+cd gen-story
 pnpm install
 ```
 
-## Development
+## Environment Variables
 
-Start the web app:
-
-```sh
-pnpm dev:web
-```
-
-Start the API app:
+Copy the example env file and edit as needed:
 
 ```sh
-pnpm dev:api
+cp apps/api/.env.example apps/api/.env
 ```
 
-The default local URLs are:
+| Variable | Default | Description |
+|---|---|---|
+| `API_PORT` | `4000` | Port for the API server |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:4000` | API base URL used by the web app |
+| `GEN_STORY_SQLITE_PATH` | `data/gen-story.sqlite` | Path to the SQLite database file |
+| `OPENAI_API_KEY` | _(none)_ | Optional. Required for real image generation |
+| `IMAGE_GENERATION_ADAPTER` | `mock` | Set to `openai` to use real generation |
 
-- Web: `http://localhost:3000`
-- API health: `http://localhost:4000/health`
+The app works without an OpenAI key — it uses a mock adapter that generates placeholder images.
 
-## Verification
+## Apply Database Migrations
 
-Run these commands from the repository root:
+Run this once before starting the app for the first time, and again after pulling changes:
+
+```sh
+pnpm --filter @gen-story/api db:migrate
+```
+
+## Start the Application
+
+```sh
+pnpm dev
+```
+
+- Web: http://localhost:3000
+- API: http://localhost:4000
+
+## Load Seed Data (Optional)
+
+Populate the database with a demo project and three scenes to explore the UI without uploading photos:
+
+```sh
+pnpm --filter @gen-story/api db:seed
+```
+
+The script prints the project URL when complete.
+
+## Running Tests
+
+Unit and integration tests (Vitest):
+
+```sh
+pnpm test
+```
+
+End-to-end tests (Playwright, requires both servers running):
+
+```sh
+pnpm --filter @gen-story/web test:e2e
+```
+
+Full verification suite:
 
 ```sh
 pnpm typecheck
@@ -45,51 +89,62 @@ pnpm test
 pnpm build
 ```
 
-## Database
+## Maintenance Scripts
 
-The API app uses local SQLite for persistence. The default database path is:
-
-```sh
-GEN_STORY_SQLITE_PATH=data/gen-story.sqlite
-```
-
-Generate and apply Drizzle migrations from the repository root:
+Purge records soft-deleted more than 7 days ago and their associated files:
 
 ```sh
-pnpm --filter @gen-story/api db:generate
-pnpm --filter @gen-story/api db:migrate
+pnpm --filter @gen-story/api db:cleanup-expired
+
+# Preview what would be deleted without making changes:
+pnpm --filter @gen-story/api db:cleanup-expired -- --dry-run
 ```
 
-## File Storage
-
-The API app stores local uploaded and derived image files under storage keys in:
+Find upload files that have no matching database record:
 
 ```sh
-data/uploads
+pnpm --filter @gen-story/api db:detect-orphans
 ```
 
-Database rows store storage keys such as `data/uploads/originals/projects/{projectId}/{photoAssetId}.jpg`, not absolute local paths. Local upload data is ignored by git.
+## Debug
+
+Inspect recent generation job history:
+
+```
+http://localhost:4000/api/debug/generation-requests
+```
+
+API terminal logs each request in structured format:
+
+```
+[API] {"method":"POST","path":"/api/projects","status":201,"ms":12}
+```
+
+## Troubleshooting
+
+**Port already in use** — Another process is using port 3000 or 4000. Stop it or change `API_PORT` / the Next.js port.
+
+**`apps/api/.env` not found** — Copy `.env.example` as described above. The app will start but generation will use the mock adapter.
+
+**SQLite locked** — Only one process should write to the database at a time. Stop any other running API instances.
+
+**HEIC conversion fails** — `sharp` requires `libvips`. On macOS: `brew install vips`. On Linux: `apt install libvips-dev`.
+
+**Missing OpenAI key** — Set `OPENAI_API_KEY` in `apps/api/.env` and `IMAGE_GENERATION_ADAPTER=openai`. Without a key the mock adapter produces gray placeholder images.
 
 ## Workspace Layout
 
-```text
-apps/web
-apps/api
-packages/domain
-packages/application
-packages/shared
+```
+apps/
+  api/     Raw Node.js HTTP server — routing, Drizzle/SQLite, local auth, image gen
+  web/     Next.js 16 / React 19 frontend
+packages/
+  domain/        Pure domain models and rules (no framework dependencies)
+  application/   Use cases and port interfaces
+  shared/        DTO types shared across the API boundary
+drizzle/         SQLite migration files
+scripts/         Maintenance and seed scripts
+data/            Local SQLite DB and uploaded files (gitignored)
 ```
 
-`packages/domain` and `packages/application` must stay independent from framework, SDK, ORM, HTTP, and cloud-specific code.
-
-## Environment
-
-Copy `.env.example` or the app-specific `.env.example` files when local overrides are needed. The baseline only uses:
-
-- `API_PORT`
-- `NEXT_PUBLIC_API_BASE_URL`
-- `GEN_STORY_SQLITE_PATH`
-
-## Current Limitations
-
-This baseline intentionally does not include API routes for product screens, authentication, image generation, video generation, or BGM generation.
+See [docs/known-limitations.md](docs/known-limitations.md) for features intentionally excluded from this local version.
