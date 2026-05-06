@@ -11,6 +11,7 @@ import {
   retryGenerationRequest,
 } from "../../lib/api-client";
 import { AppShell } from "../AppShell";
+import { ErrorAlert } from "../ErrorAlert";
 import styles from "./GeneratePage.module.css";
 
 type GenStatus = "queued" | "running" | "succeeded" | "failed" | "canceled" | "none";
@@ -180,7 +181,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
         <p>Generate AI images for each scene in your storyboard.</p>
       </div>
 
-      {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <ErrorAlert message={error} />}
 
       {/* Progress summary */}
       <div className={`card ${styles.progressCard}`}>
