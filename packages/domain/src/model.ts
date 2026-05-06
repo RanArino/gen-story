@@ -45,6 +45,7 @@ export type Project = {
   ownerUserId: UserId;
   name: string;
   status: ProjectStatus;
+  deletedAt: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -62,6 +63,7 @@ export type PhotoAsset = {
   checksum: string;
   sourceKind: string;
   notes: string | null;
+  deletedAt: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -166,6 +168,7 @@ export type CreateProjectInput = {
   ownerUserId: UserId;
   name: string;
   status?: ProjectStatus;
+  deletedAt?: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -183,6 +186,7 @@ export type CreatePhotoAssetInput = {
   sourceKind: string;
   notes?: string | null;
   usage?: PhotoUsage;
+  deletedAt?: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -303,6 +307,7 @@ export function createProject(input: CreateProjectInput): Project {
     ownerUserId: input.ownerUserId,
     name: trimRequiredText(input.name, "Project name"),
     status: input.status ?? "draft",
+    deletedAt: input.deletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
@@ -322,6 +327,7 @@ export function createPhotoAsset(input: CreatePhotoAssetInput): PhotoAsset {
     checksum: trimRequiredText(input.checksum, "Photo asset checksum"),
     sourceKind: trimRequiredText(input.sourceKind, "Photo asset source kind"),
     notes: trimOptionalText(input.notes) || null,
+    deletedAt: input.deletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
