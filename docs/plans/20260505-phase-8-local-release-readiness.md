@@ -26,6 +26,10 @@ The current state (after Phase 7) is: all seven screens are connected to the rea
 ## Surprises & Discoveries
 
 
+- **File server path was doubled for all uploaded images (post-release).** The `GET /files/*` handler in `apps/api/src/http/routes.ts` resolved the storage-key tail relative to `uploadsRoot = {cwd}/data/uploads`, but every storage key already starts with `data/uploads/…`. The result was a doubled path (`{cwd}/data/uploads/data/uploads/…`) that never existed on disk, causing every photo thumbnail to return 404. The fix was to resolve the tail against `repoRoot = process.cwd()` while keeping the existing `uploadsRoot` boundary check for path-traversal safety. This single-line change resolved both the photos-page preview and the storyboard candidate-photos display.
+
+- **HEIC uploads silently failed with a 422 (post-release).** The system-installed `libheif` bundled with `sharp` lacks HEVC plugin support, so `sharp(heicBuffer).metadata()` throws `heif: Error while loading plugin: Support for this compression format has not been built in (11.6003)`. The fix was to install `heic-convert` + `@types/heic-convert` and pre-convert any HEIC/HEIF buffer to JPEG before any `sharp` call. The stored original is then a high-quality JPEG (quality 0.95), which is universally viewable and removes any downstream HEIC dependency.
+
 - **`deletedAt` belongs in the domain model, not just the DTO layer.** The plan assumed the `deletedAt` column was already plumbed into domain types and only missing from shared DTOs. In practice, `Project` and `PhotoAsset` in `packages/domain/src/model.ts` had no `deletedAt` field at all. Adding it required touching the domain type, the `Create*Input` type, the factory function, the DTO mapper, the shared DTO, and test fixtures — a larger ripple than anticipated.
 
 - **Port interfaces lagged behind repository implementations.** `softDelete` and `restore` existed on the concrete Drizzle repositories but were absent from `PhotoAssetRepositoryPort` and `ProjectRepositoryPort` in `packages/application/src/ports.ts`. The use-case layer could not call them until the ports were updated first. The plan noted "verify the port interfaces declare them" — they did not.
@@ -55,6 +59,35 @@ The current state (after Phase 7) is: all seven screens are connected to the rea
 - Decision: Seed script creates a project with two placeholder scenes and no real photos, so it works without a real OpenAI key.
   Rationale: The seed only needs to demonstrate navigation and the UI layout. Real image generation can be triggered manually after seeding.
   Date/Author: 2026-05-05 / Claude
+
+
+## Post-Release Bug Fixes
+
+
+### Fix 1 — File server 404 for all uploaded images (2026-05-06)
+
+**Symptom:** Every photo thumbnail returned 404. Affected the photos page preview and the storyboard candidate-photos panel. API logs showed `GET /files/data/uploads/originals/…` → 404.
+
+**Root cause:** `apps/api/src/http/routes.ts` built the resolved path as `resolve(uploadsRoot, ...tail)` where `uploadsRoot = {cwd}/data/uploads` and `tail` was the full storage key `data/uploads/originals/…`. This doubled the prefix to `{cwd}/data/uploads/data/uploads/originals/…`, which does not exist.
+
+**Resolution:** Added `const repoRoot = resolve(process.cwd())` and changed the path resolution to `resolve(repoRoot, ...tail)`. The path-traversal security check against `uploadsRoot` was kept unchanged.
+
+**Files changed:** `apps/api/src/http/routes.ts` (line ~931).
+
+---
+
+### Fix 2 — HEIC/HEIF uploads returned 422 (2026-05-06)
+
+**Symptom:** Uploading any `.heic` file from an Apple device returned HTTP 422. Console showed `heif: Error while loading plugin: Support for this compression format has not been built in (11.6003)`.
+
+**Root cause:** `sharp`'s bundled `libheif` on the dev machine lacks the HEVC codec plugin required for HEIC files. `readOriginalImageMetadata` and `createPreviewImage` both call `sharp(buffer)` directly, both fail for HEIC input.
+
+**Resolution:**
+1. Installed `heic-convert` and `@types/heic-convert` in `apps/api`.
+2. Added `convertHeicToJpeg(body: Uint8Array): Promise<Uint8Array>` in `apps/api/src/images/image-metadata.ts` — converts via `heic-convert` using `quality: 0.95`.
+3. In `apps/api/src/photos/photo-asset-ingestion.ts`, after `detectSupportedImageType`, if type is `heic` or `heif`, the buffer is converted to JPEG before any `sharp` processing. `workingType` is overridden to `{ extension: "jpg", mimeType: "image/jpeg" }` so the original is stored as `.jpg`.
+
+**Files changed:** `apps/api/src/images/image-metadata.ts`, `apps/api/src/photos/photo-asset-ingestion.ts`, `apps/api/package.json`.
 
 
 ## Outcomes & Retrospective
