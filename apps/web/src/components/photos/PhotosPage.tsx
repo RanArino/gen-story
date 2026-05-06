@@ -5,12 +5,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoAssetDto } from "@gen-story/shared";
 import type { PhotoUsage } from "../../lib/api-client";
 import {
+  deletePhotoAsset,
   listPhotoAssets,
   patchPhotoAsset,
+  restorePhotoAsset,
   uploadPhotoAsset,
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
+import { ErrorAlert } from "../ErrorAlert";
 import styles from "./PhotosPage.module.css";
 
 type UsageValue = PhotoUsage;
@@ -27,19 +30,19 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const refresh = useCallback(() => {
-    return listPhotoAssets(projectId)
-      .then(setPhotos)
-      .catch((e: Error) => setError(e.message));
+  const refresh = useCallback(async () => {
+    const all = await listPhotoAssets(projectId, true);
+    setPhotos(all);
   }, [projectId]);
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
+    refresh().catch((e: Error) => setError(e.message)).finally(() => setLoading(false));
   }, [refresh]);
 
   async function handleFiles(files: FileList | File[]) {
     const fileArr = Array.from(files);
-    const slots = MAX_PHOTOS - photos.length;
+    const activePhotos = photos.filter((p) => p.deletedAt === null);
+    const slots = MAX_PHOTOS - activePhotos.length;
     if (slots <= 0) {
       setError(`Maximum ${MAX_PHOTOS} photos per project.`);
       return;
@@ -85,6 +88,26 @@ export function PhotosPage({ projectId }: { projectId: string }) {
     }
   }
 
+  async function handleDelete(photoId: string) {
+    try {
+      await deletePhotoAsset(photoId);
+      await refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+    }
+  }
+
+  async function handleRestore(photoId: string) {
+    try {
+      await restorePhotoAsset(photoId);
+      await refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Restore failed");
+    }
+  }
+
+  const activePhotos = photos.filter((p) => p.deletedAt === null);
+  const deletedPhotos = photos.filter((p) => p.deletedAt !== null);
 
   return (
     <AppShell projectId={projectId}>
@@ -103,13 +126,13 @@ export function PhotosPage({ projectId }: { projectId: string }) {
         <button
           className={`${styles.tab} ${tab === "manage" ? styles.tabActive : ""}`}
           onClick={() => setTab("manage")}
-          disabled={photos.length === 0}
+          disabled={activePhotos.length === 0}
         >
-          Manage ({photos.length})
+          Manage ({activePhotos.length})
         </button>
       </div>
 
-      {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <ErrorAlert message={error} />}
 
       {tab === "upload" && (
         <div
@@ -143,11 +166,12 @@ export function PhotosPage({ projectId }: { projectId: string }) {
             <p className={styles.hint}>Loading…</p>
           ) : (
             <div className={styles.photoGrid}>
-              {photos.map((photo) => (
+              {activePhotos.map((photo) => (
                 <PhotoCard
                   key={photo.id}
                   photo={photo}
                   onUsageChange={handleUsageChange}
+                  onDelete={handleDelete}
                 />
               ))}
               {uploading.map((id) => (
@@ -157,6 +181,24 @@ export function PhotosPage({ projectId }: { projectId: string }) {
                 </div>
               ))}
             </div>
+          )}
+
+          {deletedPhotos.length > 0 && (
+            <section className={styles.deletedSection}>
+              <h3 className={styles.deletedTitle}>Recently deleted</h3>
+              <p className={styles.deletedHint}>
+                Deleted photos are kept for 7 days.
+              </p>
+              <div className={styles.photoGrid}>
+                {deletedPhotos.map((photo) => (
+                  <DeletedPhotoCard
+                    key={photo.id}
+                    photo={photo}
+                    onRestore={handleRestore}
+                  />
+                ))}
+              </div>
+            </section>
           )}
         </>
       )}
@@ -184,9 +226,11 @@ export function PhotosPage({ projectId }: { projectId: string }) {
 function PhotoCard({
   photo,
   onUsageChange,
+  onDelete,
 }: {
   photo: PhotoAssetDto;
   onUsageChange: (id: string, usage: UsageValue) => void;
+  onDelete: (id: string) => void;
 }) {
   const imgUrl = storageKeyToUrl(photo.storageKey);
 
@@ -207,11 +251,45 @@ function PhotoCard({
           </button>
         ))}
       </div>
-      {photo.notes && (
-        <p className={styles.photoName} style={{ color: "#8898aa", fontSize: 11 }}>
-          {photo.notes}
-        </p>
+      <button
+        className={styles.deleteBtn}
+        onClick={() => onDelete(photo.id)}
+        title="Delete photo"
+      >
+        Delete
+      </button>
+    </div>
+  );
+}
+
+function DeletedPhotoCard({
+  photo,
+  onRestore,
+}: {
+  photo: PhotoAssetDto;
+  onRestore: (id: string) => void;
+}) {
+  const imgUrl = storageKeyToUrl(photo.storageKey);
+  const deletedDate = photo.deletedAt
+    ? new Date(photo.deletedAt).toLocaleDateString()
+    : "";
+
+  return (
+    <div className={`card ${styles.photoCard} ${styles.photoCardDeleted}`}>
+      <div className={styles.photoThumb}>
+        <img src={imgUrl} alt={photo.name} className={`${styles.thumbImg} ${styles.thumbDeleted}`} />
+      </div>
+      <p className={styles.photoName}>{photo.name}</p>
+      {deletedDate && (
+        <p className={styles.deletedDate}>Deleted {deletedDate}</p>
       )}
+      <button
+        className="btn btn-secondary"
+        style={{ fontSize: 12, padding: "4px 10px", marginTop: 6 }}
+        onClick={() => onRestore(photo.id)}
+      >
+        Restore
+      </button>
     </div>
   );
 }
