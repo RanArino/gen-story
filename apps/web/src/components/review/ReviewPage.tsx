@@ -14,6 +14,7 @@ import {
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
+import { ErrorAlert } from "../ErrorAlert";
 import styles from "./ReviewPage.module.css";
 
 type SceneReview = {
@@ -114,7 +115,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
         <p>Compare generated images with source photos. Adopt the ones you want to keep.</p>
       </div>
 
-      {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <ErrorAlert message={error} />}
 
       {reviews.length === 0 && (
         <div className="card">
