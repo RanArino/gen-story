@@ -6,6 +6,7 @@ import {
 import type { PhotoAsset, PhotoUsage } from "@gen-story/domain";
 
 import {
+  convertHeicToJpeg,
   createPreviewImage,
   detectSupportedImageType,
   readOriginalImageMetadata,
@@ -35,24 +36,32 @@ export class PhotoAssetIngestionService {
 
     try {
       const imageType = await detectSupportedImageType(input.body);
+
+      let workingBody = input.body;
+      let workingType = imageType;
+      if (imageType.extension === "heic" || imageType.extension === "heif") {
+        workingBody = await convertHeicToJpeg(input.body);
+        workingType = { extension: "jpg", mimeType: "image/jpeg" };
+      }
+
       const originalMetadata = await readOriginalImageMetadata({
-        body: input.body,
-        mimeType: imageType.mimeType,
+        body: workingBody,
+        mimeType: workingType.mimeType,
       });
       const originalStorageKey = buildOriginalPhotoStorageKey({
         projectId: input.projectId,
         photoAssetId: input.photoAssetId,
-        extension: imageType.extension,
+        extension: workingType.extension,
       });
       const previewStorageKey = buildPhotoPreviewStorageKey({
         projectId: input.projectId,
         photoAssetId: input.photoAssetId,
       });
-      const previewImage = await createPreviewImage(input.body);
+      const previewImage = await createPreviewImage(workingBody);
 
       await this.deps.objectStorage.putObject({
         key: originalStorageKey,
-        body: input.body,
+        body: workingBody,
         contentType: imageType.mimeType,
       });
       createdStorageKeys.push(originalStorageKey);
