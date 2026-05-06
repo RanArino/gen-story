@@ -23,6 +23,7 @@ export type ProjectDto = {
   ownerUserId: string;
   name: string;
   status: string;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -40,6 +41,7 @@ export type PhotoAssetDto = {
   checksum: string;
   sourceKind: string;
   notes: string | null;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
