@@ -28,18 +28,22 @@ export interface OrganizationRepositoryPort {
 
 export interface ProjectRepositoryPort {
   findById(projectId: string): Promise<Project | null>;
-  findByOrganizationId(organizationId: string): Promise<Project[]>;
+  findByOrganizationId(organizationId: string, includeDeleted?: boolean): Promise<Project[]>;
   save(project: Project): Promise<void>;
+  softDelete(projectId: string, deletedAt: string): Promise<void>;
+  restore(projectId: string, restoredAt: string): Promise<void>;
 }
 
 export interface PhotoAssetRepositoryPort {
   findById(photoAssetId: string): Promise<PhotoAsset | null>;
-  findByProjectId(projectId: string): Promise<PhotoAsset[]>;
+  findByProjectId(projectId: string, includeDeleted?: boolean): Promise<PhotoAsset[]>;
   findByProjectIdAndChecksum(
     projectId: string,
     checksum: string,
   ): Promise<PhotoAsset | null>;
   save(photoAsset: PhotoAsset): Promise<void>;
+  softDelete(photoAssetId: string, deletedAt: string): Promise<void>;
+  restore(photoAssetId: string, restoredAt: string): Promise<void>;
 }
 
 export interface StoryboardRepositoryPort {
@@ -69,6 +73,7 @@ export interface GenerationRequestRepositoryPort {
     status: GenerationRequestStatus,
   ): Promise<GenerationRequest[]>;
   findQueued(): Promise<GenerationRequest[]>;
+  findRecent(limit: number): Promise<GenerationRequest[]>;
   save(generationRequest: GenerationRequest): Promise<void>;
 }
 
