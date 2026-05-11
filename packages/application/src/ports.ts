@@ -1,6 +1,7 @@
 import type {
   GeneratedImage,
   GenerationRequest,
+  GenerationRequestStatus,
   Organization,
   PhotoAsset,
   Project,
@@ -62,6 +63,12 @@ export interface StylePresetRepositoryPort {
 export interface GenerationRequestRepositoryPort {
   findById(generationRequestId: string): Promise<GenerationRequest | null>;
   findBySceneId(sceneId: string): Promise<GenerationRequest[]>;
+  findRunningCountByProjectId(projectId: string): Promise<number>;
+  findByProjectIdAndStatus(
+    projectId: string,
+    status: GenerationRequestStatus,
+  ): Promise<GenerationRequest[]>;
+  findQueued(): Promise<GenerationRequest[]>;
   save(generationRequest: GenerationRequest): Promise<void>;
 }
 

@@ -510,6 +510,170 @@ describe("Generation requests", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Generation request DTO fields and adoption
+// ---------------------------------------------------------------------------
+
+describe("Generation request DTO includes startedAt and completedAt", () => {
+  it("returns null startedAt and completedAt for a queued request", async () => {
+    const { createProject, createStoryboard, createScene } =
+      await import("@gen-story/domain");
+    const now = new Date().toISOString();
+
+    await deps.projects.save(
+      createProject({
+        id: "dto-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "DTO Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "dto-sb",
+        projectId: "dto-proj",
+        tone: "cinematic",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createScene({
+        id: "dto-scene",
+        projectId: "dto-proj",
+        storyboardId: "dto-sb",
+        orderIndex: 0,
+        title: "DTO Scene",
+        description: "A scene.",
+        imagePrompt: "Cinematic still.",
+        emotion: "calm",
+        cameraDirection: "wide",
+        lightingDirection: "natural",
+        motionDirection: "slow pan",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      "/api/scenes/dto-scene/generation-requests",
+      { inputJson: {} },
+    );
+
+    expect(status).toBe(201);
+    expect(body).toMatchObject({
+      status: "queued",
+      startedAt: null,
+      completedAt: null,
+      errorMessage: null,
+    });
+  });
+});
+
+describe("Generated image adoption", () => {
+  it("adopts a generated image and returns success", async () => {
+    const {
+      createProject,
+      createStoryboard,
+      createScene,
+      createGenerationRequest,
+      createGeneratedImage,
+    } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+
+    await deps.projects.save(
+      createProject({
+        id: "adopt-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Adopt Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "adopt-sb",
+        projectId: "adopt-proj",
+        tone: "warm",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createScene({
+        id: "adopt-scene",
+        projectId: "adopt-proj",
+        storyboardId: "adopt-sb",
+        orderIndex: 0,
+        title: "Adopt Scene",
+        description: "A scene.",
+        imagePrompt: "Cinematic still.",
+        emotion: "nostalgic",
+        cameraDirection: "close-up",
+        lightingDirection: "warm",
+        motionDirection: "fade",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.generationRequests.save(
+      createGenerationRequest({
+        id: "adopt-req",
+        projectId: "adopt-proj",
+        storyboardId: "adopt-sb",
+        sceneId: "adopt-scene",
+        status: "succeeded",
+        inputJson: {},
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.generatedImages.save(
+      createGeneratedImage({
+        id: "adopt-img",
+        projectId: "adopt-proj",
+        storyboardId: "adopt-sb",
+        sceneId: "adopt-scene",
+        generationRequestId: "adopt-req",
+        storageKey:
+          "data/uploads/generated/images/projects/adopt-proj/scenes/adopt-scene/adopt-img.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        width: 1,
+        height: 1,
+        checksum: "abc",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/scenes/adopt-scene/generated-images/adopt-img/adopt",
+    );
+    expect(status).toBe(200);
+
+    const { body: images } = await req(
+      base,
+      "GET",
+      "/api/scenes/adopt-scene/generated-images",
+    );
+    const imageList = (
+      images as {
+        generatedImages: Array<{ id: string; adoptedAt: string | null }>;
+      }
+    ).generatedImages;
+    const adopted = imageList.find((i) => i.id === "adopt-img");
+    expect(adopted?.adoptedAt).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Auth scoping
 // ---------------------------------------------------------------------------
 

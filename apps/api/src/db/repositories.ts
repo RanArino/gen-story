@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import {
   createGeneratedImage,
@@ -189,6 +189,8 @@ function mapGenerationRequest(row: GenerationRequestRow): GenerationRequest {
     inputJson: parseInputJson(row.inputJson),
     errorMessage: row.errorMessage,
     sourceGenerationRequestId: row.sourceGenerationRequestId,
+    startedAt: row.startedAt ?? null,
+    completedAt: row.completedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -902,6 +904,56 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
     return rows.map(mapGenerationRequest);
   }
 
+  async findRunningCountByProjectId(projectId: string): Promise<number> {
+    const result = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(generationRequests)
+      .where(
+        and(
+          eq(generationRequests.projectId, projectId),
+          eq(generationRequests.status, "running"),
+          isNull(generationRequests.deletedAt),
+        ),
+      )
+      .get();
+
+    return result?.count ?? 0;
+  }
+
+  async findByProjectIdAndStatus(
+    projectId: string,
+    status: GenerationRequestStatus,
+  ): Promise<GenerationRequest[]> {
+    const rows = await this.db
+      .select()
+      .from(generationRequests)
+      .where(
+        and(
+          eq(generationRequests.projectId, projectId),
+          eq(generationRequests.status, status),
+          isNull(generationRequests.deletedAt),
+        ),
+      )
+      .orderBy(generationRequests.createdAt, generationRequests.id);
+
+    return rows.map(mapGenerationRequest);
+  }
+
+  async findQueued(): Promise<GenerationRequest[]> {
+    const rows = await this.db
+      .select()
+      .from(generationRequests)
+      .where(
+        and(
+          eq(generationRequests.status, "queued"),
+          isNull(generationRequests.deletedAt),
+        ),
+      )
+      .orderBy(generationRequests.createdAt, generationRequests.id);
+
+    return rows.map(mapGenerationRequest);
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.db
       .insert(generationRequests)
@@ -914,6 +966,8 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
         inputJson: JSON.stringify(generationRequest.inputJson),
         errorMessage: generationRequest.errorMessage,
         sourceGenerationRequestId: generationRequest.sourceGenerationRequestId,
+        startedAt: generationRequest.startedAt,
+        completedAt: generationRequest.completedAt,
         createdAt: generationRequest.createdAt,
         updatedAt: generationRequest.updatedAt,
       })
@@ -928,6 +982,8 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
           errorMessage: generationRequest.errorMessage,
           sourceGenerationRequestId:
             generationRequest.sourceGenerationRequestId,
+          startedAt: generationRequest.startedAt,
+          completedAt: generationRequest.completedAt,
           updatedAt: generationRequest.updatedAt,
           deletedAt: null,
         },

@@ -1,4 +1,5 @@
 import {
+  createGeneratedImage,
   createGenerationRequest,
   createPhotoAsset,
   createProject,
@@ -721,6 +722,187 @@ export async function retryFailedGenerationRequest(
     });
 
     return success(retryRequest);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type MarkGenerationRequestRunningInput = {
+  generationRequestId: string;
+  startedAt: string;
+};
+
+export async function markGenerationRequestRunning(
+  deps: ApplicationDependencies,
+  input: MarkGenerationRequestRunningInput,
+): Promise<UseCaseResult<GenerationRequest>> {
+  try {
+    const generationRequest = await getGenerationRequestOrNotFound(
+      deps,
+      input.generationRequestId,
+    );
+
+    if (isFailure(generationRequest)) {
+      return generationRequest;
+    }
+
+    if (generationRequest.status !== "queued") {
+      return failure(
+        "invalid_state",
+        `Cannot mark generation request as running: current status is "${generationRequest.status}".`,
+      );
+    }
+
+    const updated = createGenerationRequest({
+      ...generationRequest,
+      status: "running",
+      startedAt: input.startedAt,
+      updatedAt: input.startedAt,
+    });
+
+    await deps.generationRequests.save(updated);
+
+    await deps.progressEvents.publish({
+      kind: "generation-request.running",
+      entityType: "generationRequest",
+      entityId: updated.id,
+    });
+
+    return success(updated);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type MarkGenerationRequestCompletedInput = {
+  generationRequestId: string;
+  generatedImageId: string;
+  storageKey: string;
+  mimeType: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  checksum: string;
+  completedAt: string;
+};
+
+export async function markGenerationRequestCompleted(
+  deps: ApplicationDependencies,
+  input: MarkGenerationRequestCompletedInput,
+): Promise<
+  UseCaseResult<{
+    generationRequest: GenerationRequest;
+    generatedImage: GeneratedImage;
+  }>
+> {
+  try {
+    const generationRequest = await getGenerationRequestOrNotFound(
+      deps,
+      input.generationRequestId,
+    );
+
+    if (isFailure(generationRequest)) {
+      return generationRequest;
+    }
+
+    if (generationRequest.status !== "running") {
+      return failure(
+        "invalid_state",
+        `Cannot complete generation request: current status is "${generationRequest.status}".`,
+      );
+    }
+
+    const updatedRequest = createGenerationRequest({
+      ...generationRequest,
+      status: "succeeded",
+      completedAt: input.completedAt,
+      updatedAt: input.completedAt,
+    });
+
+    await deps.generationRequests.save(updatedRequest);
+
+    const generatedImage = createGeneratedImage({
+      id: input.generatedImageId,
+      projectId: generationRequest.projectId,
+      storyboardId: generationRequest.storyboardId,
+      sceneId: generationRequest.sceneId,
+      generationRequestId: generationRequest.id,
+      storageKey: input.storageKey,
+      mimeType: input.mimeType,
+      size: input.size,
+      width: input.width,
+      height: input.height,
+      checksum: input.checksum,
+      adoptedAt: null,
+      createdAt: input.completedAt,
+      updatedAt: input.completedAt,
+    });
+
+    await deps.generatedImages.save(generatedImage);
+
+    await deps.progressEvents.publish({
+      kind: "generation-request.succeeded",
+      entityType: "generationRequest",
+      entityId: updatedRequest.id,
+      payload: { generatedImageId: generatedImage.id },
+    });
+
+    return success({ generationRequest: updatedRequest, generatedImage });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type MarkGenerationRequestFailedInput = {
+  generationRequestId: string;
+  errorMessage: string;
+  completedAt: string;
+};
+
+export async function markGenerationRequestFailed(
+  deps: ApplicationDependencies,
+  input: MarkGenerationRequestFailedInput,
+): Promise<UseCaseResult<GenerationRequest>> {
+  try {
+    const generationRequest = await getGenerationRequestOrNotFound(
+      deps,
+      input.generationRequestId,
+    );
+
+    if (isFailure(generationRequest)) {
+      return generationRequest;
+    }
+
+    if (
+      generationRequest.status !== "running" &&
+      generationRequest.status !== "queued"
+    ) {
+      return failure(
+        "invalid_state",
+        `Cannot fail generation request: current status is "${generationRequest.status}".`,
+      );
+    }
+
+    const truncated = input.errorMessage.slice(0, 500);
+
+    const updated = createGenerationRequest({
+      ...generationRequest,
+      status: "failed",
+      errorMessage: truncated,
+      completedAt: input.completedAt,
+      updatedAt: input.completedAt,
+    });
+
+    await deps.generationRequests.save(updated);
+
+    await deps.progressEvents.publish({
+      kind: "generation-request.failed",
+      entityType: "generationRequest",
+      entityId: updated.id,
+      payload: { errorMessage: truncated },
+    });
+
+    return success(updated);
   } catch (error) {
     return validationFailure(error);
   }

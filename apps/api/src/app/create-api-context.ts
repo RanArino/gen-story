@@ -1,15 +1,16 @@
 import type {
   ApplicationDependencies,
-  ImageGenerationPort,
   JobQueuePort,
   ProgressEventPort,
 } from "@gen-story/application";
 
+import { LocalAuthContext } from "../auth/local-auth";
 import type { GenStorySqliteClient } from "../db/client";
 import { createSqliteRepositories } from "../db/repositories";
+import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
+import { OpenAiImageGenerationAdapter } from "../generation/openai-image-generation";
 import { LocalImagePreprocessingAdapter } from "../images/local-image-preprocessing";
 import { LocalObjectStorage } from "../storage/local-object-storage";
-import { LocalAuthContext } from "../auth/local-auth";
 
 class NoOpJobQueue implements JobQueuePort {
   async enqueue(): Promise<{ jobId: string }> {
@@ -19,12 +20,6 @@ class NoOpJobQueue implements JobQueuePort {
 
 class NoOpProgressEvents implements ProgressEventPort {
   async publish(): Promise<void> {}
-}
-
-class NoOpImageGeneration implements ImageGenerationPort {
-  async generate(): Promise<never> {
-    throw new Error("Image generation is not implemented in Phase 5.");
-  }
 }
 
 export function createApiContext(
@@ -38,11 +33,16 @@ export function createApiContext(
     objectStorage,
   });
 
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  const imageGeneration = openaiApiKey
+    ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey)
+    : new MockImageGenerationAdapter(objectStorage);
+
   return {
     ...repos,
     objectStorage,
     imagePreprocessing,
-    imageGeneration: new NoOpImageGeneration(),
+    imageGeneration,
     jobQueue: new NoOpJobQueue(),
     progressEvents: new NoOpProgressEvents(),
     authContext: new LocalAuthContext(repos),
