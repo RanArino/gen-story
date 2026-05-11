@@ -31,6 +31,8 @@ export function createApiContext(
     scenes: repos.scenes,
     photoAssets: repos.photoAssets,
     objectStorage,
+    storyboards: repos.storyboards,
+    stylePresets: repos.stylePresets,
   });
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
