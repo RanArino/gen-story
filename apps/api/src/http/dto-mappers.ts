@@ -36,6 +36,7 @@ export function toProjectDto(project: Project): ProjectDto {
     ownerUserId: project.ownerUserId,
     name: project.name,
     status: project.status,
+    deletedAt: project.deletedAt,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
@@ -55,6 +56,7 @@ export function toPhotoAssetDto(asset: PhotoAsset): PhotoAssetDto {
     checksum: asset.checksum,
     sourceKind: asset.sourceKind,
     notes: asset.notes,
+    deletedAt: asset.deletedAt,
     createdAt: asset.createdAt,
     updatedAt: asset.updatedAt,
   };

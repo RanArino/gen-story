@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "paths": {
+      "@gen-story/application": ["../packages/application/src/index.ts"],
+      "@gen-story/domain": ["../packages/domain/src/index.ts"],
+      "@gen-story/shared": ["../packages/shared/src/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts"]
+}

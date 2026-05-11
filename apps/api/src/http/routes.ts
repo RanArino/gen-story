@@ -1,10 +1,16 @@
+import { createReadStream, existsSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { resolve, sep } from "node:path";
 
 import {
   assignPhotosToScene,
   createGenerationRequestUseCase,
   createProjectUseCase,
+  deletePhotoAsset,
+  deleteProject,
   markGeneratedImageAdopted,
+  restorePhotoAsset,
+  restoreProject,
   retryFailedGenerationRequest,
   updatePhotoCuration,
   upsertScenes,
@@ -34,6 +40,7 @@ import {
   useCaseErrorToStatus,
 } from "./errors";
 import { readJsonBody, sendJson } from "./json";
+import { logRequest } from "./request-logger";
 import { getParam, Router } from "./router";
 import {
   AssignScenePhotosSchema,
@@ -72,12 +79,15 @@ export function buildRouter(deps: ApplicationDependencies): Router {
   });
 
   // GET /api/projects
-  router.add("GET", "/api/projects", async (_req, res) => {
+  router.add("GET", "/api/projects", async (req, res) => {
     const principal = await requirePrincipal(deps, res);
     if (principal == null) return;
 
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const includeDeleted = url.searchParams.get("includeDeleted") === "true";
     const projects = await deps.projects.findByOrganizationId(
       principal.organization.id,
+      includeDeleted,
     );
     sendJson(res, 200, { projects: projects.map(toProjectDto) });
   });
@@ -149,7 +159,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
   router.add(
     "GET",
     "/api/projects/:projectId/photo-assets",
-    async (_req, res, params) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -165,7 +175,9 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      const photoAssets = await deps.photoAssets.findByProjectId(projectId);
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const includeDeleted = url.searchParams.get("includeDeleted") === "true";
+      const photoAssets = await deps.photoAssets.findByProjectId(projectId, includeDeleted);
       sendJson(res, 200, { photoAssets: photoAssets.map(toPhotoAssetDto) });
     },
   );
@@ -792,6 +804,152 @@ export function buildRouter(deps: ApplicationDependencies): Router {
     },
   );
 
+  // GET /api/debug/generation-requests
+  router.add("GET", "/api/debug/generation-requests", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    const recent = await deps.generationRequests.findRecent(50);
+    sendJson(res, 200, {
+      generationRequests: recent.map((r) => ({
+        id: r.id,
+        sceneId: r.sceneId,
+        projectId: r.projectId,
+        storyboardId: r.storyboardId,
+        status: r.status,
+        errorMessage: r.errorMessage ?? null,
+        startedAt: r.startedAt ?? null,
+        completedAt: r.completedAt ?? null,
+        createdAt: r.createdAt,
+      })),
+    });
+  });
+
+  // DELETE /api/photo-assets/:photoAssetId
+  router.add("DELETE", "/api/photo-assets/:photoAssetId", async (_req, res, params) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    const photoAssetId = getParam(params, "photoAssetId");
+    const photoAsset = await deps.photoAssets.findById(photoAssetId);
+    if (photoAsset == null) {
+      sendJson(res, 404, notFoundBody("Photo asset not found."));
+      return;
+    }
+    const project = await deps.projects.findById(photoAsset.projectId);
+    if (project == null || project.organizationId !== principal.organization.id) {
+      sendJson(res, 403, forbiddenBody());
+      return;
+    }
+    const result = await deletePhotoAsset(deps, photoAssetId);
+    if (!result.ok) {
+      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+      return;
+    }
+    res.writeHead(204);
+    res.end();
+  });
+
+  // POST /api/photo-assets/:photoAssetId/restore
+  router.add("POST", "/api/photo-assets/:photoAssetId/restore", async (_req, res, params) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    const photoAssetId = getParam(params, "photoAssetId");
+    const result = await restorePhotoAsset(deps, photoAssetId);
+    if (!result.ok) {
+      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+      return;
+    }
+    // Re-fetch via includeDeleted=true path — the record is now active
+    const allAssets = await deps.photoAssets.findByProjectId(
+      (await deps.photoAssets.findById(photoAssetId))!.projectId,
+    );
+    const restored = allAssets.find((a) => a.id === photoAssetId);
+    if (restored == null) {
+      sendJson(res, 404, notFoundBody("Photo asset not found after restore."));
+      return;
+    }
+    sendJson(res, 200, toPhotoAssetDto(restored));
+  });
+
+  // DELETE /api/projects/:projectId
+  router.add("DELETE", "/api/projects/:projectId", async (_req, res, params) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    const projectId = getParam(params, "projectId");
+    const project = await deps.projects.findById(projectId);
+    if (project == null) {
+      sendJson(res, 404, notFoundBody("Project not found."));
+      return;
+    }
+    if (project.organizationId !== principal.organization.id) {
+      sendJson(res, 403, forbiddenBody());
+      return;
+    }
+    const result = await deleteProject(deps, projectId);
+    if (!result.ok) {
+      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+      return;
+    }
+    res.writeHead(204);
+    res.end();
+  });
+
+  // POST /api/projects/:projectId/restore
+  router.add("POST", "/api/projects/:projectId/restore", async (_req, res, params) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    const projectId = getParam(params, "projectId");
+    const result = await restoreProject(deps, projectId);
+    if (!result.ok) {
+      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+      return;
+    }
+    const restored = await deps.projects.findById(projectId);
+    if (restored == null) {
+      sendJson(res, 404, notFoundBody("Project not found after restore."));
+      return;
+    }
+    sendJson(res, 200, toProjectDto(restored));
+  });
+
+  const uploadsRoot = resolve(process.cwd(), "data", "uploads");
+  const repoRoot = resolve(process.cwd());
+
+  const MIME_MAP: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+  };
+
+  router.add("GET", "/files/*", async (_req, res, params) => {
+    const tail = getParam(params, "*");
+    const safePath = resolve(repoRoot, ...tail.split("/").filter(Boolean));
+
+    if (
+      safePath !== uploadsRoot &&
+      !safePath.startsWith(`${uploadsRoot}${sep}`)
+    ) {
+      sendJson(res, 403, errorBody("FORBIDDEN", "Access denied"));
+      return;
+    }
+
+    if (!existsSync(safePath)) {
+      sendJson(res, 404, notFoundBody("File not found"));
+      return;
+    }
+
+    const ext = safePath.slice(safePath.lastIndexOf(".")).toLowerCase();
+    const contentType = MIME_MAP[ext] ?? "application/octet-stream";
+    res.writeHead(200, { "Content-Type": contentType });
+    createReadStream(safePath).pipe(res);
+  });
+
   return router;
 }
 
@@ -800,11 +958,22 @@ export async function handleApiRequest(
   res: ServerResponse,
   router: Router,
 ): Promise<boolean> {
+  const startMs = Date.now();
   try {
-    return await router.handle(req, res);
+    const handled = await router.handle(req, res);
+    if (handled) {
+      logRequest(
+        req.method ?? "GET",
+        req.url ?? "/",
+        res.statusCode,
+        Date.now() - startMs,
+      );
+    }
+    return handled;
   } catch (err) {
     console.error("Unhandled route error:", err);
     sendJson(res, 500, internalErrorBody());
+    logRequest(req.method ?? "GET", req.url ?? "/", 500, Date.now() - startMs);
     return true;
   }
 }

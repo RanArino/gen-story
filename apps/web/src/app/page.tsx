@@ -1,5 +1,5 @@
-import { MockFlowClient } from "../components/mock-flow/MockFlowClient";
+import { redirect } from "next/navigation";
 
 export default function HomePage() {
-  return <MockFlowClient />;
+  redirect("/projects");
 }

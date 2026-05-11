@@ -84,7 +84,7 @@ class InMemoryProjectRepository implements ProjectRepositoryPort {
     return this.store.findById(projectId);
   }
 
-  async findByOrganizationId(organizationId: string): Promise<Project[]> {
+  async findByOrganizationId(organizationId: string, _includeDeleted?: boolean): Promise<Project[]> {
     return this.store
       .values()
       .filter((p) => p.organizationId === organizationId);
@@ -93,6 +93,9 @@ class InMemoryProjectRepository implements ProjectRepositoryPort {
   async save(project: Project): Promise<void> {
     await this.store.save(project);
   }
+
+  async softDelete(_id: string, _deletedAt: string): Promise<void> {}
+  async restore(_id: string, _restoredAt: string): Promise<void> {}
 }
 
 class InMemoryPhotoAssetRepository implements PhotoAssetRepositoryPort {
@@ -102,7 +105,7 @@ class InMemoryPhotoAssetRepository implements PhotoAssetRepositoryPort {
     return this.store.findById(photoAssetId);
   }
 
-  async findByProjectId(projectId: string): Promise<PhotoAsset[]> {
+  async findByProjectId(projectId: string, _includeDeleted?: boolean): Promise<PhotoAsset[]> {
     return this.store
       .values()
       .filter((photoAsset) => photoAsset.projectId === projectId);
@@ -126,6 +129,9 @@ class InMemoryPhotoAssetRepository implements PhotoAssetRepositoryPort {
   async save(photoAsset: PhotoAsset): Promise<void> {
     await this.store.save(photoAsset);
   }
+
+  async softDelete(_id: string, _deletedAt: string): Promise<void> {}
+  async restore(_id: string, _restoredAt: string): Promise<void> {}
 }
 
 class InMemoryStoryboardRepository implements StoryboardRepositoryPort {
@@ -214,6 +220,13 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .values()
       .filter((r) => r.status === "queued")
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async findRecent(limit: number): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
   }
 
   async save(generationRequest: GenerationRequest): Promise<void> {

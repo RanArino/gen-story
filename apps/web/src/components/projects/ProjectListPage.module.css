@@ -1,0 +1,122 @@
+.toolbar {
+  margin-bottom: 20px;
+}
+
+.hint {
+  color: #5a6a7e;
+  font-size: 14px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  max-width: 400px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.projectCard {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.projectCard:hover {
+  border-color: #1a56db;
+  box-shadow: 0 2px 8px rgba(26, 86, 219, 0.1);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cardHeader h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e5e9f0;
+  color: #5a6a7e;
+  white-space: nowrap;
+}
+
+.status_draft { background: #e5e9f0; color: #5a6a7e; }
+.status_active { background: #dbeafe; color: #1d4ed8; }
+.status_completed { background: #dcfce7; color: #166534; }
+.status_archived { background: #f3f4f6; color: #6b7280; }
+
+.meta {
+  margin: 0;
+  font-size: 12px;
+  color: #8898aa;
+}
+
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.projectCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  color: #8898aa;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 0;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.deleteBtn:hover {
+  color: #dc3545;
+}
+
+.projectCardDeleted {
+  opacity: 0.7;
+}
+
+.deletedSection {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e9f0;
+}
+
+.deletedTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5a6a7e;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.deletedHint {
+  font-size: 12px;
+  color: #8898aa;
+  margin: 0 0 16px;
+}

@@ -86,6 +86,9 @@ export class LocalJobWorker {
       return;
     }
 
+    const request = runningResult.value;
+    console.log(`[Worker] starting job ${requestId} for scene ${request.sceneId}`);
+
     try {
       const result = await this.deps.imageGeneration.generate({
         requestId,
@@ -94,6 +97,7 @@ export class LocalJobWorker {
 
       const completedAt = now();
       const generatedImageId = `img-${requestId}-${Date.now()}`;
+      const durationMs = Date.now() - new Date(startedAt).getTime();
 
       await markGenerationRequestCompleted(this.deps, {
         generationRequestId: requestId,
@@ -106,6 +110,8 @@ export class LocalJobWorker {
         checksum: result.checksum,
         completedAt,
       });
+
+      console.log(`[Worker] succeeded job ${requestId} in ${durationMs}ms`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await markGenerationRequestFailed(this.deps, {
@@ -113,6 +119,7 @@ export class LocalJobWorker {
         errorMessage: message.slice(0, 500),
         completedAt: now(),
       });
+      console.log(`[Worker] failed job ${requestId}: ${message}`);
     }
   }
 }
