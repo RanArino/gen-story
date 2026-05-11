@@ -45,6 +45,21 @@ pnpm test
 pnpm build
 ```
 
+## Database
+
+The API app uses local SQLite for persistence. The default database path is:
+
+```sh
+GEN_STORY_SQLITE_PATH=data/gen-story.sqlite
+```
+
+Generate and apply Drizzle migrations from the repository root:
+
+```sh
+pnpm --filter @gen-story/api db:generate
+pnpm --filter @gen-story/api db:migrate
+```
+
 ## Workspace Layout
 
 ```text
@@ -63,7 +78,8 @@ Copy `.env.example` or the app-specific `.env.example` files when local override
 
 - `API_PORT`
 - `NEXT_PUBLIC_API_BASE_URL`
+- `GEN_STORY_SQLITE_PATH`
 
-## Phase 0 Limitations
+## Current Limitations
 
-This baseline intentionally does not include product screens, persistence, image preprocessing, authentication, image generation, video generation, or BGM generation.
+This baseline intentionally does not include API routes for product screens, file storage, image preprocessing, authentication, image generation, video generation, or BGM generation.
