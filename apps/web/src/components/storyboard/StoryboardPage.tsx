@@ -25,8 +25,14 @@ const TONES = [
   { value: "quiet", label: "Quiet", desc: "Peaceful and reflective" },
 ] as const;
 
-const CAMERA_OPTIONS = ["Wide", "Close-up", "Medium", "Aerial", "POV"];
-const LIGHTING_OPTIONS = ["Golden hour", "Natural", "Dramatic", "Night", "Soft"];
+const CAMERA_OPTIONS = [
+  "Wide", "Extreme Wide", "Medium", "Close-up", "Extreme Close-up",
+  "Aerial", "Overhead", "POV", "Low Angle", "Telephoto", "Voyeur",
+];
+const LIGHTING_OPTIONS = [
+  "Golden hour", "Natural", "Dramatic", "Night", "Soft",
+  "Backlit", "Silhouette", "Volumetric",
+];
 const MOTION_OPTIONS = ["Slow pan", "Static", "Zoom in", "Zoom out", "Tracking"];
 const EMOTION_OPTIONS = [
   "Joy", "Nostalgia", "Love", "Pride", "Wonder", "Calm", "Excitement", "Gratitude",

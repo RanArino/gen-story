@@ -5,6 +5,7 @@ import type {
 
 import { createAiInputImage } from "./image-metadata";
 import { buildPhotoAiInputStorageKey } from "../storage/storage-keys";
+import { composeImagePrompt } from "../generation/prompt-composer";
 
 export type NormalizedInputImage = {
   photoAssetId: string;
@@ -22,7 +23,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
   constructor(
     private readonly deps: Pick<
       ApplicationDependencies,
-      "scenes" | "photoAssets" | "objectStorage"
+      "scenes" | "photoAssets" | "objectStorage" | "storyboards" | "stylePresets"
     >,
   ) {}
 
@@ -44,6 +45,24 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
     ) {
       throw new Error("Scene does not match preprocessing target.");
     }
+
+    const storyboard = await this.deps.storyboards.findById(input.storyboardId);
+    if (storyboard == null) {
+      throw new Error("Storyboard not found for image preprocessing.");
+    }
+
+    const stylePreset = storyboard.stylePresetId
+      ? await this.deps.stylePresets.findById(storyboard.stylePresetId)
+      : null;
+
+    const composedPrompt = composeImagePrompt({
+      imagePrompt: scene.imagePrompt ?? "",
+      emotion: scene.emotion ?? "",
+      cameraDirection: scene.cameraDirection ?? "",
+      lightingDirection: scene.lightingDirection ?? "",
+      tone: storyboard.tone ?? "",
+      stylePresetPrompt: stylePreset?.prompt ?? null,
+    });
 
     const normalizedInputImages: NormalizedInputImage[] = [];
 
@@ -96,6 +115,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
     return {
       ...input.inputJson,
       normalizedInputImages,
+      prompt: composedPrompt,
     };
   }
 }
