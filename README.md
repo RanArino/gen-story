@@ -60,6 +60,16 @@ pnpm --filter @gen-story/api db:generate
 pnpm --filter @gen-story/api db:migrate
 ```
 
+## File Storage
+
+The API app stores local uploaded and derived image files under storage keys in:
+
+```sh
+data/uploads
+```
+
+Database rows store storage keys such as `data/uploads/originals/projects/{projectId}/{photoAssetId}.jpg`, not absolute local paths. Local upload data is ignored by git.
+
 ## Workspace Layout
 
 ```text
@@ -82,4 +92,4 @@ Copy `.env.example` or the app-specific `.env.example` files when local override
 
 ## Current Limitations
 
-This baseline intentionally does not include API routes for product screens, file storage, image preprocessing, authentication, image generation, video generation, or BGM generation.
+This baseline intentionally does not include API routes for product screens, authentication, image generation, video generation, or BGM generation.
