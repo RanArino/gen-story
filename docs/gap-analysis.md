@@ -325,7 +325,7 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 ### High Priority — Core Phase 1 Value
 
 1. **AI photo analysis → emotion candidates**
-   Analyzing uploaded photos with an LLM (GPT-4o vision) and proposing emotion/tone candidates is the core differentiating feature of Phase 1. Without it, the user must fill in all emotion and scene fields manually.
+   Analyzing uploaded photos with the latest Gemini model (e.g., Gemini 2.0 Flash) and proposing emotion/tone candidates is the core differentiating feature of Phase 1. Without it, the user must fill in all emotion and scene fields manually.
 
 2. **AI-generated scene descriptions and image prompts**
    The system currently creates placeholder scenes; users must write titles, descriptions, and prompts by hand. Generating these from photo analysis closes the biggest usability gap.
