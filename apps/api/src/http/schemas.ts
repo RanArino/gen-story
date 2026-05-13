@@ -59,6 +59,10 @@ export const AssignScenePhotosSchema = z.object({
   ),
 });
 
+export const CreateTemplateScenesSchema = z.object({
+  photoAssetIds: z.array(z.string().min(1)).min(1).max(20),
+});
+
 export const CreateGenerationRequestSchema = z.object({
   generationRequestId: z.string().optional(),
   inputJson: z.record(z.unknown()).default({}),
