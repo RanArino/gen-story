@@ -215,6 +215,18 @@ export async function assignPhotosToScene(
   });
 }
 
+export async function createTemplateScenesFromPhotos(
+  storyboardId: string,
+  photoAssetIds: string[],
+): Promise<SceneDto[]> {
+  const data = await request<{ scenes: SceneDto[] }>(
+    "POST",
+    `/api/storyboards/${storyboardId}/template-scenes`,
+    { photoAssetIds },
+  );
+  return data.scenes;
+}
+
 // ── Style Presets ─────────────────────────────────────────────────────────────
 
 export async function listStylePresets(): Promise<StylePresetDto[]> {
@@ -254,6 +266,15 @@ export async function retryGenerationRequest(
   return request<GenerationRequestDto>(
     "POST",
     `/api/generation-requests/${generationRequestId}/retry`,
+  );
+}
+
+export async function cancelGenerationRequest(
+  generationRequestId: string,
+): Promise<GenerationRequestDto> {
+  return request<GenerationRequestDto>(
+    "POST",
+    `/api/generation-requests/${generationRequestId}/cancel`,
   );
 }
 
