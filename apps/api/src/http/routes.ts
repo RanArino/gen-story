@@ -4,8 +4,10 @@ import { resolve, sep } from "node:path";
 
 import {
   assignPhotosToScene,
+  cancelGenerationRequest,
   createGenerationRequestUseCase,
   createProjectUseCase,
+  createTemplateScenesFromPhotos,
   deletePhotoAsset,
   deleteProject,
   markGeneratedImageAdopted,
@@ -46,6 +48,7 @@ import {
   AssignScenePhotosSchema,
   CreateGenerationRequestSchema,
   CreateProjectSchema,
+  CreateTemplateScenesSchema,
   PatchPhotoAssetSchema,
   UploadPhotoAssetSchema,
   UpsertScenesSchema,
@@ -500,6 +503,67 @@ export function buildRouter(deps: ApplicationDependencies): Router {
     },
   );
 
+  // POST /api/storyboards/:storyboardId/template-scenes
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/template-scenes",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = CreateTemplateScenesSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await createTemplateScenesFromPhotos(deps, {
+        storyboardId,
+        projectId: storyboard.projectId,
+        photoAssetIds: parsed.data.photoAssetIds,
+      });
+
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 201, { scenes: result.value.map(toSceneDto) });
+    },
+  );
+
   // PUT /api/scenes/:sceneId/photo-assets
   router.add(
     "PUT",
@@ -695,6 +759,48 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       const result = await retryFailedGenerationRequest(deps, {
         generationRequestId,
         newGenerationRequestId,
+      });
+
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toGenerationRequestDto(result.value));
+    },
+  );
+
+  // POST /api/generation-requests/:generationRequestId/cancel
+  router.add(
+    "POST",
+    "/api/generation-requests/:generationRequestId/cancel",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const generationRequestId = getParam(params, "generationRequestId");
+      const generationRequest =
+        await deps.generationRequests.findById(generationRequestId);
+      if (generationRequest == null) {
+        sendJson(res, 404, notFoundBody("Generation request not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(generationRequest.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      const result = await cancelGenerationRequest(deps, {
+        generationRequestId,
       });
 
       if (!result.ok) {
