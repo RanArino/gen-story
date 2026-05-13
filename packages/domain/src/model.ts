@@ -377,6 +377,40 @@ export function createScene(input: CreateSceneInput): Scene {
   };
 }
 
+export type CreateTemplateSceneInput = {
+  id: SceneId;
+  projectId: ProjectId;
+  storyboardId: StoryboardId;
+  orderIndex: number;
+  photoAssetId?: PhotoAssetId;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    storyboardId: input.storyboardId,
+    orderIndex: input.orderIndex,
+    status: "draft",
+    title: "",
+    description: "",
+    imagePrompt: "",
+    emotion: "",
+    cameraDirection: "",
+    lightingDirection: "",
+    motionDirection: "",
+    notes: "",
+    photoAssets: input.photoAssetId
+      ? [{ photoAssetId: input.photoAssetId, role: "primary" }]
+      : [],
+    adoptedGeneratedImageId: null,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+  };
+}
+
 export function createStylePreset(input: CreateStylePresetInput): StylePreset {
   return {
     id: input.id,
