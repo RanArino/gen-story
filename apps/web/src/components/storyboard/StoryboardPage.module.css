@@ -117,9 +117,31 @@
   letter-spacing: 0.06em;
 }
 
-.sceneMoveButtons {
+.sceneHeaderActions {
   display: flex;
+  align-items: center;
   gap: 4px;
+}
+
+.aiFillBtn {
+  padding: 4px 10px;
+  border: 1px solid #1a56db;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1a56db;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.aiFillBtn:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.aiFillBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .moveBtn {
