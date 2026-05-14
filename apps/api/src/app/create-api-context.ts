@@ -10,6 +10,7 @@ import { createSqliteRepositories } from "../db/repositories";
 import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
 import { OpenAiImageGenerationAdapter } from "../generation/openai-image-generation";
 import { LocalImagePreprocessingAdapter } from "../images/local-image-preprocessing";
+import { LocalSceneFillGenerationAdapter } from "../scene-fill/local-scene-fill-generation";
 import { LocalObjectStorage } from "../storage/local-object-storage";
 
 class NoOpJobQueue implements JobQueuePort {
@@ -39,12 +40,14 @@ export function createApiContext(
   const imageGeneration = openaiApiKey
     ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey)
     : new MockImageGenerationAdapter(objectStorage);
+  const sceneFillGeneration = new LocalSceneFillGenerationAdapter();
 
   return {
     ...repos,
     objectStorage,
     imagePreprocessing,
     imageGeneration,
+    sceneFillGeneration,
     jobQueue: new NoOpJobQueue(),
     progressEvents: new NoOpProgressEvents(),
     authContext: new LocalAuthContext(repos),
