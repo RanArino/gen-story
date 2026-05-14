@@ -42,6 +42,7 @@ Default local URLs:
 - MUST keep REST request and response shapes explicit; never expose ORM schemas, SDK responses, or framework objects across boundaries.
 - MUST run `pnpm typecheck` after code changes unless dependencies or environment issues make it impossible.
 - MUST update docs when commands, setup, environment variables, APIs, configuration, or user-visible behavior changes.
+- MUST update `docs/gap-analysis.md` whenever work starts, is planned with an ExecPlan, or is completed for any requirement tracked there. If an ExecPlan targets a `❌ Not yet implemented` requirement, change that requirement to `🟡 In progress` in the same change as the plan.
 - MUST use `.env.example` for documented local environment variables.
 - NEVER commit `.env` files, secrets, credentials, or private tokens.
 - NEVER edit generated outputs such as `node_modules`, `.next`, `dist`, or `*.tsbuildinfo` manually.
@@ -57,3 +58,4 @@ Default local URLs:
 - Run the narrowest relevant check first, then broader checks for shared behavior or workspace changes.
 - If a check cannot run, document why and describe the closest verification performed.
 - Use an ExecPlan for multi-step, risky, architectural, migration-oriented, or explicitly requested work; follow `/Users/ran/my-app/PLANS.md`.
+- When creating or updating an ExecPlan from `docs/gap-analysis.md`, keep `docs/gap-analysis.md` synchronized before finishing the turn, including status icons, notes, and summary counts.
