@@ -10,6 +10,9 @@ import type {
   PhotoAssetRepositoryPort,
   ProgressEventPort,
   ProjectRepositoryPort,
+  SceneFillGenerationInput,
+  SceneFillGenerationPort,
+  SceneFillSuggestion,
   SceneRepositoryPort,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
@@ -299,6 +302,22 @@ class InMemoryImageGeneration implements ImageGenerationPort {
   }
 }
 
+class InMemorySceneFillGeneration implements SceneFillGenerationPort {
+  async generateSceneFill(
+    input: SceneFillGenerationInput,
+  ): Promise<SceneFillSuggestion> {
+    return {
+      title: `AI ${input.primaryPhoto.name}`,
+      description: `AI description for ${input.primaryPhoto.name}`,
+      imagePrompt: `AI image prompt for ${input.primaryPhoto.name}`,
+      emotion: "Joy",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "Slow pan",
+    };
+  }
+}
+
 class InMemoryJobQueue implements JobQueuePort {
   async enqueue(): Promise<{ jobId: string }> {
     return { jobId: "job_1" };
@@ -363,6 +382,7 @@ export function createInMemoryApplicationDependencies(
     objectStorage: new InMemoryObjectStorage(),
     imagePreprocessing: new InMemoryImagePreprocessing(),
     imageGeneration: new InMemoryImageGeneration(),
+    sceneFillGeneration: new InMemorySceneFillGeneration(),
     jobQueue: new InMemoryJobQueue(),
     progressEvents: new InMemoryProgressEvents(),
     authContext: new LocalAuthContext({
