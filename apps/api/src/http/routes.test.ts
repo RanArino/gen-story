@@ -438,6 +438,180 @@ describe("GET /api/storyboards/:storyboardId/scenes and PUT scenes", () => {
   });
 });
 
+describe("POST /api/scenes/:sceneId/ai-fill", () => {
+  it("fills an authorized scene and returns the updated scene DTO", async () => {
+    const {
+      createPhotoAsset,
+      createProject,
+      createStoryboard,
+      createTemplateScene,
+    } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+
+    await deps.projects.save(
+      createProject({
+        id: "ai-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "AI Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "ai-sb",
+        projectId: "ai-proj",
+        tone: "warm",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: "ai-photo",
+        projectId: "ai-proj",
+        name: "family.jpg",
+        storageKey: "photos/family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: "ai-photo-checksum",
+        sourceKind: "upload",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createTemplateScene({
+        id: "ai-scene",
+        projectId: "ai-proj",
+        storyboardId: "ai-sb",
+        orderIndex: 0,
+        photoAssetId: "ai-photo",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      "/api/scenes/ai-scene/ai-fill",
+      {},
+    );
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      id: "ai-scene",
+      title: "AI family.jpg",
+      description: "AI description for family.jpg",
+      imagePrompt: "AI image prompt for family.jpg",
+    });
+  });
+
+  it("returns 403 for a scene in another organization", async () => {
+    const { createProject, createTemplateScene, createStoryboard } =
+      await import("@gen-story/domain");
+    const now = new Date().toISOString();
+
+    await deps.projects.save(
+      createProject({
+        id: "foreign-ai-proj",
+        organizationId: "other-org",
+        ownerUserId: "other-user",
+        name: "Foreign AI",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "foreign-ai-sb",
+        projectId: "foreign-ai-proj",
+        tone: "warm",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createTemplateScene({
+        id: "foreign-ai-scene",
+        projectId: "foreign-ai-proj",
+        storyboardId: "foreign-ai-sb",
+        orderIndex: 0,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/scenes/foreign-ai-scene/ai-fill",
+      {},
+    );
+
+    expect(status).toBe(403);
+  });
+
+  it("returns 422 when the scene has no primary photo", async () => {
+    const { createProject, createTemplateScene, createStoryboard } =
+      await import("@gen-story/domain");
+    const now = new Date().toISOString();
+
+    await deps.projects.save(
+      createProject({
+        id: "no-photo-ai-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "No Photo AI",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "no-photo-ai-sb",
+        projectId: "no-photo-ai-proj",
+        tone: "warm",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createTemplateScene({
+        id: "no-photo-ai-scene",
+        projectId: "no-photo-ai-proj",
+        storyboardId: "no-photo-ai-sb",
+        orderIndex: 0,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      "/api/scenes/no-photo-ai-scene/ai-fill",
+      {},
+    );
+
+    expect(status).toBe(422);
+    expect(body).toMatchObject({ error: { code: "validation_error" } });
+  });
+
+  it("returns 404 for an unknown scene", async () => {
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/scenes/missing-ai-scene/ai-fill",
+      {},
+    );
+
+    expect(status).toBe(404);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Style presets
 // ---------------------------------------------------------------------------

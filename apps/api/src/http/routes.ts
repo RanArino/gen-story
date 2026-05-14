@@ -10,6 +10,7 @@ import {
   createTemplateScenesFromPhotos,
   deletePhotoAsset,
   deleteProject,
+  fillSceneWithAi,
   markGeneratedImageAdopted,
   restorePhotoAsset,
   restoreProject,
@@ -49,6 +50,7 @@ import {
   CreateGenerationRequestSchema,
   CreateProjectSchema,
   CreateTemplateScenesSchema,
+  FillSceneWithAiSchema,
   PatchPhotoAssetSchema,
   UploadPhotoAssetSchema,
   UpsertScenesSchema,
@@ -611,6 +613,62 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         photoAssets: parsed.data.photoAssets,
       });
 
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toSceneDto(result.value));
+    },
+  );
+
+  // POST /api/scenes/:sceneId/ai-fill
+  router.add(
+    "POST",
+    "/api/scenes/:sceneId/ai-fill",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const sceneId = getParam(params, "sceneId");
+      const scene = await deps.scenes.findById(sceneId);
+      if (scene == null) {
+        sendJson(res, 404, notFoundBody("Scene not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(scene.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = FillSceneWithAiSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await fillSceneWithAi(deps, { sceneId });
       if (!result.ok) {
         sendJson(
           res,
