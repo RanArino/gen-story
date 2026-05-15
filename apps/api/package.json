@@ -19,6 +19,7 @@
     "@gen-story/application": "workspace:*",
     "@gen-story/domain": "workspace:*",
     "@gen-story/shared": "workspace:*",
+    "@google/genai": "^2.2.0",
     "better-sqlite3": "^12.9.0",
     "drizzle-orm": "^0.45.2",
     "file-type": "^22.0.1",
