@@ -29,15 +29,18 @@ Copy the example env file and edit as needed:
 cp apps/api/.env.example apps/api/.env
 ```
 
-| Variable | Default | Description |
-|---|---|---|
-| `API_PORT` | `4000` | Port for the API server |
-| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:4000` | API base URL used by the web app |
-| `GEN_STORY_SQLITE_PATH` | `data/gen-story.sqlite` | Path to the SQLite database file |
-| `OPENAI_API_KEY` | _(none)_ | Optional. Required for real image generation |
-| `IMAGE_GENERATION_ADAPTER` | `mock` | Set to `openai` to use real generation |
+| Variable                      | Default                 | Description                                                  |
+| ----------------------------- | ----------------------- | ------------------------------------------------------------ |
+| `API_PORT`                    | `4000`                  | Port for the API server                                      |
+| `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000` | API base URL used by the web app                             |
+| `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite` | Path to the SQLite database file                             |
+| `OPENAI_API_KEY`              | _(none)_                | Optional. Required for real image generation                 |
+| `IMAGE_GENERATION_ADAPTER`    | `mock`                  | Set to `openai` to use real generation                       |
+| `GEMINI_API_KEY`              | _(none)_                | Optional. Enables real photo analysis for emotion candidates |
+| `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`      | Gemini model used for project photo analysis                 |
 
 The app works without an OpenAI key — it uses a mock adapter that generates placeholder images.
+The app works without a Gemini key; photo analysis uses deterministic local suggestions.
 
 ## Apply Database Migrations
 
