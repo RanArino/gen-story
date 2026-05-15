@@ -10,6 +10,11 @@ import { createSqliteRepositories } from "../db/repositories";
 import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
 import { OpenAiImageGenerationAdapter } from "../generation/openai-image-generation";
 import { LocalImagePreprocessingAdapter } from "../images/local-image-preprocessing";
+import {
+  DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL,
+  GeminiPhotoAnalysisGenerationAdapter,
+} from "../photo-analysis/gemini-photo-analysis-generation";
+import { LocalPhotoAnalysisGenerationAdapter } from "../photo-analysis/local-photo-analysis-generation";
 import { LocalSceneFillGenerationAdapter } from "../scene-fill/local-scene-fill-generation";
 import { LocalObjectStorage } from "../storage/local-object-storage";
 
@@ -41,6 +46,15 @@ export function createApiContext(
     ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey)
     : new MockImageGenerationAdapter(objectStorage);
   const sceneFillGeneration = new LocalSceneFillGenerationAdapter();
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const photoAnalysisGeneration = geminiApiKey
+    ? new GeminiPhotoAnalysisGenerationAdapter(
+        objectStorage,
+        geminiApiKey,
+        process.env.GEMINI_PHOTO_ANALYSIS_MODEL ??
+          DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL,
+      )
+    : new LocalPhotoAnalysisGenerationAdapter();
 
   return {
     ...repos,
@@ -48,6 +62,7 @@ export function createApiContext(
     imagePreprocessing,
     imageGeneration,
     sceneFillGeneration,
+    photoAnalysisGeneration,
     jobQueue: new NoOpJobQueue(),
     progressEvents: new NoOpProgressEvents(),
     authContext: new LocalAuthContext(repos),
