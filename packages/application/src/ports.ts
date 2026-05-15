@@ -5,6 +5,7 @@ import type {
   Organization,
   PhotoAsset,
   Project,
+  ProjectPhotoAnalysis,
   Scene,
   Storyboard,
   StylePreset,
@@ -28,7 +29,10 @@ export interface OrganizationRepositoryPort {
 
 export interface ProjectRepositoryPort {
   findById(projectId: string): Promise<Project | null>;
-  findByOrganizationId(organizationId: string, includeDeleted?: boolean): Promise<Project[]>;
+  findByOrganizationId(
+    organizationId: string,
+    includeDeleted?: boolean,
+  ): Promise<Project[]>;
   save(project: Project): Promise<void>;
   softDelete(projectId: string, deletedAt: string): Promise<void>;
   restore(projectId: string, restoredAt: string): Promise<void>;
@@ -36,7 +40,10 @@ export interface ProjectRepositoryPort {
 
 export interface PhotoAssetRepositoryPort {
   findById(photoAssetId: string): Promise<PhotoAsset | null>;
-  findByProjectId(projectId: string, includeDeleted?: boolean): Promise<PhotoAsset[]>;
+  findByProjectId(
+    projectId: string,
+    includeDeleted?: boolean,
+  ): Promise<PhotoAsset[]>;
   findByProjectIdAndChecksum(
     projectId: string,
     checksum: string,
@@ -81,6 +88,13 @@ export interface GeneratedImageRepositoryPort {
   findById(generatedImageId: string): Promise<GeneratedImage | null>;
   findBySceneId(sceneId: string): Promise<GeneratedImage[]>;
   save(generatedImage: GeneratedImage): Promise<void>;
+}
+
+export interface ProjectPhotoAnalysisRepositoryPort {
+  findLatestByProjectId(
+    projectId: string,
+  ): Promise<ProjectPhotoAnalysis | null>;
+  save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void>;
 }
 
 export interface ObjectStoragePort {
@@ -142,6 +156,25 @@ export interface SceneFillGenerationPort {
   ): Promise<SceneFillSuggestion>;
 }
 
+export type PhotoAnalysisGenerationInput = {
+  project: Project;
+  storyboard: Storyboard | null;
+  photos: PhotoAsset[];
+};
+
+export type PhotoAnalysisGenerationResult = {
+  emotionCandidates: ProjectPhotoAnalysis["emotionCandidates"];
+  photoInsights: ProjectPhotoAnalysis["photoInsights"];
+  storySummary: string;
+  model: string;
+};
+
+export interface PhotoAnalysisGenerationPort {
+  analyzeProjectPhotos(
+    input: PhotoAnalysisGenerationInput,
+  ): Promise<PhotoAnalysisGenerationResult>;
+}
+
 export interface JobQueuePort {
   enqueue(job: {
     kind: string;
@@ -172,10 +205,12 @@ export interface ApplicationDependencies {
   stylePresets: StylePresetRepositoryPort;
   generationRequests: GenerationRequestRepositoryPort;
   generatedImages: GeneratedImageRepositoryPort;
+  projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
   objectStorage: ObjectStoragePort;
   imagePreprocessing: ImagePreprocessingPort;
   imageGeneration: ImageGenerationPort;
   sceneFillGeneration: SceneFillGenerationPort;
+  photoAnalysisGeneration: PhotoAnalysisGenerationPort;
   jobQueue: JobQueuePort;
   progressEvents: ProgressEventPort;
   authContext: AuthContextPort;
