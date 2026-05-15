@@ -247,3 +247,24 @@ export const generatedImages = sqliteTable(
       .where(sql`${table.adoptedAt} is not null`),
   ],
 );
+
+export const projectPhotoAnalyses = sqliteTable(
+  "project_photo_analyses",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    emotionCandidatesJson: text("emotion_candidates_json").notNull(),
+    photoInsightsJson: text("photo_insights_json").notNull(),
+    storySummary: text("story_summary").notNull(),
+    model: text("model").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    deletedAt: text("deleted_at"),
+  },
+  (table) => [
+    uniqueIndex("project_photo_analyses_project_id_unique").on(table.projectId),
+    index("project_photo_analyses_project_id_idx").on(table.projectId),
+  ],
+);
