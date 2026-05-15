@@ -5,6 +5,7 @@ import {
   createGenerationRequest,
   createPhotoAsset,
   createProject,
+  createProjectPhotoAnalysis,
   createScene,
   createStoryboard,
   createTemplateScene,
@@ -18,6 +19,7 @@ import {
   type PhotoAsset,
   type PhotoUsage,
   type Project,
+  type ProjectPhotoAnalysis,
   type Scene,
   type ScenePhotoAsset,
   type Storyboard,
@@ -486,10 +488,15 @@ export async function createTemplateScenesFromPhotos(
     if (isFailure(storyboard)) return storyboard;
 
     if (storyboard.projectId !== input.projectId) {
-      return failure("invalid_state", "Storyboard does not belong to this project.");
+      return failure(
+        "invalid_state",
+        "Storyboard does not belong to this project.",
+      );
     }
 
-    const existingScenes = await deps.scenes.findByStoryboardId(input.storyboardId);
+    const existingScenes = await deps.scenes.findByStoryboardId(
+      input.storyboardId,
+    );
     const baseIndex = existingScenes.length;
 
     const createdScenes: Scene[] = [];
@@ -499,8 +506,15 @@ export async function createTemplateScenesFromPhotos(
       const photoAssetId = input.photoAssetIds[i]!;
       const photo = await deps.photoAssets.findById(photoAssetId);
 
-      if (!photo || photo.projectId !== input.projectId || photo.deletedAt !== null) {
-        return failure("not_found", `Photo ${photoAssetId} not found in project.`);
+      if (
+        !photo ||
+        photo.projectId !== input.projectId ||
+        photo.deletedAt !== null
+      ) {
+        return failure(
+          "not_found",
+          `Photo ${photoAssetId} not found in project.`,
+        );
       }
 
       const scene = createTemplateScene({
@@ -527,6 +541,94 @@ export async function createTemplateScenesFromPhotos(
     await deps.storyboards.save(updatedStoryboard);
 
     return success(createdScenes);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type AnalyzeProjectPhotosInput = {
+  projectId: string;
+};
+
+function isAnalyzablePhoto(photo: PhotoAsset): boolean {
+  return (
+    photo.deletedAt === null &&
+    (photo.usage === "candidate" || photo.usage === "reference")
+  );
+}
+
+export async function analyzeProjectPhotos(
+  deps: ApplicationDependencies,
+  input: AnalyzeProjectPhotosInput,
+): Promise<UseCaseResult<ProjectPhotoAnalysis>> {
+  try {
+    const project = await getProjectOrNotFound(deps, input.projectId);
+    if (isFailure(project)) return project;
+
+    const photos = (await deps.photoAssets.findByProjectId(project.id)).filter(
+      isAnalyzablePhoto,
+    );
+
+    if (photos.length === 0) {
+      return failure(
+        "validation_error",
+        "Project must have at least one candidate or reference photo for analysis.",
+      );
+    }
+
+    const storyboards = await deps.storyboards.findByProjectId(project.id);
+    const storyboard = storyboards[0] ?? null;
+    const generated = await deps.photoAnalysisGeneration.analyzeProjectPhotos({
+      project,
+      storyboard,
+      photos,
+    });
+    const timestamp = now();
+    const existing = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
+    const analysis = createProjectPhotoAnalysis({
+      id: existing?.id ?? randomUUID(),
+      projectId: project.id,
+      emotionCandidates: generated.emotionCandidates,
+      photoInsights: generated.photoInsights,
+      storySummary: generated.storySummary,
+      model: generated.model,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    });
+
+    await deps.projectPhotoAnalyses.save(analysis);
+    await deps.progressEvents.publish({
+      kind: "project_photo_analysis.completed",
+      entityType: "project",
+      entityId: project.id,
+      payload: {
+        projectPhotoAnalysisId: analysis.id,
+        model: analysis.model,
+        photoCount: photos.length,
+      },
+    });
+
+    return success(analysis);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function getProjectPhotoAnalysis(
+  deps: ApplicationDependencies,
+  input: AnalyzeProjectPhotosInput,
+): Promise<UseCaseResult<ProjectPhotoAnalysis | null>> {
+  try {
+    const project = await getProjectOrNotFound(deps, input.projectId);
+    if (isFailure(project)) return project;
+
+    const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
+
+    return success(analysis);
   } catch (error) {
     return validationFailure(error);
   }
@@ -591,7 +693,10 @@ export async function fillSceneWithAi(
       primaryPhoto.projectId !== scene.projectId ||
       primaryPhoto.deletedAt !== null
     ) {
-      return failure("validation_error", "Scene primary photo is not available.");
+      return failure(
+        "validation_error",
+        "Scene primary photo is not available.",
+      );
     }
 
     const blankFields = sceneFillFields.filter((field) =>
