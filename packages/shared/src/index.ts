@@ -123,3 +123,31 @@ export type GeneratedImageDto = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type EmotionCandidateDto = {
+  value: string;
+  label: string;
+  description: string;
+  reason: string;
+};
+
+export type PhotoInsightDto = {
+  photoAssetId: string;
+  summary: string;
+  people: string;
+  setting: string;
+  event: string;
+  atmosphere: string;
+};
+
+export type ProjectPhotoAnalysisDto = {
+  id: string;
+  projectId: string;
+  emotionCandidates: EmotionCandidateDto[];
+  photoInsights: PhotoInsightDto[];
+  storySummary: string;
+  model: string;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
