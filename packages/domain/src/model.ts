@@ -9,6 +9,7 @@ export type SceneId = string;
 export type StylePresetId = string;
 export type GenerationRequestId = string;
 export type GeneratedImageId = string;
+export type ProjectPhotoAnalysisId = string;
 
 export type ProjectStatus = "draft" | "active" | "completed" | "archived";
 export type StoryboardStatus = "draft" | "editing" | "ready" | "completed";
@@ -146,6 +147,34 @@ export type GeneratedImage = {
   updatedAt: Timestamp;
 };
 
+export type EmotionCandidate = {
+  value: string;
+  label: string;
+  description: string;
+  reason: string;
+};
+
+export type PhotoInsight = {
+  photoAssetId: PhotoAssetId;
+  summary: string;
+  people: string;
+  setting: string;
+  event: string;
+  atmosphere: string;
+};
+
+export type ProjectPhotoAnalysis = {
+  id: ProjectPhotoAnalysisId;
+  projectId: ProjectId;
+  emotionCandidates: EmotionCandidate[];
+  photoInsights: PhotoInsight[];
+  storySummary: string;
+  model: string;
+  deletedAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 export type CreateUserInput = {
   id: UserId;
   organizationId: OrganizationId;
@@ -264,6 +293,18 @@ export type CreateGeneratedImageInput = {
   updatedAt: Timestamp;
 };
 
+export type CreateProjectPhotoAnalysisInput = {
+  id: ProjectPhotoAnalysisId;
+  projectId: ProjectId;
+  emotionCandidates: EmotionCandidate[];
+  photoInsights: PhotoInsight[];
+  storySummary: string;
+  model: string;
+  deletedAt?: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 function trimRequiredText(value: string, fieldName: string): string {
   const trimmedValue = value.trim();
 
@@ -276,6 +317,10 @@ function trimRequiredText(value: string, fieldName: string): string {
 
 function trimOptionalText(value: string | null | undefined): string {
   return value == null ? "" : value.trim();
+}
+
+function trimRequiredAnalysisText(value: string, fieldName: string): string {
+  return trimRequiredText(value, fieldName);
 }
 
 export function createUser(input: CreateUserInput): User {
@@ -461,6 +506,64 @@ export function createGeneratedImage(
     height: input.height ?? null,
     checksum: trimRequiredText(input.checksum, "Generated image checksum"),
     adoptedAt: input.adoptedAt ?? null,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+  };
+}
+
+export function createProjectPhotoAnalysis(
+  input: CreateProjectPhotoAnalysisInput,
+): ProjectPhotoAnalysis {
+  const emotionCandidates = input.emotionCandidates.map((candidate) => ({
+    value: trimRequiredAnalysisText(candidate.value, "Emotion candidate value"),
+    label: trimRequiredAnalysisText(candidate.label, "Emotion candidate label"),
+    description: trimRequiredAnalysisText(
+      candidate.description,
+      "Emotion candidate description",
+    ),
+    reason: trimRequiredAnalysisText(
+      candidate.reason,
+      "Emotion candidate reason",
+    ),
+  }));
+
+  if (emotionCandidates.length === 0) {
+    throw new Error("Project photo analysis emotion candidates are required.");
+  }
+
+  const photoInsights = input.photoInsights.map((insight) => ({
+    photoAssetId: trimRequiredAnalysisText(
+      insight.photoAssetId,
+      "Photo insight photo asset ID",
+    ),
+    summary: trimRequiredAnalysisText(insight.summary, "Photo insight summary"),
+    people: trimRequiredAnalysisText(insight.people, "Photo insight people"),
+    setting: trimRequiredAnalysisText(insight.setting, "Photo insight setting"),
+    event: trimRequiredAnalysisText(insight.event, "Photo insight event"),
+    atmosphere: trimRequiredAnalysisText(
+      insight.atmosphere,
+      "Photo insight atmosphere",
+    ),
+  }));
+
+  if (photoInsights.length === 0) {
+    throw new Error("Project photo analysis photo insights are required.");
+  }
+
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    emotionCandidates,
+    photoInsights,
+    storySummary: trimRequiredAnalysisText(
+      input.storySummary,
+      "Project photo analysis story summary",
+    ),
+    model: trimRequiredAnalysisText(
+      input.model,
+      "Project photo analysis model",
+    ),
+    deletedAt: input.deletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
