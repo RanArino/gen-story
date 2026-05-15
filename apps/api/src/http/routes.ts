@@ -4,6 +4,7 @@ import { resolve, sep } from "node:path";
 
 import {
   assignPhotosToScene,
+  analyzeProjectPhotos,
   cancelGenerationRequest,
   createGenerationRequestUseCase,
   createProjectUseCase,
@@ -11,6 +12,7 @@ import {
   deletePhotoAsset,
   deleteProject,
   fillSceneWithAi,
+  getProjectPhotoAnalysis,
   markGeneratedImageAdopted,
   restorePhotoAsset,
   restoreProject,
@@ -29,6 +31,7 @@ import {
   toMeDto,
   toPhotoAssetDto,
   toProjectDto,
+  toProjectPhotoAnalysisDto,
   toSceneDto,
   toStoryboardDto,
   toStylePresetDto,
@@ -47,6 +50,7 @@ import { logRequest } from "./request-logger";
 import { getParam, Router } from "./router";
 import {
   AssignScenePhotosSchema,
+  AnalyzeProjectPhotosSchema,
   CreateGenerationRequestSchema,
   CreateProjectSchema,
   CreateTemplateScenesSchema,
@@ -182,8 +186,102 @@ export function buildRouter(deps: ApplicationDependencies): Router {
 
       const url = new URL(req.url ?? "/", "http://localhost");
       const includeDeleted = url.searchParams.get("includeDeleted") === "true";
-      const photoAssets = await deps.photoAssets.findByProjectId(projectId, includeDeleted);
+      const photoAssets = await deps.photoAssets.findByProjectId(
+        projectId,
+        includeDeleted,
+      );
       sendJson(res, 200, { photoAssets: photoAssets.map(toPhotoAssetDto) });
+    },
+  );
+
+  // GET /api/projects/:projectId/photo-analysis
+  router.add(
+    "GET",
+    "/api/projects/:projectId/photo-analysis",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const projectId = getParam(params, "projectId");
+      const project = await deps.projects.findById(projectId);
+      if (project == null) {
+        sendJson(res, 404, notFoundBody("Project not found."));
+        return;
+      }
+
+      if (project.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      const result = await getProjectPhotoAnalysis(deps, { projectId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, {
+        photoAnalysis:
+          result.value == null ? null : toProjectPhotoAnalysisDto(result.value),
+      });
+    },
+  );
+
+  // POST /api/projects/:projectId/photo-analysis
+  router.add(
+    "POST",
+    "/api/projects/:projectId/photo-analysis",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const projectId = getParam(params, "projectId");
+      const project = await deps.projects.findById(projectId);
+      if (project == null) {
+        sendJson(res, 404, notFoundBody("Project not found."));
+        return;
+      }
+
+      if (project.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = AnalyzeProjectPhotosSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await analyzeProjectPhotos(deps, { projectId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, {
+        photoAnalysis: toProjectPhotoAnalysisDto(result.value),
+      });
     },
   );
 
@@ -990,95 +1088,134 @@ export function buildRouter(deps: ApplicationDependencies): Router {
   });
 
   // DELETE /api/photo-assets/:photoAssetId
-  router.add("DELETE", "/api/photo-assets/:photoAssetId", async (_req, res, params) => {
-    const principal = await requirePrincipal(deps, res);
-    if (principal == null) return;
+  router.add(
+    "DELETE",
+    "/api/photo-assets/:photoAssetId",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
 
-    const photoAssetId = getParam(params, "photoAssetId");
-    const photoAsset = await deps.photoAssets.findById(photoAssetId);
-    if (photoAsset == null) {
-      sendJson(res, 404, notFoundBody("Photo asset not found."));
-      return;
-    }
-    const project = await deps.projects.findById(photoAsset.projectId);
-    if (project == null || project.organizationId !== principal.organization.id) {
-      sendJson(res, 403, forbiddenBody());
-      return;
-    }
-    const result = await deletePhotoAsset(deps, photoAssetId);
-    if (!result.ok) {
-      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
-      return;
-    }
-    res.writeHead(204);
-    res.end();
-  });
+      const photoAssetId = getParam(params, "photoAssetId");
+      const photoAsset = await deps.photoAssets.findById(photoAssetId);
+      if (photoAsset == null) {
+        sendJson(res, 404, notFoundBody("Photo asset not found."));
+        return;
+      }
+      const project = await deps.projects.findById(photoAsset.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+      const result = await deletePhotoAsset(deps, photoAssetId);
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+      res.writeHead(204);
+      res.end();
+    },
+  );
 
   // POST /api/photo-assets/:photoAssetId/restore
-  router.add("POST", "/api/photo-assets/:photoAssetId/restore", async (_req, res, params) => {
-    const principal = await requirePrincipal(deps, res);
-    if (principal == null) return;
+  router.add(
+    "POST",
+    "/api/photo-assets/:photoAssetId/restore",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
 
-    const photoAssetId = getParam(params, "photoAssetId");
-    const result = await restorePhotoAsset(deps, photoAssetId);
-    if (!result.ok) {
-      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
-      return;
-    }
-    // Re-fetch via includeDeleted=true path — the record is now active
-    const allAssets = await deps.photoAssets.findByProjectId(
-      (await deps.photoAssets.findById(photoAssetId))!.projectId,
-    );
-    const restored = allAssets.find((a) => a.id === photoAssetId);
-    if (restored == null) {
-      sendJson(res, 404, notFoundBody("Photo asset not found after restore."));
-      return;
-    }
-    sendJson(res, 200, toPhotoAssetDto(restored));
-  });
+      const photoAssetId = getParam(params, "photoAssetId");
+      const result = await restorePhotoAsset(deps, photoAssetId);
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+      // Re-fetch via includeDeleted=true path — the record is now active
+      const allAssets = await deps.photoAssets.findByProjectId(
+        (await deps.photoAssets.findById(photoAssetId))!.projectId,
+      );
+      const restored = allAssets.find((a) => a.id === photoAssetId);
+      if (restored == null) {
+        sendJson(
+          res,
+          404,
+          notFoundBody("Photo asset not found after restore."),
+        );
+        return;
+      }
+      sendJson(res, 200, toPhotoAssetDto(restored));
+    },
+  );
 
   // DELETE /api/projects/:projectId
-  router.add("DELETE", "/api/projects/:projectId", async (_req, res, params) => {
-    const principal = await requirePrincipal(deps, res);
-    if (principal == null) return;
+  router.add(
+    "DELETE",
+    "/api/projects/:projectId",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
 
-    const projectId = getParam(params, "projectId");
-    const project = await deps.projects.findById(projectId);
-    if (project == null) {
-      sendJson(res, 404, notFoundBody("Project not found."));
-      return;
-    }
-    if (project.organizationId !== principal.organization.id) {
-      sendJson(res, 403, forbiddenBody());
-      return;
-    }
-    const result = await deleteProject(deps, projectId);
-    if (!result.ok) {
-      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
-      return;
-    }
-    res.writeHead(204);
-    res.end();
-  });
+      const projectId = getParam(params, "projectId");
+      const project = await deps.projects.findById(projectId);
+      if (project == null) {
+        sendJson(res, 404, notFoundBody("Project not found."));
+        return;
+      }
+      if (project.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+      const result = await deleteProject(deps, projectId);
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+      res.writeHead(204);
+      res.end();
+    },
+  );
 
   // POST /api/projects/:projectId/restore
-  router.add("POST", "/api/projects/:projectId/restore", async (_req, res, params) => {
-    const principal = await requirePrincipal(deps, res);
-    if (principal == null) return;
+  router.add(
+    "POST",
+    "/api/projects/:projectId/restore",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
 
-    const projectId = getParam(params, "projectId");
-    const result = await restoreProject(deps, projectId);
-    if (!result.ok) {
-      sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
-      return;
-    }
-    const restored = await deps.projects.findById(projectId);
-    if (restored == null) {
-      sendJson(res, 404, notFoundBody("Project not found after restore."));
-      return;
-    }
-    sendJson(res, 200, toProjectDto(restored));
-  });
+      const projectId = getParam(params, "projectId");
+      const result = await restoreProject(deps, projectId);
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+      const restored = await deps.projects.findById(projectId);
+      if (restored == null) {
+        sendJson(res, 404, notFoundBody("Project not found after restore."));
+        return;
+      }
+      sendJson(res, 200, toProjectDto(restored));
+    },
+  );
 
   const uploadsRoot = resolve(process.cwd(), "data", "uploads");
   const repoRoot = resolve(process.cwd());
