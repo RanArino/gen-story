@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { GeneratedImageDto, PhotoAssetDto, SceneDto } from "@gen-story/shared";
 import {
   adoptGeneratedImage,
+  exportStoryboardUrl,
   listGeneratedImages,
   listGenerationRequests,
   listPhotoAssets,
@@ -30,6 +31,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   const [reviews, setReviews] = useState<SceneReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [storyboardId, setStoryboardId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [storyboards, photoList] = await Promise.all([
@@ -39,6 +41,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
 
     if (storyboards.length === 0) return;
     const sb = storyboards[0]!;
+    setStoryboardId(sb.id);
     const scenes = await listScenes(sb.id);
 
     const reviewData = await Promise.all(
@@ -143,6 +146,16 @@ export function ReviewPage({ projectId }: { projectId: string }) {
           <Link href={`/projects/${projectId}/generate`} className="btn btn-secondary">
             ← Back to Generate
           </Link>
+          {storyboardId && (
+            <a
+              href={exportStoryboardUrl(storyboardId)}
+              download
+              className="btn btn-primary"
+              style={{ marginLeft: "auto" }}
+            >
+              Export Storyboard JSON
+            </a>
+          )}
         </div>
       )}
     </AppShell>

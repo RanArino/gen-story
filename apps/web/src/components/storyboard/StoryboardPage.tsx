@@ -8,6 +8,7 @@ import type {
   SceneDto,
   StoryboardDto,
   StylePresetDto,
+  TestGenerationBatchDto,
 } from "@gen-story/shared";
 import {
   analyzeProjectPhotos,
@@ -15,6 +16,7 @@ import {
   createTemplateScenesFromPhotos,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
+  getTestGenerationBatch,
   listPhotoAssets,
   listScenes,
   listStoryboards,
@@ -23,6 +25,7 @@ import {
   upsertStoryboard,
   type UpsertSceneInput,
 } from "../../lib/api-client";
+import { TestGenerationModal } from "./TestGenerationModal";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
@@ -122,6 +125,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [creatingTemplates, setCreatingTemplates] = useState(false);
   const [analyzingPhotos, setAnalyzingPhotos] = useState(false);
   const [aiFillingSceneId, setAiFillingSceneId] = useState<string | null>(null);
+  const [testBatch, setTestBatch] = useState<TestGenerationBatchDto | null>(null);
+  const [showTestModal, setShowTestModal] = useState(false);
 
   const sbId = storyboard?.id;
 
@@ -138,8 +143,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     if (sbs.length > 0) {
       const sb = sbs[0]!;
       setStoryboard(sb);
-      const sceneList = await listScenes(sb.id);
+      const [sceneList, batch] = await Promise.all([
+        listScenes(sb.id),
+        getTestGenerationBatch(sb.id),
+      ]);
       setScenes(sceneList.map(sceneDtoToState));
+      setTestBatch(batch);
     }
   }, [projectId]);
 
@@ -220,8 +229,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       );
       setScenes((prev) => [...prev, ...newScenes.map(sceneDtoToState)]);
       setSelectedPhotoIds(new Set());
-      setSaveMsg("Template scenes created!");
-      setTimeout(() => setSaveMsg(null), 3000);
+      setSaveMsg(`${newScenes.length} scene${newScenes.length !== 1 ? "s" : ""} created! Scroll down to edit.`);
+      setTimeout(() => setSaveMsg(null), 4000);
+      // Scroll to scenes section after a short delay
+      setTimeout(() => {
+        const scenesSection = document.querySelector('[data-scenes-section]');
+        if (scenesSection) {
+          scenesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
     } catch (e: unknown) {
       setError(
         e instanceof Error ? e.message : "Failed to create template scenes",
@@ -419,18 +435,23 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <h3 className={styles.sectionTitle}>Create Scenes from Photos</h3>
-            {selectedPhotoIds.size > 0 && (
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateTemplateScenes}
-                disabled={creatingTemplates}
-              >
-                {creatingTemplates
-                  ? "Creating…"
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateTemplateScenes}
+              disabled={creatingTemplates || selectedPhotoIds.size === 0}
+            >
+              {creatingTemplates
+                ? "Creating…"
+                : selectedPhotoIds.size === 0
+                  ? "Select photos to create scenes"
                   : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
-              </button>
-            )}
+            </button>
           </div>
+          {selectedPhotoIds.size === 0 && (
+            <p style={{ color: "var(--color-text-muted)", fontSize: "0.9em", marginBottom: "12px" }}>
+              💡 Select one or more candidate photos below, then click the button to create draft scenes
+            </p>
+          )}
           <div
             style={{
               display: "grid",
@@ -505,7 +526,21 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               key={p.id}
               className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
               onClick={() => handleStyleChange(p.id)}
+              title={p.description}
             >
+              {p.previewImageUrl && (
+                <img
+                  src={p.previewImageUrl}
+                  alt={p.name}
+                  style={{
+                    width: "100%",
+                    height: "100px",
+                    objectFit: "cover",
+                    borderRadius: "4px",
+                    marginBottom: "8px",
+                  }}
+                />
+              )}
               {p.name}
             </button>
           ))}
@@ -513,7 +548,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       </section>
 
       {/* Scene list */}
-      <section className={styles.section}>
+      <section className={styles.section} data-scenes-section>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>Scenes ({scenes.length})</h3>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -556,14 +591,42 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       </section>
 
       <div className={styles.footer}>
-        <Link
-          href={`/projects/${projectId}/generate`}
-          className="btn btn-primary"
-          style={{ marginLeft: "auto" }}
-        >
-          Continue to Generate →
-        </Link>
+        {testBatch?.status === "completed" ? (
+          <Link
+            href={`/projects/${projectId}/generate`}
+            className="btn btn-primary"
+            style={{ marginLeft: "auto" }}
+          >
+            Continue to Generate →
+          </Link>
+        ) : (
+          <div style={{ marginLeft: "auto", display: "flex", gap: 12, alignItems: "center" }}>
+            {testBatch?.status === "pending" && (
+              <span style={{ fontSize: 13, color: "#888" }}>Test in progress…</span>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowTestModal(true)}
+              disabled={scenes.length === 0}
+            >
+              {testBatch ? "View Test Generation" : "Test Generation →"}
+            </button>
+          </div>
+        )}
       </div>
+
+      {showTestModal && storyboard && scenes[0] && (
+        <TestGenerationModal
+          storyboardId={storyboard.id}
+          sceneId={scenes[0].id ?? ""}
+          existingBatch={testBatch}
+          onConfirmed={() => {
+            setShowTestModal(false);
+            load().catch(() => undefined);
+          }}
+          onClose={() => setShowTestModal(false)}
+        />
+      )}
     </AppShell>
   );
 }
