@@ -9,6 +9,7 @@ import type {
   Scene,
   Storyboard,
   StylePreset,
+  TestGenerationBatch,
   User,
 } from "@gen-story/domain";
 
@@ -95,6 +96,13 @@ export interface ProjectPhotoAnalysisRepositoryPort {
     projectId: string,
   ): Promise<ProjectPhotoAnalysis | null>;
   save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void>;
+}
+
+export interface TestGenerationBatchRepositoryPort {
+  findLatestByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch | null>;
+  save(batch: TestGenerationBatch): Promise<void>;
 }
 
 export interface ObjectStoragePort {
@@ -206,6 +214,7 @@ export interface ApplicationDependencies {
   generationRequests: GenerationRequestRepositoryPort;
   generatedImages: GeneratedImageRepositoryPort;
   projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
+  testGenerationBatches: TestGenerationBatchRepositoryPort;
   objectStorage: ObjectStoragePort;
   imagePreprocessing: ImagePreprocessingPort;
   imageGeneration: ImageGenerationPort;
