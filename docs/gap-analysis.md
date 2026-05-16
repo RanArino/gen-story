@@ -84,9 +84,9 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Per-project common prompt (auto-generated from emotion + style) | ❌ | No common prompt field or generation |
-| Common prompt editable by user | ❌ | Depends on above |
-| Prompt consistency mechanism across scenes | ⚠️ | `storyboard.tone` and `stylePreset.prompt` are now applied consistently to all scenes via `prompt-composer.ts`; no user-editable common prompt field yet |
+| Per-project common prompt (auto-generated from emotion + style) | 🟡 | Planned in `docs/plans/20260517-common-project-prompt.md`: `commonPrompt` field on `Storyboard`, auto-generated via domain rule `composeCommonPrompt` from tone + style preset |
+| Common prompt editable by user | 🟡 | Planned in `docs/plans/20260517-common-project-prompt.md`: editable "Common Prompt" textarea + "Regenerate" button on StoryboardPage |
+| Prompt consistency mechanism across scenes | 🟡 | `storyboard.tone` and `stylePreset.prompt` already applied to all scenes via `prompt-composer.ts`; `docs/plans/20260517-common-project-prompt.md` adds a user-editable common prompt threaded into every scene's composed prompt |
 | Story-level AI context across uploaded photos | ⚠️ | Per-scene AI fill uses storyboard tone, style preset, project photos, and sibling scenes as context; no real multi-photo vision analysis yet |
 
 ---
@@ -304,7 +304,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
 | Emotion / AI photo analysis | 7 | 0 | 0 |
 | Image style selection | 1 | 2 | 4 |
-| Common project prompt | 0 | 2 | 2 |
+| Common project prompt | 0 | 1 | 3 (3 🟡 in progress — `docs/plans/20260517-common-project-prompt.md`) |
 | Test generation workflow | 4 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 3 |
 | Scene content | 10 | 3 | 4 (AI gen + complement) |
