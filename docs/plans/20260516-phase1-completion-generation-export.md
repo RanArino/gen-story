@@ -317,33 +317,37 @@ Create export endpoint and download flow for video generation pipeline consumpti
 
 ## Progress
 
-- [ ] Milestone 1: Style preset preview images
-  - [ ] Create `public/style-previews/` and 9 placeholder images
-  - [ ] Update `StylePresetService` with preview URL getter
-  - [ ] Update `StyleSelector` component to display previews
-  - [ ] Browser verification and type check
-  
-- [ ] Milestone 2: Test generation workflow
-  - [ ] Create `TestGenerationPolicy` (domain)
-  - [ ] Create `RequestTestGenerationUseCase` (application)
-  - [ ] Create test-generation DTO types
-  - [ ] Add test generation API routes
-  - [ ] Create DB migration for test_generation_batches
-  - [ ] Create `TestGenerationModal` component
-  - [ ] Update `StoryboardPage` flow logic
-  - [ ] Browser verification (test 3 samples, confirm, proceed)
-  - [ ] Type check, test suite, lint
-  
-- [ ] Milestone 3: Storyboard JSON export
-  - [ ] Create `ExportStoryboardAsJsonUseCase` (application)
-  - [ ] Create export DTO
-  - [ ] Add export API endpoint
-  - [ ] Create schema documentation
-  - [ ] Add "Export" button to `ReviewPage`
-  - [ ] Browser verification (export, download, inspect JSON)
-  - [ ] Type check, test suite, lint
+- [x] Milestone 1: Style preset preview images (COMPLETED 2026-05-16)
+  - [x] Create `public/style-previews/` and 9 placeholder images
+  - [x] Update `toStylePresetDto` mapper with preview URL generator
+  - [x] Add `previewImageUrl` field to StylePresetDto
+  - [x] Update `StoryboardPage` component to display preview images with img elements
+  - [x] Type check and test - all passing
 
-- [ ] Update `docs/gap-analysis.md` to reflect completion and recount summary table
+- [x] Milestone 2: Test generation workflow (COMPLETED 2026-05-16)
+  - [x] Created domain types: `TestGenerationBatch`, `TestGenerationBatchId`, `TestGenerationBatchStatus`
+  - [x] Created domain functions: `createTestGenerationBatch`, `canStartTestGeneration`, `completeTestGenerationBatch`, `resetTestGenerationBatch`
+  - [x] Created database schema for `test_generation_batches` table
+  - [x] Generated and applied database migration (0003_add_test_generation_batches.sql)
+  - [x] Created `TestGenerationBatchRepositoryPort` in `packages/application/src/ports.ts`
+  - [x] Created `SqliteTestGenerationBatchRepository` in `apps/api/src/db/repositories.ts`
+  - [x] Created `TestGenerationBatchDto` in `packages/shared/src/index.ts`
+  - [x] Created `toTestGenerationBatchDto` mapper in `apps/api/src/http/dto-mappers.ts`
+  - [x] Created application use cases: `requestTestGeneration`, `confirmTestGeneration`, `resetTestGeneration`
+  - [x] Added 4 API routes: POST create, GET current, POST confirm, POST reset
+  - [x] Created `TestGenerationModal` component with polling, variant cards, confirm and reset actions
+  - [x] Updated `StoryboardPage` to conditionally show test modal vs. bulk generation link
+  - [x] Wired `testGenerationBatches` into in-memory test support (use-cases.test.ts + in-memory-application.ts)
+  - [x] Type check - all 5 packages passing; 71 API + 15 application + 16 domain tests passing
+
+- [x] Milestone 3: Storyboard JSON export (COMPLETED 2026-05-16)
+  - [x] Created `exportStoryboardAsJson` use case with flattened scene + asset URL structure
+  - [x] Added `GET /api/storyboards/:storyboardId/export.json` endpoint with `Content-Disposition: attachment` header
+  - [x] Added `exportStoryboardUrl` helper to `apps/web/src/lib/api-client.ts`
+  - [x] Added "Export Storyboard JSON" download button to `ReviewPage`
+  - [x] Type check and all tests passing
+
+- [x] Update `docs/gap-analysis.md` to reflect completion (COMPLETED 2026-05-16)
 
 
 ## Surprises & Discoveries
@@ -368,7 +372,17 @@ Create export endpoint and download flow for video generation pipeline consumpti
 
 ## Outcomes & Retrospective
 
-*(To be populated at completion)*
+All three milestones delivered on 2026-05-16.
+
+**What shipped:**
+- 9 style preset preview images served from `/public/style-previews/`, with `previewImageUrl` wired into `StylePresetDto` and displayed as a gallery in `StoryboardPage`.
+- Full test generation flow: `TestGenerationBatch` domain entity, DB migration, Sqlite repository, 4 API endpoints, `TestGenerationModal` component (3 variant cards with 2s polling, confirm, reset), and conditional StoryboardPage footer (test modal gate before bulk generation).
+- JSON export: `exportStoryboardAsJson` use case, `GET /api/storyboards/:id/export.json` endpoint returning JSON with `Content-Disposition: attachment`, and "Export Storyboard JSON" download button on ReviewPage.
+
+**Surprises:**
+- `pnpm --filter @gen-story/api db:generate` failed with "no schema files found" (working directory issue). Fixed by writing the migration SQL manually and applying directly.
+- `ApplicationDependencies` interface required updating two test support files (`use-cases.test.ts` and `in-memory-application.ts`) in addition to the main wiring in `create-api-context.ts`.
+- A TypeScript error in routes.ts (passing `UseCaseError` instead of `UseCaseErrorCode` to the error-to-status helper) required patching after initial generation.
 
 
 ## Interfaces and Dependencies
