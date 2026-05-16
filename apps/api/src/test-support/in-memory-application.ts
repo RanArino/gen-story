@@ -20,9 +20,10 @@ import type {
   SceneRepositoryPort,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
+  TestGenerationBatchRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
-import type { GenerationRequestStatus } from "@gen-story/domain";
+import type { GenerationRequestStatus, TestGenerationBatch } from "@gen-story/domain";
 import { LocalAuthContext } from "../auth/local-auth";
 import type {
   GeneratedImage,
@@ -290,6 +291,23 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
   }
 }
 
+class InMemoryTestGenerationBatchRepository implements TestGenerationBatchRepositoryPort {
+  constructor(private readonly store: MemoryStore<TestGenerationBatch>) {}
+
+  async findLatestByStoryboardId(storyboardId: string): Promise<TestGenerationBatch | null> {
+    return (
+      this.store
+        .values()
+        .filter((b) => b.storyboardId === storyboardId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
+    );
+  }
+
+  async save(batch: TestGenerationBatch): Promise<void> {
+    await this.store.save(batch);
+  }
+}
+
 class InMemoryObjectStorage implements ObjectStoragePort {
   private readonly objects = new Map<string, Uint8Array>();
 
@@ -416,6 +434,7 @@ export function createInMemoryApplicationDependencies(
     generationRequests?: GenerationRequest[];
     generatedImages?: GeneratedImage[];
     projectPhotoAnalyses?: ProjectPhotoAnalysis[];
+    testGenerationBatches?: TestGenerationBatch[];
   },
   overrides?: Partial<ApplicationDependencies>,
 ): ApplicationDependencies & {
@@ -430,6 +449,7 @@ export function createInMemoryApplicationDependencies(
     generationRequests: MemoryStore<GenerationRequest>;
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
+    testGenerationBatches: MemoryStore<TestGenerationBatch>;
   };
 } {
   const stores = {
@@ -443,6 +463,7 @@ export function createInMemoryApplicationDependencies(
     generationRequests: new MemoryStore(initial?.generationRequests ?? []),
     generatedImages: new MemoryStore(initial?.generatedImages ?? []),
     projectPhotoAnalyses: new MemoryStore(initial?.projectPhotoAnalyses ?? []),
+    testGenerationBatches: new MemoryStore<TestGenerationBatch>(initial?.testGenerationBatches ?? []),
   };
   const dependencies: ApplicationDependencies = {
     users: new InMemoryUserRepository(stores.users),
@@ -460,6 +481,9 @@ export function createInMemoryApplicationDependencies(
     ),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
+    ),
+    testGenerationBatches: new InMemoryTestGenerationBatchRepository(
+      stores.testGenerationBatches,
     ),
     objectStorage: new InMemoryObjectStorage(),
     imagePreprocessing: new InMemoryImagePreprocessing(),
