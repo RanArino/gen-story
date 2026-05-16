@@ -172,6 +172,7 @@ function mapStoryboard(row: StoryboardRow, sceneIds: string[]): Storyboard {
     status: row.status as StoryboardStatus,
     tone: row.tone,
     stylePresetId: row.stylePresetId,
+    commonPrompt: row.commonPrompt,
     sceneIds,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -689,6 +690,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
         status: storyboard.status,
         tone: storyboard.tone,
         stylePresetId: storyboard.stylePresetId,
+        commonPrompt: storyboard.commonPrompt,
         createdAt: storyboard.createdAt,
         updatedAt: storyboard.updatedAt,
       })
@@ -699,6 +701,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
           status: storyboard.status,
           tone: storyboard.tone,
           stylePresetId: storyboard.stylePresetId,
+          commonPrompt: storyboard.commonPrompt,
           updatedAt: storyboard.updatedAt,
           deletedAt: null,
         },
