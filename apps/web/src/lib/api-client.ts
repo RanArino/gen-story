@@ -8,6 +8,7 @@ import type {
   SceneDto,
   StylePresetDto,
   StoryboardDto,
+  TestGenerationBatchDto,
 } from "@gen-story/shared";
 
 export class ApiError extends Error {
@@ -340,4 +341,52 @@ export async function adoptGeneratedImage(
     "POST",
     `/api/scenes/${sceneId}/generated-images/${generatedImageId}/adopt`,
   );
+}
+
+export async function getTestGenerationBatch(
+  storyboardId: string,
+): Promise<TestGenerationBatchDto | null> {
+  const data = await request<{ batch: TestGenerationBatchDto | null }>(
+    "GET",
+    `/api/storyboards/${storyboardId}/test-generation/current`,
+  );
+  return data.batch;
+}
+
+export async function requestTestGenerationBatch(
+  storyboardId: string,
+  sceneId: string,
+): Promise<{ batch: TestGenerationBatchDto; generationRequests: GenerationRequestDto[] }> {
+  return request<{ batch: TestGenerationBatchDto; generationRequests: GenerationRequestDto[] }>(
+    "POST",
+    `/api/storyboards/${storyboardId}/test-generation`,
+    { sceneId },
+  );
+}
+
+export async function confirmTestGenerationBatch(
+  storyboardId: string,
+  confirmedGenerationRequestId: string,
+): Promise<TestGenerationBatchDto> {
+  const data = await request<{ batch: TestGenerationBatchDto }>(
+    "POST",
+    `/api/storyboards/${storyboardId}/test-generation/confirm`,
+    { confirmedGenerationRequestId },
+  );
+  return data.batch;
+}
+
+export async function resetTestGenerationBatch(
+  storyboardId: string,
+): Promise<TestGenerationBatchDto> {
+  const data = await request<{ batch: TestGenerationBatchDto }>(
+    "POST",
+    `/api/storyboards/${storyboardId}/test-generation/reset`,
+  );
+  return data.batch;
+}
+
+export function exportStoryboardUrl(storyboardId: string): string {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+  return `${base}/api/storyboards/${storyboardId}/export.json`;
 }
