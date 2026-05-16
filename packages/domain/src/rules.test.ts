@@ -9,6 +9,7 @@ import {
   createStoryboard,
 } from "./index";
 import {
+  composeCommonPrompt,
   replaceScenePhotoAssets,
   retryGenerationRequest,
   setSceneAdoptedGeneratedImage,
@@ -313,5 +314,39 @@ describe("domain rules", () => {
 
     expect(failedRequest.status).toBe("failed");
     expect(storyboard.status).toBe("draft");
+  });
+
+  it("composes a common prompt from tone and style preset", () => {
+    const prompt = composeCommonPrompt({
+      tone: "Tender and reflective",
+      stylePresetName: "Cinematic",
+      stylePresetPrompt: "photorealistic cinematic film still",
+    });
+
+    expect(prompt).toContain("Tender and reflective");
+    expect(prompt).toContain("Cinematic");
+    expect(prompt).toContain("photorealistic cinematic film still");
+    expect(prompt).toContain("consistent across every scene");
+  });
+
+  it("composes a tone-only common prompt when no style preset is given", () => {
+    const prompt = composeCommonPrompt({
+      tone: "Joyful",
+      stylePresetName: null,
+      stylePresetPrompt: null,
+    });
+
+    expect(prompt).toContain("Joyful");
+    expect(prompt).not.toContain("Visual style:");
+  });
+
+  it("composes the common prompt deterministically", () => {
+    const input = {
+      tone: "Calm",
+      stylePresetName: "Watercolor",
+      stylePresetPrompt: "soft watercolor illustration",
+    };
+
+    expect(composeCommonPrompt(input)).toBe(composeCommonPrompt(input));
   });
 });
