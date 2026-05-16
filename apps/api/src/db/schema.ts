@@ -268,3 +268,20 @@ export const projectPhotoAnalyses = sqliteTable(
     index("project_photo_analyses_project_id_idx").on(table.projectId),
   ],
 );
+
+export const testGenerationBatches = sqliteTable(
+  "test_generation_batches",
+  {
+    id: text("id").primaryKey(),
+    storyboardId: text("storyboard_id")
+      .notNull()
+      .references(() => storyboards.id),
+    status: text("status").notNull(),
+    confirmedGenerationRequestId: text("confirmed_generation_request_id").references(() => generationRequests.id),
+    createdAt: text("created_at").notNull(),
+    completedAt: text("completed_at"),
+  },
+  (table) => [
+    index("test_generation_batches_storyboard_id_idx").on(table.storyboardId),
+  ],
+);

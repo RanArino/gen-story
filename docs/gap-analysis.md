@@ -70,8 +70,8 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | System style presets (8 predefined styles + AI auto) | ⚠️ | `style_presets` table and seeding script exist; need to verify all 9 system presets are seeded |
-| Style preset preview images for comparison | ❌ | No preview images in `public/` |
-| Style preview shows same subject in each style | ❌ | Not implemented |
+| Style preset preview images for comparison | 🟡 | ExecPlan 20260516: add 9 preview images to `public/style-previews/`, wire into UI |
+| Style preview shows same subject in each style | ❌ | Not implemented; static previews sufficient for MVP |
 | Custom style creation from user-uploaded reference image | ❌ | No custom style workflow |
 | Custom styles saved per user, reusable across projects | ❌ | Schema supports `scope=user` but no creation UI/API |
 | Style applied at project level (not per scene) | ✅ | `storyboards.stylePresetId`; `stylePreset.prompt` is now composed into every generation prompt via `prompt-composer.ts` |
@@ -94,12 +94,12 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Test-generate 3 pattern images before bulk generation | ❌ | No test generation workflow |
-| Adjustment sliders / buttons (warmer, more cinematic, etc.) | ❌ | Not implemented |
-| Adjustments update common project prompt internally | ❌ | No common prompt |
-| User selects one test image to confirm style | ❌ | Not implemented |
-| "Generate more tests" option | ❌ | Not implemented |
-| Bulk generation starts only after test confirmation | ❌ | Currently goes straight to full generation |
+| Test-generate 3 pattern images before bulk generation | 🟡 | ExecPlan 20260516: test batch creation, 3-pattern sampling, confirm-before-bulk flow |
+| Adjustment sliders / buttons (warmer, more cinematic, etc.) | ❌ | Not implemented; deferred — test generation provides initial validation |
+| Adjustments update common project prompt internally | ❌ | No common prompt; depends on test workflow completion |
+| User selects one test image to confirm style | 🟡 | ExecPlan 20260516: TestGenerationModal with confirm action |
+| "Generate more tests" option | 🟡 | ExecPlan 20260516: "Generate new tests" button to reset batch state |
+| Bulk generation starts only after test confirmation | 🟡 | ExecPlan 20260516: bulk generation button blocked until test batch confirmed |
 
 ---
 
@@ -187,11 +187,11 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | Card view inside app | ✅ | `ReviewPage` card layout |
-| Timeline view | ❌ | Not implemented |
-| Table / spreadsheet view | ❌ | Not implemented |
-| Filter: original only / generated only | ❌ | No filter controls |
-| JSON export | ❌ | No export endpoint or UI |
-| Structured data for CapCut / video generation pipeline | ❌ | No export format defined |
+| Timeline view | ❌ | Not implemented; deferred post-MVP |
+| Table / spreadsheet view | ❌ | Not implemented; deferred post-MVP |
+| Filter: original only / generated only | ❌ | No filter controls; deferred post-MVP |
+| JSON export | 🟡 | ExecPlan 20260516: export endpoint + download UI on ReviewPage |
+| Structured data for CapCut / video generation pipeline | 🟡 | ExecPlan 20260516: define JSON schema for video tools |
 
 ---
 
@@ -302,15 +302,15 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Project management | 5 | 0 | 0 |
 | Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
 | Emotion / AI photo analysis | 7 | 0 | 0 |
-| Image style selection | 2 | 1 | 4 |
+| Image style selection | 2 | 2 | 3 |
 | Common project prompt | 0 | 2 | 2 |
-| Test generation workflow | 0 | 0 | 6 |
+| Test generation workflow | 0 | 3 | 3 |
 | Storyboard composition | 5 | 0 | 3 |
 | Scene content | 10 | 3 | 4 (AI gen + complement) |
 | Scene editing UX | 4 | 1 | 1 |
 | Language / i18n | 0 | 0 | 5 |
 | Generated image handling | 5 | 2 | 3 |
-| Storyboard viewing & export | 1 | 0 | 5 |
+| Storyboard viewing & export | 1 | 2 | 3 |
 | Image generation infra | 13 | 2 | 2 |
 | Generation history | 5 | 0 | 2 |
 | File lifecycle & cleanup | 5 | 1 | 0 |
