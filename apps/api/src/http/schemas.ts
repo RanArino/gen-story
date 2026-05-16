@@ -22,6 +22,7 @@ export const UpsertStoryboardSchema = z.object({
   tone: z.string().min(1),
   status: z.enum(["draft", "editing", "ready", "completed"]).optional(),
   stylePresetId: z.string().nullable().optional(),
+  commonPrompt: z.string().optional(),
 });
 
 export const SceneInputSchema = z.object({
