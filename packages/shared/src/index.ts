@@ -57,6 +57,7 @@ export type StoryboardDto = {
   status: string;
   tone: string;
   stylePresetId: string | null;
+  commonPrompt: string;
   sceneIds: string[];
   createdAt: string;
   updatedAt: string;
