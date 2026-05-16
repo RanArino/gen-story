@@ -69,8 +69,9 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| System style presets (8 predefined styles + AI auto) | ⚠️ | `style_presets` table and seeding script exist; need to verify all 9 system presets are seeded |
-| Style preset preview images for comparison | ✅ | 9 preview images in `public/style-previews/`; `previewImageUrl` in `StylePresetDto`; displayed in StoryboardPage style picker gallery |
+| System style presets (8 predefined styles + AI auto) | ❌ | Only "Cinematic" is seeded with a photorealistic prompt; the 9 required styles (Anime movie style, watercolor illustration style, 3D animation style with a sense of depth, etc.) are not defined or seeded |
+| Style preset `prompt` field defined per style (illustration / texture-axis) | ❌ | Each of the 9 system presets requires a generation prompt that produces the correct illustration/texture style; currently only a photorealistic cinematic prompt exists in seed data |
+| Style preset preview images for comparison | ❌ | Current files in `public/style-previews/` are 149-byte stubs; real images must be generated from the correct per-style prompts once prompts are finalized |
 | Style preview shows same subject in each style | ❌ | Not implemented; static previews sufficient for MVP |
 | Custom style creation from user-uploaded reference image | ❌ | No custom style workflow |
 | Custom styles saved per user, reusable across projects | ❌ | Schema supports `scope=user` but no creation UI/API |
@@ -302,7 +303,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Project management | 5 | 0 | 0 |
 | Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
 | Emotion / AI photo analysis | 7 | 0 | 0 |
-| Image style selection | 3 | 2 | 2 |
+| Image style selection | 1 | 2 | 4 |
 | Common project prompt | 0 | 2 | 2 |
 | Test generation workflow | 4 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 3 |
