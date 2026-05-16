@@ -947,6 +947,134 @@ describe("application use cases", () => {
     expect(storedStoryboard?.sceneIds).toEqual(["scene_1", "scene_2"]);
   });
 
+  function createCommonPromptDeps() {
+    return createDependencies({
+      users: [
+        createUser({
+          id: "user_1",
+          organizationId: "org_1",
+          email: "ran@example.com",
+          displayName: "Ran",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      organizations: [
+        createOrganization({
+          id: "org_1",
+          name: "Family Studio",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      stylePresets: [
+        createStylePreset({
+          id: "style_1",
+          scope: "system",
+          name: "Cinematic",
+          prompt: "filmic photorealistic still",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+  }
+
+  it("auto-generates a common prompt for a new storyboard when none is provided", async () => {
+    const deps = createCommonPromptDeps();
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      stylePresetId: "style_1",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.commonPrompt).not.toBe("");
+      expect(result.value.commonPrompt).toContain("Reflective");
+      expect(result.value.commonPrompt).toContain("Cinematic");
+    }
+  });
+
+  it("keeps an existing non-empty common prompt when none is provided", async () => {
+    const deps = createCommonPromptDeps();
+
+    await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      stylePresetId: "style_1",
+      commonPrompt: "Hand-written common prompt.",
+    });
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Joyful",
+      stylePresetId: "style_1",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.commonPrompt).toBe("Hand-written common prompt.");
+    }
+  });
+
+  it("regenerates the common prompt when an explicit empty value is provided", async () => {
+    const deps = createCommonPromptDeps();
+
+    await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      stylePresetId: "style_1",
+      commonPrompt: "Hand-written common prompt.",
+    });
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Joyful",
+      stylePresetId: "style_1",
+      commonPrompt: "",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.commonPrompt).not.toBe("Hand-written common prompt.");
+      expect(result.value.commonPrompt).toContain("Joyful");
+    }
+  });
+
+  it("stores an explicit non-empty common prompt verbatim", async () => {
+    const deps = createCommonPromptDeps();
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      stylePresetId: "style_1",
+      commonPrompt: "  Warm nostalgic family film.  ",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.commonPrompt).toBe("Warm nostalgic family film.");
+    }
+  });
+
   it("assigns photos to a scene and keeps primary counts valid", async () => {
     const deps = createDependencies({
       users: [

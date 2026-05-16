@@ -12,6 +12,7 @@ import {
   createStoryboard,
   createTemplateScene,
   createTestGenerationBatch,
+  composeCommonPrompt,
   replaceScenePhotoAssets,
   resetTestGenerationBatch,
   retryGenerationRequest,
@@ -326,8 +327,41 @@ export type UpsertStoryboardInput = {
   status?: StoryboardStatus;
   tone: string;
   stylePresetId?: string | null;
+  commonPrompt?: string;
   sceneIds?: string[];
 };
+
+async function resolveCommonPrompt(
+  deps: ApplicationDependencies,
+  args: {
+    requestedCommonPrompt: string | undefined;
+    existingCommonPrompt: string;
+    tone: string;
+    stylePresetId: string | null;
+  },
+): Promise<string> {
+  if (args.requestedCommonPrompt === undefined) {
+    if (args.existingCommonPrompt.trim() !== "") {
+      return args.existingCommonPrompt;
+    }
+  } else {
+    const trimmed = args.requestedCommonPrompt.trim();
+    if (trimmed !== "") {
+      return trimmed;
+    }
+  }
+
+  let stylePreset: StylePreset | null = null;
+  if (args.stylePresetId != null) {
+    stylePreset = await deps.stylePresets.findById(args.stylePresetId);
+  }
+
+  return composeCommonPrompt({
+    tone: args.tone,
+    stylePresetName: stylePreset?.name ?? null,
+    stylePresetPrompt: stylePreset?.prompt ?? null,
+  });
+}
 
 export async function upsertStoryboard(
   deps: ApplicationDependencies,
@@ -351,13 +385,23 @@ export async function upsertStoryboard(
     const existingStoryboard = await deps.storyboards.findById(
       input.storyboardId,
     );
+    const effectiveStylePresetId =
+      input.stylePresetId ?? existingStoryboard?.stylePresetId ?? null;
+
+    const commonPrompt = await resolveCommonPrompt(deps, {
+      requestedCommonPrompt: input.commonPrompt,
+      existingCommonPrompt: existingStoryboard?.commonPrompt ?? "",
+      tone: input.tone,
+      stylePresetId: effectiveStylePresetId,
+    });
+
     const storyboard = createStoryboard({
       id: input.storyboardId,
       projectId: input.projectId,
       status: input.status ?? existingStoryboard?.status,
       tone: input.tone,
-      stylePresetId:
-        input.stylePresetId ?? existingStoryboard?.stylePresetId ?? null,
+      stylePresetId: effectiveStylePresetId,
+      commonPrompt,
       sceneIds: input.sceneIds ?? existingStoryboard?.sceneIds ?? [],
       createdAt: existingStoryboard?.createdAt ?? now(),
       updatedAt: now(),
