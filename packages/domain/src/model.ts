@@ -10,8 +10,10 @@ export type StylePresetId = string;
 export type GenerationRequestId = string;
 export type GeneratedImageId = string;
 export type ProjectPhotoAnalysisId = string;
+export type TestGenerationBatchId = string;
 
 export type ProjectStatus = "draft" | "active" | "completed" | "archived";
+export type TestGenerationBatchStatus = "pending" | "completed";
 export type StoryboardStatus = "draft" | "editing" | "ready" | "completed";
 export type SceneStatus = "draft" | "ready" | "completed";
 export type PhotoUsage = "candidate" | "excluded" | "reference";
@@ -175,6 +177,15 @@ export type ProjectPhotoAnalysis = {
   updatedAt: Timestamp;
 };
 
+export type TestGenerationBatch = {
+  id: TestGenerationBatchId;
+  storyboardId: StoryboardId;
+  status: TestGenerationBatchStatus;
+  confirmedGenerationRequestId: GenerationRequestId | null;
+  createdAt: Timestamp;
+  completedAt: Timestamp | null;
+};
+
 export type CreateUserInput = {
   id: UserId;
   organizationId: OrganizationId;
@@ -305,6 +316,15 @@ export type CreateProjectPhotoAnalysisInput = {
   updatedAt: Timestamp;
 };
 
+export type CreateTestGenerationBatchInput = {
+  id: TestGenerationBatchId;
+  storyboardId: StoryboardId;
+  status?: TestGenerationBatchStatus;
+  confirmedGenerationRequestId?: GenerationRequestId | null;
+  createdAt: Timestamp;
+  completedAt?: Timestamp | null;
+};
+
 function trimRequiredText(value: string, fieldName: string): string {
   const trimmedValue = value.trim();
 
@@ -398,22 +418,13 @@ export function createScene(input: CreateSceneInput): Scene {
     storyboardId: input.storyboardId,
     orderIndex: input.orderIndex,
     status: input.status ?? "draft",
-    title: trimRequiredText(input.title, "Scene title"),
-    description: trimRequiredText(input.description, "Scene description"),
-    imagePrompt: trimRequiredText(input.imagePrompt, "Scene image prompt"),
-    emotion: trimRequiredText(input.emotion, "Scene emotion"),
-    cameraDirection: trimRequiredText(
-      input.cameraDirection,
-      "Scene camera direction",
-    ),
-    lightingDirection: trimRequiredText(
-      input.lightingDirection,
-      "Scene lighting direction",
-    ),
-    motionDirection: trimRequiredText(
-      input.motionDirection,
-      "Scene motion direction",
-    ),
+    title: trimOptionalText(input.title),
+    description: trimOptionalText(input.description),
+    imagePrompt: trimOptionalText(input.imagePrompt),
+    emotion: trimOptionalText(input.emotion),
+    cameraDirection: trimOptionalText(input.cameraDirection),
+    lightingDirection: trimOptionalText(input.lightingDirection),
+    motionDirection: trimOptionalText(input.motionDirection),
     notes: trimOptionalText(input.notes),
     photoAssets: [...(input.photoAssets ?? [])],
     adoptedGeneratedImageId: input.adoptedGeneratedImageId ?? null,
@@ -566,5 +577,18 @@ export function createProjectPhotoAnalysis(
     deletedAt: input.deletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
+  };
+}
+
+export function createTestGenerationBatch(
+  input: CreateTestGenerationBatchInput,
+): TestGenerationBatch {
+  return {
+    id: input.id,
+    storyboardId: input.storyboardId,
+    status: input.status ?? "pending",
+    confirmedGenerationRequestId: input.confirmedGenerationRequestId ?? null,
+    createdAt: input.createdAt,
+    completedAt: input.completedAt ?? null,
   };
 }
