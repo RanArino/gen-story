@@ -33,25 +33,70 @@ This closes three rows of Section 5 ("Common Project Prompt") in `docs/gap-analy
 
 ## Progress
 
-- [ ] Milestone 1 — Domain: add `commonPrompt` to the `Storyboard` aggregate and a pure
-      `composeCommonPrompt` rule; update domain tests.
-- [ ] Milestone 2 — Persistence: add `common_prompt` column via Drizzle migration; update
-      the storyboard Drizzle repository mapper.
-- [ ] Milestone 3 — Application: `upsertStoryboard` accepts `commonPrompt` and
-      auto-generates it when absent; update use-case tests.
-- [ ] Milestone 4 — API boundary: extend `StoryboardDto`, `UpsertStoryboardSchema`,
-      the route handler, and the DTO mapper.
-- [ ] Milestone 5 — Generation: include the common prompt in `composeImagePrompt` so it
-      reaches every scene's generation request.
-- [ ] Milestone 6 — Web UI: surface an editable "Common Prompt" textarea with a
-      "Regenerate" button in `StoryboardPage`.
-- [ ] Milestone 7 — Validation: full check suite green; `docs/gap-analysis.md` synced.
+- [x] (2026-05-17 01:03Z) Milestone 1 — Domain: added `commonPrompt` to the `Storyboard`
+      aggregate (`model.ts`), `CreateStoryboardInput`, and `createStoryboard`; added pure
+      `composeCommonPrompt` rule to `rules.ts` and re-exported it from `index.ts`. Domain
+      tests pass (20 tests green via `pnpm --filter @gen-story/domain test`).
+- [x] (2026-05-17 01:10Z) Milestone 2 — Persistence: added `common_prompt` column to the
+      `storyboards` table in `apps/api/src/db/schema.ts`; hand-authored
+      `drizzle/migrations/0004_add_storyboard_common_prompt.sql` and registered it in
+      `_journal.json` (idx 3); updated `mapStoryboard` and `save` in
+      `apps/api/src/db/repositories.ts`. `db:migrate` applied cleanly — verified
+      `common_prompt` column present on the `storyboards` table.
+- [x] (2026-05-17 01:18Z) Milestone 3 — Application: added `commonPrompt?` to
+      `UpsertStoryboardInput`; added a `resolveCommonPrompt` helper in `use-cases.ts` that
+      keeps an existing value, uses an explicit non-empty value verbatim, or auto-generates
+      via `composeCommonPrompt` (explicit empty string regenerates). Added 4 use-case
+      tests; `pnpm --filter @gen-story/application test` reports 19 tests green.
+- [x] (2026-05-17 01:20Z) Milestone 4 — API boundary: added `commonPrompt` to
+      `StoryboardDto` (`packages/shared`), `commonPrompt` to `UpsertStoryboardSchema`
+      (`apps/api/src/http/schemas.ts`), passed it through the route handler
+      (`routes.ts`), and mapped it in `toStoryboardDto` (`dto-mappers.ts`).
+- [x] (2026-05-17 01:24Z) Milestone 5 — Generation: added a `commonPrompt` input to
+      `composeImagePrompt` (`prompt-composer.ts`), inserted after the style preset prompt
+      and before the camera descriptor; threaded `storyboard.commonPrompt` through the
+      `composeImagePrompt` call in `local-image-preprocessing.ts`. Added
+      `prompt-composer.test.ts` asserting the common prompt is present/omitted as
+      expected. `pnpm typecheck` passes across all 5 projects.
+- [x] (2026-05-17 01:30Z) Milestone 6 — Web UI: added `commonPrompt` to the
+      `upsertStoryboard` API client; added a "Common prompt" section to `StoryboardPage`
+      with an editable textarea (`commonPromptDraft` state synced from the storyboard via
+      effect), a "Save common prompt" button, and a "Regenerate from tone & style" button
+      that submits `commonPrompt: ""`. `pnpm typecheck` passes across all 5 projects.
+- [x] (2026-05-17 01:38Z) Milestone 7 — Validation: `pnpm typecheck` green (5 projects);
+      `pnpm test` green (domain 20, application 19, api 73); `pnpm build` green; the
+      domain/application boundary `rg` check returns no matches. `pnpm lint` reports 0
+      errors (1 pre-existing unused-import warning in `rules.ts`, unrelated). `pnpm format`
+      fails repo-wide on pre-existing Prettier drift — all files this plan touched were
+      already drift at HEAD, so no new drift was introduced and no repo-wide reformat was
+      done. `docs/gap-analysis.md` Section 5 rows 1–3 set to ✅ and the summary row updated
+      to `3 / 1 / 0`. Interactive browser verification was not performed in this
+      environment; behavior is covered by `prompt-composer.test.ts` and the four
+      `upsertStoryboard` use-case tests.
 
 
 ## Surprises & Discoveries
 
-- Observation: (none yet — fill in as work proceeds).
-  Evidence:
+- Observation: `pnpm --filter @gen-story/api db:generate` must run with cwd at the repo
+  root, not the package directory. The `drizzle.config.ts` `schema` path
+  (`apps/api/src/db/schema.ts`) is resolved relative to the process cwd, so running it via
+  the package script (cwd `apps/api`) fails with "No schema files found".
+  Evidence: `drizzle-kit generate` errored until invoked from the repo root with
+  `apps/api/node_modules/.bin/drizzle-kit generate --config=drizzle.config.ts`.
+
+- Observation: Pre-existing migration drift unrelated to this plan —
+  `drizzle/migrations/0003_add_test_generation_batches.sql` exists as a file but is NOT
+  registered in `drizzle/migrations/meta/_journal.json` and has no `meta/0003_snapshot.json`.
+  Consequently `test_generation_batches` was never created in the local dev DB, and
+  `drizzle-kit generate` (which diffs from snapshot `0002`) bundles that table's
+  `CREATE TABLE` into any newly generated migration.
+  Evidence: `__drizzle_migrations` in `data/gen-story.sqlite` has only 3 rows (0000–0002);
+  `SELECT ... sqlite_master ... 'test_generation_batches'` returns 0.
+  Resolution for this plan: the auto-generated bundled migration was discarded and the
+  `common_prompt` change was hand-authored as an isolated migration
+  (`0004_add_storyboard_common_prompt.sql`) registered directly in `_journal.json`. The
+  `test_generation_batches` journal/snapshot drift is left untouched as out of scope and
+  should be flagged to the team separately.
 
 
 ## Decision Log
@@ -83,7 +128,26 @@ This closes three rows of Section 5 ("Common Project Prompt") in `docs/gap-analy
 
 ## Outcomes & Retrospective
 
-To be completed at milestone boundaries and at completion.
+All seven milestones are complete. A storyboard now carries a `commonPrompt`: it is
+auto-generated from the storyboard tone + style preset via the pure domain rule
+`composeCommonPrompt` when no value is stored, it is editable in the `StoryboardPage`
+"Common prompt" section (with a "Regenerate from tone & style" button), and it is composed
+into every scene's image-generation prompt by `composeImagePrompt`. This closes Section 5
+rows 1–3 of `docs/gap-analysis.md`.
+
+Validation: `pnpm typecheck`, `pnpm test` (112 tests across domain/application/api),
+`pnpm build`, and the architecture boundary check all pass. The hexagonal-DDD goal held —
+the auto-generation business rule lives in `packages/domain` and no new ports, aggregates,
+or use-case splits were introduced.
+
+Remaining gaps / lessons:
+- Section 5 row 4 ("Story-level AI context across uploaded photos") is still ⚠️ and was
+  intentionally out of scope — it needs real multi-photo vision analysis.
+- Pre-existing repo issues surfaced (see Surprises & Discoveries) that are out of scope and
+  should be flagged to the team: (1) the unregistered `0003_add_test_generation_batches`
+  migration / snapshot drift, and (2) repo-wide Prettier drift causing `pnpm format` to
+  fail independently of this work.
+- `db:generate` cwd sensitivity is worth fixing in the package script later.
 
 
 ## Context and Orientation

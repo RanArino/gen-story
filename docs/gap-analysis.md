@@ -84,9 +84,9 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Per-project common prompt (auto-generated from emotion + style) | 🟡 | Planned in `docs/plans/20260517-common-project-prompt.md`: `commonPrompt` field on `Storyboard`, auto-generated via domain rule `composeCommonPrompt` from tone + style preset |
-| Common prompt editable by user | 🟡 | Planned in `docs/plans/20260517-common-project-prompt.md`: editable "Common Prompt" textarea + "Regenerate" button on StoryboardPage |
-| Prompt consistency mechanism across scenes | 🟡 | `storyboard.tone` and `stylePreset.prompt` already applied to all scenes via `prompt-composer.ts`; `docs/plans/20260517-common-project-prompt.md` adds a user-editable common prompt threaded into every scene's composed prompt |
+| Per-project common prompt (auto-generated from emotion + style) | ✅ | `storyboards.commonPrompt` column; `upsertStoryboard` auto-generates it from tone + style preset via the domain rule `composeCommonPrompt` when no value is stored |
+| Common prompt editable by user | ✅ | Editable "Common prompt" textarea on `StoryboardPage` with a "Save common prompt" action and a "Regenerate from tone & style" button |
+| Prompt consistency mechanism across scenes | ✅ | `storyboard.commonPrompt` is composed into every scene's generation prompt via `composeImagePrompt` in `prompt-composer.ts`, alongside `storyboard.tone` and `stylePreset.prompt` |
 | Story-level AI context across uploaded photos | ⚠️ | Per-scene AI fill uses storyboard tone, style preset, project photos, and sibling scenes as context; no real multi-photo vision analysis yet |
 
 ---
@@ -261,6 +261,15 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 ---
 
+### 17. Technical Debt & Infrastructure
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Fix migration journal drift for test_generation_batches | ❌ | File `drizzle/migrations/0003_add_test_generation_batches.sql` exists but is not registered in `drizzle/migrations/meta/_journal.json` and lacks `0003_snapshot.json`. This prevented the table from being created in local dev; drizzle-kit generate bundles it into any new migration. Should register the migration in _journal.json or rebase migrations to avoid future drizzle-kit confusion. |
+| Resolve repo-wide Prettier formatting drift | ❌ | ~21 files (pre-existing + some touched by common-prompt work) fail `pnpm format` checks. Root cause unknown; should diagnose and apply consistent formatting across the codebase to unblock CI/pre-commit checks. |
+
+---
+
 ## Phase 2 — Video Generation (Future)
 
 All Phase 2 items are **🔮 not started** and explicitly out of scope for the initial release.
@@ -304,7 +313,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
 | Emotion / AI photo analysis | 7 | 0 | 0 |
 | Image style selection | 1 | 2 | 4 |
-| Common project prompt | 0 | 1 | 3 (3 🟡 in progress — `docs/plans/20260517-common-project-prompt.md`) |
+| Common project prompt | 3 | 1 | 0 |
 | Test generation workflow | 4 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 3 |
 | Scene content | 10 | 3 | 4 (AI gen + complement) |
@@ -316,6 +325,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Generation history | 5 | 0 | 2 |
 | File lifecycle & cleanup | 5 | 1 | 0 |
 | Local release readiness | 11 | 0 | 0 |
+| Technical debt & infrastructure | 0 | 0 | 2 |
 
 ---
 
