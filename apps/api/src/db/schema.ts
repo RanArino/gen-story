@@ -278,7 +278,9 @@ export const testGenerationBatches = sqliteTable(
       .notNull()
       .references(() => storyboards.id),
     status: text("status").notNull(),
-    confirmedGenerationRequestId: text("confirmed_generation_request_id").references(() => generationRequests.id),
+    confirmedGenerationRequestId: text(
+      "confirmed_generation_request_id",
+    ).references(() => generationRequests.id),
     createdAt: text("created_at").notNull(),
     completedAt: text("completed_at"),
   },
