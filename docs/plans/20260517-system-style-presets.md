@@ -27,12 +27,12 @@ Out of scope (remain `❌`): custom style creation from a user-uploaded referenc
 
 ## Progress
 
-- [ ] Define the nine style presets (id, name, description, prompt) as a shared constant.
-- [ ] Update the seed script to upsert all nine system presets idempotently.
-- [ ] Replace the nine stub files in `apps/web/public/style-previews/` with real preview images whose filenames match the new preset names.
-- [ ] Add `scripts/generate-style-previews.ts` to render the previews from one fixed subject through each style prompt.
-- [ ] Update `docs/` (gap-analysis status, README/known-limitations if affected).
-- [ ] Validate: typecheck, lint, test, and manual gallery check.
+- [x] (2026-05-17) Define the nine style presets (id, name, description, prompt) as a shared constant — `scripts/style-presets.ts`.
+- [x] (2026-05-17) Update the seed script to upsert all nine system presets idempotently — `scripts/seed.ts`; verified 9 `system` rows seed and re-seed cleanly.
+- [x] (2026-05-18) Replace the nine stub files in `apps/web/public/style-previews/` with real preview images. The nine 149-byte stubs were removed and nine real same-subject JPEGs were generated and confirmed production-quality.
+- [x] (2026-05-17) Add `scripts/generate-style-previews.ts` (+ `apps/api/src/generation/style-preview-renderer.ts`): character-anchor rendering (one base image + `images.edit` restyles), base cached at `data/style-preview-base.png`, optional per-style arguments.
+- [x] (2026-05-17) Update `docs/`: gap-analysis status + counts, README seed/preview sections, `.env.example` `OPENAI_API_KEY` note.
+- [x] (2026-05-17) Validate: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` all pass. Manual gallery check pending real preview images.
 
 
 ## Surprises & Discoveries
@@ -40,7 +40,19 @@ Out of scope (remain `❌`): custom style creation from a user-uploaded referenc
 - Observation: `previewImageUrl` is derived, not stored. `apps/api/src/http/dto-mappers.ts` builds it as `/style-previews/<preset.name lowercased, spaces→dashes>.jpg`. Therefore the preview filename is fully determined by the preset `name`, and renaming a preset silently breaks its preview link.
   Evidence: `toStylePresetDto` in `apps/api/src/http/dto-mappers.ts` line ~158.
 - Observation: The existing nine files in `apps/web/public/style-previews/` are 149-byte stubs named after emotions/colors (`cinematic`, `cool`, `moody`, `neon`, `noir`, `retro`, `soft`, `vibrant`, `warm`), none of which correspond to the required style names. They must be replaced, not reused.
-  Evidence: `ls -la apps/web/public/style-previews` shows nine 149-byte `.jpg` files.
+  Evidence: `ls -la apps/web/public/style-previews` shows nine 149-byte `.jpg` files. Resolution: all nine stubs were deleted; the directory is now empty pending a real render.
+- Observation: `openai` and `sharp` are dependencies of `apps/api`, not hoisted to the repo-root `node_modules` (pnpm isolated linker). A script under `scripts/` cannot `import "openai"` directly.
+  Evidence: `ls node_modules/openai` → not found; `pnpm-workspace.yaml` lists only `apps/*` and `packages/*`.
+  Resolution: the OpenAI + `sharp` calls live in `apps/api/src/generation/style-preview-renderer.ts` (inside the api package's resolution scope); the script imports that module by relative path, the same pattern `scripts/seed.ts` uses for `repositories.ts`.
+- Observation: `scripts/seed.ts` returns early when the demo project already exists, which would skip any seeding placed after that check.
+  Evidence: lines 25-32 of `seed.ts` `return` when a project named "Demo — Family Trip" is found.
+  Resolution: the style-preset seeding loop was placed *before* the demo-project early-return so prompt revisions still propagate when re-seeding an existing database.
+- Observation: The first preview-generation approach (nine independent text-to-image calls, each with a continuity sentence mentioning "all style previews") produced collage/contact-sheet images and a different-looking person per style.
+  Evidence: a generation run produced multi-panel `cinematic-photoreal.jpg`; the model interpreted "across all style previews" as a multi-panel request, and independent generations cannot share a subject.
+  Resolution: switched to the character-anchor pattern (one base image + `images.edit` restyles) and added explicit "single image, no grid/collage/panels" constraints to every prompt.
+- Observation: gpt-image endpoints reject `response_format`.
+  Evidence: live `400 Unknown parameter: 'response_format'` from `images.generate`.
+  Resolution: `response_format` is never sent (gpt-image returns base64 by default); `input_fidelity` is also omitted (disabled for `gpt-image-2`); `quality: "high"` is sent per the guide.
 
 
 ## Decision Log
@@ -61,10 +73,33 @@ Out of scope (remain `❌`): custom style creation from a user-uploaded referenc
   Rationale: `REQUIREMENTS_INIT.md` lines 56-57 require previews we provide ourselves AND the *same subject* shown in every style for comparison. A single-subject render loop satisfies both directly and is reproducible.
   Date/Author: 2026-05-17 / Claude
 
+- Decision: Put the OpenAI + `sharp` rendering logic in a new module `apps/api/src/generation/style-preview-renderer.ts` and have the script call it, instead of reusing `OpenAiImageGenerationAdapter` directly as the plan first suggested.
+  Rationale: The existing adapter is bound to `ObjectStoragePort` and writes generated-image storage keys — wrong target for static `public/` preview files. It also could not be imported from `scripts/` since `openai`/`sharp` are not hoisted to the repo root. A thin renderer module inside the api package solves both: correct dependency resolution and a return-the-bytes shape the script can write anywhere.
+  Date/Author: 2026-05-17 / Claude
+
+- Decision: Generate the previews with the "character anchor" pattern — one text-to-image base, then `images.edit` restyles of that exact image — instead of nine independent text-to-image calls.
+  Rationale: Independent text-to-image calls invent a different person each time, so the nine previews were not the same subject (a hard requirement) and some came out as multi-panel collages. OpenAI's gpt-image prompting guide §6.4 recommends exactly this anchor-then-edit pattern for character consistency. The base image is cached at `data/style-preview-base.png` and the script accepts style-name arguments, so a bad single style can be re-rendered without paying to regenerate the base or the other eight.
+  Date/Author: 2026-05-17 / Claude
+
+- Decision: Send `quality: "high"` and never send `response_format` or `input_fidelity` to the gpt-image endpoints.
+  Rationale: gpt-image models return base64 by default and reject `response_format` (confirmed by a live 400). `input_fidelity` is disabled for `gpt-image-2`. `quality` is supported (`low`/`medium`/`high`); the guide recommends `high` for identity-sensitive close-up portraits, which these previews are.
+  Date/Author: 2026-05-17 / Claude
+
 
 ## Outcomes & Retrospective
 
-To be completed when work finishes. Summarize: whether all nine previews render in the gallery, whether seed is idempotent on re-run, and any style prompts that needed tuning after visual inspection.
+Milestone (2026-05-17): the preset data and tooling are complete and verified.
+
+- All nine `system` style presets are defined in `scripts/style-presets.ts` with per-style illustration/texture prompts and seed via `scripts/seed.ts`. Verified: a fresh `db:migrate` + `db:seed` produces exactly nine `scope = 'system'` rows; re-running the seed updates in place with no duplicates.
+- `scripts/generate-style-previews.ts` and `apps/api/src/generation/style-preview-renderer.ts` are implemented; the renderer generates a 1024×1024 image per style and downscales to a 480px JPEG.
+- `pnpm typecheck`, `pnpm lint`, `pnpm test` (domain 20, application 24, api 81), and `pnpm build` all pass.
+
+Completion (2026-05-18): the nine preview JPEGs were generated and confirmed production-quality, and live in `apps/web/public/style-previews/`. All four targeted `docs/gap-analysis.md` rows are now `✅`; the section-4 summary row is `5 | 2 | 0 | 0`. The plan is complete.
+
+Lessons:
+- In a pnpm isolated-linker monorepo, repo-root scripts cannot import package-scoped deps — push such logic into the owning package and import it by relative path.
+- Independent text-to-image calls cannot produce a consistent subject; the first approach also produced collage images. The fix was OpenAI's character-anchor pattern (one base image + `images.edit` restyles) plus explicit single-frame constraints — and grounding the prompts in the official gpt-image guide rather than guessing.
+- Image-generation calls cost money: the base image is cached and the script supports per-style regeneration so a bad result never forces a full re-run.
 
 
 ## Context and Orientation
