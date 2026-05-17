@@ -30,10 +30,7 @@ export function ProjectCreatePage() {
     setSubmitting(true);
     setError(null);
     try {
-      const project = await createProject(
-        name.trim(),
-        occasion || undefined,
-      );
+      const project = await createProject(name.trim(), occasion || undefined);
       router.push(`/projects/${project.id}/photos`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create project");

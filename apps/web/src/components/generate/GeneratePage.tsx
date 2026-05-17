@@ -15,7 +15,13 @@ import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./GeneratePage.module.css";
 
-type GenStatus = "queued" | "running" | "succeeded" | "failed" | "canceled" | "none";
+type GenStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "canceled"
+  | "none";
 
 type SceneProgress = {
   scene: SceneDto;
@@ -23,7 +29,9 @@ type SceneProgress = {
   status: GenStatus;
 };
 
-function latestRequest(requests: GenerationRequestDto[]): GenerationRequestDto | null {
+function latestRequest(
+  requests: GenerationRequestDto[],
+): GenerationRequestDto | null {
   if (requests.length === 0) return null;
   return requests.reduce((latest, r) =>
     new Date(r.createdAt) > new Date(latest.createdAt) ? r : latest,
@@ -57,19 +65,24 @@ export function GeneratePage({ projectId }: { projectId: string }) {
     }
   }, []);
 
-  const pollAll = useCallback(async (scenes: SceneDto[]) => {
-    const updated = await Promise.all(
-      scenes.map(async (scene) => {
-        const requests = await listGenerationRequests(scene.id);
-        const req = latestRequest(requests);
-        return { scene, latestRequest: req, status: getStatus(req) };
-      }),
-    );
-    setProgress(updated);
-    const allDone = updated.every((p) => isTerminal(p.status) || p.status === "none");
-    if (allDone) stopPolling();
-    return updated;
-  }, [stopPolling]);
+  const pollAll = useCallback(
+    async (scenes: SceneDto[]) => {
+      const updated = await Promise.all(
+        scenes.map(async (scene) => {
+          const requests = await listGenerationRequests(scene.id);
+          const req = latestRequest(requests);
+          return { scene, latestRequest: req, status: getStatus(req) };
+        }),
+      );
+      setProgress(updated);
+      const allDone = updated.every(
+        (p) => isTerminal(p.status) || p.status === "none",
+      );
+      if (allDone) stopPolling();
+      return updated;
+    },
+    [stopPolling],
+  );
 
   const loadAndPoll = useCallback(async () => {
     const storyboards = await listStoryboards(projectId);
@@ -100,7 +113,10 @@ export function GeneratePage({ projectId }: { projectId: string }) {
     try {
       const scenes = progress.map((p) => p.scene);
       const scenesToQueue = progress.filter(
-        (p) => p.status === "none" || p.status === "failed" || p.status === "canceled",
+        (p) =>
+          p.status === "none" ||
+          p.status === "failed" ||
+          p.status === "canceled",
       );
 
       for (const { scene } of scenesToQueue) {
@@ -166,7 +182,9 @@ export function GeneratePage({ projectId }: { projectId: string }) {
   const succeeded = progress.filter((p) => p.status === "succeeded").length;
   const failed = progress.filter((p) => p.status === "failed").length;
   const total = progress.length;
-  const allDone = total > 0 && progress.every((p) => isTerminal(p.status) || p.status === "none");
+  const allDone =
+    total > 0 &&
+    progress.every((p) => isTerminal(p.status) || p.status === "none");
   const anyActive = progress.some((p) => isActive(p.status));
   const noneStarted = progress.every((p) => p.status === "none");
 
@@ -185,8 +203,14 @@ export function GeneratePage({ projectId }: { projectId: string }) {
           <h2>Generate</h2>
         </div>
         <div className="card">
-          <p>No scenes found. Please add scenes in the Storyboard step first.</p>
-          <Link href={`/projects/${projectId}/storyboard`} className="btn btn-primary" style={{ marginTop: 12 }}>
+          <p>
+            No scenes found. Please add scenes in the Storyboard step first.
+          </p>
+          <Link
+            href={`/projects/${projectId}/storyboard`}
+            className="btn btn-primary"
+            style={{ marginTop: 12 }}
+          >
             Go to Storyboard →
           </Link>
         </div>
@@ -214,9 +238,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
               <span className={styles.failedCount}>{failed} failed</span>
             )}
           </div>
-          {anyActive && (
-            <div className={styles.spinner} title="Generating…" />
-          )}
+          {anyActive && <div className={styles.spinner} title="Generating…" />}
         </div>
         {total > 0 && (
           <div className={styles.progressBar}>
@@ -236,7 +258,11 @@ export function GeneratePage({ projectId }: { projectId: string }) {
             onClick={startGeneration}
             disabled={launching || anyActive}
           >
-            {launching ? "Starting…" : noneStarted ? "Start generation" : "Retry failed scenes"}
+            {launching
+              ? "Starting…"
+              : noneStarted
+                ? "Start generation"
+                : "Retry failed scenes"}
           </button>
         )}
         {allDone && succeeded > 0 && (
@@ -256,7 +282,9 @@ export function GeneratePage({ projectId }: { projectId: string }) {
             <div className={styles.sceneInfo}>
               <span className={styles.sceneName}>{p.scene.title}</span>
               {p.latestRequest?.errorMessage && (
-                <span className={styles.errorReason}>{p.latestRequest.errorMessage}</span>
+                <span className={styles.errorReason}>
+                  {p.latestRequest.errorMessage}
+                </span>
               )}
             </div>
             <div className={styles.sceneRight}>

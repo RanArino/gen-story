@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { GenerationRequestDto, TestGenerationBatchDto } from "@gen-story/shared";
+import type {
+  GenerationRequestDto,
+  TestGenerationBatchDto,
+} from "@gen-story/shared";
 import {
   confirmTestGenerationBatch,
   listGeneratedImages,
@@ -32,7 +35,9 @@ export function TestGenerationModal({
   onConfirmed,
   onClose,
 }: Props) {
-  const [batch, setBatch] = useState<TestGenerationBatchDto | null>(existingBatch);
+  const [batch, setBatch] = useState<TestGenerationBatchDto | null>(
+    existingBatch,
+  );
   const [requests, setRequests] = useState<GenerationRequestDto[]>([]);
   const [images, setImages] = useState<GeneratedImageEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,11 +48,12 @@ export function TestGenerationModal({
     if (!sceneId) return;
     const reqs = await listGenerationRequests(sceneId);
     const testReqs = batch
-      ? reqs.filter((r) =>
-          r.inputJson &&
-          typeof r.inputJson === "object" &&
-          "testBatchId" in r.inputJson &&
-          r.inputJson.testBatchId === batch.id,
+      ? reqs.filter(
+          (r) =>
+            r.inputJson &&
+            typeof r.inputJson === "object" &&
+            "testBatchId" in r.inputJson &&
+            r.inputJson.testBatchId === batch.id,
         )
       : [];
     setRequests(testReqs);
@@ -87,7 +93,9 @@ export function TestGenerationModal({
       setBatch(result.batch);
       setRequests(result.generationRequests);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to start test generation.");
+      setError(
+        e instanceof Error ? e.message : "Failed to start test generation.",
+      );
     } finally {
       setLoading(false);
     }
@@ -117,7 +125,9 @@ export function TestGenerationModal({
     }
   }
 
-  const succeededCount = requests.filter((r) => r.status === "succeeded").length;
+  const succeededCount = requests.filter(
+    (r) => r.status === "succeeded",
+  ).length;
   const totalCount = requests.length;
 
   return (
@@ -143,19 +153,43 @@ export function TestGenerationModal({
           overflowY: "auto",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 24,
+          }}
+        >
           <h2 style={{ margin: 0 }}>Test Generation — Preview 3 Styles</h2>
-          <button onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer" }}>
+          <button
+            onClick={onClose}
+            style={{
+              fontSize: 20,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
             ✕
           </button>
         </div>
 
         <p style={{ color: "#666", marginTop: 0, marginBottom: 24 }}>
-          Generate 3 sample images to verify your style selection before bulk generation. Confirm the one you like to proceed.
+          Generate 3 sample images to verify your style selection before bulk
+          generation. Confirm the one you like to proceed.
         </p>
 
         {error && (
-          <div style={{ color: "red", marginBottom: 16, padding: 8, background: "#fff0f0", borderRadius: 4 }}>
+          <div
+            style={{
+              color: "red",
+              marginBottom: 16,
+              padding: 8,
+              background: "#fff0f0",
+              borderRadius: 4,
+            }}
+          >
             {error}
           </div>
         )}
@@ -174,7 +208,15 @@ export function TestGenerationModal({
         )}
 
         {batch && batch.status === "completed" && (
-          <div style={{ background: "#f0fff4", padding: 12, borderRadius: 6, marginBottom: 16, color: "#2d6a4f" }}>
+          <div
+            style={{
+              background: "#f0fff4",
+              padding: 12,
+              borderRadius: 6,
+              marginBottom: 16,
+              color: "#2d6a4f",
+            }}
+          >
             ✓ Test confirmed. You can now proceed with bulk generation.
           </div>
         )}
@@ -184,28 +226,46 @@ export function TestGenerationModal({
             <p style={{ color: "#666", marginBottom: 16 }}>
               Progress: {succeededCount} of {totalCount} complete
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 16,
+                marginBottom: 24,
+              }}
+            >
               {requests.map((req, i) => {
                 const entry = images.find((img) => img.requestId === req.id);
-                const isConfirmed = batch.confirmedGenerationRequestId === req.id;
+                const isConfirmed =
+                  batch.confirmedGenerationRequestId === req.id;
                 return (
                   <div
                     key={req.id}
                     style={{
-                      border: isConfirmed ? "2px solid #4caf50" : "1px solid #ddd",
+                      border: isConfirmed
+                        ? "2px solid #4caf50"
+                        : "1px solid #ddd",
                       borderRadius: 8,
                       padding: 12,
                       textAlign: "center",
                     }}
                   >
-                    <div style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>
+                    <div
+                      style={{ fontSize: 13, color: "#888", marginBottom: 8 }}
+                    >
                       Variant {i + 1} — {req.status}
                     </div>
                     {entry?.imageUrl ? (
                       <img
                         src={entry.imageUrl}
                         alt={`Test variant ${i + 1}`}
-                        style={{ width: "100%", borderRadius: 4, marginBottom: 8, aspectRatio: "1", objectFit: "cover" }}
+                        style={{
+                          width: "100%",
+                          borderRadius: 4,
+                          marginBottom: 8,
+                          aspectRatio: "1",
+                          objectFit: "cover",
+                        }}
                       />
                     ) : (
                       <div
@@ -225,18 +285,23 @@ export function TestGenerationModal({
                         {req.status === "failed" ? "Failed" : "Generating…"}
                       </div>
                     )}
-                    {batch.status !== "completed" && req.status === "succeeded" && (
-                      <button
-                        className="btn btn-primary"
-                        style={{ width: "100%", fontSize: 13 }}
-                        onClick={() => handleConfirm(req.id)}
-                        disabled={confirming !== null}
-                      >
-                        {confirming === req.id ? "Confirming…" : "Confirm this style"}
-                      </button>
-                    )}
+                    {batch.status !== "completed" &&
+                      req.status === "succeeded" && (
+                        <button
+                          className="btn btn-primary"
+                          style={{ width: "100%", fontSize: 13 }}
+                          onClick={() => handleConfirm(req.id)}
+                          disabled={confirming !== null}
+                        >
+                          {confirming === req.id
+                            ? "Confirming…"
+                            : "Confirm this style"}
+                        </button>
+                      )}
                     {isConfirmed && (
-                      <div style={{ color: "#4caf50", fontWeight: 600 }}>✓ Confirmed</div>
+                      <div style={{ color: "#4caf50", fontWeight: 600 }}>
+                        ✓ Confirmed
+                      </div>
                     )}
                   </div>
                 );
@@ -245,7 +310,11 @@ export function TestGenerationModal({
 
             {batch.status !== "completed" && (
               <div style={{ textAlign: "right" }}>
-                <button className="btn btn-secondary" onClick={handleReset} style={{ fontSize: 13 }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleReset}
+                  style={{ fontSize: 13 }}
+                >
                   Generate new tests
                 </button>
               </div>

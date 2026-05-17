@@ -125,7 +125,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [creatingTemplates, setCreatingTemplates] = useState(false);
   const [analyzingPhotos, setAnalyzingPhotos] = useState(false);
   const [aiFillingSceneId, setAiFillingSceneId] = useState<string | null>(null);
-  const [testBatch, setTestBatch] = useState<TestGenerationBatchDto | null>(null);
+  const [testBatch, setTestBatch] = useState<TestGenerationBatchDto | null>(
+    null,
+  );
   const [showTestModal, setShowTestModal] = useState(false);
   const [commonPromptDraft, setCommonPromptDraft] = useState("");
   const [savingCommonPrompt, setSavingCommonPrompt] = useState(false);
@@ -257,13 +259,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       );
       setScenes((prev) => [...prev, ...newScenes.map(sceneDtoToState)]);
       setSelectedPhotoIds(new Set());
-      setSaveMsg(`${newScenes.length} scene${newScenes.length !== 1 ? "s" : ""} created! Scroll down to edit.`);
+      setSaveMsg(
+        `${newScenes.length} scene${newScenes.length !== 1 ? "s" : ""} created! Scroll down to edit.`,
+      );
       setTimeout(() => setSaveMsg(null), 4000);
       // Scroll to scenes section after a short delay
       setTimeout(() => {
-        const scenesSection = document.querySelector('[data-scenes-section]');
+        const scenesSection = document.querySelector("[data-scenes-section]");
         if (scenesSection) {
-          scenesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          scenesSection.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       }, 300);
     } catch (e: unknown) {
@@ -476,8 +480,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </button>
           </div>
           {selectedPhotoIds.size === 0 && (
-            <p style={{ color: "var(--color-text-muted)", fontSize: "0.9em", marginBottom: "12px" }}>
-              💡 Select one or more candidate photos below, then click the button to create draft scenes
+            <p
+              style={{
+                color: "var(--color-text-muted)",
+                fontSize: "0.9em",
+                marginBottom: "12px",
+              }}
+            >
+              💡 Select one or more candidate photos below, then click the
+              button to create draft scenes
             </p>
           )}
           <div
@@ -588,8 +599,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           </button>
         </div>
         <p className={styles.photoAssignHint}>
-          Applied to every scene&apos;s image generation. Auto-generated from the
-          storyboard tone and style; edit it to guide all scenes consistently.
+          Applied to every scene&apos;s image generation. Auto-generated from
+          the storyboard tone and style; edit it to guide all scenes
+          consistently.
         </p>
         <textarea
           className={styles.fieldInput}
@@ -598,7 +610,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           onChange={(e) => setCommonPromptDraft(e.target.value)}
           placeholder="Common prompt applied to every scene"
         />
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginTop: 8,
+          }}
+        >
           <button
             className="btn btn-primary"
             onClick={() => saveCommonPrompt(commonPromptDraft)}
@@ -665,9 +684,18 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             Continue to Generate →
           </Link>
         ) : (
-          <div style={{ marginLeft: "auto", display: "flex", gap: 12, alignItems: "center" }}>
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+            }}
+          >
             {testBatch?.status === "pending" && (
-              <span style={{ fontSize: 13, color: "#888" }}>Test in progress…</span>
+              <span style={{ fontSize: 13, color: "#888" }}>
+                Test in progress…
+              </span>
             )}
             <button
               className="btn btn-primary"

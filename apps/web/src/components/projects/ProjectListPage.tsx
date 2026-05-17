@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { ProjectDto } from "@gen-story/shared";
-import { deleteProject, listProjects, restoreProject } from "../../lib/api-client";
+import {
+  deleteProject,
+  listProjects,
+  restoreProject,
+} from "../../lib/api-client";
 import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./ProjectListPage.module.css";
@@ -22,7 +26,9 @@ export function ProjectListPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function handleDelete(projectId: string) {
     try {
@@ -61,14 +67,16 @@ export function ProjectListPage() {
       {loading && <p className={styles.hint}>Loading…</p>}
       {error && <ErrorAlert message={error} onRetry={load} />}
 
-      {!loading && activeProjects.length === 0 && deletedProjects.length === 0 && (
-        <div className={`card ${styles.empty}`}>
-          <p>No projects yet. Create your first project to get started.</p>
-          <Link href="/projects/new" className="btn btn-primary">
-            + New project
-          </Link>
-        </div>
-      )}
+      {!loading &&
+        activeProjects.length === 0 &&
+        deletedProjects.length === 0 && (
+          <div className={`card ${styles.empty}`}>
+            <p>No projects yet. Create your first project to get started.</p>
+            <Link href="/projects/new" className="btn btn-primary">
+              + New project
+            </Link>
+          </div>
+        )}
 
       <div className={styles.grid}>
         {activeProjects.map((p) => (
@@ -76,7 +84,9 @@ export function ProjectListPage() {
             <Link href={`/projects/${p.id}/photos`} className={styles.cardLink}>
               <div className={styles.cardHeader}>
                 <h3>{p.name}</h3>
-                <span className={`${styles.badge} ${styles[`status_${p.status}`] ?? styles.badge}`}>
+                <span
+                  className={`${styles.badge} ${styles[`status_${p.status}`] ?? styles.badge}`}
+                >
                   {p.status}
                 </span>
               </div>
@@ -98,10 +108,15 @@ export function ProjectListPage() {
       {deletedProjects.length > 0 && (
         <section className={styles.deletedSection}>
           <h3 className={styles.deletedTitle}>Recently deleted</h3>
-          <p className={styles.deletedHint}>Deleted projects are kept for 7 days.</p>
+          <p className={styles.deletedHint}>
+            Deleted projects are kept for 7 days.
+          </p>
           <div className={styles.grid}>
             {deletedProjects.map((p) => (
-              <div key={p.id} className={`card ${styles.projectCard} ${styles.projectCardDeleted}`}>
+              <div
+                key={p.id}
+                className={`card ${styles.projectCard} ${styles.projectCardDeleted}`}
+              >
                 <div className={styles.cardHeader}>
                   <h3>{p.name}</h3>
                 </div>
