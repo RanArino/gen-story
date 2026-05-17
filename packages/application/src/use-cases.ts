@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  assertComplementSceneBridge,
   canStartTestGeneration,
   completeTestGenerationBatch,
+  createComplementScene,
   createGeneratedImage,
   createGenerationRequest,
   createPhotoAsset,
@@ -33,7 +35,11 @@ import {
   type TestGenerationBatch,
 } from "@gen-story/domain";
 
-import type { ApplicationDependencies, UseCaseResult } from "./ports";
+import type {
+  ApplicationDependencies,
+  ComplementSceneProposal,
+  UseCaseResult,
+} from "./ports";
 
 function success<T>(value: T): UseCaseResult<T> {
   return {
@@ -258,6 +264,10 @@ export async function registerPhotoAsset(
       return failure("conflict", "Photo asset already exists in this project.");
     }
 
+    const existingPhotos = await deps.photoAssets.findByProjectId(
+      input.projectId,
+    );
+
     const photoAsset = createPhotoAsset({
       id: input.photoAssetId,
       projectId: input.projectId,
@@ -271,6 +281,7 @@ export async function registerPhotoAsset(
       sourceKind: input.sourceKind,
       notes: input.notes ?? null,
       usage: input.usage,
+      position: existingPhotos.length,
       createdAt: now(),
       updatedAt: now(),
     });
@@ -446,6 +457,8 @@ function buildScene(existingScene: Scene | null, input: SceneInput): Scene {
     storyboardId: input.storyboardId,
     orderIndex: input.orderIndex,
     status: input.status ?? existingScene?.status,
+    kind: existingScene?.kind,
+    bridge: existingScene?.bridge,
     title: input.title,
     description: input.description,
     imagePrompt: input.imagePrompt,
@@ -787,6 +800,247 @@ export async function fillSceneWithAi(
     await deps.scenes.save(updatedScene);
 
     return success(updatedScene);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── Complement Scenes ────────────────────────────────────────────────────────
+
+export type InsertComplementSceneInput = {
+  storyboardId: string;
+  fromSceneId: string;
+  toSceneId: string;
+};
+
+export async function insertComplementScene(
+  deps: ApplicationDependencies,
+  input: InsertComplementSceneInput,
+): Promise<UseCaseResult<Scene>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const scenes = sortScenesByOrderIndex(
+      await deps.scenes.findByStoryboardId(input.storyboardId),
+    );
+    const fromIndex = scenes.findIndex(
+      (scene) => scene.id === input.fromSceneId,
+    );
+    const toIndex = scenes.findIndex((scene) => scene.id === input.toSceneId);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      return failure(
+        "not_found",
+        "Bridge scenes were not found in this storyboard.",
+      );
+    }
+
+    if (toIndex !== fromIndex + 1) {
+      return failure(
+        "invalid_state",
+        "A complement scene must bridge two adjacent scenes.",
+      );
+    }
+
+    assertComplementSceneBridge(
+      { fromSceneId: input.fromSceneId, toSceneId: input.toSceneId },
+      scenes,
+    );
+
+    const timestamp = now();
+    const complementScene = createComplementScene({
+      id: randomUUID(),
+      projectId: storyboard.projectId,
+      storyboardId: input.storyboardId,
+      orderIndex: fromIndex + 1,
+      bridge: { fromSceneId: input.fromSceneId, toSceneId: input.toSceneId },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    const reordered = [
+      ...scenes.slice(0, fromIndex + 1),
+      complementScene,
+      ...scenes.slice(fromIndex + 1),
+    ];
+
+    for (let index = 0; index < reordered.length; index++) {
+      const scene = reordered[index]!;
+      if (scene.id === complementScene.id) {
+        await deps.scenes.save(scene);
+      } else if (scene.orderIndex !== index) {
+        await deps.scenes.save({
+          ...scene,
+          orderIndex: index,
+          updatedAt: timestamp,
+        });
+      }
+    }
+
+    const updatedStoryboard = {
+      ...storyboard,
+      sceneIds: reordered.map((scene) => scene.id),
+      updatedAt: timestamp,
+    };
+    await deps.storyboards.save(updatedStoryboard);
+
+    return success(complementScene);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type ProposeComplementScenesInput = {
+  storyboardId: string;
+  fromSceneId: string;
+  toSceneId: string;
+};
+
+export async function proposeComplementScenes(
+  deps: ApplicationDependencies,
+  input: ProposeComplementScenesInput,
+): Promise<UseCaseResult<ComplementSceneProposal[]>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const project = await getProjectOrNotFound(deps, storyboard.projectId);
+    if (isFailure(project)) return project;
+
+    const scenes = sortScenesByOrderIndex(
+      await deps.scenes.findByStoryboardId(input.storyboardId),
+    );
+    const fromScene = scenes.find((scene) => scene.id === input.fromSceneId);
+    const toScene = scenes.find((scene) => scene.id === input.toSceneId);
+
+    if (fromScene == null || toScene == null) {
+      return failure(
+        "not_found",
+        "Bridge scenes were not found in this storyboard.",
+      );
+    }
+
+    let stylePreset: StylePreset | null = null;
+    if (storyboard.stylePresetId != null) {
+      stylePreset = await deps.stylePresets.findById(storyboard.stylePresetId);
+      if (stylePreset == null) {
+        return failure("not_found", "Style preset not found.");
+      }
+    }
+
+    const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
+    const proposals =
+      await deps.complementSceneProposal.proposeComplementScenes({
+        project,
+        storyboard,
+        fromScene,
+        toScene,
+        stylePreset,
+        projectPhotos,
+        siblingScenes: scenes,
+      });
+
+    return success(proposals.slice(0, 3));
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── Reordering ───────────────────────────────────────────────────────────────
+
+export type ReorderPhotosInput = {
+  projectId: string;
+  photoAssetIds: string[];
+};
+
+export async function reorderPhotos(
+  deps: ApplicationDependencies,
+  input: ReorderPhotosInput,
+): Promise<UseCaseResult<PhotoAsset[]>> {
+  try {
+    const project = await getProjectOrNotFound(deps, input.projectId);
+    if (isFailure(project)) return project;
+
+    const photos = await deps.photoAssets.findByProjectId(input.projectId);
+    const photosById = new Map(photos.map((photo) => [photo.id, photo]));
+
+    for (const photoAssetId of input.photoAssetIds) {
+      if (!photosById.has(photoAssetId)) {
+        return failure(
+          "not_found",
+          `Photo ${photoAssetId} not found in this project.`,
+        );
+      }
+    }
+
+    const timestamp = now();
+    for (let index = 0; index < input.photoAssetIds.length; index++) {
+      const photo = photosById.get(input.photoAssetIds[index]!)!;
+      if (photo.position !== index) {
+        await deps.photoAssets.save({
+          ...photo,
+          position: index,
+          updatedAt: timestamp,
+        });
+      }
+    }
+
+    const reordered = await deps.photoAssets.findByProjectId(input.projectId);
+    return success(reordered);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type ReorderScenesInput = {
+  storyboardId: string;
+  sceneIds: string[];
+};
+
+export async function reorderScenes(
+  deps: ApplicationDependencies,
+  input: ReorderScenesInput,
+): Promise<UseCaseResult<Scene[]>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const scenes = await deps.scenes.findByStoryboardId(input.storyboardId);
+    const scenesById = new Map(scenes.map((scene) => [scene.id, scene]));
+
+    if (
+      input.sceneIds.length !== scenes.length ||
+      input.sceneIds.some((sceneId) => !scenesById.has(sceneId))
+    ) {
+      return failure(
+        "invalid_state",
+        "Scene order must list every scene in this storyboard exactly once.",
+      );
+    }
+
+    const timestamp = now();
+    for (let index = 0; index < input.sceneIds.length; index++) {
+      const scene = scenesById.get(input.sceneIds[index]!)!;
+      if (scene.orderIndex !== index) {
+        await deps.scenes.save({
+          ...scene,
+          orderIndex: index,
+          updatedAt: timestamp,
+        });
+      }
+    }
+
+    await deps.storyboards.save({
+      ...storyboard,
+      sceneIds: [...input.sceneIds],
+      updatedAt: timestamp,
+    });
+
+    const reordered = sortScenesByOrderIndex(
+      await deps.scenes.findByStoryboardId(input.storyboardId),
+    );
+    return success(reordered);
   } catch (error) {
     return validationFailure(error);
   }

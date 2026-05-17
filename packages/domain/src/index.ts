@@ -5,6 +5,7 @@ export type {
   CreatePhotoAssetInput,
   CreateProjectInput,
   CreateProjectPhotoAnalysisInput,
+  CreateComplementSceneInput,
   CreateSceneInput,
   CreateTemplateSceneInput,
   CreateStoryboardInput,
@@ -29,7 +30,9 @@ export type {
   ProjectPhotoAnalysisId,
   ProjectStatus,
   Scene,
+  SceneBridge,
   SceneId,
+  SceneKind,
   ScenePhotoAsset,
   ScenePhotoRole,
   SceneStatus,
@@ -48,6 +51,7 @@ export type {
 } from "./model";
 export {
   createGeneratedImage,
+  createComplementScene,
   createGenerationRequest,
   createOrganization,
   createPhotoAsset,
@@ -61,6 +65,7 @@ export {
   createUser,
 } from "./model";
 export {
+  assertComplementSceneBridge,
   canStartTestGeneration,
   completeTestGenerationBatch,
   composeCommonPrompt,

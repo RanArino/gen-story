@@ -164,6 +164,32 @@ export interface SceneFillGenerationPort {
   ): Promise<SceneFillSuggestion>;
 }
 
+export type ComplementSceneProposal = {
+  title: string;
+  description: string;
+  imagePrompt: string;
+  emotion: string;
+  cameraDirection: string;
+  lightingDirection: string;
+  motionDirection: string;
+};
+
+export type ComplementSceneProposalInput = {
+  project: Project;
+  storyboard: Storyboard;
+  fromScene: Scene;
+  toScene: Scene;
+  stylePreset: StylePreset | null;
+  projectPhotos: PhotoAsset[];
+  siblingScenes: Scene[];
+};
+
+export interface ComplementSceneProposalPort {
+  proposeComplementScenes(
+    input: ComplementSceneProposalInput,
+  ): Promise<ComplementSceneProposal[]>;
+}
+
 export type PhotoAnalysisGenerationInput = {
   project: Project;
   storyboard: Storyboard | null;
@@ -219,6 +245,7 @@ export interface ApplicationDependencies {
   imagePreprocessing: ImagePreprocessingPort;
   imageGeneration: ImageGenerationPort;
   sceneFillGeneration: SceneFillGenerationPort;
+  complementSceneProposal: ComplementSceneProposalPort;
   photoAnalysisGeneration: PhotoAnalysisGenerationPort;
   jobQueue: JobQueuePort;
   progressEvents: ProgressEventPort;

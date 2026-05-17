@@ -28,6 +28,9 @@ import {
 
 import type {
   ApplicationDependencies,
+  ComplementSceneProposal,
+  ComplementSceneProposalInput,
+  ComplementSceneProposalPort,
   GeneratedImageRepositoryPort,
   GenerationRequestRepositoryPort,
   ImageGenerationPort,
@@ -58,8 +61,12 @@ import {
   createProjectUseCase,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
+  insertComplementScene,
   markGeneratedImageAdopted,
+  proposeComplementScenes,
   registerPhotoAsset,
+  reorderPhotos,
+  reorderScenes,
   retryFailedGenerationRequest,
   updatePhotoCuration,
   upsertScenes,
@@ -416,6 +423,28 @@ class InMemorySceneFillGenerationPort implements SceneFillGenerationPort {
   }
 }
 
+class InMemoryComplementSceneProposalPort implements ComplementSceneProposalPort {
+  public readonly calls: ComplementSceneProposalInput[] = [];
+  public proposals: ComplementSceneProposal[] = [
+    {
+      title: "Bridge proposal",
+      description: "AI bridging description",
+      imagePrompt: "AI bridging image prompt",
+      emotion: "Calm",
+      cameraDirection: "Wide",
+      lightingDirection: "Natural",
+      motionDirection: "Slow pan",
+    },
+  ];
+
+  async proposeComplementScenes(
+    input: ComplementSceneProposalInput,
+  ): Promise<ComplementSceneProposal[]> {
+    this.calls.push(input);
+    return this.proposals;
+  }
+}
+
 class InMemoryPhotoAnalysisGenerationPort implements PhotoAnalysisGenerationPort {
   public readonly calls: PhotoAnalysisGenerationInput[] = [];
   public result: PhotoAnalysisGenerationResult = {
@@ -526,6 +555,7 @@ function createDependencies(initial?: {
   objectStorage: InMemoryObjectStoragePort;
   imageGeneration: InMemoryImageGenerationPort;
   sceneFillGeneration: InMemorySceneFillGenerationPort;
+  complementSceneProposal: InMemoryComplementSceneProposalPort;
   photoAnalysisGeneration: InMemoryPhotoAnalysisGenerationPort;
   scenes: InMemorySceneRepository;
 } {
@@ -557,6 +587,7 @@ function createDependencies(initial?: {
   const objectStorage = new InMemoryObjectStoragePort();
   const imageGeneration = new InMemoryImageGenerationPort();
   const sceneFillGeneration = new InMemorySceneFillGenerationPort();
+  const complementSceneProposal = new InMemoryComplementSceneProposalPort();
   const photoAnalysisGeneration = new InMemoryPhotoAnalysisGenerationPort();
 
   return {
@@ -583,6 +614,7 @@ function createDependencies(initial?: {
     imagePreprocessing,
     imageGeneration,
     sceneFillGeneration,
+    complementSceneProposal,
     photoAnalysisGeneration,
     jobQueue,
     progressEvents,
@@ -1823,5 +1855,205 @@ describe("application use cases", () => {
     if (result.ok) {
       expect(result.value?.id).toBe("analysis_1");
     }
+  });
+
+  function seedComplementSceneDeps() {
+    const ts = "2026-05-02T00:00:00.000Z";
+    const baseScene = (id: string, orderIndex: number) =>
+      createScene({
+        id,
+        projectId: "project_1",
+        storyboardId: "storyboard_1",
+        orderIndex,
+        title: `Scene ${orderIndex + 1}`,
+        description: "desc",
+        imagePrompt: "prompt",
+        emotion: "warm",
+        cameraDirection: "wide",
+        lightingDirection: "soft",
+        motionDirection: "still",
+        createdAt: ts,
+        updatedAt: ts,
+      });
+    return createDependencies({
+      users: [
+        createUser({
+          id: "user_1",
+          organizationId: "org_1",
+          displayName: "Ran",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      ],
+      organizations: [
+        createOrganization({
+          id: "org_1",
+          name: "Family Studio",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      ],
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_1",
+          projectId: "project_1",
+          tone: "Reflective",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      ],
+      scenes: [baseScene("scene_1", 0), baseScene("scene_2", 1)],
+    });
+  }
+
+  it("inserts a blank complement scene between two adjacent scenes", async () => {
+    const deps = seedComplementSceneDeps();
+
+    const result = await insertComplementScene(deps, {
+      storyboardId: "storyboard_1",
+      fromSceneId: "scene_1",
+      toSceneId: "scene_2",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.kind).toBe("complement");
+      expect(result.value.orderIndex).toBe(1);
+      expect(result.value.photoAssets).toHaveLength(0);
+      expect(result.value.bridge).toEqual({
+        fromSceneId: "scene_1",
+        toSceneId: "scene_2",
+      });
+    }
+
+    const scenes = await deps.scenes.findByStoryboardId("storyboard_1");
+    expect(scenes).toHaveLength(3);
+    const trailing = scenes.find((scene) => scene.id === "scene_2");
+    expect(trailing?.orderIndex).toBe(2);
+  });
+
+  it("rejects a complement scene between non-adjacent scenes", async () => {
+    const deps = seedComplementSceneDeps();
+
+    const result = await insertComplementScene(deps, {
+      storyboardId: "storyboard_1",
+      fromSceneId: "scene_2",
+      toSceneId: "scene_1",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state");
+    }
+  });
+
+  it("returns AI complement-scene proposals for a bridge", async () => {
+    const deps = seedComplementSceneDeps();
+
+    const result = await proposeComplementScenes(deps, {
+      storyboardId: "storyboard_1",
+      fromSceneId: "scene_1",
+      toSceneId: "scene_2",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.length).toBeGreaterThan(0);
+      expect(result.value.length).toBeLessThanOrEqual(3);
+    }
+    expect(deps.complementSceneProposal.calls).toHaveLength(1);
+  });
+
+  it("reorders scenes and rejects an incomplete order list", async () => {
+    const deps = seedComplementSceneDeps();
+
+    const result = await reorderScenes(deps, {
+      storyboardId: "storyboard_1",
+      sceneIds: ["scene_2", "scene_1"],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.map((scene) => scene.id)).toEqual([
+        "scene_2",
+        "scene_1",
+      ]);
+      expect(result.value[0]?.orderIndex).toBe(0);
+    }
+
+    const incomplete = await reorderScenes(deps, {
+      storyboardId: "storyboard_1",
+      sceneIds: ["scene_1"],
+    });
+    expect(incomplete.ok).toBe(false);
+  });
+
+  it("reorders photos by the provided id list", async () => {
+    const ts = "2026-05-02T00:00:00.000Z";
+    const photo = (id: string, position: number) =>
+      createPhotoAsset({
+        id,
+        projectId: "project_1",
+        name: `${id}.jpg`,
+        storageKey: `data/uploads/originals/projects/project_1/${id}.jpg`,
+        mimeType: "image/jpeg",
+        size: 1024,
+        checksum: `checksum_${id}`,
+        sourceKind: "upload",
+        position,
+        createdAt: ts,
+        updatedAt: ts,
+      });
+    const deps = createDependencies({
+      users: [
+        createUser({
+          id: "user_1",
+          organizationId: "org_1",
+          displayName: "Ran",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      ],
+      organizations: [
+        createOrganization({
+          id: "org_1",
+          name: "Family Studio",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      ],
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      ],
+      photoAssets: [photo("photo_1", 0), photo("photo_2", 1)],
+    });
+
+    const result = await reorderPhotos(deps, {
+      projectId: "project_1",
+      photoAssetIds: ["photo_2", "photo_1"],
+    });
+
+    expect(result.ok).toBe(true);
+    const photo2 = await deps.photoAssets.findById("photo_2");
+    const photo1 = await deps.photoAssets.findById("photo_1");
+    expect(photo2?.position).toBe(0);
+    expect(photo1?.position).toBe(1);
   });
 });

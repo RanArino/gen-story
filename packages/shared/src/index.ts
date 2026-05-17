@@ -41,6 +41,7 @@ export type PhotoAssetDto = {
   checksum: string;
   sourceKind: string;
   notes: string | null;
+  position: number;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -63,12 +64,19 @@ export type StoryboardDto = {
   updatedAt: string;
 };
 
+export type SceneBridgeDto = {
+  fromSceneId: string;
+  toSceneId: string;
+};
+
 export type SceneDto = {
   id: string;
   projectId: string;
   storyboardId: string;
   orderIndex: number;
   status: string;
+  kind: string;
+  bridge: SceneBridgeDto | null;
   title: string;
   description: string;
   imagePrompt: string;
@@ -81,6 +89,16 @@ export type SceneDto = {
   adoptedGeneratedImageId: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ComplementSceneProposalDto = {
+  title: string;
+  description: string;
+  imagePrompt: string;
+  emotion: string;
+  cameraDirection: string;
+  lightingDirection: string;
+  motionDirection: string;
 };
 
 export type StylePresetDto = {
