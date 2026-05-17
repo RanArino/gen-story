@@ -1,0 +1,155 @@
+import { GoogleGenAI } from "@google/genai";
+import { z } from "zod";
+
+import type {
+  ObjectStoragePort,
+  SceneFillGenerationInput,
+  SceneFillGenerationPort,
+  SceneFillSuggestion,
+} from "@gen-story/application";
+
+import { createAiInputImage } from "../images/image-metadata";
+
+export const DEFAULT_GEMINI_SCENE_FILL_MODEL = "gemini-2.5-flash";
+
+const SceneFillSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  imagePrompt: z.string().min(1),
+  emotion: z.string().min(1),
+  cameraDirection: z.string().min(1),
+  lightingDirection: z.string().min(1),
+  motionDirection: z.string().min(1),
+});
+
+type GeminiClient = {
+  models: {
+    generateContent(input: unknown): Promise<{ text?: string }>;
+  };
+};
+
+const responseJsonSchema = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    description: { type: "string" },
+    imagePrompt: { type: "string" },
+    emotion: { type: "string" },
+    cameraDirection: { type: "string" },
+    lightingDirection: { type: "string" },
+    motionDirection: { type: "string" },
+  },
+  required: [
+    "title",
+    "description",
+    "imagePrompt",
+    "emotion",
+    "cameraDirection",
+    "lightingDirection",
+    "motionDirection",
+  ],
+} as const;
+
+function buildPrompt(input: SceneFillGenerationInput): string {
+  const siblings = input.siblingScenes
+    .filter((scene) => scene.id !== input.scene.id)
+    .map(
+      (scene) =>
+        `- Scene ${scene.orderIndex + 1}: "${scene.title || "(untitled)"}"`,
+    )
+    .join("\n");
+
+  return [
+    "You are drafting one scene of an anniversary-style storyboard.",
+    "The FIRST image is this scene's primary photo; any following images are other project photos for context.",
+    "Generate scene fields grounded in what is actually visible in the primary photo.",
+    "Return only JSON matching the provided schema.",
+    `Project: ${input.project.name}`,
+    `Storyboard tone: ${input.storyboard.tone}`,
+    `Common prompt applied to every scene: ${input.storyboard.commonPrompt || "(none)"}`,
+    input.stylePreset
+      ? `Visual style: ${input.stylePreset.name} — ${input.stylePreset.prompt}`
+      : "Visual style: AI's choice, consistent with the tone.",
+    `Primary photo: name="${input.primaryPhoto.name}", notes="${input.primaryPhoto.notes ?? ""}"`,
+    `This is scene ${input.scene.orderIndex + 1}.`,
+    siblings ? `Other scenes in the storyboard:\n${siblings}` : "",
+    "emotion/cameraDirection/lightingDirection/motionDirection should be short label-style values.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function bytesToBase64(body: Uint8Array): string {
+  return Buffer.from(body).toString("base64");
+}
+
+export class GeminiSceneFillGenerationAdapter implements SceneFillGenerationPort {
+  private client: GeminiClient | null;
+
+  constructor(
+    private readonly objectStorage: ObjectStoragePort,
+    private readonly apiKey: string | undefined,
+    private readonly model = DEFAULT_GEMINI_SCENE_FILL_MODEL,
+    client?: GeminiClient,
+  ) {
+    this.client = client ?? null;
+  }
+
+  private getClient(): GeminiClient {
+    if (this.client != null) {
+      return this.client;
+    }
+    if (this.apiKey == null || this.apiKey.length === 0) {
+      throw new Error(
+        "GEMINI_API_KEY is required for photo-aware AI scene fill.",
+      );
+    }
+    this.client = new GoogleGenAI({ apiKey: this.apiKey });
+    return this.client;
+  }
+
+  async generateSceneFill(
+    input: SceneFillGenerationInput,
+  ): Promise<SceneFillSuggestion> {
+    const client = this.getClient();
+    const parts: unknown[] = [{ text: buildPrompt(input) }];
+
+    const photoOrder = [
+      input.primaryPhoto,
+      ...input.projectPhotos.filter(
+        (photo) =>
+          photo.id !== input.primaryPhoto.id && photo.deletedAt === null,
+      ),
+    ];
+
+    for (const photo of photoOrder) {
+      const body = await this.objectStorage.getObject(photo.storageKey);
+      if (body == null) {
+        continue;
+      }
+      const normalized = await createAiInputImage(body);
+      parts.push({
+        inlineData: {
+          mimeType: normalized.mimeType,
+          data: bytesToBase64(normalized.body),
+        },
+      });
+    }
+
+    const response = await client.models.generateContent({
+      model: this.model,
+      contents: [{ role: "user", parts }],
+      config: {
+        responseMimeType: "application/json",
+        responseJsonSchema,
+      },
+    });
+    const text = response.text;
+
+    if (text == null || text.trim().length === 0) {
+      throw new Error("Gemini scene fill returned an empty response.");
+    }
+
+    return SceneFillSchema.parse(JSON.parse(text));
+  }
+}
