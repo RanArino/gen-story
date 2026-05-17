@@ -147,7 +147,9 @@ export function toStylePresetDto(preset: StylePreset): StylePresetDto {
   };
 }
 
-export function toTestGenerationBatchDto(batch: TestGenerationBatch): TestGenerationBatchDto {
+export function toTestGenerationBatchDto(
+  batch: TestGenerationBatch,
+): TestGenerationBatchDto {
   return {
     id: batch.id,
     storyboardId: batch.storyboardId,
