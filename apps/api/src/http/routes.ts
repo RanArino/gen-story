@@ -6,14 +6,18 @@ import {
   assignPhotosToScene,
   analyzeProjectPhotos,
   cancelGenerationRequest,
+  confirmTestGeneration,
   createGenerationRequestUseCase,
   createProjectUseCase,
   createTemplateScenesFromPhotos,
   deletePhotoAsset,
   deleteProject,
+  exportStoryboardAsJson,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
   markGeneratedImageAdopted,
+  requestTestGeneration,
+  resetTestGeneration,
   restorePhotoAsset,
   restoreProject,
   retryFailedGenerationRequest,
@@ -35,6 +39,7 @@ import {
   toSceneDto,
   toStoryboardDto,
   toStylePresetDto,
+  toTestGenerationBatchDto,
 } from "./dto-mappers";
 import {
   badRequestBody,
@@ -1227,6 +1232,127 @@ export function buildRouter(deps: ApplicationDependencies): Router {
     ".webp": "image/webp",
     ".gif": "image/gif",
   };
+
+  // POST /api/storyboards/:storyboardId/test-generation
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/test-generation",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const body = await readJsonBody(req);
+      if (!body || typeof body !== "object" || !("sceneId" in body) || typeof body.sceneId !== "string") {
+        sendJson(res, 422, badRequestBody("sceneId is required"));
+        return;
+      }
+
+      const result = await requestTestGeneration(deps, {
+        storyboardId,
+        sceneId: body.sceneId,
+      });
+
+      if (!result.ok) {
+        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        return;
+      }
+
+      sendJson(res, 201, {
+        batch: toTestGenerationBatchDto(result.value.batch),
+        generationRequests: result.value.generationRequests.map(toGenerationRequestDto),
+      });
+    },
+  );
+
+  // GET /api/storyboards/:storyboardId/test-generation/current
+  router.add(
+    "GET",
+    "/api/storyboards/:storyboardId/test-generation/current",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const batch = await deps.testGenerationBatches.findLatestByStoryboardId(storyboardId);
+
+      sendJson(res, 200, { batch: batch ? toTestGenerationBatchDto(batch) : null });
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/test-generation/confirm
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/test-generation/confirm",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const body = await readJsonBody(req);
+      if (!body || typeof body !== "object" || !("confirmedGenerationRequestId" in body) || typeof body.confirmedGenerationRequestId !== "string") {
+        sendJson(res, 422, badRequestBody("confirmedGenerationRequestId is required"));
+        return;
+      }
+
+      const result = await confirmTestGeneration(deps, {
+        storyboardId,
+        confirmedGenerationRequestId: body.confirmedGenerationRequestId,
+      });
+
+      if (!result.ok) {
+        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        return;
+      }
+
+      sendJson(res, 200, { batch: toTestGenerationBatchDto(result.value) });
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/test-generation/reset
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/test-generation/reset",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const result = await resetTestGeneration(deps, { storyboardId });
+
+      if (!result.ok) {
+        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        return;
+      }
+
+      sendJson(res, 200, { batch: toTestGenerationBatchDto(result.value) });
+    },
+  );
+
+  // GET /api/storyboards/:storyboardId/export.json
+  router.add(
+    "GET",
+    "/api/storyboards/:storyboardId/export.json",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const result = await exportStoryboardAsJson(deps, { storyboardId });
+
+      if (!result.ok) {
+        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        return;
+      }
+
+      const filename = `storyboard-${storyboardId}-${Date.now()}.json`;
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      });
+      res.end(JSON.stringify(result.value, null, 2));
+    },
+  );
 
   router.add("GET", "/files/*", async (_req, res, params) => {
     const tail = getParam(params, "*");

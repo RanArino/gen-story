@@ -22,6 +22,7 @@ import {
   type Scene,
   type Storyboard,
   type StylePreset,
+  type TestGenerationBatch,
   type User,
 } from "@gen-story/domain";
 
@@ -47,6 +48,7 @@ import type {
   SceneRepositoryPort,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
+  TestGenerationBatchRepositoryPort,
   UserRepositoryPort,
 } from "./ports";
 import {
@@ -311,6 +313,23 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
   }
 }
 
+class InMemoryTestGenerationBatchRepository implements TestGenerationBatchRepositoryPort {
+  constructor(private readonly store: MemoryStore<TestGenerationBatch>) {}
+
+  async findLatestByStoryboardId(storyboardId: string): Promise<TestGenerationBatch | null> {
+    return (
+      this.store
+        .values()
+        .filter((b) => b.storyboardId === storyboardId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
+    );
+  }
+
+  async save(batch: TestGenerationBatch): Promise<void> {
+    await this.store.save(batch);
+  }
+}
+
 class InMemoryObjectStoragePort implements ObjectStoragePort {
   public readonly storedObjects: Array<{
     key: string;
@@ -484,6 +503,7 @@ function createDependencies(initial?: {
   generationRequests?: GenerationRequest[];
   generatedImages?: GeneratedImage[];
   projectPhotoAnalyses?: ProjectPhotoAnalysis[];
+  testGenerationBatches?: TestGenerationBatch[];
 }): ApplicationDependencies & {
   stores: {
     users: MemoryStore<User>;
@@ -496,6 +516,7 @@ function createDependencies(initial?: {
     generationRequests: MemoryStore<GenerationRequest>;
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
+    testGenerationBatches: MemoryStore<TestGenerationBatch>;
   };
   jobQueue: InMemoryJobQueuePort;
   imagePreprocessing: InMemoryImagePreprocessingPort;
@@ -523,6 +544,9 @@ function createDependencies(initial?: {
     projectPhotoAnalyses: new MemoryStore<ProjectPhotoAnalysis>(
       initial?.projectPhotoAnalyses ?? [],
     ),
+    testGenerationBatches: new MemoryStore<TestGenerationBatch>(
+      initial?.testGenerationBatches ?? [],
+    ),
   };
 
   const jobQueue = new InMemoryJobQueuePort();
@@ -549,6 +573,9 @@ function createDependencies(initial?: {
     ),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
+    ),
+    testGenerationBatches: new InMemoryTestGenerationBatchRepository(
+      stores.testGenerationBatches,
     ),
     objectStorage,
     imagePreprocessing,

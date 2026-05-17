@@ -7,6 +7,7 @@ import type {
   Scene,
   Storyboard,
   StylePreset,
+  TestGenerationBatch,
 } from "@gen-story/domain";
 import type {
   GeneratedImageDto,
@@ -18,6 +19,7 @@ import type {
   SceneDto,
   StylePresetDto,
   StoryboardDto,
+  TestGenerationBatchDto,
 } from "@gen-story/shared";
 
 import type { AuthPrincipal } from "@gen-story/application";
@@ -131,14 +133,27 @@ export function toSceneDto(scene: Scene): SceneDto {
 }
 
 export function toStylePresetDto(preset: StylePreset): StylePresetDto {
+  const previewImageUrl = `/public/style-previews/${preset.name.toLowerCase().replace(/\s+/g, "-")}.jpg`;
   return {
     id: preset.id,
     scope: preset.scope,
     name: preset.name,
     description: preset.description,
     prompt: preset.prompt,
+    previewImageUrl,
     createdAt: preset.createdAt,
     updatedAt: preset.updatedAt,
+  };
+}
+
+export function toTestGenerationBatchDto(batch: TestGenerationBatch): TestGenerationBatchDto {
+  return {
+    id: batch.id,
+    storyboardId: batch.storyboardId,
+    status: batch.status,
+    confirmedGenerationRequestId: batch.confirmedGenerationRequestId,
+    createdAt: batch.createdAt,
+    completedAt: batch.completedAt,
   };
 }
 

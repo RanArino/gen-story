@@ -88,6 +88,7 @@ export type StylePresetDto = {
   name: string;
   description: string;
   prompt: string;
+  previewImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -122,6 +123,15 @@ export type GeneratedImageDto = {
   adoptedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type TestGenerationBatchDto = {
+  id: string;
+  storyboardId: string;
+  status: string;
+  confirmedGenerationRequestId: string | null;
+  createdAt: string;
+  completedAt: string | null;
 };
 
 export type EmotionCandidateDto = {

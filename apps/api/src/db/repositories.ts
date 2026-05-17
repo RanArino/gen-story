@@ -10,6 +10,7 @@ import {
   createScene,
   createStoryboard,
   createStylePreset,
+  createTestGenerationBatch,
   createUser,
   sortScenesByOrderIndex,
   type GeneratedImage,
@@ -29,6 +30,8 @@ import {
   type StoryboardStatus,
   type StylePreset,
   type StylePresetScope,
+  type TestGenerationBatch,
+  type TestGenerationBatchStatus,
   type User,
 } from "@gen-story/domain";
 import type {
@@ -41,6 +44,7 @@ import type {
   SceneRepositoryPort,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
+  TestGenerationBatchRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
 
@@ -56,6 +60,7 @@ import {
   scenes,
   storyboards,
   stylePresets,
+  testGenerationBatches,
   users,
 } from "./schema";
 
@@ -1309,6 +1314,59 @@ export class SqliteProjectPhotoAnalysisRepository implements ProjectPhotoAnalysi
   }
 }
 
+type TestGenerationBatchRow = typeof testGenerationBatches.$inferSelect;
+
+function mapTestGenerationBatch(row: TestGenerationBatchRow): TestGenerationBatch {
+  return createTestGenerationBatch({
+    id: row.id,
+    storyboardId: row.storyboardId,
+    status: row.status as TestGenerationBatchStatus,
+    confirmedGenerationRequestId: row.confirmedGenerationRequestId ?? null,
+    createdAt: row.createdAt,
+    completedAt: row.completedAt ?? null,
+  });
+}
+
+export class SqliteTestGenerationBatchRepository
+  implements TestGenerationBatchRepositoryPort
+{
+  constructor(private readonly db: GenStoryDatabase) {}
+
+  async findLatestByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch | null> {
+    const row = await this.db
+      .select()
+      .from(testGenerationBatches)
+      .where(eq(testGenerationBatches.storyboardId, storyboardId))
+      .orderBy(sql`${testGenerationBatches.createdAt} desc`)
+      .get();
+
+    return row == null ? null : mapTestGenerationBatch(row);
+  }
+
+  async save(batch: TestGenerationBatch): Promise<void> {
+    await this.db
+      .insert(testGenerationBatches)
+      .values({
+        id: batch.id,
+        storyboardId: batch.storyboardId,
+        status: batch.status,
+        confirmedGenerationRequestId: batch.confirmedGenerationRequestId,
+        createdAt: batch.createdAt,
+        completedAt: batch.completedAt,
+      })
+      .onConflictDoUpdate({
+        target: testGenerationBatches.id,
+        set: {
+          status: batch.status,
+          confirmedGenerationRequestId: batch.confirmedGenerationRequestId,
+          completedAt: batch.completedAt,
+        },
+      });
+  }
+}
+
 export function createSqliteRepositories(db: GenStoryDatabase) {
   return {
     users: new SqliteUserRepository(db),
@@ -1321,5 +1379,6 @@ export function createSqliteRepositories(db: GenStoryDatabase) {
     generationRequests: new SqliteGenerationRequestRepository(db),
     generatedImages: new SqliteGeneratedImageRepository(db),
     projectPhotoAnalyses: new SqliteProjectPhotoAnalysisRepository(db),
+    testGenerationBatches: new SqliteTestGenerationBatchRepository(db),
   };
 }

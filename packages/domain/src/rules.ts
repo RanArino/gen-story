@@ -7,6 +7,8 @@ import {
   type Scene,
   type ScenePhotoAsset,
   type StylePreset,
+  type TestGenerationBatch,
+  type TestGenerationBatchStatus,
   type Timestamp,
 } from "./model";
 
@@ -189,5 +191,39 @@ export function retryGenerationRequest(
     sourceGenerationRequestId: request.id,
     createdAt,
     updatedAt,
+  };
+}
+
+export function canStartTestGeneration(
+  existingBatch: TestGenerationBatch | null,
+): boolean {
+  if (existingBatch === null) return true;
+  if (existingBatch.status === "completed") return true;
+  return false;
+}
+
+export function completeTestGenerationBatch(
+  batch: TestGenerationBatch,
+  confirmedGenerationRequestId: string,
+  completedAt: Timestamp,
+): TestGenerationBatch {
+  return {
+    ...batch,
+    status: "completed",
+    confirmedGenerationRequestId,
+    completedAt,
+  };
+}
+
+export function resetTestGenerationBatch(
+  batch: TestGenerationBatch,
+  createdAt: Timestamp,
+): TestGenerationBatch {
+  return {
+    ...batch,
+    status: "pending",
+    confirmedGenerationRequestId: null,
+    completedAt: null,
+    createdAt,
   };
 }

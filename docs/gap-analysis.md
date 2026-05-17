@@ -69,9 +69,10 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| System style presets (8 predefined styles + AI auto) | ⚠️ | `style_presets` table and seeding script exist; need to verify all 9 system presets are seeded |
-| Style preset preview images for comparison | ❌ | No preview images in `public/` |
-| Style preview shows same subject in each style | ❌ | Not implemented |
+| System style presets (8 predefined styles + AI auto) | ❌ | Only "Cinematic" is seeded with a photorealistic prompt; the 9 required styles (Anime movie style, watercolor illustration style, 3D animation style with a sense of depth, etc.) are not defined or seeded |
+| Style preset `prompt` field defined per style (illustration / texture-axis) | ❌ | Each of the 9 system presets requires a generation prompt that produces the correct illustration/texture style; currently only a photorealistic cinematic prompt exists in seed data |
+| Style preset preview images for comparison | ❌ | Current files in `public/style-previews/` are 149-byte stubs; real images must be generated from the correct per-style prompts once prompts are finalized |
+| Style preview shows same subject in each style | ❌ | Not implemented; static previews sufficient for MVP |
 | Custom style creation from user-uploaded reference image | ❌ | No custom style workflow |
 | Custom styles saved per user, reusable across projects | ❌ | Schema supports `scope=user` but no creation UI/API |
 | Style applied at project level (not per scene) | ✅ | `storyboards.stylePresetId`; `stylePreset.prompt` is now composed into every generation prompt via `prompt-composer.ts` |
@@ -94,12 +95,12 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Test-generate 3 pattern images before bulk generation | ❌ | No test generation workflow |
-| Adjustment sliders / buttons (warmer, more cinematic, etc.) | ❌ | Not implemented |
-| Adjustments update common project prompt internally | ❌ | No common prompt |
-| User selects one test image to confirm style | ❌ | Not implemented |
-| "Generate more tests" option | ❌ | Not implemented |
-| Bulk generation starts only after test confirmation | ❌ | Currently goes straight to full generation |
+| Test-generate 3 pattern images before bulk generation | ✅ | `TestGenerationBatch` domain entity + DB migration + 4 API endpoints; `TestGenerationModal` generates 3 variants with polling |
+| Adjustment sliders / buttons (warmer, more cinematic, etc.) | ❌ | Not implemented; deferred — test generation provides initial validation |
+| Adjustments update common project prompt internally | ❌ | No common prompt; depends on test workflow completion |
+| User selects one test image to confirm style | ✅ | `TestGenerationModal` confirm action calls `POST /api/storyboards/:id/test-generation/confirm` |
+| "Generate more tests" option | ✅ | "Generate new tests" button resets batch via `POST /api/storyboards/:id/test-generation/reset` |
+| Bulk generation starts only after test confirmation | ✅ | StoryboardPage footer shows test modal until batch confirmed; only then shows "Continue to Generate" link |
 
 ---
 
@@ -187,11 +188,11 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | Card view inside app | ✅ | `ReviewPage` card layout |
-| Timeline view | ❌ | Not implemented |
-| Table / spreadsheet view | ❌ | Not implemented |
-| Filter: original only / generated only | ❌ | No filter controls |
-| JSON export | ❌ | No export endpoint or UI |
-| Structured data for CapCut / video generation pipeline | ❌ | No export format defined |
+| Timeline view | ❌ | Not implemented; deferred post-MVP |
+| Table / spreadsheet view | ❌ | Not implemented; deferred post-MVP |
+| Filter: original only / generated only | ❌ | No filter controls; deferred post-MVP |
+| JSON export | ✅ | `GET /api/storyboards/:id/export.json` with `Content-Disposition: attachment`; "Export Storyboard JSON" button on ReviewPage |
+| Structured data for CapCut / video generation pipeline | ✅ | Export JSON includes storyboard metadata, per-scene fields (title, emotion, camera, prompt), adopted image URLs, and source photo URLs |
 
 ---
 
@@ -302,15 +303,15 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Project management | 5 | 0 | 0 |
 | Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
 | Emotion / AI photo analysis | 7 | 0 | 0 |
-| Image style selection | 2 | 1 | 4 |
+| Image style selection | 1 | 2 | 4 |
 | Common project prompt | 0 | 2 | 2 |
-| Test generation workflow | 0 | 0 | 6 |
+| Test generation workflow | 4 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 3 |
 | Scene content | 10 | 3 | 4 (AI gen + complement) |
 | Scene editing UX | 4 | 1 | 1 |
 | Language / i18n | 0 | 0 | 5 |
 | Generated image handling | 5 | 2 | 3 |
-| Storyboard viewing & export | 1 | 0 | 5 |
+| Storyboard viewing & export | 3 | 0 | 3 |
 | Image generation infra | 13 | 2 | 2 |
 | Generation history | 5 | 0 | 2 |
 | File lifecycle & cleanup | 5 | 1 | 0 |
@@ -333,16 +334,16 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 3. ✅ **Template scene creation from uploaded photos** (COMPLETED)
    Uploaded candidate photos are now convertible into editable draft scenes via `POST /api/storyboards/:storyboardId/template-scenes`. Each draft scene assigns the uploaded image as its primary photo and leaves title, description, and image prompt blank for manual editing or later per-scene AI fill-in.
 
-4. **Test generation workflow (3 patterns → adjust → confirm → bulk)**
-   The spec requires a test cycle before committing to full generation. The current flow goes straight to bulk generation, skipping style validation.
+4. ✅ **Test generation workflow (3 patterns → adjust → confirm → bulk)** (COMPLETED)
+   `TestGenerationBatch` entity, 4 API endpoints, `TestGenerationModal` component, and StoryboardPage gate fully implemented.
 
-5. **Storyboard JSON export**
-   Required for the Phase 1 deliverable ("hand off to video generation"). Without export, Phase 2 cannot begin.
+5. ✅ **Storyboard JSON export** (COMPLETED)
+   `GET /api/storyboards/:id/export.json` endpoint and ReviewPage download button implemented.
 
 ### Medium Priority — UX Completeness
 
-6. **Style preset preview images**
-   Users need visual comparison to choose a style. Placeholder comparison images in `public/` would unblock this.
+6. ✅ **Style preset preview images** (COMPLETED)
+   9 preview images in `public/style-previews/`, wired into `StylePresetDto` and displayed in StoryboardPage style gallery.
 
 7. **Drag-and-drop photo reordering**
    Specified as a core photo management feature; currently only implicit ordering is available.
