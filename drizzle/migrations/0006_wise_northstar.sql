@@ -1,0 +1,1 @@
+ALTER TABLE `photo_assets` ADD `position` integer DEFAULT 0 NOT NULL;
