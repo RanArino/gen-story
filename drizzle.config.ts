@@ -10,8 +10,8 @@ const databasePath = resolve(
 );
 
 export default defineConfig({
-  schema: resolve(repoRoot, "apps/api/src/db/schema.ts"),
-  out: resolve(repoRoot, "drizzle/migrations"),
+  schema: "apps/api/src/db/schema.ts",
+  out: "drizzle/migrations",
   dialect: "sqlite",
   dbCredentials: {
     url: databasePath,

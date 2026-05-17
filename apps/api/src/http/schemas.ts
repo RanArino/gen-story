@@ -61,6 +61,8 @@ export const AssignScenePhotosSchema = z.object({
 
 export const FillSceneWithAiSchema = z.object({}).strict();
 
+export const AnalyzeProjectPhotosSchema = z.object({}).strict();
+
 export const CreateTemplateScenesSchema = z.object({
   photoAssetIds: z.array(z.string().min(1)).min(1).max(20),
 });

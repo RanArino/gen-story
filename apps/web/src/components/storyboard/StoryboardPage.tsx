@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import type {
   PhotoAssetDto,
+  ProjectPhotoAnalysisDto,
   SceneDto,
   StoryboardDto,
   StylePresetDto,
 } from "@gen-story/shared";
 import {
+  analyzeProjectPhotos,
   assignPhotosToScene,
   createTemplateScenesFromPhotos,
   fillSceneWithAi,
+  getProjectPhotoAnalysis,
   listPhotoAssets,
   listScenes,
   listStoryboards,
@@ -33,16 +36,44 @@ const TONES = [
 ] as const;
 
 const CAMERA_OPTIONS = [
-  "Wide", "Extreme Wide", "Medium", "Close-up", "Extreme Close-up",
-  "Aerial", "Overhead", "POV", "Low Angle", "Telephoto", "Voyeur",
+  "Wide",
+  "Extreme Wide",
+  "Medium",
+  "Close-up",
+  "Extreme Close-up",
+  "Aerial",
+  "Overhead",
+  "POV",
+  "Low Angle",
+  "Telephoto",
+  "Voyeur",
 ];
 const LIGHTING_OPTIONS = [
-  "Golden hour", "Natural", "Dramatic", "Night", "Soft",
-  "Backlit", "Silhouette", "Volumetric",
+  "Golden hour",
+  "Natural",
+  "Dramatic",
+  "Night",
+  "Soft",
+  "Backlit",
+  "Silhouette",
+  "Volumetric",
 ];
-const MOTION_OPTIONS = ["Slow pan", "Static", "Zoom in", "Zoom out", "Tracking"];
+const MOTION_OPTIONS = [
+  "Slow pan",
+  "Static",
+  "Zoom in",
+  "Zoom out",
+  "Tracking",
+];
 const EMOTION_OPTIONS = [
-  "Joy", "Nostalgia", "Love", "Pride", "Wonder", "Calm", "Excitement", "Gratitude",
+  "Joy",
+  "Nostalgia",
+  "Love",
+  "Pride",
+  "Wonder",
+  "Calm",
+  "Excitement",
+  "Gratitude",
 ];
 
 const DEFAULT_SCENE: Omit<UpsertSceneInput, "orderIndex"> = {
@@ -79,24 +110,31 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [scenes, setScenes] = useState<SceneState[]>([]);
   const [stylePresets, setStylePresets] = useState<StylePresetDto[]>([]);
   const [photos, setPhotos] = useState<PhotoAssetDto[]>([]);
+  const [photoAnalysis, setPhotoAnalysis] =
+    useState<ProjectPhotoAnalysisDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [creatingTemplates, setCreatingTemplates] = useState(false);
+  const [analyzingPhotos, setAnalyzingPhotos] = useState(false);
   const [aiFillingSceneId, setAiFillingSceneId] = useState<string | null>(null);
 
   const sbId = storyboard?.id;
 
   const load = useCallback(async () => {
-    const [sbs, presets, photoList] = await Promise.all([
+    const [sbs, presets, photoList, latestPhotoAnalysis] = await Promise.all([
       listStoryboards(projectId),
       listStylePresets(),
       listPhotoAssets(projectId),
+      getProjectPhotoAnalysis(projectId),
     ]);
     setStylePresets(presets);
     setPhotos(photoList);
+    setPhotoAnalysis(latestPhotoAnalysis);
     if (sbs.length > 0) {
       const sb = sbs[0]!;
       setStoryboard(sb);
@@ -106,7 +144,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   }, [projectId]);
 
   useEffect(() => {
-    load().catch((e: Error) => setError(e.message)).finally(() => setLoading(false));
+    load()
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   }, [load]);
 
   async function initStoryboard() {
@@ -139,6 +179,21 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     }
   }
 
+  async function handleAnalyzePhotos() {
+    setAnalyzingPhotos(true);
+    setError(null);
+    try {
+      const analysis = await analyzeProjectPhotos(projectId);
+      setPhotoAnalysis(analysis);
+      setSaveMsg("Photo analysis complete!");
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to analyze photos");
+    } finally {
+      setAnalyzingPhotos(false);
+    }
+  }
+
   async function handleStyleChange(stylePresetId: string | null) {
     if (!sbId) return;
     const prev = storyboard!;
@@ -168,7 +223,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setSaveMsg("Template scenes created!");
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create template scenes");
+      setError(
+        e instanceof Error ? e.message : "Failed to create template scenes",
+      );
     } finally {
       setCreatingTemplates(false);
     }
@@ -202,18 +259,21 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     setSaving(true);
     setError(null);
     try {
-      const saved = await upsertScenes(sbId, scenes.map((s) => ({
-        sceneId: s.id,
-        orderIndex: s.orderIndex,
-        title: s.title || "Untitled",
-        description: s.description || "-",
-        imagePrompt: s.imagePrompt || "-",
-        emotion: s.emotion || "Joy",
-        cameraDirection: s.cameraDirection || "Wide",
-        lightingDirection: s.lightingDirection || "Natural",
-        motionDirection: s.motionDirection || "Slow pan",
-        notes: s.notes,
-      })));
+      const saved = await upsertScenes(
+        sbId,
+        scenes.map((s) => ({
+          sceneId: s.id,
+          orderIndex: s.orderIndex,
+          title: s.title || "Untitled",
+          description: s.description || "-",
+          imagePrompt: s.imagePrompt || "-",
+          emotion: s.emotion || "Joy",
+          cameraDirection: s.cameraDirection || "Wide",
+          lightingDirection: s.lightingDirection || "Natural",
+          motionDirection: s.motionDirection || "Slow pan",
+          notes: s.notes,
+        })),
+      );
       setScenes(saved.map(sceneDtoToState));
       setSaveMsg("Saved");
       setTimeout(() => setSaveMsg(null), 2000);
@@ -266,6 +326,16 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     );
   }
 
+  const analyzablePhotoCount = photos.filter(
+    (photo) => photo.usage === "candidate" || photo.usage === "reference",
+  ).length;
+  const fixedToneSelected = TONES.some(
+    (tone) => tone.value === storyboard.tone,
+  );
+  const selectedAnalysisTone = photoAnalysis?.emotionCandidates.find(
+    (candidate) => candidate.value === storyboard.tone,
+  );
+
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
@@ -289,7 +359,59 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               <span>{t.desc}</span>
             </button>
           ))}
+          {!fixedToneSelected && selectedAnalysisTone && (
+            <button
+              className={`${styles.toneBtn} ${styles.toneBtnActive}`}
+              onClick={() => handleToneChange(selectedAnalysisTone.value)}
+            >
+              <strong>{selectedAnalysisTone.label}</strong>
+              <span>{selectedAnalysisTone.description}</span>
+            </button>
+          )}
         </div>
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h3 className={styles.sectionTitle}>AI Photo Analysis</h3>
+          {analyzablePhotoCount > 0 && (
+            <button
+              className="btn btn-secondary"
+              onClick={handleAnalyzePhotos}
+              disabled={analyzingPhotos}
+            >
+              {analyzingPhotos ? "Analyzing…" : "Analyze photos"}
+            </button>
+          )}
+        </div>
+        {analyzablePhotoCount === 0 ? (
+          <p className={styles.analysisEmpty}>
+            Mark at least one photo as candidate or reference to analyze tone.
+          </p>
+        ) : photoAnalysis ? (
+          <div className={styles.analysisPanel}>
+            <p className={styles.analysisSummary}>
+              {photoAnalysis.storySummary}
+            </p>
+            <div className={styles.analysisCandidates}>
+              {photoAnalysis.emotionCandidates.map((candidate) => (
+                <button
+                  key={candidate.value}
+                  className={`${styles.analysisCandidate} ${storyboard.tone === candidate.value ? styles.analysisCandidateActive : ""}`}
+                  onClick={() => handleToneChange(candidate.value)}
+                >
+                  <strong>{candidate.label}</strong>
+                  <span>{candidate.description}</span>
+                  <small>{candidate.reason}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className={styles.analysisEmpty}>
+            Run analysis to get emotion candidates from the selected photo set.
+          </p>
+        )}
       </section>
 
       {/* Create template scenes from photos */}
@@ -303,51 +425,67 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                 onClick={handleCreateTemplateScenes}
                 disabled={creatingTemplates}
               >
-                {creatingTemplates ? "Creating…" : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
+                {creatingTemplates
+                  ? "Creating…"
+                  : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
               </button>
             )}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 12 }}>
-            {photos.filter((p) => p.usage === "candidate").map((photo) => (
-              <label
-                key={photo.id}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  cursor: "pointer",
-                  opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
-                  transition: "opacity 0.2s",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedPhotoIds.has(photo.id)}
-                  onChange={(e) => {
-                    const newSet = new Set(selectedPhotoIds);
-                    if (e.target.checked) {
-                      newSet.add(photo.id);
-                    } else {
-                      newSet.delete(photo.id);
-                    }
-                    setSelectedPhotoIds(newSet);
-                  }}
-                  style={{ marginBottom: 8 }}
-                />
-                <img
-                  src={storageKeyToUrl(photo.storageKey)}
-                  alt={photo.name}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {photos
+              .filter((p) => p.usage === "candidate")
+              .map((photo) => (
+                <label
+                  key={photo.id}
                   style={{
-                    width: "100%",
-                    aspectRatio: "1 / 1",
-                    objectFit: "cover",
-                    borderRadius: 8,
-                    border: selectedPhotoIds.has(photo.id) ? "2px solid var(--color-primary)" : "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
+                    transition: "opacity 0.2s",
                   }}
-                />
-                <span style={{ fontSize: 12, marginTop: 4, textAlign: "center" }}>{photo.name}</span>
-              </label>
-            ))}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedPhotoIds.has(photo.id)}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedPhotoIds);
+                      if (e.target.checked) {
+                        newSet.add(photo.id);
+                      } else {
+                        newSet.delete(photo.id);
+                      }
+                      setSelectedPhotoIds(newSet);
+                    }}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <img
+                    src={storageKeyToUrl(photo.storageKey)}
+                    alt={photo.name}
+                    style={{
+                      width: "100%",
+                      aspectRatio: "1 / 1",
+                      objectFit: "cover",
+                      borderRadius: 8,
+                      border: selectedPhotoIds.has(photo.id)
+                        ? "2px solid var(--color-primary)"
+                        : "none",
+                    }}
+                  />
+                  <span
+                    style={{ fontSize: 12, marginTop: 4, textAlign: "center" }}
+                  >
+                    {photo.name}
+                  </span>
+                </label>
+              ))}
           </div>
         </section>
       )}
@@ -456,8 +594,10 @@ function SceneCard({
 
   const candidatePhotos = photos.filter((p) => p.usage === "candidate");
 
-
-  async function handleAssignPhoto(photoAssetId: string, role: "primary" | "reference") {
+  async function handleAssignPhoto(
+    photoAssetId: string,
+    role: "primary" | "reference",
+  ) {
     if (!scene.id) return;
     setAssigningPhoto(photoAssetId);
     try {
@@ -539,7 +679,9 @@ function SceneCard({
               value={scene.emotion}
               onChange={(e) => onUpdate({ emotion: e.target.value })}
             >
-              {EMOTION_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+              {EMOTION_OPTIONS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </SceneField>
 
@@ -550,7 +692,9 @@ function SceneCard({
               value={scene.cameraDirection}
               onChange={(e) => onUpdate({ cameraDirection: e.target.value })}
             >
-              {CAMERA_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+              {CAMERA_OPTIONS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </SceneField>
 
@@ -561,7 +705,9 @@ function SceneCard({
               value={scene.lightingDirection}
               onChange={(e) => onUpdate({ lightingDirection: e.target.value })}
             >
-              {LIGHTING_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+              {LIGHTING_OPTIONS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </SceneField>
 
@@ -572,7 +718,9 @@ function SceneCard({
               value={scene.motionDirection}
               onChange={(e) => onUpdate({ motionDirection: e.target.value })}
             >
-              {MOTION_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+              {MOTION_OPTIONS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </SceneField>
         </div>

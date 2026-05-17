@@ -11,6 +11,7 @@ import {
   createOrganization,
   createPhotoAsset,
   createProject,
+  createProjectPhotoAnalysis,
   createScene,
   createStoryboard,
   createStylePreset,
@@ -100,6 +101,32 @@ describe("SQLite persistence", () => {
         createdAt: now,
         updatedAt: now,
       });
+      const projectPhotoAnalysis = createProjectPhotoAnalysis({
+        id: "analysis_1",
+        projectId: base.project.id,
+        emotionCandidates: [
+          {
+            value: "warm_nostalgia",
+            label: "Warm nostalgia",
+            description: "Tender and memory-focused.",
+            reason: "The photos feel warm.",
+          },
+        ],
+        photoInsights: [
+          {
+            photoAssetId: photoAsset.id,
+            summary: "A warm moment.",
+            people: "Family members.",
+            setting: "Indoor setting.",
+            event: "Anniversary memory.",
+            atmosphere: "Warm.",
+          },
+        ],
+        storySummary: "A warm family story.",
+        model: "test-model",
+        createdAt: now,
+        updatedAt: now,
+      });
 
       await repositories.photoAssets.save(photoAsset);
       await repositories.stylePresets.save(stylePreset);
@@ -107,6 +134,7 @@ describe("SQLite persistence", () => {
       await repositories.scenes.save(scene);
       await repositories.generationRequests.save(generationRequest);
       await repositories.generatedImages.save(generatedImage);
+      await repositories.projectPhotoAnalyses.save(projectPhotoAnalysis);
 
       await expect(
         repositories.organizations.findById(base.organization.id),
@@ -138,6 +166,15 @@ describe("SQLite persistence", () => {
       await expect(
         repositories.generatedImages.findById(generatedImage.id),
       ).resolves.toMatchObject({ checksum: generatedImage.checksum });
+      await expect(
+        repositories.projectPhotoAnalyses.findLatestByProjectId(
+          base.project.id,
+        ),
+      ).resolves.toMatchObject({
+        id: projectPhotoAnalysis.id,
+        emotionCandidates: projectPhotoAnalysis.emotionCandidates,
+        photoInsights: projectPhotoAnalysis.photoInsights,
+      });
     });
   });
 

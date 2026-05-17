@@ -847,6 +847,152 @@ describe("Generated image adoption", () => {
   });
 });
 
+describe("project photo analysis routes", () => {
+  it("returns null before analysis", async () => {
+    const { createProject } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    await deps.projects.save(
+      createProject({
+        id: "analysis-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Analysis Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      "/api/projects/analysis-proj/photo-analysis",
+    );
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ photoAnalysis: null });
+  });
+
+  it("runs and fetches persisted photo analysis", async () => {
+    const { createPhotoAsset, createProject } =
+      await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    await deps.projects.save(
+      createProject({
+        id: "analysis-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Analysis Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: "analysis-photo",
+        projectId: "analysis-proj",
+        name: "family.jpg",
+        storageKey: "family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: "checksum",
+        sourceKind: "upload",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const created = await req(
+      base,
+      "POST",
+      "/api/projects/analysis-proj/photo-analysis",
+      {},
+    );
+
+    expect(created.status).toBe(200);
+    expect(created.body).toMatchObject({
+      photoAnalysis: {
+        projectId: "analysis-proj",
+        model: "in-memory",
+      },
+    });
+
+    const fetched = await req(
+      base,
+      "GET",
+      "/api/projects/analysis-proj/photo-analysis",
+    );
+    expect(fetched.status).toBe(200);
+    expect(fetched.body).toMatchObject({
+      photoAnalysis: {
+        projectId: "analysis-proj",
+        model: "in-memory",
+      },
+    });
+  });
+
+  it("rejects non-empty analysis request bodies", async () => {
+    const { createProject } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    await deps.projects.save(
+      createProject({
+        id: "analysis-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Analysis Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/projects/analysis-proj/photo-analysis",
+      { unexpected: true },
+    );
+
+    expect(status).toBe(422);
+  });
+
+  it("returns 403 for another organization's analysis project", async () => {
+    const { createProject } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    await deps.projects.save(
+      createProject({
+        id: "foreign-analysis-proj",
+        organizationId: "other-org",
+        ownerUserId: "other-user",
+        name: "Foreign",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const { status } = await req(
+      base,
+      "GET",
+      "/api/projects/foreign-analysis-proj/photo-analysis",
+    );
+
+    expect(status).toBe(403);
+  });
+
+  it("returns 401 without principal", async () => {
+    const { server: s2 } = makeServer();
+    const b2 = await listen(s2);
+    try {
+      const { status } = await req(
+        b2,
+        "GET",
+        "/api/projects/analysis-proj/photo-analysis",
+      );
+      expect(status).toBe(401);
+    } finally {
+      await close(s2);
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Auth scoping
 // ---------------------------------------------------------------------------

@@ -8,8 +8,12 @@ import type {
   ObjectStoragePort,
   OrganizationRepositoryPort,
   PhotoAssetRepositoryPort,
+  PhotoAnalysisGenerationInput,
+  PhotoAnalysisGenerationPort,
+  PhotoAnalysisGenerationResult,
   ProgressEventPort,
   ProjectRepositoryPort,
+  ProjectPhotoAnalysisRepositoryPort,
   SceneFillGenerationInput,
   SceneFillGenerationPort,
   SceneFillSuggestion,
@@ -26,6 +30,7 @@ import type {
   Organization,
   PhotoAsset,
   Project,
+  ProjectPhotoAnalysis,
   Scene,
   Storyboard,
   StylePreset,
@@ -87,7 +92,10 @@ class InMemoryProjectRepository implements ProjectRepositoryPort {
     return this.store.findById(projectId);
   }
 
-  async findByOrganizationId(organizationId: string, _includeDeleted?: boolean): Promise<Project[]> {
+  async findByOrganizationId(
+    organizationId: string,
+    _includeDeleted?: boolean,
+  ): Promise<Project[]> {
     return this.store
       .values()
       .filter((p) => p.organizationId === organizationId);
@@ -108,7 +116,10 @@ class InMemoryPhotoAssetRepository implements PhotoAssetRepositoryPort {
     return this.store.findById(photoAssetId);
   }
 
-  async findByProjectId(projectId: string, _includeDeleted?: boolean): Promise<PhotoAsset[]> {
+  async findByProjectId(
+    projectId: string,
+    _includeDeleted?: boolean,
+  ): Promise<PhotoAsset[]> {
     return this.store
       .values()
       .filter((photoAsset) => photoAsset.projectId === projectId);
@@ -253,6 +264,32 @@ class InMemoryGeneratedImageRepository implements GeneratedImageRepositoryPort {
   }
 }
 
+class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepositoryPort {
+  constructor(private readonly store: MemoryStore<ProjectPhotoAnalysis>) {}
+
+  async findLatestByProjectId(
+    projectId: string,
+  ): Promise<ProjectPhotoAnalysis | null> {
+    return (
+      this.store
+        .values()
+        .filter((analysis) => analysis.projectId === projectId)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null
+    );
+  }
+
+  async save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void> {
+    const existing = await this.findLatestByProjectId(
+      projectPhotoAnalysis.projectId,
+    );
+    if (existing != null && existing.id !== projectPhotoAnalysis.id) {
+      await this.store.save({ ...projectPhotoAnalysis, id: existing.id });
+      return;
+    }
+    await this.store.save(projectPhotoAnalysis);
+  }
+}
+
 class InMemoryObjectStorage implements ObjectStoragePort {
   private readonly objects = new Map<string, Uint8Array>();
 
@@ -318,6 +355,45 @@ class InMemorySceneFillGeneration implements SceneFillGenerationPort {
   }
 }
 
+class InMemoryPhotoAnalysisGeneration implements PhotoAnalysisGenerationPort {
+  async analyzeProjectPhotos(
+    input: PhotoAnalysisGenerationInput,
+  ): Promise<PhotoAnalysisGenerationResult> {
+    return {
+      emotionCandidates: [
+        {
+          value: "warm_nostalgia",
+          label: "Warm nostalgia",
+          description: "Tender and memory-focused.",
+          reason: `Generated from ${input.photos.length} photos.`,
+        },
+        {
+          value: "quiet_gratitude",
+          label: "Quiet gratitude",
+          description: "Calm and appreciative.",
+          reason: "A reflective option for the storyboard.",
+        },
+        {
+          value: "joyful_connection",
+          label: "Joyful connection",
+          description: "Bright and people-centered.",
+          reason: "A lively option for the storyboard.",
+        },
+      ],
+      photoInsights: input.photos.map((photo) => ({
+        photoAssetId: photo.id,
+        summary: `Insight for ${photo.name}`,
+        people: "People insight",
+        setting: "Setting insight",
+        event: "Event insight",
+        atmosphere: "Atmosphere insight",
+      })),
+      storySummary: `Summary for ${input.project.name}`,
+      model: "in-memory",
+    };
+  }
+}
+
 class InMemoryJobQueue implements JobQueuePort {
   async enqueue(): Promise<{ jobId: string }> {
     return { jobId: "job_1" };
@@ -339,6 +415,7 @@ export function createInMemoryApplicationDependencies(
     stylePresets?: StylePreset[];
     generationRequests?: GenerationRequest[];
     generatedImages?: GeneratedImage[];
+    projectPhotoAnalyses?: ProjectPhotoAnalysis[];
   },
   overrides?: Partial<ApplicationDependencies>,
 ): ApplicationDependencies & {
@@ -352,6 +429,7 @@ export function createInMemoryApplicationDependencies(
     stylePresets: MemoryStore<StylePreset>;
     generationRequests: MemoryStore<GenerationRequest>;
     generatedImages: MemoryStore<GeneratedImage>;
+    projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
   };
 } {
   const stores = {
@@ -364,6 +442,7 @@ export function createInMemoryApplicationDependencies(
     stylePresets: new MemoryStore(initial?.stylePresets ?? []),
     generationRequests: new MemoryStore(initial?.generationRequests ?? []),
     generatedImages: new MemoryStore(initial?.generatedImages ?? []),
+    projectPhotoAnalyses: new MemoryStore(initial?.projectPhotoAnalyses ?? []),
   };
   const dependencies: ApplicationDependencies = {
     users: new InMemoryUserRepository(stores.users),
@@ -379,10 +458,14 @@ export function createInMemoryApplicationDependencies(
     generatedImages: new InMemoryGeneratedImageRepository(
       stores.generatedImages,
     ),
+    projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
+      stores.projectPhotoAnalyses,
+    ),
     objectStorage: new InMemoryObjectStorage(),
     imagePreprocessing: new InMemoryImagePreprocessing(),
     imageGeneration: new InMemoryImageGeneration(),
     sceneFillGeneration: new InMemorySceneFillGeneration(),
+    photoAnalysisGeneration: new InMemoryPhotoAnalysisGeneration(),
     jobQueue: new InMemoryJobQueue(),
     progressEvents: new InMemoryProgressEvents(),
     authContext: new LocalAuthContext({

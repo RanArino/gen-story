@@ -6,6 +6,7 @@ import {
   createOrganization,
   createPhotoAsset,
   createProject,
+  createProjectPhotoAnalysis,
   createScene,
   createStoryboard,
   createTemplateScene,
@@ -17,6 +18,7 @@ import {
   type Organization,
   type PhotoAsset,
   type Project,
+  type ProjectPhotoAnalysis,
   type Scene,
   type Storyboard,
   type StylePreset,
@@ -32,8 +34,12 @@ import type {
   JobQueuePort,
   ObjectStoragePort,
   OrganizationRepositoryPort,
+  PhotoAnalysisGenerationInput,
+  PhotoAnalysisGenerationPort,
+  PhotoAnalysisGenerationResult,
   PhotoAssetRepositoryPort,
   ProgressEventPort,
+  ProjectPhotoAnalysisRepositoryPort,
   ProjectRepositoryPort,
   SceneFillGenerationInput,
   SceneFillGenerationPort,
@@ -44,10 +50,12 @@ import type {
   UserRepositoryPort,
 } from "./ports";
 import {
+  analyzeProjectPhotos,
   assignPhotosToScene,
   createGenerationRequestUseCase,
   createProjectUseCase,
   fillSceneWithAi,
+  getProjectPhotoAnalysis,
   markGeneratedImageAdopted,
   registerPhotoAsset,
   retryFailedGenerationRequest,
@@ -111,7 +119,10 @@ class InMemoryProjectRepository implements ProjectRepositoryPort {
     return this.store.findById(projectId);
   }
 
-  async findByOrganizationId(organizationId: string, _includeDeleted?: boolean): Promise<Project[]> {
+  async findByOrganizationId(
+    organizationId: string,
+    _includeDeleted?: boolean,
+  ): Promise<Project[]> {
     return this.store
       .values()
       .filter((p) => p.organizationId === organizationId);
@@ -132,7 +143,10 @@ class InMemoryPhotoAssetRepository implements PhotoAssetRepositoryPort {
     return this.store.findById(photoAssetId);
   }
 
-  async findByProjectId(projectId: string, _includeDeleted?: boolean): Promise<PhotoAsset[]> {
+  async findByProjectId(
+    projectId: string,
+    _includeDeleted?: boolean,
+  ): Promise<PhotoAsset[]> {
     return this.store
       .values()
       .filter((photoAsset) => photoAsset.projectId === projectId);
@@ -278,6 +292,25 @@ class InMemoryGeneratedImageRepository implements GeneratedImageRepositoryPort {
   }
 }
 
+class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepositoryPort {
+  constructor(private readonly store: MemoryStore<ProjectPhotoAnalysis>) {}
+
+  async findLatestByProjectId(
+    projectId: string,
+  ): Promise<ProjectPhotoAnalysis | null> {
+    return (
+      this.store
+        .values()
+        .filter((analysis) => analysis.projectId === projectId)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null
+    );
+  }
+
+  async save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void> {
+    await this.store.save(projectPhotoAnalysis);
+  }
+}
+
 class InMemoryObjectStoragePort implements ObjectStoragePort {
   public readonly storedObjects: Array<{
     key: string;
@@ -362,6 +395,51 @@ class InMemorySceneFillGenerationPort implements SceneFillGenerationPort {
   }
 }
 
+class InMemoryPhotoAnalysisGenerationPort implements PhotoAnalysisGenerationPort {
+  public readonly calls: PhotoAnalysisGenerationInput[] = [];
+  public result: PhotoAnalysisGenerationResult = {
+    emotionCandidates: [
+      {
+        value: "warm_nostalgia",
+        label: "Warm nostalgia",
+        description: "Tender and memory-focused.",
+        reason: "The photos feel warm.",
+      },
+      {
+        value: "quiet_gratitude",
+        label: "Quiet gratitude",
+        description: "Calm and appreciative.",
+        reason: "The photos feel reflective.",
+      },
+      {
+        value: "joyful_connection",
+        label: "Joyful connection",
+        description: "Bright and people-centered.",
+        reason: "The photos feel connected.",
+      },
+    ],
+    photoInsights: [
+      {
+        photoAssetId: "photo_1",
+        summary: "A warm family moment.",
+        people: "Family members are central.",
+        setting: "Indoor setting.",
+        event: "Anniversary memory.",
+        atmosphere: "Warm and intimate.",
+      },
+    ],
+    storySummary: "A warm family story.",
+    model: "test-model",
+  };
+
+  async analyzeProjectPhotos(
+    input: PhotoAnalysisGenerationInput,
+  ): Promise<PhotoAnalysisGenerationResult> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
 class InMemoryJobQueuePort implements JobQueuePort {
   public readonly jobs: Array<{
     kind: string;
@@ -405,6 +483,7 @@ function createDependencies(initial?: {
   stylePresets?: StylePreset[];
   generationRequests?: GenerationRequest[];
   generatedImages?: GeneratedImage[];
+  projectPhotoAnalyses?: ProjectPhotoAnalysis[];
 }): ApplicationDependencies & {
   stores: {
     users: MemoryStore<User>;
@@ -416,6 +495,7 @@ function createDependencies(initial?: {
     stylePresets: MemoryStore<StylePreset>;
     generationRequests: MemoryStore<GenerationRequest>;
     generatedImages: MemoryStore<GeneratedImage>;
+    projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
   };
   jobQueue: InMemoryJobQueuePort;
   imagePreprocessing: InMemoryImagePreprocessingPort;
@@ -423,6 +503,7 @@ function createDependencies(initial?: {
   objectStorage: InMemoryObjectStoragePort;
   imageGeneration: InMemoryImageGenerationPort;
   sceneFillGeneration: InMemorySceneFillGenerationPort;
+  photoAnalysisGeneration: InMemoryPhotoAnalysisGenerationPort;
   scenes: InMemorySceneRepository;
 } {
   const stores = {
@@ -439,6 +520,9 @@ function createDependencies(initial?: {
     generatedImages: new MemoryStore<GeneratedImage>(
       initial?.generatedImages ?? [],
     ),
+    projectPhotoAnalyses: new MemoryStore<ProjectPhotoAnalysis>(
+      initial?.projectPhotoAnalyses ?? [],
+    ),
   };
 
   const jobQueue = new InMemoryJobQueuePort();
@@ -447,6 +531,7 @@ function createDependencies(initial?: {
   const objectStorage = new InMemoryObjectStoragePort();
   const imageGeneration = new InMemoryImageGenerationPort();
   const sceneFillGeneration = new InMemorySceneFillGenerationPort();
+  const photoAnalysisGeneration = new InMemoryPhotoAnalysisGenerationPort();
 
   return {
     users: new InMemoryUserRepository(stores.users),
@@ -462,10 +547,14 @@ function createDependencies(initial?: {
     generatedImages: new InMemoryGeneratedImageRepository(
       stores.generatedImages,
     ),
+    projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
+      stores.projectPhotoAnalyses,
+    ),
     objectStorage,
     imagePreprocessing,
     imageGeneration,
     sceneFillGeneration,
+    photoAnalysisGeneration,
     jobQueue,
     progressEvents,
     authContext: {
@@ -1372,5 +1461,210 @@ describe("application use cases", () => {
     expect(result.ok).toBe(true);
     expect(deps.sceneFillGeneration.calls).toHaveLength(0);
     expect(deps.scenes.saveCalls).toBe(0);
+  });
+
+  it("analyzes only candidate and reference photos", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_1",
+          projectId: "project_1",
+          tone: "warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_1",
+          projectId: "project_1",
+          name: "candidate.jpg",
+          usage: "candidate",
+          storageKey: "candidate.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "candidate",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+        createPhotoAsset({
+          id: "photo_2",
+          projectId: "project_1",
+          name: "reference.jpg",
+          usage: "reference",
+          storageKey: "reference.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "reference",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+        createPhotoAsset({
+          id: "photo_3",
+          projectId: "project_1",
+          name: "excluded.jpg",
+          usage: "excluded",
+          storageKey: "excluded.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "excluded",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+        createPhotoAsset({
+          id: "photo_4",
+          projectId: "project_1",
+          name: "deleted.jpg",
+          usage: "candidate",
+          storageKey: "deleted.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "deleted",
+          sourceKind: "upload",
+          deletedAt: "2026-05-03T00:00:00.000Z",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-03T00:00:00.000Z",
+        }),
+      ],
+    });
+    deps.photoAnalysisGeneration.result = {
+      ...deps.photoAnalysisGeneration.result,
+      photoInsights: [
+        {
+          photoAssetId: "photo_1",
+          summary: "Candidate insight.",
+          people: "People",
+          setting: "Setting",
+          event: "Event",
+          atmosphere: "Atmosphere",
+        },
+        {
+          photoAssetId: "photo_2",
+          summary: "Reference insight.",
+          people: "People",
+          setting: "Setting",
+          event: "Event",
+          atmosphere: "Atmosphere",
+        },
+      ],
+    };
+
+    const result = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+
+    expect(result.ok).toBe(true);
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
+    expect(
+      deps.photoAnalysisGeneration.calls[0]!.photos.map((photo) => photo.id),
+    ).toEqual(["photo_1", "photo_2"]);
+    expect(deps.photoAnalysisGeneration.calls[0]!.storyboard?.id).toBe(
+      "storyboard_1",
+    );
+    expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(1);
+    if (result.ok) {
+      expect(result.value.model).toBe("test-model");
+    }
+  });
+
+  it("rejects project photo analysis without included photos", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_1",
+          projectId: "project_1",
+          name: "excluded.jpg",
+          usage: "excluded",
+          storageKey: "excluded.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "excluded",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const result = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("validation_error");
+    }
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(0);
+    expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(0);
+  });
+
+  it("returns the latest saved project photo analysis", async () => {
+    const analysis = createProjectPhotoAnalysis({
+      id: "analysis_1",
+      projectId: "project_1",
+      emotionCandidates: [
+        {
+          value: "warm_nostalgia",
+          label: "Warm nostalgia",
+          description: "Tender.",
+          reason: "The photos are warm.",
+        },
+      ],
+      photoInsights: [
+        {
+          photoAssetId: "photo_1",
+          summary: "Insight.",
+          people: "People.",
+          setting: "Setting.",
+          event: "Event.",
+          atmosphere: "Atmosphere.",
+        },
+      ],
+      storySummary: "Saved summary.",
+      model: "test-model",
+      createdAt: "2026-05-02T00:00:00.000Z",
+      updatedAt: "2026-05-02T00:00:00.000Z",
+    });
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projectPhotoAnalyses: [analysis],
+    });
+
+    const result = await getProjectPhotoAnalysis(deps, {
+      projectId: "project_1",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value?.id).toBe("analysis_1");
+    }
   });
 });
