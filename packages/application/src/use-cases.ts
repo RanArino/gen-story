@@ -1308,7 +1308,12 @@ export type RequestTestGenerationInput = {
 export async function requestTestGeneration(
   deps: ApplicationDependencies,
   input: RequestTestGenerationInput,
-): Promise<UseCaseResult<{ batch: TestGenerationBatch; generationRequests: GenerationRequest[] }>> {
+): Promise<
+  UseCaseResult<{
+    batch: TestGenerationBatch;
+    generationRequests: GenerationRequest[];
+  }>
+> {
   try {
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
@@ -1317,12 +1322,21 @@ export async function requestTestGeneration(
     if (isFailure(scene)) return scene;
 
     if (scene.storyboardId !== input.storyboardId) {
-      return failure("invalid_state", "Scene does not belong to this storyboard.");
+      return failure(
+        "invalid_state",
+        "Scene does not belong to this storyboard.",
+      );
     }
 
-    const existingBatch = await deps.testGenerationBatches.findLatestByStoryboardId(input.storyboardId);
+    const existingBatch =
+      await deps.testGenerationBatches.findLatestByStoryboardId(
+        input.storyboardId,
+      );
     if (!canStartTestGeneration(existingBatch)) {
-      return failure("invalid_state", "A pending test generation batch already exists. Confirm or reset it first.");
+      return failure(
+        "invalid_state",
+        "A pending test generation batch already exists. Confirm or reset it first.",
+      );
     }
 
     const ts = now();
@@ -1375,21 +1389,38 @@ export async function confirmTestGeneration(
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
-    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(input.storyboardId);
+    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(
+      input.storyboardId,
+    );
     if (!batch) {
-      return failure("not_found", "No test generation batch found for this storyboard.");
+      return failure(
+        "not_found",
+        "No test generation batch found for this storyboard.",
+      );
     }
     if (batch.status === "completed") {
-      return failure("invalid_state", "Test generation batch is already confirmed.");
+      return failure(
+        "invalid_state",
+        "Test generation batch is already confirmed.",
+      );
     }
 
-    const req = await deps.generationRequests.findById(input.confirmedGenerationRequestId);
+    const req = await deps.generationRequests.findById(
+      input.confirmedGenerationRequestId,
+    );
     if (!req || req.storyboardId !== input.storyboardId) {
-      return failure("not_found", "Generation request not found in this storyboard.");
+      return failure(
+        "not_found",
+        "Generation request not found in this storyboard.",
+      );
     }
 
     const ts = now();
-    const confirmed = completeTestGenerationBatch(batch, input.confirmedGenerationRequestId, ts);
+    const confirmed = completeTestGenerationBatch(
+      batch,
+      input.confirmedGenerationRequestId,
+      ts,
+    );
     await deps.testGenerationBatches.save(confirmed);
 
     return success(confirmed);
@@ -1410,9 +1441,14 @@ export async function resetTestGeneration(
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
-    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(input.storyboardId);
+    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(
+      input.storyboardId,
+    );
     if (!batch) {
-      return failure("not_found", "No test generation batch found for this storyboard.");
+      return failure(
+        "not_found",
+        "No test generation batch found for this storyboard.",
+      );
     }
 
     const ts = now();
@@ -1474,17 +1510,23 @@ export async function exportStoryboardAsJson(
 
     const exportScenes: StoryboardExportScene[] = [];
     for (const scene of ordered) {
-      const primaryPhotoAsset = scene.photoAssets.find((p) => p.role === "primary");
+      const primaryPhotoAsset = scene.photoAssets.find(
+        (p) => p.role === "primary",
+      );
       let sourcePhotoStorageKey: string | null = null;
       if (primaryPhotoAsset) {
-        const photo = await deps.photoAssets.findById(primaryPhotoAsset.photoAssetId);
+        const photo = await deps.photoAssets.findById(
+          primaryPhotoAsset.photoAssetId,
+        );
         sourcePhotoStorageKey = photo?.storageKey ?? null;
       }
 
       let adoptedImageStorageKey: string | null = null;
       if (scene.adoptedGeneratedImageId) {
         const images = await deps.generatedImages.findBySceneId(scene.id);
-        const adopted = images.find((img) => img.id === scene.adoptedGeneratedImageId);
+        const adopted = images.find(
+          (img) => img.id === scene.adoptedGeneratedImageId,
+        );
         adoptedImageStorageKey = adopted?.storageKey ?? null;
       }
 
