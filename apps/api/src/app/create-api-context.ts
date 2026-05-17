@@ -15,7 +15,14 @@ import {
   GeminiPhotoAnalysisGenerationAdapter,
 } from "../photo-analysis/gemini-photo-analysis-generation";
 import { LocalPhotoAnalysisGenerationAdapter } from "../photo-analysis/local-photo-analysis-generation";
-import { LocalSceneFillGenerationAdapter } from "../scene-fill/local-scene-fill-generation";
+import {
+  DEFAULT_GEMINI_COMPLEMENT_SCENE_MODEL,
+  GeminiComplementSceneProposalAdapter,
+} from "../complement-scenes/gemini-complement-scene-proposal";
+import {
+  DEFAULT_GEMINI_SCENE_FILL_MODEL,
+  GeminiSceneFillGenerationAdapter,
+} from "../scene-fill/gemini-scene-fill-generation";
 import { LocalObjectStorage } from "../storage/local-object-storage";
 
 class NoOpJobQueue implements JobQueuePort {
@@ -45,8 +52,20 @@ export function createApiContext(
   const imageGeneration = openaiApiKey
     ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey)
     : new MockImageGenerationAdapter(objectStorage);
-  const sceneFillGeneration = new LocalSceneFillGenerationAdapter();
   const geminiApiKey = process.env.GEMINI_API_KEY;
+  // Photo-aware AI requires Gemini at runtime; the adapter throws a clear
+  // error if GEMINI_API_KEY is unset. Tests inject mock ports instead.
+  const sceneFillGeneration = new GeminiSceneFillGenerationAdapter(
+    objectStorage,
+    geminiApiKey,
+    process.env.GEMINI_SCENE_FILL_MODEL ?? DEFAULT_GEMINI_SCENE_FILL_MODEL,
+  );
+  const complementSceneProposal = new GeminiComplementSceneProposalAdapter(
+    objectStorage,
+    geminiApiKey,
+    process.env.GEMINI_COMPLEMENT_SCENE_MODEL ??
+      DEFAULT_GEMINI_COMPLEMENT_SCENE_MODEL,
+  );
   const photoAnalysisGeneration = geminiApiKey
     ? new GeminiPhotoAnalysisGenerationAdapter(
         objectStorage,
@@ -62,6 +81,7 @@ export function createApiContext(
     imagePreprocessing,
     imageGeneration,
     sceneFillGeneration,
+    complementSceneProposal,
     photoAnalysisGeneration,
     jobQueue: new NoOpJobQueue(),
     progressEvents: new NoOpProgressEvents(),
