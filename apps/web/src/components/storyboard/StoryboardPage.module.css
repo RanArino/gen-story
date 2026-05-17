@@ -316,3 +316,73 @@
   border-top: 1px solid #e5e9f0;
   margin-top: 8px;
 }
+
+.complementGap {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  padding: 6px 0;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.complementGap:hover {
+  opacity: 1;
+}
+
+.complementGapBtn {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px dashed #b0b8c8;
+  border-radius: 999px;
+  background: #fff;
+  color: #5a6478;
+  cursor: pointer;
+}
+
+.complementGapBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.complementGapBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.complementCard {
+  border-left: 3px solid var(--color-primary);
+  background: #f7f9ff;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.modalContent {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proposalCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}

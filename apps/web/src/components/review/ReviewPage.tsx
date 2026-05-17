@@ -36,6 +36,8 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [storyboardId, setStoryboardId] = useState<string | null>(null);
+  const [view, setView] = useState<"card" | "timeline" | "table">("card");
+  const [filter, setFilter] = useState<"all" | "original" | "generated">("all");
 
   const load = useCallback(async () => {
     const [storyboards, photoList] = await Promise.all([
@@ -129,6 +131,41 @@ export function ReviewPage({ projectId }: { projectId: string }) {
 
       {error && <ErrorAlert message={error} />}
 
+      {reviews.length > 0 && (
+        <div className={styles.controls}>
+          <div className={styles.controlGroup}>
+            <span className={styles.controlLabel}>View</span>
+            {(["card", "timeline", "table"] as const).map((v) => (
+              <button
+                key={v}
+                className={`${styles.controlBtn} ${view === v ? styles.controlBtnActive : ""}`}
+                onClick={() => setView(v)}
+              >
+                {v[0]!.toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div className={styles.controlGroup}>
+            <span className={styles.controlLabel}>Show</span>
+            {(
+              [
+                ["all", "All"],
+                ["original", "Original only"],
+                ["generated", "Generated only"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                className={`${styles.controlBtn} ${filter === value ? styles.controlBtnActive : ""}`}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {reviews.length === 0 && (
         <div className="card">
           <p>No scenes found.</p>
@@ -142,17 +179,28 @@ export function ReviewPage({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      <div className={styles.sceneList}>
-        {reviews.map((r) => (
-          <SceneReviewCard
-            key={r.scene.id}
-            review={r}
-            projectId={projectId}
-            onAdopt={handleAdopt}
-            onRetry={handleRetry}
-          />
-        ))}
-      </div>
+      {reviews.length > 0 && view === "card" && (
+        <div className={styles.sceneList}>
+          {reviews.map((r) => (
+            <SceneReviewCard
+              key={r.scene.id}
+              review={r}
+              projectId={projectId}
+              filter={filter}
+              onAdopt={handleAdopt}
+              onRetry={handleRetry}
+            />
+          ))}
+        </div>
+      )}
+
+      {reviews.length > 0 && view === "timeline" && (
+        <TimelineView reviews={reviews} filter={filter} />
+      )}
+
+      {reviews.length > 0 && view === "table" && (
+        <TableView reviews={reviews} filter={filter} />
+      )}
 
       {reviews.length > 0 && (
         <div className={styles.footer}>
@@ -181,11 +229,13 @@ export function ReviewPage({ projectId }: { projectId: string }) {
 function SceneReviewCard({
   review,
   projectId,
+  filter,
   onAdopt,
   onRetry,
 }: {
   review: SceneReview;
   projectId: string;
+  filter: "all" | "original" | "generated";
   onAdopt: (sceneId: string, imageId: string) => void;
   onRetry: (requestId: string) => void;
 }) {
@@ -219,45 +269,51 @@ function SceneReviewCard({
 
       <div className={styles.comparisonRow}>
         {/* Source photo */}
-        <div className={styles.comparisonCol}>
-          <p className={styles.colLabel}>Source photo</p>
-          <div className={styles.imgBox}>
-            {primaryPhoto ? (
-              <img
-                src={storageKeyToUrl(primaryPhoto.storageKey)}
-                alt={primaryPhoto.name}
-                className={styles.img}
-              />
-            ) : (
-              <div className={styles.imgPlaceholder}>No photo assigned</div>
-            )}
+        {filter !== "generated" && (
+          <div className={styles.comparisonCol}>
+            <p className={styles.colLabel}>Source photo</p>
+            <div className={styles.imgBox}>
+              {primaryPhoto ? (
+                <img
+                  src={storageKeyToUrl(primaryPhoto.storageKey)}
+                  alt={primaryPhoto.name}
+                  className={styles.img}
+                />
+              ) : (
+                <div className={styles.imgPlaceholder}>No photo assigned</div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Adopted image */}
-        <div className={styles.comparisonCol}>
-          <p className={styles.colLabel}>Generated image</p>
-          <div className={styles.imgBox}>
-            {adoptedImage ? (
-              <img
-                src={storageKeyToUrl(adoptedImage.storageKey)}
-                alt="Generated"
-                className={styles.img}
-              />
-            ) : generatedImages.length === 0 ? (
-              <div className={styles.imgPlaceholder}>
-                {latestRequestStatus === "failed"
-                  ? "Generation failed"
-                  : latestRequestStatus === "running" ||
-                      latestRequestStatus === "queued"
-                    ? "Generating…"
-                    : "Not generated yet"}
-              </div>
-            ) : (
-              <div className={styles.imgPlaceholder}>No image adopted yet</div>
-            )}
+        {filter !== "original" && (
+          <div className={styles.comparisonCol}>
+            <p className={styles.colLabel}>Generated image</p>
+            <div className={styles.imgBox}>
+              {adoptedImage ? (
+                <img
+                  src={storageKeyToUrl(adoptedImage.storageKey)}
+                  alt="Generated"
+                  className={styles.img}
+                />
+              ) : generatedImages.length === 0 ? (
+                <div className={styles.imgPlaceholder}>
+                  {latestRequestStatus === "failed"
+                    ? "Generation failed"
+                    : latestRequestStatus === "running" ||
+                        latestRequestStatus === "queued"
+                      ? "Generating…"
+                      : "Not generated yet"}
+                </div>
+              ) : (
+                <div className={styles.imgPlaceholder}>
+                  No image adopted yet
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -319,6 +375,137 @@ function SceneReviewCard({
           </Link>
         )}
       </div>
+    </div>
+  );
+}
+
+function adoptedOrLatest(
+  images: GeneratedImageDto[],
+): GeneratedImageDto | null {
+  const adopted = images.find((img) => img.adoptedAt !== null);
+  if (adopted) return adopted;
+  if (images.length === 0) return null;
+  return images.reduce((a, b) =>
+    new Date(a.createdAt) > new Date(b.createdAt) ? a : b,
+  );
+}
+
+function TimelineView({
+  reviews,
+  filter,
+}: {
+  reviews: SceneReview[];
+  filter: "all" | "original" | "generated";
+}) {
+  return (
+    <div className={styles.timeline}>
+      {reviews.map((r, index) => {
+        const generated = adoptedOrLatest(r.generatedImages);
+        return (
+          <div key={r.scene.id} className={styles.timelineItem}>
+            <div className={styles.timelineMarker}>{index + 1}</div>
+            <div className={styles.timelineCard}>
+              <p className={styles.colLabel}>{r.scene.title || "Untitled"}</p>
+              <div className={styles.timelineImages}>
+                {filter !== "generated" && (
+                  <div className={styles.imgBox}>
+                    {r.primaryPhoto ? (
+                      <img
+                        src={storageKeyToUrl(r.primaryPhoto.storageKey)}
+                        alt={r.primaryPhoto.name}
+                        className={styles.img}
+                      />
+                    ) : (
+                      <div className={styles.imgPlaceholder}>
+                        {r.scene.kind === "complement"
+                          ? "Complement scene"
+                          : "No photo"}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {filter !== "original" && (
+                  <div className={styles.imgBox}>
+                    {generated ? (
+                      <img
+                        src={storageKeyToUrl(generated.storageKey)}
+                        alt="Generated"
+                        className={styles.img}
+                      />
+                    ) : (
+                      <div className={styles.imgPlaceholder}>Not generated</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TableView({
+  reviews,
+  filter,
+}: {
+  reviews: SceneReview[];
+  filter: "all" | "original" | "generated";
+}) {
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Emotion</th>
+            <th>Camera</th>
+            {filter !== "generated" && <th>Source photo</th>}
+            {filter !== "original" && <th>Generated image</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {reviews.map((r, index) => {
+            const generated = adoptedOrLatest(r.generatedImages);
+            return (
+              <tr key={r.scene.id}>
+                <td>{index + 1}</td>
+                <td>{r.scene.title || "Untitled"}</td>
+                <td>{r.scene.emotion || "—"}</td>
+                <td>{r.scene.cameraDirection || "—"}</td>
+                {filter !== "generated" && (
+                  <td>
+                    {r.primaryPhoto ? (
+                      <img
+                        src={storageKeyToUrl(r.primaryPhoto.storageKey)}
+                        alt={r.primaryPhoto.name}
+                        className={styles.tableThumb}
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                )}
+                {filter !== "original" && (
+                  <td>
+                    {generated ? (
+                      <img
+                        src={storageKeyToUrl(generated.storageKey)}
+                        alt="Generated"
+                        className={styles.tableThumb}
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

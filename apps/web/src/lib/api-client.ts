@@ -1,4 +1,5 @@
 import type {
+  ComplementSceneProposalDto,
   GeneratedImageDto,
   GenerationRequestDto,
   MeDto,
@@ -159,6 +160,18 @@ export async function patchPhotoAsset(
   });
 }
 
+export async function reorderPhotos(
+  projectId: string,
+  photoAssetIds: string[],
+): Promise<PhotoAssetDto[]> {
+  const data = await request<{ photoAssets: PhotoAssetDto[] }>(
+    "PATCH",
+    `/api/projects/${projectId}/photos/order`,
+    { photoAssetIds },
+  );
+  return data.photoAssets;
+}
+
 // ── Photo Analysis ───────────────────────────────────────────────────────────
 
 export async function getProjectPhotoAnalysis(
@@ -246,6 +259,18 @@ export async function upsertScenes(
   return data.scenes;
 }
 
+export async function reorderScenes(
+  storyboardId: string,
+  sceneIds: string[],
+): Promise<SceneDto[]> {
+  const data = await request<{ scenes: SceneDto[] }>(
+    "PUT",
+    `/api/storyboards/${storyboardId}/scene-order`,
+    { sceneIds },
+  );
+  return data.scenes;
+}
+
 export async function assignPhotosToScene(
   sceneId: string,
   photoAssets: { photoAssetId: string; role: "primary" | "reference" }[],
@@ -269,6 +294,33 @@ export async function createTemplateScenesFromPhotos(
 
 export async function fillSceneWithAi(sceneId: string): Promise<SceneDto> {
   return request<SceneDto>("POST", `/api/scenes/${sceneId}/ai-fill`, {});
+}
+
+// ── Complement Scenes ─────────────────────────────────────────────────────────
+
+export async function insertComplementScene(
+  storyboardId: string,
+  fromSceneId: string,
+  toSceneId: string,
+): Promise<SceneDto> {
+  return request<SceneDto>(
+    "POST",
+    `/api/storyboards/${storyboardId}/complement-scenes`,
+    { fromSceneId, toSceneId },
+  );
+}
+
+export async function proposeComplementScenes(
+  storyboardId: string,
+  fromSceneId: string,
+  toSceneId: string,
+): Promise<ComplementSceneProposalDto[]> {
+  const data = await request<{ proposals: ComplementSceneProposalDto[] }>(
+    "POST",
+    `/api/storyboards/${storyboardId}/complement-scenes/proposals`,
+    { fromSceneId, toSceneId },
+  );
+  return data.proposals;
 }
 
 // ── Style Presets ─────────────────────────────────────────────────────────────

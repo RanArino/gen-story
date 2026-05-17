@@ -8,6 +8,7 @@ import {
   deletePhotoAsset,
   listPhotoAssets,
   patchPhotoAsset,
+  reorderPhotos,
   restorePhotoAsset,
   uploadPhotoAsset,
 } from "../../lib/api-client";
@@ -29,6 +30,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   const [tab, setTab] = useState<"upload" | "manage">("upload");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     const all = await listPhotoAssets(projectId, true);
@@ -111,6 +113,31 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   const activePhotos = photos.filter((p) => p.deletedAt === null);
   const deletedPhotos = photos.filter((p) => p.deletedAt !== null);
 
+  async function handleReorder(targetIndex: number) {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+      return;
+    }
+    const next = [...activePhotos];
+    const [moved] = next.splice(dragIndex, 1);
+    if (!moved) {
+      setDragIndex(null);
+      return;
+    }
+    next.splice(targetIndex, 0, moved);
+    setDragIndex(null);
+    setPhotos([...next, ...deletedPhotos]);
+    try {
+      await reorderPhotos(
+        projectId,
+        next.map((p) => p.id),
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Reorder failed");
+      await refresh();
+    }
+  }
+
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
@@ -171,10 +198,15 @@ export function PhotosPage({ projectId }: { projectId: string }) {
             <p className={styles.hint}>Loading…</p>
           ) : (
             <div className={styles.photoGrid}>
-              {activePhotos.map((photo) => (
+              {activePhotos.map((photo, index) => (
                 <PhotoCard
                   key={photo.id}
                   photo={photo}
+                  index={index}
+                  isDragging={dragIndex === index}
+                  onDragStart={() => setDragIndex(index)}
+                  onDragEnd={() => setDragIndex(null)}
+                  onDropOn={() => handleReorder(index)}
                   onUsageChange={handleUsageChange}
                   onDelete={handleDelete}
                 />
@@ -230,17 +262,39 @@ export function PhotosPage({ projectId }: { projectId: string }) {
 
 function PhotoCard({
   photo,
+  index,
+  isDragging,
+  onDragStart,
+  onDragEnd,
+  onDropOn,
   onUsageChange,
   onDelete,
 }: {
   photo: PhotoAssetDto;
+  index: number;
+  isDragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDropOn: () => void;
   onUsageChange: (id: string, usage: UsageValue) => void;
   onDelete: (id: string) => void;
 }) {
   const imgUrl = storageKeyToUrl(photo.storageKey);
 
   return (
-    <div className={`card ${styles.photoCard}`}>
+    <div
+      className={`card ${styles.photoCard}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDropOn();
+      }}
+      style={{ opacity: isDragging ? 0.4 : 1, cursor: "grab" }}
+      title={`Drag to reorder (position ${index + 1})`}
+    >
       <div className={styles.photoThumb}>
         <img src={imgUrl} alt={photo.name} className={styles.thumbImg} />
       </div>

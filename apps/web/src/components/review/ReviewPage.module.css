@@ -135,3 +135,104 @@
   padding-top: 20px;
   border-top: 1px solid #e5e9f0;
 }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.controlLabel {
+  font-size: 12px;
+  color: #8898aa;
+  margin-right: 4px;
+}
+
+.controlBtn {
+  font-size: 13px;
+  padding: 4px 12px;
+  border: 1px solid #d5dbe5;
+  border-radius: 6px;
+  background: #fff;
+  color: #4a5568;
+  cursor: pointer;
+}
+
+.controlBtnActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timelineItem {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.timelineMarker {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.timelineCard {
+  flex: 1;
+  border: 1px solid #e5e9f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.timelineImages {
+  display: flex;
+  gap: 12px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  border: 1px solid #e5e9f0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.table th {
+  background: #f7f9fc;
+  font-weight: 600;
+}
+
+.tableThumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import type {
+  ComplementSceneProposalDto,
   PhotoAssetDto,
   ProjectPhotoAnalysisDto,
   SceneDto,
@@ -17,10 +18,13 @@ import {
   fillSceneWithAi,
   getProjectPhotoAnalysis,
   getTestGenerationBatch,
+  insertComplementScene,
   listPhotoAssets,
   listScenes,
   listStoryboards,
   listStylePresets,
+  proposeComplementScenes,
+  reorderScenes,
   upsertScenes,
   upsertStoryboard,
   type UpsertSceneInput,
@@ -90,13 +94,19 @@ const DEFAULT_SCENE: Omit<UpsertSceneInput, "orderIndex"> = {
   notes: "",
 };
 
-type SceneState = UpsertSceneInput & { id?: string };
+type SceneState = UpsertSceneInput & {
+  id?: string;
+  kind: string;
+  bridge: { fromSceneId: string; toSceneId: string } | null;
+};
 
 function sceneDtoToState(scene: SceneDto): SceneState {
   return {
     id: scene.id,
     sceneId: scene.id,
     orderIndex: scene.orderIndex,
+    kind: scene.kind,
+    bridge: scene.bridge,
     title: scene.title,
     description: scene.description,
     imagePrompt: scene.imagePrompt,
@@ -131,6 +141,13 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [showTestModal, setShowTestModal] = useState(false);
   const [commonPromptDraft, setCommonPromptDraft] = useState("");
   const [savingCommonPrompt, setSavingCommonPrompt] = useState(false);
+  const [complementBusy, setComplementBusy] = useState(false);
+  const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
+  const [proposalCtx, setProposalCtx] = useState<{
+    fromSceneId: string;
+    toSceneId: string;
+    proposals: ComplementSceneProposalDto[];
+  } | null>(null);
 
   const sbId = storyboard?.id;
 
@@ -288,7 +305,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   function addScene() {
     setScenes((prev) => [
       ...prev,
-      { ...DEFAULT_SCENE, orderIndex: prev.length },
+      {
+        ...DEFAULT_SCENE,
+        orderIndex: prev.length,
+        kind: "photo",
+        bridge: null,
+      },
     ]);
   }
 
@@ -300,6 +322,27 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       [next[idx], next[target]] = [next[target]!, next[idx]!];
       return next.map((s, i) => ({ ...s, orderIndex: i }));
     });
+  }
+
+  async function handleSceneReorder(fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx) return;
+    const next = [...scenes];
+    const [moved] = next.splice(fromIdx, 1);
+    if (!moved) return;
+    next.splice(toIdx, 0, moved);
+    const reindexed = next.map((s, i) => ({ ...s, orderIndex: i }));
+    setScenes(reindexed);
+    if (sbId && reindexed.every((s) => s.id)) {
+      try {
+        const saved = await reorderScenes(
+          sbId,
+          reindexed.map((s) => s.id!),
+        );
+        setScenes(saved.map(sceneDtoToState));
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to reorder scenes");
+      }
+    }
   }
 
   async function saveScenes() {
@@ -348,6 +391,90 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setError(e instanceof Error ? e.message : "Failed to fill scene");
     } finally {
       setAiFillingSceneId(null);
+    }
+  }
+
+  async function handleInsertBlankComplement(
+    fromSceneId: string,
+    toSceneId: string,
+  ) {
+    if (!sbId) return;
+    setComplementBusy(true);
+    setError(null);
+    try {
+      await insertComplementScene(sbId, fromSceneId, toSceneId);
+      const sceneList = await listScenes(sbId);
+      setScenes(sceneList.map(sceneDtoToState));
+      setSaveMsg("Complement scene inserted");
+      setTimeout(() => setSaveMsg(null), 2000);
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to insert complement scene",
+      );
+    } finally {
+      setComplementBusy(false);
+    }
+  }
+
+  async function handleProposeComplement(
+    fromSceneId: string,
+    toSceneId: string,
+  ) {
+    if (!sbId) return;
+    setComplementBusy(true);
+    setError(null);
+    try {
+      const proposals = await proposeComplementScenes(
+        sbId,
+        fromSceneId,
+        toSceneId,
+      );
+      setProposalCtx({ fromSceneId, toSceneId, proposals });
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to propose complement scenes",
+      );
+    } finally {
+      setComplementBusy(false);
+    }
+  }
+
+  async function handleApplyProposal(proposal: ComplementSceneProposalDto) {
+    if (!sbId || !proposalCtx) return;
+    setComplementBusy(true);
+    setError(null);
+    try {
+      const inserted = await insertComplementScene(
+        sbId,
+        proposalCtx.fromSceneId,
+        proposalCtx.toSceneId,
+      );
+      const sceneList = await listScenes(sbId);
+      setScenes(
+        sceneList.map((dto) => {
+          const state = sceneDtoToState(dto);
+          if (dto.id === inserted.id) {
+            return {
+              ...state,
+              title: proposal.title,
+              description: proposal.description,
+              imagePrompt: proposal.imagePrompt,
+              emotion: proposal.emotion,
+              cameraDirection: proposal.cameraDirection,
+              lightingDirection: proposal.lightingDirection,
+              motionDirection: proposal.motionDirection,
+            };
+          }
+          return state;
+        }),
+      );
+      setProposalCtx(null);
+      setSaveMsg("Proposal applied — review and Save scenes");
+      setTimeout(() => setSaveMsg(null), 4000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to apply proposal");
+    } finally {
+      setComplementBusy(false);
     }
   }
 
@@ -657,22 +784,61 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         )}
 
         <div className={styles.sceneList}>
-          {scenes.map((scene, idx) => (
-            <SceneCard
-              key={scene.id ?? idx}
-              scene={scene}
-              idx={idx}
-              total={scenes.length}
-              photos={photos}
-              onUpdate={(patch) => updateScene(idx, patch)}
-              onMove={(dir) => moveScene(idx, dir)}
-              onAiFill={handleAiFill}
-              isAiFilling={aiFillingSceneId === scene.id}
-              isBusy={saving || aiFillingSceneId !== null}
-            />
-          ))}
+          {scenes.map((scene, idx) => {
+            const nextScene = scenes[idx + 1];
+            return (
+              <div
+                key={scene.id ?? idx}
+                onDragOver={(e) => {
+                  if (sceneDragIndex !== null) e.preventDefault();
+                }}
+                onDrop={() => {
+                  if (sceneDragIndex !== null) {
+                    void handleSceneReorder(sceneDragIndex, idx);
+                  }
+                  setSceneDragIndex(null);
+                }}
+              >
+                <SceneCard
+                  scene={scene}
+                  idx={idx}
+                  total={scenes.length}
+                  scenes={scenes}
+                  photos={photos}
+                  isDragging={sceneDragIndex === idx}
+                  onDragHandleStart={() => setSceneDragIndex(idx)}
+                  onDragHandleEnd={() => setSceneDragIndex(null)}
+                  onUpdate={(patch) => updateScene(idx, patch)}
+                  onMove={(dir) => moveScene(idx, dir)}
+                  onAiFill={handleAiFill}
+                  isAiFilling={aiFillingSceneId === scene.id}
+                  isBusy={saving || aiFillingSceneId !== null}
+                />
+                {scene.id && nextScene?.id && (
+                  <ComplementGap
+                    disabled={complementBusy || saving}
+                    onInsertBlank={() =>
+                      handleInsertBlankComplement(scene.id!, nextScene.id!)
+                    }
+                    onPropose={() =>
+                      handleProposeComplement(scene.id!, nextScene.id!)
+                    }
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
+
+      {proposalCtx && (
+        <ComplementProposalModal
+          proposals={proposalCtx.proposals}
+          busy={complementBusy}
+          onApply={handleApplyProposal}
+          onClose={() => setProposalCtx(null)}
+        />
+      )}
 
       <div className={styles.footer}>
         {testBatch?.status === "completed" ? (
@@ -724,11 +890,97 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   );
 }
 
+function ComplementGap({
+  disabled,
+  onInsertBlank,
+  onPropose,
+}: {
+  disabled: boolean;
+  onInsertBlank: () => void;
+  onPropose: () => void;
+}) {
+  return (
+    <div className={styles.complementGap}>
+      <button
+        type="button"
+        className={styles.complementGapBtn}
+        onClick={onInsertBlank}
+        disabled={disabled}
+        title="Insert a blank complement scene here"
+      >
+        + Complement scene
+      </button>
+      <button
+        type="button"
+        className={styles.complementGapBtn}
+        onClick={onPropose}
+        disabled={disabled}
+        title="Let AI propose bridging scenes"
+      >
+        ✨ AI propose
+      </button>
+    </div>
+  );
+}
+
+function ComplementProposalModal({
+  proposals,
+  busy,
+  onApply,
+  onClose,
+}: {
+  proposals: ComplementSceneProposalDto[];
+  busy: boolean;
+  onApply: (proposal: ComplementSceneProposalDto) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <h3 className={styles.sectionTitle}>AI complement scene proposals</h3>
+        <p className={styles.photoAssignHint}>
+          Pick a bridging scene to insert. You can edit it before saving.
+        </p>
+        {proposals.length === 0 && (
+          <p className={styles.analysisEmpty}>No proposals returned.</p>
+        )}
+        {proposals.map((proposal, index) => (
+          <div key={index} className={`card ${styles.proposalCard}`}>
+            <strong>{proposal.title}</strong>
+            <p>{proposal.description}</p>
+            <small>{proposal.imagePrompt}</small>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => onApply(proposal)}
+              disabled={busy}
+            >
+              {busy ? "Applying…" : "Use this scene"}
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={onClose}
+          disabled={busy}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SceneCard({
   scene,
   idx,
   total,
+  scenes,
   photos,
+  isDragging,
+  onDragHandleStart,
+  onDragHandleEnd,
   onUpdate,
   onMove,
   onAiFill,
@@ -738,7 +990,11 @@ function SceneCard({
   scene: SceneState;
   idx: number;
   total: number;
+  scenes: SceneState[];
   photos: PhotoAssetDto[];
+  isDragging: boolean;
+  onDragHandleStart: () => void;
+  onDragHandleEnd: () => void;
   onUpdate: (patch: Partial<SceneState>) => void;
   onMove: (dir: -1 | 1) => void;
   onAiFill: (sceneId: string) => void;
@@ -748,7 +1004,18 @@ function SceneCard({
   const [assigningPhoto, setAssigningPhoto] = useState<string | null>(null);
   const id = useId();
 
+  const isComplement = scene.kind === "complement";
   const candidatePhotos = photos.filter((p) => p.usage === "candidate");
+  const bridgeLabel = (() => {
+    if (!isComplement || !scene.bridge) return null;
+    const sceneTitle = (sceneId: string) => {
+      const found = scenes.find((s) => s.id === sceneId);
+      if (!found) return "a scene";
+      const order = scenes.indexOf(found) + 1;
+      return found.title ? `Scene ${order} · ${found.title}` : `Scene ${order}`;
+    };
+    return `${sceneTitle(scene.bridge.fromSceneId)} → ${sceneTitle(scene.bridge.toSceneId)}`;
+  })();
 
   async function handleAssignPhoto(
     photoAssetId: string,
@@ -766,9 +1033,23 @@ function SceneCard({
   }
 
   return (
-    <div className={`card ${styles.sceneCard}`}>
+    <div
+      className={`card ${styles.sceneCard}${
+        isComplement ? ` ${styles.complementCard}` : ""
+      }`}
+      style={{ opacity: isDragging ? 0.4 : 1 }}
+    >
       <div className={styles.sceneCardHeader}>
-        <span className={styles.sceneIndex}>Scene {idx + 1}</span>
+        <span
+          className={styles.sceneIndex}
+          draggable
+          onDragStart={onDragHandleStart}
+          onDragEnd={onDragHandleEnd}
+          style={{ cursor: "grab" }}
+          title="Drag to reorder this scene"
+        >
+          ⠿ {isComplement ? `Complement ${idx + 1}` : `Scene ${idx + 1}`}
+        </span>
         <div className={styles.sceneHeaderActions}>
           <button
             className={styles.aiFillBtn}
@@ -796,6 +1077,12 @@ function SceneCard({
           </button>
         </div>
       </div>
+
+      {bridgeLabel && (
+        <p className={styles.photoAssignHint}>
+          AI-only bridging scene · {bridgeLabel}
+        </p>
+      )}
 
       <div className={styles.sceneFields}>
         <SceneField label="Title" htmlFor={`${id}-title`}>
@@ -882,7 +1169,7 @@ function SceneCard({
         </div>
 
         {/* Photo assignment — only available after scene is saved (has ID) */}
-        {scene.id && candidatePhotos.length > 0 && (
+        {scene.id && !isComplement && candidatePhotos.length > 0 && (
           <SceneField label="Primary photo" htmlFor={`${id}-photo`}>
             <div className={styles.photoAssignRow}>
               {candidatePhotos.map((p) => (
