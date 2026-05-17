@@ -87,7 +87,9 @@ export class LocalJobWorker {
     }
 
     const request = runningResult.value;
-    console.log(`[Worker] starting job ${requestId} for scene ${request.sceneId}`);
+    console.log(
+      `[Worker] starting job ${requestId} for scene ${request.sceneId}`,
+    );
 
     try {
       const result = await this.deps.imageGeneration.generate({
@@ -112,7 +114,9 @@ export class LocalJobWorker {
       });
 
       if (!completedResult.ok) {
-        console.log(`[Worker] job ${requestId} already canceled; discarding result`);
+        console.log(
+          `[Worker] job ${requestId} already canceled; discarding result`,
+        );
         return;
       }
 
