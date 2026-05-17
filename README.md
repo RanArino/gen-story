@@ -67,7 +67,31 @@ Populate the database with a demo project and three scenes to explore the UI wit
 pnpm --filter @gen-story/api db:seed
 ```
 
-The script prints the project URL when complete.
+The script prints the project URL when complete. It also seeds the nine
+built-in image style presets (idempotent — safe to re-run).
+
+## Generate Style Preview Images (Optional)
+
+The storyboard style gallery shows a preview image per style preset. The script
+generates one base image, then restyles that same image into every other style
+(OpenAI's "character anchor" pattern), so all nine previews show the same
+subject and differ only by visual style.
+
+```sh
+# Render all nine previews
+OPENAI_API_KEY=... pnpm tsx scripts/generate-style-previews.ts
+
+# Regenerate only specific styles (base image is reused — no extra cost)
+pnpm tsx scripts/generate-style-previews.ts "Anime Movie" "Film Photo"
+
+# Force the base image to be regenerated
+pnpm tsx scripts/generate-style-previews.ts --fresh-base
+```
+
+This writes JPEG files to `apps/web/public/style-previews/`. The base image is
+cached at `data/style-preview-base.png` so re-runs do not regenerate it. The
+script requires `OPENAI_API_KEY` (it is also read from `.env` / `.env.local`);
+without it the gallery simply shows no preview thumbnails.
 
 ## Running Tests
 
