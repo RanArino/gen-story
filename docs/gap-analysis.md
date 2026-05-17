@@ -108,7 +108,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | Storyboard creation and editing | ✅ | `StoryboardPage` + `PUT /api/storyboards/:id` |
-| Template scene creation from uploaded photos | ❌ | Uploaded candidate photos should be convertible into draft scenes without AI; each scene should assign the source photo as the primary photo, show the uploaded image preview, and leave title, description, and image prompt blank for manual editing or later AI fill-in |
+| Template scene creation from uploaded photos | ✅ | `POST /api/storyboards/:storyboardId/template-scenes` creates draft scenes from photos; source photo assigned as primary; title/description/imagePrompt blank for manual editing |
 | AI proposes scene composition from photos | ❌ | User builds scenes manually |
 | AI proposes scene ordering (opt-in toggle) | ❌ | No AI ordering |
 | User can reorder scenes | ✅ | Scene list UI; no DnD yet |
@@ -126,7 +126,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Scene description | ✅ | `scenes.description` |
 | Target emotion per scene | ✅ | `scenes.emotion` |
 | Image generation prompt | ✅ | `scenes.image_prompt` |
-| Blank draft title / description / image prompt before generation | ❌ | Template scenes created from uploaded photos should allow these fields to remain blank until the user edits them or runs per-scene AI fill-in |
+| Blank draft title / description / image prompt before generation | ✅ | Template scenes created via `createTemplateScenesFromPhotos` allow blank fields for manual editing or later AI fill-in |
 | Camera angle / camera work (selection) | ✅ | `scenes.camera_direction`; translated to cinematic shot descriptors (incl. depth, vanishing point) in generation prompt; 11 options including Telephoto, Voyeur, Low Angle, Overhead |
 | Color / lighting direction (selection) | ✅ | `scenes.lighting_direction`; translated to cinematic lighting descriptors in generation prompt; 8 options including Backlit, Silhouette, Volumetric |
 | Animation movement direction (selection) | ✅ | `scenes.motion_direction`; stored only — not yet composed into generation prompt |
@@ -147,7 +147,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 |---|---|---|
 | All storyboard fields editable by user | ✅ | Full edit form in `StoryboardPage` |
 | Professional fields use selection UI (camera, lighting, motion) | ✅ | Dropdown selects |
-| Uploaded primary photo preview inside each scene card | ⚠️ | Photo assignment thumbnails exist, but template-created scenes should show the assigned uploaded photo as the scene preview by default |
+| Uploaded primary photo preview inside each scene card | ✅ | Template-created scenes assigned with uploaded photo as primary; preview visible in scene editor |
 | Per-scene AI fill button for empty text fields | ❌ | Scene cards should expose an AI action that can populate blank title, description, and image prompt fields while preserving user-edited values |
 | Beginner-friendly labels for selections | ⚠️ | English labels present; no i18n yet |
 | Labels follow app language setting | ❌ | No language setting |
@@ -208,7 +208,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Asynchronous job queue (queued → running → succeeded/failed) | ✅ | Local worker + `generation_requests` state machine |
 | Max 5 concurrent running jobs per project | ✅ | `GenerationConcurrencyPolicy` |
 | Queued jobs execute when slots free up | ✅ | Local worker polls queued jobs |
-| Cancel generation request | ⚠️ | `canceled` status in schema; no cancel API/UI |
+| Cancel generation request | ✅ | `POST /api/generation-requests/:id/cancel` + UI cancel button on GeneratePage; graceful handling for in-flight jobs |
 | Per-scene retry of failed jobs | ✅ | `POST /generation-requests/:id/retry` |
 | Short failure reason displayed | ✅ | `errorMessage` stored; shown in UI |
 | Generation progress UI (N of M completed) | ✅ | Polling every 2 s in `GeneratePage` |
@@ -305,13 +305,13 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Image style selection | 2 | 1 | 4 |
 | Common project prompt | 0 | 1 | 3 |
 | Test generation workflow | 0 | 0 | 6 |
-| Storyboard composition | 4 | 0 | 4 |
-| Scene content | 9 | 0 | 8 (AI gen + complement + blank drafts) |
-| Scene editing UX | 3 | 2 | 2 |
+| Storyboard composition | 5 | 0 | 3 |
+| Scene content | 10 | 0 | 7 (AI gen + complement) |
+| Scene editing UX | 4 | 2 | 1 |
 | Language / i18n | 0 | 0 | 5 |
 | Generated image handling | 5 | 2 | 3 |
 | Storyboard viewing & export | 1 | 0 | 5 |
-| Image generation infra | 12 | 2 | 3 |
+| Image generation infra | 13 | 2 | 2 |
 | Generation history | 5 | 0 | 2 |
 | File lifecycle & cleanup | 5 | 1 | 0 |
 | Local release readiness | 11 | 0 | 0 |
@@ -325,15 +325,13 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 ### High Priority — Core Phase 1 Value
 
 1. **AI photo analysis → emotion candidates**
-   Analyzing uploaded photos with an LLM (GPT-4o vision) and proposing emotion/tone candidates is the core differentiating feature of Phase 1. Without it, the user must fill in all emotion and scene fields manually.
+   Analyzing uploaded photos with the latest Gemini model (e.g., Gemini 2.0 Flash) and proposing emotion/tone candidates is the core differentiating feature of Phase 1. Without it, the user must fill in all emotion and scene fields manually.
 
 2. **AI-generated scene descriptions and image prompts**
    The system currently creates placeholder scenes; users must write titles, descriptions, and prompts by hand. Generating these from photo analysis closes the biggest usability gap.
 
-3. **Template scene creation from uploaded photos**
-   Uploaded candidate photos should be converted into editable draft scenes without requiring AI. Each draft scene should assign the uploaded image as its primary photo, show that image as a preview in the scene editor, and leave the title, description, and image prompt blank so the user can edit them manually or fill them later through a per-scene AI action.
-
-   The per-scene AI action should eventually receive context from all current project photos and the overall story structure, so generated titles, descriptions, and image prompts fit the whole storyboard instead of only the individual image.
+3. ✅ **Template scene creation from uploaded photos** (COMPLETED)
+   Uploaded candidate photos are now convertible into editable draft scenes via `POST /api/storyboards/:storyboardId/template-scenes`. Each draft scene assigns the uploaded image as its primary photo and leaves title, description, and image prompt blank for manual editing or later per-scene AI fill-in.
 
 4. **Test generation workflow (3 patterns → adjust → confirm → bulk)**
    The spec requires a test cycle before committing to full generation. The current flow goes straight to bulk generation, skipping style validation.
@@ -355,8 +353,8 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 9. **Timeline and table views of storyboard**
    Two of three specified storyboard viewing modes are missing.
 
-10. **Cancel generation request**
-   Status exists in schema but no API route or UI control surfaces it.
+10. ✅ **Cancel generation request** (COMPLETED)
+   `POST /api/generation-requests/:generationRequestId/cancel` endpoint added with graceful handling for in-flight jobs. UI cancel button added to GeneratePage for queued/running requests.
 
 ### Lower Priority — Polish & Future-Readiness
 

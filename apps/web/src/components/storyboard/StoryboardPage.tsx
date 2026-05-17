@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import type { PhotoAssetDto, StylePresetDto, StoryboardDto } from "@gen-story/shared";
 import {
   assignPhotosToScene,
+  createTemplateScenesFromPhotos,
   listPhotoAssets,
   listScenes,
   listStoryboards,
@@ -60,6 +61,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+  const [creatingTemplates, setCreatingTemplates] = useState(false);
 
   const sbId = storyboard?.id;
 
@@ -140,6 +143,36 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setStoryboard(updated);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save style");
+    }
+  }
+
+  async function handleCreateTemplateScenes() {
+    if (!sbId || selectedPhotoIds.size === 0) return;
+    setCreatingTemplates(true);
+    try {
+      const newScenes = await createTemplateScenesFromPhotos(
+        sbId,
+        Array.from(selectedPhotoIds),
+      );
+      setScenes((prev) => [...prev, ...newScenes.map((s) => ({
+        id: s.id,
+        orderIndex: prev.length + newScenes.indexOf(s),
+        title: s.title,
+        description: s.description,
+        imagePrompt: s.imagePrompt,
+        emotion: s.emotion,
+        cameraDirection: s.cameraDirection,
+        lightingDirection: s.lightingDirection,
+        motionDirection: s.motionDirection,
+        notes: s.notes,
+      }))]);
+      setSelectedPhotoIds(new Set());
+      setSaveMsg("Template scenes created!");
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to create template scenes");
+    } finally {
+      setCreatingTemplates(false);
     }
   }
 
@@ -253,6 +286,66 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           ))}
         </div>
       </section>
+
+      {/* Create template scenes from photos */}
+      {photos.some((p) => p.usage === "candidate") && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Create Scenes from Photos</h3>
+            {selectedPhotoIds.size > 0 && (
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateTemplateScenes}
+                disabled={creatingTemplates}
+              >
+                {creatingTemplates ? "Creating…" : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
+              </button>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 12 }}>
+            {photos.filter((p) => p.usage === "candidate").map((photo) => (
+              <label
+                key={photo.id}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  cursor: "pointer",
+                  opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
+                  transition: "opacity 0.2s",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedPhotoIds.has(photo.id)}
+                  onChange={(e) => {
+                    const newSet = new Set(selectedPhotoIds);
+                    if (e.target.checked) {
+                      newSet.add(photo.id);
+                    } else {
+                      newSet.delete(photo.id);
+                    }
+                    setSelectedPhotoIds(newSet);
+                  }}
+                  style={{ marginBottom: 8 }}
+                />
+                <img
+                  src={storageKeyToUrl(photo.storageKey)}
+                  alt={photo.name}
+                  style={{
+                    width: "100%",
+                    aspectRatio: "1 / 1",
+                    objectFit: "cover",
+                    borderRadius: 8,
+                    border: selectedPhotoIds.has(photo.id) ? "2px solid var(--color-primary)" : "none",
+                  }}
+                />
+                <span style={{ fontSize: 12, marginTop: 4, textAlign: "center" }}>{photo.name}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Style preset selector */}
       <section className={styles.section}>

@@ -99,7 +99,7 @@ export class LocalJobWorker {
       const generatedImageId = `img-${requestId}-${Date.now()}`;
       const durationMs = Date.now() - new Date(startedAt).getTime();
 
-      await markGenerationRequestCompleted(this.deps, {
+      const completedResult = await markGenerationRequestCompleted(this.deps, {
         generationRequestId: requestId,
         generatedImageId,
         storageKey: result.storageKey,
@@ -110,6 +110,11 @@ export class LocalJobWorker {
         checksum: result.checksum,
         completedAt,
       });
+
+      if (!completedResult.ok) {
+        console.log(`[Worker] job ${requestId} already canceled; discarding result`);
+        return;
+      }
 
       console.log(`[Worker] succeeded job ${requestId} in ${durationMs}ms`);
     } catch (err) {

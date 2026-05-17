@@ -26,8 +26,10 @@ export type {
 } from "./ports";
 export {
   assignPhotosToScene,
+  cancelGenerationRequest,
   createGenerationRequestUseCase,
   createProjectUseCase,
+  createTemplateScenesFromPhotos,
   deletePhotoAsset,
   deleteProject,
   markGeneratedImageAdopted,
@@ -43,6 +45,8 @@ export {
   upsertStoryboard,
 } from "./use-cases";
 export type {
+  CancelGenerationRequestInput,
+  CreateTemplateScenesFromPhotosInput,
   MarkGenerationRequestCompletedInput,
   MarkGenerationRequestFailedInput,
   MarkGenerationRequestRunningInput,

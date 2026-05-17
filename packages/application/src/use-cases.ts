@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   createGeneratedImage,
   createGenerationRequest,
@@ -5,10 +7,12 @@ import {
   createProject,
   createScene,
   createStoryboard,
+  createTemplateScene,
   retryGenerationRequest,
   replaceScenePhotoAssets,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
+  transitionGenerationRequestStatus,
   type GeneratedImage,
   type GenerationRequest,
   type PhotoAsset,
@@ -466,6 +470,67 @@ export async function upsertScenes(
   }
 }
 
+export type CreateTemplateScenesFromPhotosInput = {
+  storyboardId: string;
+  projectId: string;
+  photoAssetIds: string[];
+};
+
+export async function createTemplateScenesFromPhotos(
+  deps: ApplicationDependencies,
+  input: CreateTemplateScenesFromPhotosInput,
+): Promise<UseCaseResult<Scene[]>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    if (storyboard.projectId !== input.projectId) {
+      return failure("invalid_state", "Storyboard does not belong to this project.");
+    }
+
+    const existingScenes = await deps.scenes.findByStoryboardId(input.storyboardId);
+    const baseIndex = existingScenes.length;
+
+    const createdScenes: Scene[] = [];
+    const timestamp = now();
+
+    for (let i = 0; i < input.photoAssetIds.length; i++) {
+      const photoAssetId = input.photoAssetIds[i]!;
+      const photo = await deps.photoAssets.findById(photoAssetId);
+
+      if (!photo || photo.projectId !== input.projectId || photo.deletedAt !== null) {
+        return failure("not_found", `Photo ${photoAssetId} not found in project.`);
+      }
+
+      const scene = createTemplateScene({
+        id: randomUUID(),
+        projectId: input.projectId,
+        storyboardId: input.storyboardId,
+        orderIndex: baseIndex + i,
+        photoAssetId,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+
+      await deps.scenes.save(scene);
+      createdScenes.push(scene);
+    }
+
+    const allScenes = await deps.scenes.findByStoryboardId(input.storyboardId);
+    const orderedScenes = sortScenesByOrderIndex(allScenes);
+    const updatedStoryboard = {
+      ...storyboard,
+      sceneIds: orderedScenes.map((s) => s.id),
+      updatedAt: timestamp,
+    };
+    await deps.storyboards.save(updatedStoryboard);
+
+    return success(createdScenes);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
 export type AssignPhotosToSceneInput = {
   sceneId: string;
   photoAssets: ScenePhotoAsset[];
@@ -722,6 +787,34 @@ export async function retryFailedGenerationRequest(
     });
 
     return success(retryRequest);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type CancelGenerationRequestInput = {
+  generationRequestId: string;
+};
+
+export async function cancelGenerationRequest(
+  deps: ApplicationDependencies,
+  input: CancelGenerationRequestInput,
+): Promise<UseCaseResult<GenerationRequest>> {
+  try {
+    const generationRequest = await getGenerationRequestOrNotFound(
+      deps,
+      input.generationRequestId,
+    );
+    if (isFailure(generationRequest)) return generationRequest;
+
+    const canceled = transitionGenerationRequestStatus(
+      generationRequest,
+      "canceled",
+      now(),
+    );
+
+    await deps.generationRequests.save(canceled);
+    return success(canceled);
   } catch (error) {
     return validationFailure(error);
   }

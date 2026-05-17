@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GenerationRequestDto, SceneDto } from "@gen-story/shared";
 import {
+  cancelGenerationRequest,
   createGenerationRequest,
   listGenerationRequests,
   listScenes,
@@ -143,6 +144,25 @@ export function GeneratePage({ projectId }: { projectId: string }) {
     }
   }
 
+  async function cancelScene(sceneProgress: SceneProgress) {
+    if (!sceneProgress.latestRequest) return;
+    setError(null);
+    try {
+      await cancelGenerationRequest(sceneProgress.latestRequest.id);
+      const scenes = progress.map((p) => p.scene);
+      await pollAll(scenes);
+      setProgress((prev) =>
+        prev.map((p) =>
+          p.scene.id === sceneProgress.scene.id
+            ? { ...p, status: "canceled" as GenStatus }
+            : p,
+        ),
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to cancel");
+    }
+  }
+
   const succeeded = progress.filter((p) => p.status === "succeeded").length;
   const failed = progress.filter((p) => p.status === "failed").length;
   const total = progress.length;
@@ -248,6 +268,15 @@ export function GeneratePage({ projectId }: { projectId: string }) {
                   onClick={() => retryScene(p)}
                 >
                   Retry
+                </button>
+              )}
+              {(p.status === "queued" || p.status === "running") && (
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: 12, padding: "4px 10px" }}
+                  onClick={() => cancelScene(p)}
+                >
+                  Cancel
                 </button>
               )}
             </div>
