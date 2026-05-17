@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "db:generate": "drizzle-kit generate --config=../../drizzle.config.ts",
+    "db:generate": "cd ../.. && drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx ../../scripts/seed.ts",
     "db:cleanup-expired": "tsx ../../scripts/cleanup-expired.ts",
