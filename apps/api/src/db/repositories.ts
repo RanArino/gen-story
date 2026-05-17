@@ -23,6 +23,7 @@ import {
   type ProjectPhotoAnalysis,
   type ProjectStatus,
   type Scene,
+  type SceneKind,
   type ScenePhotoAsset,
   type ScenePhotoRole,
   type SceneStatus,
@@ -143,6 +144,7 @@ function mapPhotoAsset(row: PhotoAssetRow): PhotoAsset {
     checksum: row.checksum,
     sourceKind: row.sourceKind,
     notes: row.notes,
+    position: row.position,
     deletedAt: row.deletedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -186,6 +188,14 @@ function mapScene(row: SceneRow, photos: ScenePhotoAsset[]): Scene {
     storyboardId: row.storyboardId,
     orderIndex: row.orderIndex,
     status: row.status as SceneStatus,
+    kind: row.kind as SceneKind,
+    bridge:
+      row.bridgeFromSceneId != null && row.bridgeToSceneId != null
+        ? {
+            fromSceneId: row.bridgeFromSceneId,
+            toSceneId: row.bridgeToSceneId,
+          }
+        : null,
     title: row.title,
     description: row.description,
     imagePrompt: row.imagePrompt,
@@ -511,7 +521,7 @@ export class SqlitePhotoAssetRepository implements PhotoAssetRepositoryPort {
               isNull(photoAssets.deletedAt),
             ),
       )
-      .orderBy(photoAssets.createdAt, photoAssets.id);
+      .orderBy(photoAssets.position, photoAssets.createdAt, photoAssets.id);
 
     return rows.map(mapPhotoAsset);
   }
@@ -551,6 +561,7 @@ export class SqlitePhotoAssetRepository implements PhotoAssetRepositoryPort {
         checksum: photoAsset.checksum,
         sourceKind: photoAsset.sourceKind,
         notes: photoAsset.notes,
+        position: photoAsset.position,
         createdAt: photoAsset.createdAt,
         updatedAt: photoAsset.updatedAt,
       })
@@ -568,6 +579,7 @@ export class SqlitePhotoAssetRepository implements PhotoAssetRepositoryPort {
           checksum: photoAsset.checksum,
           sourceKind: photoAsset.sourceKind,
           notes: photoAsset.notes,
+          position: photoAsset.position,
           updatedAt: photoAsset.updatedAt,
           deletedAt: null,
         },
@@ -785,6 +797,9 @@ export class SqliteSceneRepository implements SceneRepositoryPort {
           storyboardId: scene.storyboardId,
           orderIndex: scene.orderIndex,
           status: scene.status,
+          kind: scene.kind,
+          bridgeFromSceneId: scene.bridge?.fromSceneId ?? null,
+          bridgeToSceneId: scene.bridge?.toSceneId ?? null,
           title: scene.title,
           description: scene.description,
           imagePrompt: scene.imagePrompt,
@@ -804,6 +819,9 @@ export class SqliteSceneRepository implements SceneRepositoryPort {
             storyboardId: scene.storyboardId,
             orderIndex: scene.orderIndex,
             status: scene.status,
+            kind: scene.kind,
+            bridgeFromSceneId: scene.bridge?.fromSceneId ?? null,
+            bridgeToSceneId: scene.bridge?.toSceneId ?? null,
             title: scene.title,
             description: scene.description,
             imagePrompt: scene.imagePrompt,
