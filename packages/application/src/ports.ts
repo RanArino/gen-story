@@ -116,6 +116,32 @@ export interface ImageGenerationPort {
   }>;
 }
 
+export type SceneFillSuggestion = {
+  title: string;
+  description: string;
+  imagePrompt: string;
+  emotion: string;
+  cameraDirection: string;
+  lightingDirection: string;
+  motionDirection: string;
+};
+
+export type SceneFillGenerationInput = {
+  project: Project;
+  storyboard: Storyboard;
+  scene: Scene;
+  primaryPhoto: PhotoAsset;
+  stylePreset: StylePreset | null;
+  projectPhotos: PhotoAsset[];
+  siblingScenes: Scene[];
+};
+
+export interface SceneFillGenerationPort {
+  generateSceneFill(
+    input: SceneFillGenerationInput,
+  ): Promise<SceneFillSuggestion>;
+}
+
 export interface JobQueuePort {
   enqueue(job: {
     kind: string;
@@ -149,6 +175,7 @@ export interface ApplicationDependencies {
   objectStorage: ObjectStoragePort;
   imagePreprocessing: ImagePreprocessingPort;
   imageGeneration: ImageGenerationPort;
+  sceneFillGeneration: SceneFillGenerationPort;
   jobQueue: JobQueuePort;
   progressEvents: ProgressEventPort;
   authContext: AuthContextPort;

@@ -227,6 +227,10 @@ export async function createTemplateScenesFromPhotos(
   return data.scenes;
 }
 
+export async function fillSceneWithAi(sceneId: string): Promise<SceneDto> {
+  return request<SceneDto>("POST", `/api/scenes/${sceneId}/ai-fill`, {});
+}
+
 // ── Style Presets ─────────────────────────────────────────────────────────────
 
 export async function listStylePresets(): Promise<StylePresetDto[]> {

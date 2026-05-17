@@ -8,6 +8,7 @@ import {
   createProject,
   createScene,
   createStoryboard,
+  createTemplateScene,
   createStylePreset,
   createUser,
   type GeneratedImage,
@@ -34,6 +35,9 @@ import type {
   PhotoAssetRepositoryPort,
   ProgressEventPort,
   ProjectRepositoryPort,
+  SceneFillGenerationInput,
+  SceneFillGenerationPort,
+  SceneFillSuggestion,
   SceneRepositoryPort,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
@@ -43,6 +47,7 @@ import {
   assignPhotosToScene,
   createGenerationRequestUseCase,
   createProjectUseCase,
+  fillSceneWithAi,
   markGeneratedImageAdopted,
   registerPhotoAsset,
   retryFailedGenerationRequest,
@@ -175,6 +180,8 @@ class InMemoryStoryboardRepository implements StoryboardRepositoryPort {
 }
 
 class InMemorySceneRepository implements SceneRepositoryPort {
+  public saveCalls = 0;
+
   constructor(private readonly store: MemoryStore<Scene>) {}
 
   async findById(sceneId: string): Promise<Scene | null> {
@@ -188,6 +195,7 @@ class InMemorySceneRepository implements SceneRepositoryPort {
   }
 
   async save(scene: Scene): Promise<void> {
+    this.saveCalls += 1;
     await this.store.save(scene);
   }
 }
@@ -334,6 +342,26 @@ class InMemoryImageGenerationPort implements ImageGenerationPort {
   }
 }
 
+class InMemorySceneFillGenerationPort implements SceneFillGenerationPort {
+  public readonly calls: SceneFillGenerationInput[] = [];
+  public suggestion: SceneFillSuggestion = {
+    title: "AI title",
+    description: "AI description",
+    imagePrompt: "AI image prompt",
+    emotion: "Wonder",
+    cameraDirection: "Medium",
+    lightingDirection: "Natural",
+    motionDirection: "Slow pan",
+  };
+
+  async generateSceneFill(
+    input: SceneFillGenerationInput,
+  ): Promise<SceneFillSuggestion> {
+    this.calls.push(input);
+    return this.suggestion;
+  }
+}
+
 class InMemoryJobQueuePort implements JobQueuePort {
   public readonly jobs: Array<{
     kind: string;
@@ -394,6 +422,8 @@ function createDependencies(initial?: {
   progressEvents: InMemoryProgressEventPort;
   objectStorage: InMemoryObjectStoragePort;
   imageGeneration: InMemoryImageGenerationPort;
+  sceneFillGeneration: InMemorySceneFillGenerationPort;
+  scenes: InMemorySceneRepository;
 } {
   const stores = {
     users: new MemoryStore<User>(initial?.users ?? []),
@@ -416,6 +446,7 @@ function createDependencies(initial?: {
   const progressEvents = new InMemoryProgressEventPort();
   const objectStorage = new InMemoryObjectStoragePort();
   const imageGeneration = new InMemoryImageGenerationPort();
+  const sceneFillGeneration = new InMemorySceneFillGenerationPort();
 
   return {
     users: new InMemoryUserRepository(stores.users),
@@ -434,6 +465,7 @@ function createDependencies(initial?: {
     objectStorage,
     imagePreprocessing,
     imageGeneration,
+    sceneFillGeneration,
     jobQueue,
     progressEvents,
     authContext: {
@@ -1165,5 +1197,180 @@ describe("application use cases", () => {
       expect(result.value.sourceGenerationRequestId).toBe("request_1");
     }
     expect(deps.jobQueue.jobs).toHaveLength(1);
+  });
+
+  it("fills blank scene fields with AI suggestions and preserves edited fields", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_ai",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_ai",
+          projectId: "project_ai",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_ai",
+          projectId: "project_ai",
+          name: "birthday.jpg",
+          storageKey: "photos/birthday.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "photo_ai_checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      scenes: [
+        {
+          ...createTemplateScene({
+            id: "scene_ai",
+            projectId: "project_ai",
+            storyboardId: "storyboard_ai",
+            orderIndex: 0,
+            photoAssetId: "photo_ai",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+          title: "Edited title",
+          imagePrompt: "   ",
+        },
+      ],
+    });
+
+    const result = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+
+    expect(result.ok).toBe(true);
+    expect(deps.sceneFillGeneration.calls).toHaveLength(1);
+    expect(deps.scenes.saveCalls).toBe(1);
+    if (result.ok) {
+      expect(result.value).toMatchObject({
+        title: "Edited title",
+        description: "AI description",
+        imagePrompt: "AI image prompt",
+        emotion: "Wonder",
+        cameraDirection: "Medium",
+        lightingDirection: "Natural",
+        motionDirection: "Slow pan",
+      });
+      expect(result.value.updatedAt).not.toBe("2026-05-02T00:00:00.000Z");
+    }
+  });
+
+  it("rejects AI fill when the scene has no primary photo", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_no_photo",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_no_photo",
+          projectId: "project_no_photo",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      scenes: [
+        createTemplateScene({
+          id: "scene_no_photo",
+          projectId: "project_no_photo",
+          storyboardId: "storyboard_no_photo",
+          orderIndex: 0,
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const result = await fillSceneWithAi(deps, { sceneId: "scene_no_photo" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("validation_error");
+    }
+    expect(deps.sceneFillGeneration.calls).toHaveLength(0);
+  });
+
+  it("does not call AI fill generation when all fill fields are already present", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_full",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_full",
+          projectId: "project_full",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_full",
+          projectId: "project_full",
+          name: "family.jpg",
+          storageKey: "photos/family.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "photo_full_checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      scenes: [
+        createScene({
+          id: "scene_full",
+          projectId: "project_full",
+          storyboardId: "storyboard_full",
+          orderIndex: 0,
+          title: "Title",
+          description: "Description",
+          imagePrompt: "Prompt",
+          emotion: "Joy",
+          cameraDirection: "Wide",
+          lightingDirection: "Natural",
+          motionDirection: "Static",
+          photoAssets: [{ photoAssetId: "photo_full", role: "primary" }],
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const result = await fillSceneWithAi(deps, { sceneId: "scene_full" });
+
+    expect(result.ok).toBe(true);
+    expect(deps.sceneFillGeneration.calls).toHaveLength(0);
+    expect(deps.scenes.saveCalls).toBe(0);
   });
 });

@@ -22,6 +22,7 @@ import {
   type ScenePhotoAsset,
   type Storyboard,
   type StoryboardStatus,
+  type StylePreset,
 } from "@gen-story/domain";
 
 import type { ApplicationDependencies, UseCaseResult } from "./ports";
@@ -526,6 +527,112 @@ export async function createTemplateScenesFromPhotos(
     await deps.storyboards.save(updatedStoryboard);
 
     return success(createdScenes);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type FillSceneWithAiInput = {
+  sceneId: string;
+};
+
+const sceneFillFields = [
+  "title",
+  "description",
+  "imagePrompt",
+  "emotion",
+  "cameraDirection",
+  "lightingDirection",
+  "motionDirection",
+] as const satisfies ReadonlyArray<keyof Scene>;
+
+function isBlankSceneField(value: string): boolean {
+  return value.trim().length === 0;
+}
+
+export async function fillSceneWithAi(
+  deps: ApplicationDependencies,
+  input: FillSceneWithAiInput,
+): Promise<UseCaseResult<Scene>> {
+  try {
+    const scene = await getSceneOrNotFound(deps, input.sceneId);
+    if (isFailure(scene)) return scene;
+
+    const storyboard = await getStoryboardOrNotFound(deps, scene.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    if (storyboard.projectId !== scene.projectId) {
+      return failure(
+        "invalid_state",
+        "Scene does not belong to this storyboard.",
+      );
+    }
+
+    const project = await getProjectOrNotFound(deps, scene.projectId);
+    if (isFailure(project)) return project;
+
+    const primaryPhotoAssignment = scene.photoAssets.find(
+      (photoAsset) => photoAsset.role === "primary",
+    );
+    if (primaryPhotoAssignment == null) {
+      return failure(
+        "validation_error",
+        "Scene must have a primary photo for AI fill.",
+      );
+    }
+
+    const primaryPhoto = await getPhotoAssetOrNotFound(
+      deps,
+      primaryPhotoAssignment.photoAssetId,
+    );
+    if (isFailure(primaryPhoto)) return primaryPhoto;
+
+    if (
+      primaryPhoto.projectId !== scene.projectId ||
+      primaryPhoto.deletedAt !== null
+    ) {
+      return failure("validation_error", "Scene primary photo is not available.");
+    }
+
+    const blankFields = sceneFillFields.filter((field) =>
+      isBlankSceneField(scene[field]),
+    );
+    if (blankFields.length === 0) {
+      return success(scene);
+    }
+
+    const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
+    const siblingScenes = await deps.scenes.findByStoryboardId(storyboard.id);
+    let stylePreset: StylePreset | null = null;
+
+    if (storyboard.stylePresetId != null) {
+      stylePreset = await deps.stylePresets.findById(storyboard.stylePresetId);
+      if (stylePreset == null) {
+        return failure("not_found", "Style preset not found.");
+      }
+    }
+
+    const suggestion = await deps.sceneFillGeneration.generateSceneFill({
+      project,
+      storyboard,
+      scene,
+      primaryPhoto,
+      stylePreset,
+      projectPhotos,
+      siblingScenes,
+    });
+
+    const updatedScene = {
+      ...scene,
+      ...Object.fromEntries(
+        blankFields.map((field) => [field, suggestion[field]]),
+      ),
+      updatedAt: now(),
+    };
+
+    await deps.scenes.save(updatedScene);
+
+    return success(updatedScene);
   } catch (error) {
     return validationFailure(error);
   }

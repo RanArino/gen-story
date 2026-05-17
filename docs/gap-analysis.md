@@ -86,7 +86,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Per-project common prompt (auto-generated from emotion + style) | ❌ | No common prompt field or generation |
 | Common prompt editable by user | ❌ | Depends on above |
 | Prompt consistency mechanism across scenes | ⚠️ | `storyboard.tone` and `stylePreset.prompt` are now applied consistently to all scenes via `prompt-composer.ts`; no user-editable common prompt field yet |
-| Story-level AI context across uploaded photos | ❌ | Future AI fill-in should be able to analyze all current project photos and use the overall story structure as context when generating per-scene text |
+| Story-level AI context across uploaded photos | ⚠️ | Per-scene AI fill uses storyboard tone, style preset, project photos, and sibling scenes as context; no real multi-photo vision analysis yet |
 
 ---
 
@@ -135,9 +135,9 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Complement scene marks which scenes it bridges | ❌ | No bridge metadata |
 | AI generates 1–3 proposals for complement scenes | ❌ | No complement scene workflow |
 | Hover "+" between scenes to insert complement | ❌ | No inter-scene insert UI |
-| AI-generated scene title (not manual-only) | ❌ | Titles entered manually |
-| AI-generated scene description | ❌ | Descriptions entered manually |
-| AI-generated image prompt per scene | ❌ | Prompts entered manually |
+| AI-generated scene title (not manual-only) | ⚠️ | Per-scene AI fill drafts blank titles while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
+| AI-generated scene description | ⚠️ | Per-scene AI fill drafts blank descriptions while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
+| AI-generated image prompt per scene | ⚠️ | Per-scene AI fill drafts blank image prompts while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
 
 ---
 
@@ -148,7 +148,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | All storyboard fields editable by user | ✅ | Full edit form in `StoryboardPage` |
 | Professional fields use selection UI (camera, lighting, motion) | ✅ | Dropdown selects |
 | Uploaded primary photo preview inside each scene card | ✅ | Template-created scenes assigned with uploaded photo as primary; preview visible in scene editor |
-| Per-scene AI fill button for empty text fields | ❌ | Scene cards should expose an AI action that can populate blank title, description, and image prompt fields while preserving user-edited values |
+| Per-scene AI fill button for empty text fields | ✅ | Scene cards expose an AI fill action that fills blank title, description, image prompt, emotion, camera, lighting, and motion fields while preserving user-edited values |
 | Beginner-friendly labels for selections | ⚠️ | English labels present; no i18n yet |
 | Labels follow app language setting | ❌ | No language setting |
 
@@ -303,11 +303,11 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
 | Emotion / AI photo analysis | 1 | 0 | 6 |
 | Image style selection | 2 | 1 | 4 |
-| Common project prompt | 0 | 1 | 3 |
+| Common project prompt | 0 | 2 | 2 |
 | Test generation workflow | 0 | 0 | 6 |
 | Storyboard composition | 5 | 0 | 3 |
-| Scene content | 10 | 0 | 7 (AI gen + complement) |
-| Scene editing UX | 4 | 2 | 1 |
+| Scene content | 10 | 3 | 4 (AI gen + complement) |
+| Scene editing UX | 4 | 1 | 1 |
 | Language / i18n | 0 | 0 | 5 |
 | Generated image handling | 5 | 2 | 3 |
 | Storyboard viewing & export | 1 | 0 | 5 |
@@ -327,8 +327,8 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 1. **AI photo analysis → emotion candidates**
    Analyzing uploaded photos with the latest Gemini model (e.g., Gemini 2.0 Flash) and proposing emotion/tone candidates is the core differentiating feature of Phase 1. Without it, the user must fill in all emotion and scene fields manually.
 
-2. **AI-generated scene descriptions and image prompts**
-   The system currently creates placeholder scenes; users must write titles, descriptions, and prompts by hand. Generating these from photo analysis closes the biggest usability gap.
+2. ⚠️ **Real photo-aware AI scene descriptions and image prompts**
+   Per-scene AI fill now drafts blank scene fields from metadata and storyboard context. The remaining gap is true photo vision analysis for people, places, events, and atmosphere across uploaded photos.
 
 3. ✅ **Template scene creation from uploaded photos** (COMPLETED)
    Uploaded candidate photos are now convertible into editable draft scenes via `POST /api/storyboards/:storyboardId/template-scenes`. Each draft scene assigns the uploaded image as its primary photo and leaves title, description, and image prompt blank for manual editing or later per-scene AI fill-in.

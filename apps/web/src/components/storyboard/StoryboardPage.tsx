@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
-import type { PhotoAssetDto, StylePresetDto, StoryboardDto } from "@gen-story/shared";
+import type {
+  PhotoAssetDto,
+  SceneDto,
+  StoryboardDto,
+  StylePresetDto,
+} from "@gen-story/shared";
 import {
   assignPhotosToScene,
   createTemplateScenesFromPhotos,
+  fillSceneWithAi,
   listPhotoAssets,
   listScenes,
   listStoryboards,
@@ -52,6 +58,22 @@ const DEFAULT_SCENE: Omit<UpsertSceneInput, "orderIndex"> = {
 
 type SceneState = UpsertSceneInput & { id?: string };
 
+function sceneDtoToState(scene: SceneDto): SceneState {
+  return {
+    id: scene.id,
+    sceneId: scene.id,
+    orderIndex: scene.orderIndex,
+    title: scene.title,
+    description: scene.description,
+    imagePrompt: scene.imagePrompt,
+    emotion: scene.emotion,
+    cameraDirection: scene.cameraDirection,
+    lightingDirection: scene.lightingDirection,
+    motionDirection: scene.motionDirection,
+    notes: scene.notes,
+  };
+}
+
 export function StoryboardPage({ projectId }: { projectId: string }) {
   const [storyboard, setStoryboard] = useState<StoryboardDto | null>(null);
   const [scenes, setScenes] = useState<SceneState[]>([]);
@@ -63,6 +85,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [creatingTemplates, setCreatingTemplates] = useState(false);
+  const [aiFillingSceneId, setAiFillingSceneId] = useState<string | null>(null);
 
   const sbId = storyboard?.id;
 
@@ -78,21 +101,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       const sb = sbs[0]!;
       setStoryboard(sb);
       const sceneList = await listScenes(sb.id);
-      setScenes(
-        sceneList.map((s) => ({
-          id: s.id,
-          sceneId: s.id,
-          orderIndex: s.orderIndex,
-          title: s.title,
-          description: s.description,
-          imagePrompt: s.imagePrompt,
-          emotion: s.emotion,
-          cameraDirection: s.cameraDirection,
-          lightingDirection: s.lightingDirection,
-          motionDirection: s.motionDirection,
-          notes: s.notes,
-        })),
-      );
+      setScenes(sceneList.map(sceneDtoToState));
     }
   }, [projectId]);
 
@@ -154,18 +163,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         sbId,
         Array.from(selectedPhotoIds),
       );
-      setScenes((prev) => [...prev, ...newScenes.map((s) => ({
-        id: s.id,
-        orderIndex: prev.length + newScenes.indexOf(s),
-        title: s.title,
-        description: s.description,
-        imagePrompt: s.imagePrompt,
-        emotion: s.emotion,
-        cameraDirection: s.cameraDirection,
-        lightingDirection: s.lightingDirection,
-        motionDirection: s.motionDirection,
-        notes: s.notes,
-      }))]);
+      setScenes((prev) => [...prev, ...newScenes.map(sceneDtoToState)]);
       setSelectedPhotoIds(new Set());
       setSaveMsg("Template scenes created!");
       setTimeout(() => setSaveMsg(null), 3000);
@@ -216,25 +214,32 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         motionDirection: s.motionDirection || "Slow pan",
         notes: s.notes,
       })));
-      setScenes(saved.map((s) => ({
-        id: s.id,
-        sceneId: s.id,
-        orderIndex: s.orderIndex,
-        title: s.title,
-        description: s.description,
-        imagePrompt: s.imagePrompt,
-        emotion: s.emotion,
-        cameraDirection: s.cameraDirection,
-        lightingDirection: s.lightingDirection,
-        motionDirection: s.motionDirection,
-        notes: s.notes,
-      })));
+      setScenes(saved.map(sceneDtoToState));
       setSaveMsg("Saved");
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save scenes");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAiFill(sceneId: string) {
+    setAiFillingSceneId(sceneId);
+    setError(null);
+    try {
+      const filled = await fillSceneWithAi(sceneId);
+      setScenes((prev) =>
+        prev.map((scene) =>
+          scene.id === sceneId ? sceneDtoToState(filled) : scene,
+        ),
+      );
+      setSaveMsg("AI fill saved");
+      setTimeout(() => setSaveMsg(null), 2000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to fill scene");
+    } finally {
+      setAiFillingSceneId(null);
     }
   }
 
@@ -381,7 +386,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             <button
               className="btn btn-primary"
               onClick={saveScenes}
-              disabled={saving}
+              disabled={saving || aiFillingSceneId !== null}
             >
               {saving ? "Saving…" : "Save scenes"}
             </button>
@@ -404,6 +409,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               photos={photos}
               onUpdate={(patch) => updateScene(idx, patch)}
               onMove={(dir) => moveScene(idx, dir)}
+              onAiFill={handleAiFill}
+              isAiFilling={aiFillingSceneId === scene.id}
+              isBusy={saving || aiFillingSceneId !== null}
             />
           ))}
         </div>
@@ -429,6 +437,9 @@ function SceneCard({
   photos,
   onUpdate,
   onMove,
+  onAiFill,
+  isAiFilling,
+  isBusy,
 }: {
   scene: SceneState;
   idx: number;
@@ -436,6 +447,9 @@ function SceneCard({
   photos: PhotoAssetDto[];
   onUpdate: (patch: Partial<SceneState>) => void;
   onMove: (dir: -1 | 1) => void;
+  onAiFill: (sceneId: string) => void;
+  isAiFilling: boolean;
+  isBusy: boolean;
 }) {
   const [assigningPhoto, setAssigningPhoto] = useState<string | null>(null);
   const id = useId();
@@ -459,11 +473,19 @@ function SceneCard({
     <div className={`card ${styles.sceneCard}`}>
       <div className={styles.sceneCardHeader}>
         <span className={styles.sceneIndex}>Scene {idx + 1}</span>
-        <div className={styles.sceneMoveButtons}>
+        <div className={styles.sceneHeaderActions}>
+          <button
+            className={styles.aiFillBtn}
+            onClick={() => scene.id && onAiFill(scene.id)}
+            disabled={!scene.id || isBusy}
+            title="Fill blank fields with AI"
+          >
+            {isAiFilling ? "Filling..." : "AI fill"}
+          </button>
           <button
             className={styles.moveBtn}
             onClick={() => onMove(-1)}
-            disabled={idx === 0}
+            disabled={idx === 0 || isBusy}
             title="Move up"
           >
             ↑
@@ -471,7 +493,7 @@ function SceneCard({
           <button
             className={styles.moveBtn}
             onClick={() => onMove(1)}
-            disabled={idx === total - 1}
+            disabled={idx === total - 1 || isBusy}
             title="Move down"
           >
             ↓
