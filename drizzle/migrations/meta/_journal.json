@@ -26,6 +26,13 @@
     {
       "idx": 3,
       "version": "6",
+      "when": 1778900000000,
+      "tag": "0003_add_test_generation_batches",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
       "when": 1779062400000,
       "tag": "0004_add_storyboard_common_prompt",
       "breakpoints": true

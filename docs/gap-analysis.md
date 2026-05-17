@@ -40,7 +40,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Per-photo memo / notes field | ✅ | `notes` column on `photo_assets` |
 | Photo usage states: candidate / excluded / reference | ✅ | `curationStatus` column + `PATCH` endpoint |
 | Manual photo ordering (upload order) | ✅ | Implicit via `createdAt` ordering |
-| Manual drag-and-drop reordering | ❌ | UI does not support DnD yet |
+| Manual drag-and-drop reordering | 🟡 | Planned in `docs/plans/20260517-small-refactoring.md` (Workstream D); adds `position` column + reorder endpoints + DnD UI |
 | AI-recommended ordering (opt-in toggle) | ❌ | No AI ordering logic |
 | Checksum-based exact duplicate detection within project | ✅ | SHA-256 checksum on ingest |
 | Duplicate presented to user (not auto-deleted) | ✅ | Returns conflict error with details |
@@ -132,10 +132,10 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Color / lighting direction (selection) | ✅ | `scenes.lighting_direction`; translated to cinematic lighting descriptors in generation prompt; 8 options including Backlit, Silhouette, Volumetric |
 | Animation movement direction (selection) | ✅ | `scenes.motion_direction`; stored only — not yet composed into generation prompt |
 | User editing notes | ✅ | `scenes.notes` |
-| AI-only complement scene (no source photo) | ❌ | Schema requires photo; AI-only scene not supported |
-| Complement scene marks which scenes it bridges | ❌ | No bridge metadata |
-| AI generates 1–3 proposals for complement scenes | ❌ | No complement scene workflow |
-| Hover "+" between scenes to insert complement | ❌ | No inter-scene insert UI |
+| AI-only complement scene (no source photo) | 🟡 | Planned in `docs/plans/20260517-small-refactoring.md` (Workstream B); `scenes.kind` + optional photo assets |
+| Complement scene marks which scenes it bridges | 🟡 | Planned (Workstream B); `bridge_from_scene_id` / `bridge_to_scene_id` columns |
+| AI generates 1–3 proposals for complement scenes | 🟡 | Planned (Workstream B/C); `ComplementSceneProposalPort` + proposals endpoint |
+| Hover "+" between scenes to insert complement | 🟡 | Planned (Workstream B); inter-scene insert affordance on `StoryboardPage` |
 | AI-generated scene title (not manual-only) | ⚠️ | Per-scene AI fill drafts blank titles while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
 | AI-generated scene description | ⚠️ | Per-scene AI fill drafts blank descriptions while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
 | AI-generated image prompt per scene | ⚠️ | Per-scene AI fill drafts blank image prompts while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
@@ -188,9 +188,9 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | Card view inside app | ✅ | `ReviewPage` card layout |
-| Timeline view | ❌ | Not implemented; deferred post-MVP |
-| Table / spreadsheet view | ❌ | Not implemented; deferred post-MVP |
-| Filter: original only / generated only | ❌ | No filter controls; deferred post-MVP |
+| Timeline view | 🟡 | Planned in `docs/plans/20260517-small-refactoring.md` (Workstream E); client-side view on `ReviewPage` |
+| Table / spreadsheet view | 🟡 | Planned (Workstream E); client-side table view on `ReviewPage` |
+| Filter: original only / generated only | 🟡 | Planned (Workstream E); client-side filter control on `ReviewPage` |
 | JSON export | ✅ | `GET /api/storyboards/:id/export.json` with `Content-Disposition: attachment`; "Export Storyboard JSON" button on ReviewPage |
 | Structured data for CapCut / video generation pipeline | ✅ | Export JSON includes storyboard metadata, per-scene fields (title, emotion, camera, prompt), adopted image URLs, and source photo URLs |
 
@@ -265,8 +265,8 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Fix migration journal drift for test_generation_batches | ❌ | File `drizzle/migrations/0003_add_test_generation_batches.sql` exists but is not registered in `drizzle/migrations/meta/_journal.json` and lacks `0003_snapshot.json`. This prevented the table from being created in local dev; drizzle-kit generate bundles it into any new migration. Should register the migration in _journal.json or rebase migrations to avoid future drizzle-kit confusion. |
-| Resolve repo-wide Prettier formatting drift | ❌ | ~21 files (pre-existing + some touched by common-prompt work) fail `pnpm format` checks. Root cause unknown; should diagnose and apply consistent formatting across the codebase to unblock CI/pre-commit checks. |
+| Fix migration journal drift for test_generation_batches | ✅ | `0003` registered in `_journal.json`; handwritten `0003`/`0004` snapshots added. Fresh `db:migrate` applies all 5 migrations; `db:generate` reports no drift. Root cause was a cwd bug in the `db:generate` script (resolved relative paths against `apps/api`), now fixed to run from repo root. |
+| Resolve repo-wide Prettier formatting drift | ✅ | 21 drifting files reformatted; `pnpm format` passes. |
 
 ---
 
@@ -307,25 +307,25 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 
 ## Summary Table
 
-| Area | Implemented | Partial | Missing |
-|---|---|---|---|
-| Project management | 5 | 0 | 0 |
-| Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
-| Emotion / AI photo analysis | 7 | 0 | 0 |
-| Image style selection | 1 | 2 | 4 |
-| Common project prompt | 3 | 1 | 0 |
-| Test generation workflow | 4 | 0 | 2 |
-| Storyboard composition | 5 | 0 | 3 |
-| Scene content | 10 | 3 | 4 (AI gen + complement) |
-| Scene editing UX | 4 | 1 | 1 |
-| Language / i18n | 0 | 0 | 5 |
-| Generated image handling | 5 | 2 | 3 |
-| Storyboard viewing & export | 3 | 0 | 3 |
-| Image generation infra | 13 | 2 | 2 |
-| Generation history | 5 | 0 | 2 |
-| File lifecycle & cleanup | 5 | 1 | 0 |
-| Local release readiness | 11 | 0 | 0 |
-| Technical debt & infrastructure | 0 | 0 | 2 |
+| Area | Implemented | Partial | In progress | Missing |
+|---|---|---|---|---|
+| Project management | 5 | 0 | 0 | 0 |
+| Photo upload & management | 13 | 0 | 1 (DnD) | 1 (AI order) |
+| Emotion / AI photo analysis | 7 | 0 | 0 | 0 |
+| Image style selection | 1 | 2 | 0 | 4 |
+| Common project prompt | 3 | 1 | 0 | 0 |
+| Test generation workflow | 4 | 0 | 0 | 2 |
+| Storyboard composition | 5 | 0 | 0 | 3 |
+| Scene content | 10 | 3 | 4 (complement) | 0 |
+| Scene editing UX | 4 | 1 | 0 | 1 |
+| Language / i18n | 0 | 0 | 0 | 5 |
+| Generated image handling | 5 | 2 | 0 | 3 |
+| Storyboard viewing & export | 3 | 0 | 3 | 0 |
+| Image generation infra | 13 | 2 | 0 | 2 |
+| Generation history | 5 | 0 | 0 | 2 |
+| File lifecycle & cleanup | 5 | 1 | 0 | 0 |
+| Local release readiness | 11 | 0 | 0 | 0 |
+| Technical debt & infrastructure | 2 | 0 | 0 | 0 |
 
 ---
 
