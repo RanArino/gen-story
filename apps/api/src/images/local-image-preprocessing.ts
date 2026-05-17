@@ -23,7 +23,11 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
   constructor(
     private readonly deps: Pick<
       ApplicationDependencies,
-      "scenes" | "photoAssets" | "objectStorage" | "storyboards" | "stylePresets"
+      | "scenes"
+      | "photoAssets"
+      | "objectStorage"
+      | "storyboards"
+      | "stylePresets"
     >,
   ) {}
 
