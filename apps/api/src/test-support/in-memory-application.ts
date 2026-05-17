@@ -23,7 +23,10 @@ import type {
   TestGenerationBatchRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
-import type { GenerationRequestStatus, TestGenerationBatch } from "@gen-story/domain";
+import type {
+  GenerationRequestStatus,
+  TestGenerationBatch,
+} from "@gen-story/domain";
 import { LocalAuthContext } from "../auth/local-auth";
 import type {
   GeneratedImage,
@@ -294,7 +297,9 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
 class InMemoryTestGenerationBatchRepository implements TestGenerationBatchRepositoryPort {
   constructor(private readonly store: MemoryStore<TestGenerationBatch>) {}
 
-  async findLatestByStoryboardId(storyboardId: string): Promise<TestGenerationBatch | null> {
+  async findLatestByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch | null> {
     return (
       this.store
         .values()
@@ -463,7 +468,9 @@ export function createInMemoryApplicationDependencies(
     generationRequests: new MemoryStore(initial?.generationRequests ?? []),
     generatedImages: new MemoryStore(initial?.generatedImages ?? []),
     projectPhotoAnalyses: new MemoryStore(initial?.projectPhotoAnalyses ?? []),
-    testGenerationBatches: new MemoryStore<TestGenerationBatch>(initial?.testGenerationBatches ?? []),
+    testGenerationBatches: new MemoryStore<TestGenerationBatch>(
+      initial?.testGenerationBatches ?? [],
+    ),
   };
   const dependencies: ApplicationDependencies = {
     users: new InMemoryUserRepository(stores.users),
