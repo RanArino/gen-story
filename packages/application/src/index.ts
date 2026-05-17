@@ -13,8 +13,12 @@ export type {
   JobQueuePort,
   ObjectStoragePort,
   OrganizationRepositoryPort,
+  PhotoAnalysisGenerationInput,
+  PhotoAnalysisGenerationPort,
+  PhotoAnalysisGenerationResult,
   PhotoAssetRepositoryPort,
   ProgressEventPort,
+  ProjectPhotoAnalysisRepositoryPort,
   ProjectRepositoryPort,
   SceneFillGenerationInput,
   SceneFillGenerationPort,
@@ -28,6 +32,7 @@ export type {
   UserRepositoryPort,
 } from "./ports";
 export {
+  analyzeProjectPhotos,
   assignPhotosToScene,
   cancelGenerationRequest,
   createGenerationRequestUseCase,
@@ -36,6 +41,7 @@ export {
   deletePhotoAsset,
   deleteProject,
   fillSceneWithAi,
+  getProjectPhotoAnalysis,
   markGeneratedImageAdopted,
   markGenerationRequestCompleted,
   markGenerationRequestFailed,
@@ -49,6 +55,7 @@ export {
   upsertStoryboard,
 } from "./use-cases";
 export type {
+  AnalyzeProjectPhotosInput,
   CancelGenerationRequestInput,
   CreateTemplateScenesFromPhotosInput,
   FillSceneWithAiInput,

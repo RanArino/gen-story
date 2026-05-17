@@ -6,6 +6,7 @@ import {
   createOrganization,
   createPhotoAsset,
   createProject,
+  createProjectPhotoAnalysis,
   createScene,
   createStoryboard,
   createStylePreset,
@@ -18,6 +19,7 @@ import {
   type PhotoAsset,
   type PhotoUsage,
   type Project,
+  type ProjectPhotoAnalysis,
   type ProjectStatus,
   type Scene,
   type ScenePhotoAsset,
@@ -34,6 +36,7 @@ import type {
   GenerationRequestRepositoryPort,
   OrganizationRepositoryPort,
   PhotoAssetRepositoryPort,
+  ProjectPhotoAnalysisRepositoryPort,
   ProjectRepositoryPort,
   SceneRepositoryPort,
   StoryboardRepositoryPort,
@@ -47,6 +50,7 @@ import {
   generationRequests,
   organizations,
   photoAssets,
+  projectPhotoAnalyses,
   projects,
   scenePhotoAssets,
   scenes,
@@ -59,6 +63,7 @@ type OrganizationRow = typeof organizations.$inferSelect;
 type UserRow = typeof users.$inferSelect;
 type ProjectRow = typeof projects.$inferSelect;
 type PhotoAssetRow = typeof photoAssets.$inferSelect;
+type ProjectPhotoAnalysisRow = typeof projectPhotoAnalyses.$inferSelect;
 type StoryboardRow = typeof storyboards.$inferSelect;
 type SceneRow = typeof scenes.$inferSelect;
 type StylePresetRow = typeof stylePresets.$inferSelect;
@@ -79,6 +84,11 @@ function parseInputJson(value: string): Record<string, unknown> {
   }
 
   return {};
+}
+
+function parseJsonArray<T>(value: string): T[] {
+  const parsed: unknown = JSON.parse(value);
+  return Array.isArray(parsed) ? (parsed as T[]) : [];
 }
 
 function mapOrganization(row: OrganizationRow): Organization {
@@ -128,6 +138,22 @@ function mapPhotoAsset(row: PhotoAssetRow): PhotoAsset {
     checksum: row.checksum,
     sourceKind: row.sourceKind,
     notes: row.notes,
+    deletedAt: row.deletedAt ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
+function mapProjectPhotoAnalysis(
+  row: ProjectPhotoAnalysisRow,
+): ProjectPhotoAnalysis {
+  return createProjectPhotoAnalysis({
+    id: row.id,
+    projectId: row.projectId,
+    emotionCandidates: parseJsonArray(row.emotionCandidatesJson),
+    photoInsights: parseJsonArray(row.photoInsightsJson),
+    storySummary: row.storySummary,
+    model: row.model,
     deletedAt: row.deletedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -365,8 +391,13 @@ export class SqliteProjectRepository implements ProjectRepositoryPort {
     return row == null ? null : mapProject(row);
   }
 
-  async findByOrganizationId(organizationId: string, includeDeleted = false): Promise<Project[]> {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  async findByOrganizationId(
+    organizationId: string,
+    includeDeleted = false,
+  ): Promise<Project[]> {
+    const sevenDaysAgo = new Date(
+      Date.now() - 7 * 24 * 3600 * 1000,
+    ).toISOString();
     const rows = await this.db
       .select()
       .from(projects)
@@ -447,8 +478,13 @@ export class SqlitePhotoAssetRepository implements PhotoAssetRepositoryPort {
     return row == null ? null : mapPhotoAsset(row);
   }
 
-  async findByProjectId(projectId: string, includeDeleted = false): Promise<PhotoAsset[]> {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  async findByProjectId(
+    projectId: string,
+    includeDeleted = false,
+  ): Promise<PhotoAsset[]> {
+    const sevenDaysAgo = new Date(
+      Date.now() - 7 * 24 * 3600 * 1000,
+    ).toISOString();
     const rows = await this.db
       .select()
       .from(photoAssets)
@@ -1219,6 +1255,60 @@ export class SqliteGeneratedImageRepository implements GeneratedImageRepositoryP
   }
 }
 
+export class SqliteProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepositoryPort {
+  constructor(private readonly db: GenStoryDatabase) {}
+
+  async findLatestByProjectId(
+    projectId: string,
+  ): Promise<ProjectPhotoAnalysis | null> {
+    const row = await this.db
+      .select()
+      .from(projectPhotoAnalyses)
+      .where(
+        and(
+          eq(projectPhotoAnalyses.projectId, projectId),
+          isNull(projectPhotoAnalyses.deletedAt),
+        ),
+      )
+      .orderBy(sql`${projectPhotoAnalyses.updatedAt} desc`)
+      .get();
+
+    return row == null ? null : mapProjectPhotoAnalysis(row);
+  }
+
+  async save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void> {
+    await this.db
+      .insert(projectPhotoAnalyses)
+      .values({
+        id: projectPhotoAnalysis.id,
+        projectId: projectPhotoAnalysis.projectId,
+        emotionCandidatesJson: JSON.stringify(
+          projectPhotoAnalysis.emotionCandidates,
+        ),
+        photoInsightsJson: JSON.stringify(projectPhotoAnalysis.photoInsights),
+        storySummary: projectPhotoAnalysis.storySummary,
+        model: projectPhotoAnalysis.model,
+        createdAt: projectPhotoAnalysis.createdAt,
+        updatedAt: projectPhotoAnalysis.updatedAt,
+        deletedAt: projectPhotoAnalysis.deletedAt,
+      })
+      .onConflictDoUpdate({
+        target: projectPhotoAnalyses.projectId,
+        set: {
+          id: projectPhotoAnalysis.id,
+          emotionCandidatesJson: JSON.stringify(
+            projectPhotoAnalysis.emotionCandidates,
+          ),
+          photoInsightsJson: JSON.stringify(projectPhotoAnalysis.photoInsights),
+          storySummary: projectPhotoAnalysis.storySummary,
+          model: projectPhotoAnalysis.model,
+          updatedAt: projectPhotoAnalysis.updatedAt,
+          deletedAt: projectPhotoAnalysis.deletedAt,
+        },
+      });
+  }
+}
+
 export function createSqliteRepositories(db: GenStoryDatabase) {
   return {
     users: new SqliteUserRepository(db),
@@ -1230,5 +1320,6 @@ export function createSqliteRepositories(db: GenStoryDatabase) {
     stylePresets: new SqliteStylePresetRepository(db),
     generationRequests: new SqliteGenerationRequestRepository(db),
     generatedImages: new SqliteGeneratedImageRepository(db),
+    projectPhotoAnalyses: new SqliteProjectPhotoAnalysisRepository(db),
   };
 }

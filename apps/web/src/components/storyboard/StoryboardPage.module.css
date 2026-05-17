@@ -58,6 +58,68 @@
   background: #eff6ff;
 }
 
+.analysisPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analysisSummary,
+.analysisEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: #5a6a7e;
+  line-height: 1.5;
+}
+
+.analysisCandidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.analysisCandidate {
+  display: flex;
+  min-height: 126px;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border: 1.5px solid #d0d9e8;
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.analysisCandidate:hover {
+  border-color: #1a56db;
+}
+
+.analysisCandidate strong {
+  font-size: 13px;
+  color: #152033;
+}
+
+.analysisCandidate span {
+  font-size: 12px;
+  color: #5a6a7e;
+}
+
+.analysisCandidate small {
+  margin-top: auto;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8898aa;
+}
+
+.analysisCandidateActive {
+  border-color: #1a56db;
+  background: #eff6ff;
+}
+
 .styleGrid {
   display: flex;
   flex-wrap: wrap;
@@ -73,7 +135,10 @@
   background: #fff;
   color: #5a6a7e;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
 
 .styleBtn:hover {

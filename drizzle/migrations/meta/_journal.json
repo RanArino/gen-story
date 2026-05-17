@@ -15,6 +15,13 @@
       "when": 1777943839000,
       "tag": "0001_add_generation_request_timestamps",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1778773147718,
+      "tag": "0002_icy_pyro",
+      "breakpoints": true
     }
   ]
 }

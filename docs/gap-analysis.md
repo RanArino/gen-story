@@ -56,12 +56,12 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | User can select target emotion/tone for storyboard | ✅ | `tone` field on storyboard |
-| AI analyzes photos and proposes emotion candidates | ❌ | No AI photo analysis implemented |
-| AI reads: person relationships, expressions, age changes | ❌ | Part of missing AI analysis |
-| AI reads: location, season, photo era | ❌ | Part of missing AI analysis |
-| AI reads: event type (birthday, wedding, trip, graduation…) | ❌ | Part of missing AI analysis |
-| AI reads: overall atmosphere, story across multiple photos | ❌ | Part of missing AI analysis |
-| User selects / adjusts AI-proposed emotions | ❌ | Requires AI analysis first |
+| AI analyzes photos and proposes emotion candidates | ✅ | `POST /api/projects/:projectId/photo-analysis` uses Gemini when `GEMINI_API_KEY` is configured, with deterministic local fallback |
+| AI reads: person relationships, expressions, age changes | ✅ | Persisted `photoInsights` include people/relationship observations from Gemini-backed photo analysis |
+| AI reads: location, season, photo era | ✅ | Persisted `photoInsights` include setting observations from Gemini-backed photo analysis |
+| AI reads: event type (birthday, wedding, trip, graduation…) | ✅ | Persisted `photoInsights` include event observations from Gemini-backed photo analysis |
+| AI reads: overall atmosphere, story across multiple photos | ✅ | Persisted project photo analysis includes atmosphere insights and a `storySummary` |
+| User selects / adjusts AI-proposed emotions | ✅ | Storyboard page displays generated emotion candidates and applies the selected value to storyboard `tone` |
 
 ---
 
@@ -301,7 +301,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 |---|---|---|---|
 | Project management | 5 | 0 | 0 |
 | Photo upload & management | 13 | 0 | 2 (DnD, AI order) |
-| Emotion / AI photo analysis | 1 | 0 | 6 |
+| Emotion / AI photo analysis | 7 | 0 | 0 |
 | Image style selection | 2 | 1 | 4 |
 | Common project prompt | 0 | 2 | 2 |
 | Test generation workflow | 0 | 0 | 6 |
@@ -324,11 +324,11 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 
 ### High Priority — Core Phase 1 Value
 
-1. **AI photo analysis → emotion candidates**
-   Analyzing uploaded photos with the latest Gemini model (e.g., Gemini 2.0 Flash) and proposing emotion/tone candidates is the core differentiating feature of Phase 1. Without it, the user must fill in all emotion and scene fields manually.
-
-2. ⚠️ **Real photo-aware AI scene descriptions and image prompts**
+1. ⚠️ **Real photo-aware AI scene descriptions and image prompts**
    Per-scene AI fill now drafts blank scene fields from metadata and storyboard context. The remaining gap is true photo vision analysis for people, places, events, and atmosphere across uploaded photos.
+
+2. ✅ **AI photo analysis → emotion candidates** (COMPLETED)
+   Project photo analysis now analyzes uploaded candidate/reference photos, persists photo insights, proposes emotion/tone candidates, and lets the user apply one candidate to the storyboard tone. Gemini is used when `GEMINI_API_KEY` is configured; local development falls back to deterministic suggestions.
 
 3. ✅ **Template scene creation from uploaded photos** (COMPLETED)
    Uploaded candidate photos are now convertible into editable draft scenes via `POST /api/storyboards/:storyboardId/template-scenes`. Each draft scene assigns the uploaded image as its primary photo and leaves title, description, and image prompt blank for manual editing or later per-scene AI fill-in.

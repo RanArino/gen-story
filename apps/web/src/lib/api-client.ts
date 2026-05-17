@@ -4,6 +4,7 @@ import type {
   MeDto,
   PhotoAssetDto,
   ProjectDto,
+  ProjectPhotoAnalysisDto,
   SceneDto,
   StylePresetDto,
   StoryboardDto,
@@ -62,9 +63,14 @@ export async function getMe(): Promise<MeDto> {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
-export async function listProjects(includeDeleted = false): Promise<ProjectDto[]> {
+export async function listProjects(
+  includeDeleted = false,
+): Promise<ProjectDto[]> {
   const qs = includeDeleted ? "?includeDeleted=true" : "";
-  const data = await request<{ projects: ProjectDto[] }>("GET", `/api/projects${qs}`);
+  const data = await request<{ projects: ProjectDto[] }>(
+    "GET",
+    `/api/projects${qs}`,
+  );
   return data.projects;
 }
 
@@ -101,8 +107,13 @@ export async function deletePhotoAsset(photoAssetId: string): Promise<void> {
   return request<void>("DELETE", `/api/photo-assets/${photoAssetId}`);
 }
 
-export async function restorePhotoAsset(photoAssetId: string): Promise<PhotoAssetDto> {
-  return request<PhotoAssetDto>("POST", `/api/photo-assets/${photoAssetId}/restore`);
+export async function restorePhotoAsset(
+  photoAssetId: string,
+): Promise<PhotoAssetDto> {
+  return request<PhotoAssetDto>(
+    "POST",
+    `/api/photo-assets/${photoAssetId}/restore`,
+  );
 }
 
 async function fileToBase64(file: File): Promise<string> {
@@ -147,6 +158,29 @@ export async function patchPhotoAsset(
   });
 }
 
+// ── Photo Analysis ───────────────────────────────────────────────────────────
+
+export async function getProjectPhotoAnalysis(
+  projectId: string,
+): Promise<ProjectPhotoAnalysisDto | null> {
+  const data = await request<{ photoAnalysis: ProjectPhotoAnalysisDto | null }>(
+    "GET",
+    `/api/projects/${projectId}/photo-analysis`,
+  );
+  return data.photoAnalysis;
+}
+
+export async function analyzeProjectPhotos(
+  projectId: string,
+): Promise<ProjectPhotoAnalysisDto> {
+  const data = await request<{ photoAnalysis: ProjectPhotoAnalysisDto }>(
+    "POST",
+    `/api/projects/${projectId}/photo-analysis`,
+    {},
+  );
+  return data.photoAnalysis;
+}
+
 // ── Storyboards ───────────────────────────────────────────────────────────────
 
 export async function listStoryboards(
@@ -168,7 +202,11 @@ export async function upsertStoryboard(
     status?: string;
   },
 ): Promise<StoryboardDto> {
-  return request<StoryboardDto>("PUT", `/api/storyboards/${storyboardId}`, input);
+  return request<StoryboardDto>(
+    "PUT",
+    `/api/storyboards/${storyboardId}`,
+    input,
+  );
 }
 
 // ── Scenes ────────────────────────────────────────────────────────────────────

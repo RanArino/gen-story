@@ -3,6 +3,7 @@ import type {
   GenerationRequest,
   PhotoAsset,
   Project,
+  ProjectPhotoAnalysis,
   Scene,
   Storyboard,
   StylePreset,
@@ -13,6 +14,7 @@ import type {
   MeDto,
   PhotoAssetDto,
   ProjectDto,
+  ProjectPhotoAnalysisDto,
   SceneDto,
   StylePresetDto,
   StoryboardDto,
@@ -59,6 +61,34 @@ export function toPhotoAssetDto(asset: PhotoAsset): PhotoAssetDto {
     deletedAt: asset.deletedAt,
     createdAt: asset.createdAt,
     updatedAt: asset.updatedAt,
+  };
+}
+
+export function toProjectPhotoAnalysisDto(
+  analysis: ProjectPhotoAnalysis,
+): ProjectPhotoAnalysisDto {
+  return {
+    id: analysis.id,
+    projectId: analysis.projectId,
+    emotionCandidates: analysis.emotionCandidates.map((candidate) => ({
+      value: candidate.value,
+      label: candidate.label,
+      description: candidate.description,
+      reason: candidate.reason,
+    })),
+    photoInsights: analysis.photoInsights.map((insight) => ({
+      photoAssetId: insight.photoAssetId,
+      summary: insight.summary,
+      people: insight.people,
+      setting: insight.setting,
+      event: insight.event,
+      atmosphere: insight.atmosphere,
+    })),
+    storySummary: analysis.storySummary,
+    model: analysis.model,
+    deletedAt: analysis.deletedAt,
+    createdAt: analysis.createdAt,
+    updatedAt: analysis.updatedAt,
   };
 }
 
