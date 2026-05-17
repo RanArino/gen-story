@@ -69,10 +69,10 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| System style presets (8 predefined styles + AI auto) | ❌ | Only "Cinematic" is seeded with a photorealistic prompt; the 9 required styles (Anime movie style, watercolor illustration style, 3D animation style with a sense of depth, etc.) are not defined or seeded |
-| Style preset `prompt` field defined per style (illustration / texture-axis) | ❌ | Each of the 9 system presets requires a generation prompt that produces the correct illustration/texture style; currently only a photorealistic cinematic prompt exists in seed data |
-| Style preset preview images for comparison | ❌ | Current files in `public/style-previews/` are 149-byte stubs; real images must be generated from the correct per-style prompts once prompts are finalized |
-| Style preview shows same subject in each style | ❌ | Not implemented; static previews sufficient for MVP |
+| System style presets (8 predefined styles + AI auto) | 🟡 | ExecPlan `docs/plans/20260517-system-style-presets.md`: seed the 9 styles (Cinematic Photoreal, Anime Movie, Warm Hand-Drawn, Luminous Light, Film Photo, Watercolor Illustration, Monochrome Film, 3D Animation, AI Auto) as `system` presets |
+| Style preset `prompt` field defined per style (illustration / texture-axis) | 🟡 | ExecPlan `docs/plans/20260517-system-style-presets.md`: each of the 9 presets gets a per-style illustration/texture prompt |
+| Style preset preview images for comparison | 🟡 | ExecPlan `docs/plans/20260517-system-style-presets.md`: replace the 149-byte stubs with real previews via `scripts/generate-style-previews.ts` |
+| Style preview shows same subject in each style | 🟡 | ExecPlan `docs/plans/20260517-system-style-presets.md`: preview script renders one fixed subject through every style prompt |
 | Custom style creation from user-uploaded reference image | ❌ | No custom style workflow |
 | Custom styles saved per user, reusable across projects | ❌ | Schema supports `scope=user` but no creation UI/API |
 | Style applied at project level (not per scene) | ✅ | `storyboards.stylePresetId`; `stylePreset.prompt` is now composed into every generation prompt via `prompt-composer.ts` |
@@ -312,7 +312,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Project management | 5 | 0 | 0 | 0 |
 | Photo upload & management | 14 | 0 | 0 | 1 |
 | Emotion / AI photo analysis | 7 | 0 | 0 | 0 |
-| Image style selection | 1 | 2 | 0 | 4 |
+| Image style selection | 1 | 2 | 4 | 0 |
 | Common project prompt | 4 | 0 | 0 | 0 |
 | Test generation workflow | 4 | 0 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 0 | 3 |
@@ -352,8 +352,8 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 
 ### Medium Priority — UX Completeness
 
-6. ✅ **Style preset preview images** (COMPLETED)
-   9 preview images in `public/style-previews/`, wired into `StylePresetDto` and displayed in StoryboardPage style gallery.
+6. 🟡 **System style presets (9 styles + prompts + preview images)** (IN PROGRESS)
+   ExecPlan `docs/plans/20260517-system-style-presets.md`. The `StylePresetDto` wiring and gallery rendering exist, but only "Cinematic" is seeded and the 9 preview files are 149-byte stubs. The plan seeds all 9 system presets with per-style prompts and renders real same-subject preview images.
 
 7. ✅ **Drag-and-drop photo reordering** (COMPLETED)
    `photo_assets.position` column + `PATCH /api/projects/:id/photos/order`; HTML5 drag-and-drop on `PhotosPage`, and scene drag-and-drop on `StoryboardPage` via `PUT /api/storyboards/:id/scene-order`.
