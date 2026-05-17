@@ -116,15 +116,70 @@ This is the minimal sufficient path: the gap is purely missing seed data and mis
 
 Run all commands from the repository root `/Users/ran/my-app/gen-story`.
 
-1. Create `scripts/style-presets.ts` with the `SYSTEM_STYLE_PRESETS` constant (nine entries, fixed ids, prompts). Prompts must describe illustration/texture only (no artist/studio names), for example:
+1. Create `scripts/style-presets.ts` with the `SYSTEM_STYLE_PRESETS` constant using exactly these nine entries. The `prompt` value is defined here and should be copied as-is unless visual inspection later proves a specific preset needs revision.
 
-       Anime Movie: "anime movie style, hand-painted cel shading, expressive linework, soft gradient skies, vibrant but harmonious palette"
+       {
+         id: "system-cinematic-photoreal",
+         name: "Cinematic Photoreal",
+         description: "Realistic live-action film look with natural lighting and grounded detail.",
+         prompt: "A cinematic photoreal image with natural skin texture, realistic materials, and grounded production design. Use a film-still composition with motivated lighting, controlled depth of field, subtle color grading, and believable shadows. Preserve consistent character identity, wardrobe, and environment details across scenes."
+       }
 
-       Watercolor Illustration: "watercolor illustration, visible paper texture, soft pigment bleeds, gentle washes, light pencil underdrawing"
+       {
+         id: "system-anime-movie",
+         name: "Anime Movie",
+         description: "Original animated film look with expressive linework and painted backgrounds.",
+         prompt: "An original animated feature-film still with clean expressive linework, hand-painted background detail, and soft cel shading. Use dynamic but readable composition, luminous skies or practical light sources, and a vibrant harmonious palette. Keep faces, costumes, and key props consistent across scenes."
+       }
 
-       3D Animation: "stylized 3D animation, soft global illumination, rounded forms, strong sense of depth and volume, subsurface-lit skin"
+       {
+         id: "system-warm-hand-drawn",
+         name: "Warm Hand-Drawn",
+         description: "Gentle hand-drawn storybook look with pencil texture and warm color.",
+         prompt: "A warm hand-drawn storybook illustration with visible pencil texture, gentle ink outlines, and softly layered color. Use cozy directional light, rounded shapes, human imperfections, and an intimate mid-shot composition. Keep character proportions and recurring design details stable."
+       }
 
-       AI Auto: "choose a cohesive, natural style that best fits the scene's emotion and composition; keep characters and color consistent across scenes"
+       {
+         id: "system-luminous-light",
+         name: "Luminous Light",
+         description: "Airy digital illustration style focused on transparent light and soft glow.",
+         prompt: "A luminous digital illustration centered on transparent light, airy atmosphere, and delicate highlights. Use soft bloom, clean silhouettes, pale reflected color, and a calm composition with generous negative space. Keep the scene readable and avoid washing out faces or important objects."
+       }
+
+       {
+         id: "system-film-photo",
+         name: "Film Photo",
+         description: "Analog film photograph look with realistic grain, exposure, and lens feel.",
+         prompt: "A natural film photograph with realistic lens rendering, fine grain, and slightly imperfect exposure. Use documentary-style framing, available light, gentle contrast, and authentic color response from analog film. Preserve believable anatomy, materials, and location continuity."
+       }
+
+       {
+         id: "system-watercolor-illustration",
+         name: "Watercolor Illustration",
+         description: "Transparent watercolor illustration with paper texture and soft pigment edges.",
+         prompt: "A watercolor illustration on textured paper with transparent pigment washes, soft edge bleeding, and restrained pencil underdrawing. Use light tonal contrast, layered color, and uncluttered composition so the subject remains clear. Keep recurring characters recognizable despite the loose medium."
+       }
+
+       {
+         id: "system-monochrome-film",
+         name: "Monochrome Film",
+         description: "Black-and-white film still look with rich grayscale and expressive shadows.",
+         prompt: "A black-and-white cinematic film still with rich grayscale tonality, controlled contrast, and expressive shadow design. Use classic lens framing, practical light sources, visible film grain, and strong silhouettes. Preserve facial readability and avoid losing important objects in the shadows."
+       }
+
+       {
+         id: "system-3d-animation",
+         name: "3D Animation",
+         description: "Stylized 3D animated film look with soft lighting and tactile materials.",
+         prompt: "A stylized 3D animated film still with appealing shapes, soft global illumination, tactile materials, and clear depth. Use cinematic camera placement, readable posing, gentle subsurface skin lighting, and polished but not plastic surfaces. Keep character models, costumes, and props consistent across scenes."
+       }
+
+       {
+         id: "system-ai-auto",
+         name: "AI Auto",
+         description: "Automatically chooses a cohesive original look that fits the scene.",
+         prompt: "Choose the most fitting cohesive visual style for the scene's emotion, setting, and composition while keeping it original and copyright-safe. Prioritize clear storytelling, consistent character identity, stable color logic, readable faces, and continuity with earlier scenes. Do not imitate any named artist, studio, brand, franchise, or copyrighted character."
+       }
 
 2. Edit `scripts/seed.ts`: replace lines 111-126 with the upsert-by-id loop over `SYSTEM_STYLE_PRESETS`.
 
@@ -135,21 +190,32 @@ Run all commands from the repository root `/Users/ran/my-app/gen-story`.
 
    Expected: console output ends with "Seed complete" and no error. Querying the DB shows nine `scope = 'system'` rows.
 
-4. Create `scripts/generate-style-previews.ts`. Run it (requires a valid `OPENAI_API_KEY` in the environment):
+4. Create `scripts/generate-style-previews.ts`. The script should build a full image prompt from four explicit parts:
+
+   - A fixed subject and setting used for every preset, for example: "A young adult traveler with a red scarf standing beside a train-station window at late afternoon, holding a small notebook."
+   - Fixed composition constraints used for every preset: "waist-up shot, three-quarter view, subject centered slightly left, window light from camera right, no text, no logo."
+   - The selected `preset.prompt`.
+   - A short continuity sentence: "Render the same person, clothing, pose, prop, and environment layout across all style previews; only the visual style changes."
+
+   This makes the previews compare style only, instead of accidentally comparing different subjects, moods, or compositions.
+
+5. Run the preview script with a valid `OPENAI_API_KEY` in the environment:
 
        OPENAI_API_KEY=... pnpm tsx scripts/generate-style-previews.ts
 
    Expected: nine JPEG files written under `apps/web/public/style-previews/`, each named per the derived filename, each a real image (not 149 bytes).
 
-5. Remove the old stub files if their names differ from the new derived names:
+6. Visually inspect the generated previews before accepting them. Check that all nine share the same subject, pose, prop, and rough composition; that each preset changes only the intended visual style; and that no preview contains broken anatomy, unreadable faces, accidental text, logos, or obvious imitation of a named studio/artist/franchise. Regenerate or revise only the failing preset prompt, keeping the fixed subject unchanged.
+
+7. Remove the old stub files if their names differ from the new derived names:
 
        ls -la apps/web/public/style-previews
 
    Expected: exactly the nine new files; no leftover `cool.jpg`, `moody.jpg`, etc.
 
-6. Validate (see next section).
+8. Validate (see next section).
 
-7. Update `docs/gap-analysis.md` and any other affected docs.
+9. Update `docs/gap-analysis.md` and any other affected docs.
 
 
 ## Validation and Acceptance
