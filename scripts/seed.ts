@@ -6,6 +6,7 @@ import {
 } from "../apps/api/src/auth/local-auth.ts";
 import { getDatabasePath, openDatabase } from "../apps/api/src/db/client.ts";
 import { createSqliteRepositories } from "../apps/api/src/db/repositories.ts";
+import { SYSTEM_STYLE_PRESETS } from "./style-presets.ts";
 
 const SEED_DEMO_PROJECT_NAME = "Demo — Family Trip";
 
@@ -21,6 +22,24 @@ async function main() {
   try {
     const repos = createSqliteRepositories(db);
     await seedLocalPrincipal(repos);
+
+    // Seed/refresh the nine system style presets (idempotent, matched by id).
+    // Done before the demo-project early-return so prompt revisions still
+    // propagate when re-seeding an existing database.
+    const presetTs = now();
+    for (const preset of SYSTEM_STYLE_PRESETS) {
+      const existing = await repos.stylePresets.findById(preset.id);
+      await repos.stylePresets.save({
+        id: preset.id,
+        scope: "system",
+        name: preset.name,
+        description: preset.description,
+        prompt: preset.prompt,
+        createdAt: existing?.createdAt ?? presetTs,
+        updatedAt: presetTs,
+      });
+    }
+    console.log(`Seeded ${SYSTEM_STYLE_PRESETS.length} system style presets.`);
 
     // Check if demo project already exists (idempotent)
     const existingProjects = await repos.projects.findByOrganizationId(LOCAL_ORGANIZATION_ID);
@@ -107,23 +126,6 @@ async function main() {
 
     // Update storyboard with scene IDs
     await repos.storyboards.save({ ...storyboard, sceneIds, updatedAt: now() });
-
-    // Seed system style preset "Cinematic" if not present
-    const allPresets = await repos.stylePresets.findAll();
-    const hasCinematic = allPresets.some(
-      (p) => p.name === "Cinematic" && p.scope === "system",
-    );
-    if (!hasCinematic) {
-      await repos.stylePresets.save({
-        id: crypto.randomUUID(),
-        scope: "system",
-        name: "Cinematic",
-        description: "Dramatic cinematic look with rich colors and depth",
-        prompt: "cinematic photography, dramatic lighting, shallow depth of field, film grain, 4K",
-        createdAt: ts,
-        updatedAt: ts,
-      });
-    }
 
     console.log(`Seed complete. Project id: ${projectId}.`);
     console.log(`Visit http://localhost:3000/projects/${projectId}/storyboard to explore.`);
