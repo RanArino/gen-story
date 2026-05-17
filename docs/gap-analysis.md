@@ -130,7 +130,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Blank draft title / description / image prompt before generation | ✅ | Template scenes created via `createTemplateScenesFromPhotos` allow blank fields for manual editing or later AI fill-in |
 | Camera angle / camera work (selection) | ✅ | `scenes.camera_direction`; translated to cinematic shot descriptors (incl. depth, vanishing point) in generation prompt; 11 options including Telephoto, Voyeur, Low Angle, Overhead |
 | Color / lighting direction (selection) | ✅ | `scenes.lighting_direction`; translated to cinematic lighting descriptors in generation prompt; 8 options including Backlit, Silhouette, Volumetric |
-| Animation movement direction (selection) | ✅ | `scenes.motion_direction`; stored only — not yet composed into generation prompt |
+| Animation movement direction (selection) | 🟡 | `scenes.motion_direction`; stored only — not yet composed into generation prompt; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 1 |
 | User editing notes | ✅ | `scenes.notes` |
 | AI-only complement scene (no source photo) | ✅ | `scenes.kind = 'complement'`; `createComplementScene` produces photo-free scenes (migration `0005`) |
 | Complement scene marks which scenes it bridges | ✅ | `bridge_from_scene_id` / `bridge_to_scene_id` columns; `SceneBridge` on the domain model |
@@ -176,10 +176,10 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Per-scene regeneration | ✅ | Retry endpoint + UI button |
 | Adopt / unadopt per scene | ✅ | `POST /adopt` + `isAdopted` flag |
 | Regenerate with same conditions | ⚠️ | Retry copies `inputJson` but no explicit "same-conditions" UX |
-| Regenerate with changed scene settings | ❌ | No per-scene re-generation with modified settings UI |
+| Regenerate with changed scene settings | 🟡 | No per-scene re-generation with modified settings UI; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 3 |
 | Non-adopted images retained as history | ✅ | `deletedAt` null until user explicitly deletes |
-| Version history across multiple generations | ❌ | No versioning; all images shown flat |
-| Previous version retrievable after re-test | ❌ | No version grouping |
+| Version history across multiple generations | 🟡 | No versioning; all images shown flat; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 2 |
+| Previous version retrievable after re-test | 🟡 | No version grouping; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 2 |
 
 ---
 
@@ -226,7 +226,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Fields: model, prompt, source photo ID, size/quality | ✅ | Stored in `inputJson` + dedicated columns |
 | Fields: success/failure, error reason, timestamp | ✅ | `status`, `errorMessage`, `completedAt` |
 | Fields: cost / coin consumption | ❌ | No cost tracking |
-| User-facing generation history view | ❌ | Debug endpoint exists; no user UI |
+| User-facing generation history view | 🟡 | Debug endpoint exists; no user UI; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 4 |
 
 ---
 
@@ -316,13 +316,13 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Common project prompt | 4 | 0 | 0 | 0 |
 | Test generation workflow | 4 | 0 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 0 | 3 |
-| Scene content | 17 | 0 | 0 | 0 |
+| Scene content | 16 | 0 | 1 | 0 |
 | Scene editing UX | 4 | 1 | 0 | 1 |
 | Language / i18n | 0 | 0 | 0 | 5 |
-| Generated image handling | 5 | 2 | 0 | 3 |
+| Generated image handling | 5 | 2 | 3 | 0 |
 | Storyboard viewing & export | 6 | 0 | 0 | 0 |
 | Image generation infra | 13 | 2 | 0 | 2 |
-| Generation history | 5 | 0 | 0 | 2 |
+| Generation history | 5 | 0 | 1 | 1 |
 | File lifecycle & cleanup | 5 | 1 | 0 | 0 |
 | Local release readiness | 11 | 0 | 0 | 0 |
 | Technical debt & infrastructure | 2 | 0 | 0 | 0 |
@@ -378,11 +378,10 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 12. **Model / provider selection UI**
     Schema and adapter support exist; surfacing it in the UI is straightforward once test generation is in place.
 
-13. **Generation version history**
-    Important for recovering from bad re-generations; schema changes needed.
+13. 🟡 **Generation version history, per-scene re-generation & motion direction** (IN PROGRESS)
+    ExecPlan `docs/plans/20260518-generation-history-and-regen.md`. Covers: motion direction composed into prompt (Milestone 1), collapsible version history panel in ReviewPage (Milestone 2), inline re-generation modal with changed scene settings (Milestone 3), and user-facing generation history page (Milestone 4).
 
-14. **User-facing generation history screen**
-    Debug endpoint exists; wrapping it in a proper UI is low effort.
+14. **User-facing generation history screen** — covered by item 13 above (Milestone 4).
 
 15. **Cascade physical file deletion on project/photo delete**
     Soft delete works; file cleanup on hard-delete path needs to be wired up.
