@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type {
   GeneratedImageDto,
+  GenerationRequestDto,
   PhotoAssetDto,
   SceneDto,
 } from "@gen-story/shared";
 import {
   adoptGeneratedImage,
+  createGenerationRequest,
   exportStoryboardUrl,
   listGeneratedImages,
   listGenerationRequests,
@@ -16,6 +18,7 @@ import {
   listScenes,
   listStoryboards,
   retryGenerationRequest,
+  upsertScenes,
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
@@ -26,10 +29,12 @@ type SceneReview = {
   scene: SceneDto;
   generatedImages: GeneratedImageDto[];
   primaryPhoto: PhotoAssetDto | null;
-  latestRequestId: string | null;
-  latestRequestStatus: string | null;
-  latestErrorMessage: string | null;
+  requests: GenerationRequestDto[];
 };
+
+function latestRequest(r: SceneReview): GenerationRequestDto | null {
+  return r.requests.length > 0 ? r.requests[0]! : null;
+}
 
 export function ReviewPage({ projectId }: { projectId: string }) {
   const [reviews, setReviews] = useState<SceneReview[]>([]);
@@ -38,6 +43,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   const [storyboardId, setStoryboardId] = useState<string | null>(null);
   const [view, setView] = useState<"card" | "timeline" | "table">("card");
   const [filter, setFilter] = useState<"all" | "original" | "generated">("all");
+  const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [storyboards, photoList] = await Promise.all([
@@ -57,13 +63,6 @@ export function ReviewPage({ projectId }: { projectId: string }) {
           listGenerationRequests(scene.id),
         ]);
 
-        const latest =
-          requests.length > 0
-            ? requests.reduce((a, b) =>
-                new Date(a.createdAt) > new Date(b.createdAt) ? a : b,
-              )
-            : null;
-
         const primaryPhotoAssetId = scene.photoAssets.find(
           (pa) => pa.role === "primary",
         )?.photoAssetId;
@@ -72,13 +71,15 @@ export function ReviewPage({ projectId }: { projectId: string }) {
           ? (photoList.find((p) => p.id === primaryPhotoAssetId) ?? null)
           : null;
 
+        const requestsDesc = [...requests].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
         return {
           scene,
           generatedImages: images,
           primaryPhoto,
-          latestRequestId: latest?.id ?? null,
-          latestRequestStatus: latest?.status ?? null,
-          latestErrorMessage: latest?.errorMessage ?? null,
+          requests: requestsDesc,
         };
       }),
     );
@@ -101,15 +102,61 @@ export function ReviewPage({ projectId }: { projectId: string }) {
     }
   }
 
-  async function handleRetry(latestRequestId: string) {
+  async function handleRetry(requestId: string) {
     setError(null);
     try {
-      await retryGenerationRequest(latestRequestId);
+      await retryGenerationRequest(requestId);
       await load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to retry");
     }
   }
+
+  async function handleRegen(
+    scene: SceneDto,
+    overrides: RegenFields,
+  ) {
+    if (!storyboardId) return;
+    setError(null);
+    try {
+      const base = scene;
+      if (
+        overrides.imagePrompt !== base.imagePrompt ||
+        overrides.emotion !== base.emotion ||
+        overrides.cameraDirection !== base.cameraDirection ||
+        overrides.lightingDirection !== base.lightingDirection ||
+        overrides.motionDirection !== base.motionDirection
+      ) {
+        await upsertScenes(storyboardId, [
+          {
+            sceneId: scene.id,
+            orderIndex: scene.orderIndex,
+            title: scene.title,
+            description: scene.description ?? "",
+            imagePrompt: overrides.imagePrompt,
+            emotion: overrides.emotion,
+            cameraDirection: overrides.cameraDirection,
+            lightingDirection: overrides.lightingDirection,
+            motionDirection: overrides.motionDirection,
+            notes: scene.notes ?? "",
+          },
+        ]);
+      }
+      await createGenerationRequest(scene.id, {
+        sceneId: scene.id,
+        storyboardId,
+        projectId,
+      });
+      setRegenSceneId(null);
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to queue re-generation");
+    }
+  }
+
+  const regenReview = regenSceneId
+    ? reviews.find((r) => r.scene.id === regenSceneId) ?? null
+    : null;
 
   if (loading) {
     return (
@@ -189,6 +236,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
               filter={filter}
               onAdopt={handleAdopt}
               onRetry={handleRetry}
+              onRegen={() => setRegenSceneId(r.scene.id)}
             />
           ))}
         </div>
@@ -211,6 +259,15 @@ export function ReviewPage({ projectId }: { projectId: string }) {
             ← Back to Generate
           </Link>
           {storyboardId && (
+            <Link
+              href={`/projects/${projectId}/generation-history`}
+              className="btn btn-secondary"
+              style={{ marginLeft: 8 }}
+            >
+              Generation history
+            </Link>
+          )}
+          {storyboardId && (
             <a
               href={exportStoryboardUrl(storyboardId)}
               download
@@ -222,6 +279,14 @@ export function ReviewPage({ projectId }: { projectId: string }) {
           )}
         </div>
       )}
+
+      {regenReview && (
+        <RegenModal
+          scene={regenReview.scene}
+          onConfirm={(fields) => handleRegen(regenReview.scene, fields)}
+          onClose={() => setRegenSceneId(null)}
+        />
+      )}
     </AppShell>
   );
 }
@@ -232,26 +297,24 @@ function SceneReviewCard({
   filter,
   onAdopt,
   onRetry,
+  onRegen,
 }: {
   review: SceneReview;
   projectId: string;
   filter: "all" | "original" | "generated";
   onAdopt: (sceneId: string, imageId: string) => void;
   onRetry: (requestId: string) => void;
+  onRegen: () => void;
 }) {
-  const {
-    scene,
-    generatedImages,
-    primaryPhoto,
-    latestRequestStatus,
-    latestErrorMessage,
-    latestRequestId,
-  } = review;
+  const { scene, generatedImages, primaryPhoto, requests } = review;
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+
+  const latest = latestRequest(review);
+  const latestRequestStatus = latest?.status ?? null;
+  const latestErrorMessage = latest?.errorMessage ?? null;
+  const latestRequestId = latest?.id ?? null;
 
   const adoptedImage = generatedImages.find((img) => img.adoptedAt !== null);
-  const unadoptedImages = generatedImages.filter(
-    (img) => img.adoptedAt === null,
-  );
 
   return (
     <div className={`card ${styles.sceneCard}`}>
@@ -261,6 +324,9 @@ function SceneReviewCard({
         {latestRequestStatus === "failed" && (
           <span className={styles.failedBadge}>Generation failed</span>
         )}
+        <button className={styles.regenBtn} onClick={onRegen}>
+          Re-generate
+        </button>
       </div>
 
       {latestErrorMessage && latestRequestStatus === "failed" && (
@@ -327,44 +393,6 @@ function SceneReviewCard({
           </button>
         )}
 
-        {unadoptedImages.length > 0 && (
-          <div className={styles.candidateList}>
-            <p className={styles.colLabel} style={{ marginBottom: 8 }}>
-              {adoptedImage ? "Other candidates:" : "Select image to adopt:"}
-            </p>
-            <div className={styles.candidateRow}>
-              {[
-                ...(adoptedImage ? [adoptedImage] : []),
-                ...unadoptedImages,
-              ].map((img) => (
-                <div key={img.id} className={styles.candidateItem}>
-                  <img
-                    src={storageKeyToUrl(img.storageKey)}
-                    alt="Candidate"
-                    className={`${styles.candidateThumb} ${img.adoptedAt ? styles.candidateThumbAdopted : ""}`}
-                  />
-                  {img.adoptedAt ? (
-                    <span
-                      className={styles.adoptedBadge}
-                      style={{ fontSize: 11 }}
-                    >
-                      Adopted
-                    </span>
-                  ) : (
-                    <button
-                      className="btn btn-primary"
-                      style={{ fontSize: 12, padding: "4px 10px" }}
-                      onClick={() => onAdopt(scene.id, img.id)}
-                    >
-                      Adopt
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {generatedImages.length === 0 && latestRequestStatus !== "failed" && (
           <Link
             href={`/projects/${projectId}/generate`}
@@ -374,6 +402,272 @@ function SceneReviewCard({
             Go to Generate →
           </Link>
         )}
+      </div>
+
+      {/* Generation history */}
+      {requests.length > 0 && (
+        <div className={styles.historySection}>
+          <button
+            className={styles.historyToggle}
+            onClick={() => setHistoryExpanded((v) => !v)}
+          >
+            Generation history ({requests.length})
+            <span className={styles.historyChevron}>
+              {historyExpanded ? "▲" : "▼"}
+            </span>
+          </button>
+          {historyExpanded && (
+            <div className={styles.historyList}>
+              {requests.map((req) => {
+                const img = generatedImages.find(
+                  (i) => i.generationRequestId === req.id,
+                );
+                return (
+                  <div key={req.id} className={styles.historyItem}>
+                    <div className={styles.historyThumbBox}>
+                      {img ? (
+                        <img
+                          src={storageKeyToUrl(img.storageKey)}
+                          alt="Generated"
+                          className={styles.historyThumb}
+                        />
+                      ) : (
+                        <div className={styles.historyThumbPlaceholder}>—</div>
+                      )}
+                    </div>
+                    <div className={styles.historyMeta}>
+                      <StatusChip status={req.status} />
+                      <span className={styles.historyTime}>
+                        {formatRelativeTime(req.createdAt)}
+                      </span>
+                      {req.errorMessage && (
+                        <span className={styles.historyError}>
+                          {req.errorMessage}
+                        </span>
+                      )}
+                    </div>
+                    <div className={styles.historyActions}>
+                      {img &&
+                        (img.adoptedAt ? (
+                          <span
+                            className={styles.adoptedBadge}
+                            style={{ fontSize: 11 }}
+                          >
+                            Adopted
+                          </span>
+                        ) : (
+                          <button
+                            className="btn btn-primary"
+                            style={{ fontSize: 12, padding: "4px 10px" }}
+                            onClick={() => onAdopt(scene.id, img.id)}
+                          >
+                            Adopt
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusChip({ status }: { status: string }) {
+  const map: Record<string, string | undefined> = {
+    succeeded: styles.chipSucceeded,
+    failed: styles.chipFailed,
+    running: styles.chipRunning,
+    queued: styles.chipQueued,
+    canceled: styles.chipCanceled,
+  };
+  return (
+    <span className={`${styles.statusChip} ${map[status] ?? ""}`}>
+      {status}
+    </span>
+  );
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+type RegenFields = {
+  imagePrompt: string;
+  emotion: string;
+  cameraDirection: string;
+  lightingDirection: string;
+  motionDirection: string;
+};
+
+const EMOTION_OPTIONS = [
+  "Joy",
+  "Nostalgia",
+  "Love",
+  "Pride",
+  "Wonder",
+  "Calm",
+  "Excitement",
+  "Gratitude",
+];
+const CAMERA_OPTIONS = [
+  "Wide",
+  "Extreme Wide",
+  "Medium",
+  "Close-up",
+  "Extreme Close-up",
+  "Aerial",
+  "Overhead",
+  "POV",
+  "Low Angle",
+  "Telephoto",
+  "Voyeur",
+];
+const LIGHTING_OPTIONS = [
+  "Golden hour",
+  "Natural",
+  "Dramatic",
+  "Night",
+  "Soft",
+  "Backlit",
+  "Silhouette",
+  "Volumetric",
+];
+const MOTION_OPTIONS = ["Slow pan", "Static", "Zoom in", "Zoom out", "Tracking"];
+
+function RegenModal({
+  scene,
+  onConfirm,
+  onClose,
+}: {
+  scene: SceneDto;
+  onConfirm: (fields: RegenFields) => void;
+  onClose: () => void;
+}) {
+  const [fields, setFields] = useState<RegenFields>({
+    imagePrompt: scene.imagePrompt ?? "",
+    emotion: scene.emotion ?? "",
+    cameraDirection: scene.cameraDirection ?? "",
+    lightingDirection: scene.lightingDirection ?? "",
+    motionDirection: scene.motionDirection ?? "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  function set<K extends keyof RegenFields>(key: K, value: RegenFields[K]) {
+    setFields((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    await onConfirm(fields);
+    setSubmitting(false);
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div
+        className={styles.modalBox}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className={styles.modalTitle}>
+          Re-generate — {scene.title || "Untitled scene"}
+        </h3>
+        <p className={styles.modalSubtitle}>
+          Adjust settings then confirm to queue a new generation.
+          Changes will be saved to the scene.
+        </p>
+
+        <div className={styles.modalFields}>
+          <label className={styles.modalLabel}>
+            Image prompt
+            <textarea
+              className={styles.modalTextarea}
+              rows={3}
+              value={fields.imagePrompt}
+              onChange={(e) => set("imagePrompt", e.target.value)}
+            />
+          </label>
+
+          <div className={styles.modalSelects}>
+            <label className={styles.modalLabel}>
+              Emotion
+              <select
+                className={styles.modalSelect}
+                value={fields.emotion}
+                onChange={(e) => set("emotion", e.target.value)}
+              >
+                <option value="">—</option>
+                {EMOTION_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className={styles.modalLabel}>
+              Camera
+              <select
+                className={styles.modalSelect}
+                value={fields.cameraDirection}
+                onChange={(e) => set("cameraDirection", e.target.value)}
+              >
+                <option value="">—</option>
+                {CAMERA_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className={styles.modalLabel}>
+              Lighting
+              <select
+                className={styles.modalSelect}
+                value={fields.lightingDirection}
+                onChange={(e) => set("lightingDirection", e.target.value)}
+              >
+                <option value="">—</option>
+                {LIGHTING_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className={styles.modalLabel}>
+              Motion
+              <select
+                className={styles.modalSelect}
+                value={fields.motionDirection}
+                onChange={(e) => set("motionDirection", e.target.value)}
+              >
+                <option value="">—</option>
+                {MOTION_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div className={styles.modalFooter}>
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? "Queuing…" : "Queue generation"}
+          </button>
+        </div>
       </div>
     </div>
   );
