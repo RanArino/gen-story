@@ -8,6 +8,7 @@ import {
   cancelGenerationRequest,
   confirmTestGeneration,
   createGenerationRequestUseCase,
+  createCustomStyle,
   createProjectUseCase,
   createTemplateScenesFromPhotos,
   deletePhotoAsset,
@@ -64,6 +65,7 @@ import {
   AnalyzeProjectPhotosSchema,
   ComplementSceneBridgeSchema,
   CreateGenerationRequestSchema,
+  CreateCustomStyleSchema,
   ReorderPhotosSchema,
   ReorderScenesSchema,
   CreateProjectSchema,
@@ -1041,6 +1043,42 @@ export function buildRouter(deps: ApplicationDependencies): Router {
 
     const stylePresets = await deps.stylePresets.findAll();
     sendJson(res, 200, { stylePresets: stylePresets.map(toStylePresetDto) });
+  });
+
+  // POST /api/style-presets
+  router.add("POST", "/api/style-presets", async (req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    let rawBody: unknown;
+    try {
+      rawBody = await readJsonBody(req);
+    } catch (err) {
+      sendJson(
+        res,
+        400,
+        badRequestBody(err instanceof Error ? err.message : "Bad request."),
+      );
+      return;
+    }
+
+    const parsed = CreateCustomStyleSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+      return;
+    }
+
+    const result = await createCustomStyle(deps, parsed.data);
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
+
+    sendJson(res, 201, { stylePreset: toStylePresetDto(result.value) });
   });
 
   // GET /api/scenes/:sceneId/generation-requests

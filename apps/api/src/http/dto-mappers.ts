@@ -156,7 +156,10 @@ export function toSceneDto(scene: Scene): SceneDto {
 }
 
 export function toStylePresetDto(preset: StylePreset): StylePresetDto {
-  const previewImageUrl = `/public/style-previews/${preset.name.toLowerCase().replace(/\s+/g, "-")}.jpg`;
+  const previewImageUrl =
+    preset.scope === "system"
+      ? `/public/style-previews/${preset.name.toLowerCase().replace(/\s+/g, "-")}.jpg`
+      : null;
   return {
     id: preset.id,
     scope: preset.scope,

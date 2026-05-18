@@ -85,3 +85,10 @@ export const CreateGenerationRequestSchema = z.object({
   generationRequestId: z.string().optional(),
   inputJson: z.record(z.unknown()).default({}),
 });
+
+export const CreateCustomStyleSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().default(""),
+  prompt: z.string().min(1),
+  referenceImageStorageKey: z.string().min(1).optional(),
+});
