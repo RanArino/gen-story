@@ -334,6 +334,20 @@ export async function listStylePresets(): Promise<StylePresetDto[]> {
   return data.stylePresets;
 }
 
+export async function createCustomStyle(input: {
+  name: string;
+  description: string;
+  prompt: string;
+  referenceImageStorageKey?: string;
+}): Promise<StylePresetDto> {
+  const data = await request<{ stylePreset: StylePresetDto }>(
+    "POST",
+    "/api/style-presets",
+    input,
+  );
+  return data.stylePreset;
+}
+
 // ── Generation Requests ───────────────────────────────────────────────────────
 
 export async function createGenerationRequest(
