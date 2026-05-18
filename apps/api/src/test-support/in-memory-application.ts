@@ -250,6 +250,15 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .slice(0, limit);
   }
 
+  async findByStoryboardId(
+    storyboardId: string,
+  ): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.storyboardId === storyboardId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.store.save(generationRequest);
   }
