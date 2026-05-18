@@ -44,6 +44,15 @@ const EMOTION_DESCRIPTORS: Record<string, string> = {
   Gratitude: "warm emotional resonance, gentle light, connected atmosphere",
 };
 
+const MOTION_DESCRIPTORS: Record<string, string> = {
+  "Slow pan": "slow lateral camera sweep, implied gentle motion across the frame",
+  Static: "locked-off static composition, no implied camera movement",
+  "Zoom in":
+    "subject-centred framing, foreground pulls toward camera, subtle compression",
+  "Zoom out": "expanding field of view, environment reveals around subject",
+  Tracking: "subject mid-motion, dynamic framing with implied camera follow",
+};
+
 const TONE_COLOR_MODIFIERS: Record<string, string> = {
   warm: "warm color palette, dominant amber and gold tones",
   cinematic: "desaturated cinematic palette, teal and orange color grade",
@@ -75,6 +84,7 @@ export function composeImagePrompt(input: {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
+  motionDirection: string;
   tone: string;
   stylePresetPrompt: string | null;
   commonPrompt: string;
@@ -84,6 +94,7 @@ export function composeImagePrompt(input: {
     emotion,
     cameraDirection,
     lightingDirection,
+    motionDirection,
     tone,
     stylePresetPrompt,
     commonPrompt,
@@ -101,6 +112,8 @@ export function composeImagePrompt(input: {
   segments.push(
     LIGHTING_DESCRIPTORS[lightingDirection] ?? "cinematic lighting",
   );
+  if (MOTION_DESCRIPTORS[motionDirection])
+    segments.push(MOTION_DESCRIPTORS[motionDirection]);
   segments.push(depthSuffix(cameraDirection));
   if (TONE_COLOR_MODIFIERS[tone]) segments.push(TONE_COLOR_MODIFIERS[tone]);
 
