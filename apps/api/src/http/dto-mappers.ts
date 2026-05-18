@@ -20,6 +20,7 @@ import type {
   StylePresetDto,
   StoryboardDto,
   TestGenerationBatchDto,
+  GenerationRequestWithSceneTitleDto,
 } from "@gen-story/shared";
 
 import type {
@@ -198,6 +199,13 @@ export function toGenerationRequestDto(
     createdAt: req.createdAt,
     updatedAt: req.updatedAt,
   };
+}
+
+export function toGenerationRequestWithSceneTitleDto(
+  req: GenerationRequest,
+  sceneTitle: string | null,
+): GenerationRequestWithSceneTitleDto {
+  return { ...toGenerationRequestDto(req), sceneTitle };
 }
 
 export function toGeneratedImageDto(img: GeneratedImage): GeneratedImageDto {

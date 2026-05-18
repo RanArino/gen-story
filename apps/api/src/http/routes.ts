@@ -37,6 +37,7 @@ import {
   toComplementSceneProposalDto,
   toGeneratedImageDto,
   toGenerationRequestDto,
+  toGenerationRequestWithSceneTitleDto,
   toMeDto,
   toPhotoAssetDto,
   toProjectDto,
@@ -1605,6 +1606,50 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       sendJson(res, 200, { batch: toTestGenerationBatchDto(result.value) });
+    },
+  );
+
+  // GET /api/storyboards/:storyboardId/generation-requests
+  router.add(
+    "GET",
+    "/api/storyboards/:storyboardId/generation-requests",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      const [requests, scenes] = await Promise.all([
+        deps.generationRequests.findByStoryboardId(storyboardId),
+        deps.scenes.findByStoryboardId(storyboardId),
+      ]);
+
+      const sceneTitleById = new Map(
+        scenes.map((s) => [s.id, s.title ?? null]),
+      );
+
+      sendJson(res, 200, {
+        generationRequests: requests.map((r) =>
+          toGenerationRequestWithSceneTitleDto(
+            r,
+            sceneTitleById.get(r.sceneId) ?? null,
+          ),
+        ),
+      });
     },
   );
 
