@@ -130,7 +130,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Blank draft title / description / image prompt before generation | ✅ | Template scenes created via `createTemplateScenesFromPhotos` allow blank fields for manual editing or later AI fill-in |
 | Camera angle / camera work (selection) | ✅ | `scenes.camera_direction`; translated to cinematic shot descriptors (incl. depth, vanishing point) in generation prompt; 11 options including Telephoto, Voyeur, Low Angle, Overhead |
 | Color / lighting direction (selection) | ✅ | `scenes.lighting_direction`; translated to cinematic lighting descriptors in generation prompt; 8 options including Backlit, Silhouette, Volumetric |
-| Animation movement direction (selection) | 🟡 | `scenes.motion_direction`; stored only — not yet composed into generation prompt; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 1 |
+| Animation movement direction (selection) | ✅ | `scenes.motion_direction`; `MOTION_DESCRIPTORS` lookup added to `prompt-composer.ts`; `motionDirection` now composed into every generation prompt via `local-image-preprocessing.ts` |
 | User editing notes | ✅ | `scenes.notes` |
 | AI-only complement scene (no source photo) | ✅ | `scenes.kind = 'complement'`; `createComplementScene` produces photo-free scenes (migration `0005`) |
 | Complement scene marks which scenes it bridges | ✅ | `bridge_from_scene_id` / `bridge_to_scene_id` columns; `SceneBridge` on the domain model |
@@ -176,10 +176,10 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Per-scene regeneration | ✅ | Retry endpoint + UI button |
 | Adopt / unadopt per scene | ✅ | `POST /adopt` + `isAdopted` flag |
 | Regenerate with same conditions | ⚠️ | Retry copies `inputJson` but no explicit "same-conditions" UX |
-| Regenerate with changed scene settings | 🟡 | No per-scene re-generation with modified settings UI; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 3 |
+| Regenerate with changed scene settings | ✅ | "Re-generate" button on each ReviewPage scene card opens a modal pre-filled with scene fields; on confirm patches changed fields then queues a new generation request |
 | Non-adopted images retained as history | ✅ | `deletedAt` null until user explicitly deletes |
-| Version history across multiple generations | 🟡 | No versioning; all images shown flat; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 2 |
-| Previous version retrievable after re-test | 🟡 | No version grouping; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 2 |
+| Version history across multiple generations | ✅ | ReviewPage scene cards show a collapsible "Generation history (N)" panel with per-request thumbnails, status chips, and timestamps |
+| Previous version retrievable after re-test | ✅ | History panel exposes an "Adopt" button for any past succeeded generation |
 
 ---
 
@@ -226,7 +226,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Fields: model, prompt, source photo ID, size/quality | ✅ | Stored in `inputJson` + dedicated columns |
 | Fields: success/failure, error reason, timestamp | ✅ | `status`, `errorMessage`, `completedAt` |
 | Fields: cost / coin consumption | ❌ | No cost tracking |
-| User-facing generation history view | 🟡 | Debug endpoint exists; no user UI; ExecPlan `docs/plans/20260518-generation-history-and-regen.md` Milestone 4 |
+| User-facing generation history view | ✅ | `GET /api/storyboards/:id/generation-requests` endpoint + `/projects/:id/generation-history` page; shows all requests grouped by scene with status, timestamps, and error messages |
 
 ---
 
@@ -316,13 +316,13 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Common project prompt | 4 | 0 | 0 | 0 |
 | Test generation workflow | 4 | 0 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 0 | 3 |
-| Scene content | 16 | 0 | 1 | 0 |
+| Scene content | 17 | 0 | 0 | 0 |
 | Scene editing UX | 4 | 1 | 0 | 1 |
 | Language / i18n | 0 | 0 | 0 | 5 |
-| Generated image handling | 5 | 2 | 3 | 0 |
+| Generated image handling | 8 | 2 | 0 | 0 |
 | Storyboard viewing & export | 6 | 0 | 0 | 0 |
 | Image generation infra | 13 | 2 | 0 | 2 |
-| Generation history | 5 | 0 | 1 | 1 |
+| Generation history | 6 | 0 | 0 | 1 |
 | File lifecycle & cleanup | 5 | 1 | 0 | 0 |
 | Local release readiness | 11 | 0 | 0 | 0 |
 | Technical debt & infrastructure | 2 | 0 | 0 | 0 |
@@ -378,10 +378,10 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 12. **Model / provider selection UI**
     Schema and adapter support exist; surfacing it in the UI is straightforward once test generation is in place.
 
-13. 🟡 **Generation version history, per-scene re-generation & motion direction** (IN PROGRESS)
-    ExecPlan `docs/plans/20260518-generation-history-and-regen.md`. Covers: motion direction composed into prompt (Milestone 1), collapsible version history panel in ReviewPage (Milestone 2), inline re-generation modal with changed scene settings (Milestone 3), and user-facing generation history page (Milestone 4).
+13. ✅ **Generation version history, per-scene re-generation & motion direction** (COMPLETED)
+    ExecPlan `docs/plans/20260518-generation-history-and-regen.md`. Motion direction now composed into prompts; ReviewPage shows collapsible history panel per scene with adopt buttons for past versions; inline re-generation modal lets users adjust settings before re-queuing; new `/projects/:id/generation-history` page shows full audit trail.
 
-14. **User-facing generation history screen** — covered by item 13 above (Milestone 4).
+14. **User-facing generation history screen** — completed as part of item 13 above.
 
 15. **Cascade physical file deletion on project/photo delete**
     Soft delete works; file cleanup on hard-delete path needs to be wired up.

@@ -35,11 +35,11 @@ This closes five requirements tracked in `docs/gap-analysis.md`:
 
 ## Progress
 
-- [ ] Milestone 1 — Motion direction in generation prompt.
-- [ ] Milestone 2 — Generation version history in ReviewPage.
-- [ ] Milestone 3 — Per-scene re-generation modal in ReviewPage.
-- [ ] Milestone 4 — Generation history page.
-- [ ] Update `docs/gap-analysis.md` for all five targeted rows.
+- [x] (2026-05-18) Milestone 1 — Motion direction in generation prompt. Added `MOTION_DESCRIPTORS` to `prompt-composer.ts`; wired `motionDirection` through `composeImagePrompt()` and its sole caller `local-image-preprocessing.ts`; added two new test cases to `prompt-composer.test.ts`.
+- [x] (2026-05-18) Milestone 2 — Generation version history in ReviewPage. `SceneReview` now holds `requests: GenerationRequestDto[]` (sorted newest-first). Each scene card has a collapsible "Generation history (N)" panel showing per-request thumbnails, status chips, timestamps, and adopt buttons.
+- [x] (2026-05-18) Milestone 3 — Per-scene re-generation modal in ReviewPage. "Re-generate" button on each card opens a pre-filled modal (imagePrompt, emotion, camera, lighting, motion). On confirm: patches changed scene fields via `upsertScenes`, then queues a new `GenerationRequest`.
+- [x] (2026-05-18) Milestone 4 — Generation history page. New `findByStoryboardId` on `GenerationRequestRepositoryPort` + Drizzle impl; `GET /api/storyboards/:id/generation-requests` endpoint returning `GenerationRequestWithSceneTitleDto[]`; `listStoryboardGenerationRequests` client helper; `/projects/[projectId]/generation-history` Next.js page + `GenerationHistoryPage` component; "Generation history" link added to ReviewPage footer.
+- [x] (2026-05-18) Updated `docs/gap-analysis.md` — all five targeted rows moved to ✅; Summary Table counts updated.
 
 
 ## Surprises & Discoveries
@@ -68,7 +68,16 @@ _(Fill in as work proceeds.)_
 
 ## Outcomes & Retrospective
 
-_(Fill in at completion.)_
+Completion (2026-05-18): All four milestones implemented and verified. `pnpm typecheck`, `pnpm test` (83 tests), all pass.
+
+- Motion direction is now fully composed into image generation prompts, matching the existing camera/lighting descriptor pattern.
+- ReviewPage scene cards show a collapsible generation history with adopt buttons for any past version, plus an inline re-generation modal.
+- A new `/projects/:id/generation-history` page provides a full audit trail of all generation requests grouped by scene.
+- No DB migrations needed — all changes were additive (new query, new endpoint, new UI).
+
+Lessons:
+- The existing in-memory stubs in both `packages/application/src/use-cases.test.ts` and `apps/api/src/test-support/in-memory-application.ts` must be updated whenever the port interface gains a new method — the TS compiler catches this reliably, making the fix mechanical.
+- `findBySceneId` returns requests ascending by `createdAt`; the ReviewPage `load()` must reverse-sort before storing so that `requests[0]` is reliably the most recent.
 
 
 ## Context and Orientation
