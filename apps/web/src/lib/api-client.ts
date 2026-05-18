@@ -2,6 +2,7 @@ import type {
   ComplementSceneProposalDto,
   GeneratedImageDto,
   GenerationRequestDto,
+  GenerationRequestWithSceneTitleDto,
   MeDto,
   PhotoAssetDto,
   ProjectDto,
@@ -353,6 +354,15 @@ export async function listGenerationRequests(
     "GET",
     `/api/scenes/${sceneId}/generation-requests`,
   );
+  return data.generationRequests;
+}
+
+export async function listStoryboardGenerationRequests(
+  storyboardId: string,
+): Promise<GenerationRequestWithSceneTitleDto[]> {
+  const data = await request<{
+    generationRequests: GenerationRequestWithSceneTitleDto[];
+  }>("GET", `/api/storyboards/${storyboardId}/generation-requests`);
   return data.generationRequests;
 }
 
