@@ -12,6 +12,7 @@ import {
   createProjectPhotoAnalysis,
   createScene,
   createStoryboard,
+  createStylePreset,
   createTemplateScene,
   createTestGenerationBatch,
   composeCommonPrompt,
@@ -215,6 +216,36 @@ export async function createProjectUseCase(
     });
 
     return success(project);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type CreateCustomStyleInput = {
+  name: string;
+  description: string;
+  prompt: string;
+  referenceImageStorageKey?: string;
+};
+
+export async function createCustomStyle(
+  deps: ApplicationDependencies,
+  input: CreateCustomStyleInput,
+): Promise<UseCaseResult<StylePreset>> {
+  try {
+    const timestamp = now();
+    const stylePreset = createStylePreset({
+      id: randomUUID(),
+      scope: "user",
+      name: input.name,
+      description: input.description,
+      prompt: input.prompt,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    await deps.stylePresets.save(stylePreset);
+    return success(stylePreset);
   } catch (error) {
     return validationFailure(error);
   }
