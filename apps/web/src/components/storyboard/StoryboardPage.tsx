@@ -150,6 +150,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   });
   const [savingCustomStyle, setSavingCustomStyle] = useState(false);
   const [complementBusy, setComplementBusy] = useState(false);
+  const [photoViewSize, setPhotoViewSize] = useState<"small" | "medium" | "large">("small");
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
   const [proposalCtx, setProposalCtx] = useState<{
     fromSceneId: string;
@@ -619,44 +620,92 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       </section>
 
       {/* Create template scenes from photos */}
-      {photos.some((p) => p.usage === "candidate") && (
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Create Scenes from Photos</h3>
-            <button
-              className="btn btn-primary"
-              onClick={handleCreateTemplateScenes}
-              disabled={creatingTemplates || selectedPhotoIds.size === 0}
-            >
-              {creatingTemplates
-                ? "Creating…"
-                : selectedPhotoIds.size === 0
-                  ? "Select photos to create scenes"
-                  : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
-            </button>
-          </div>
-          {selectedPhotoIds.size === 0 && (
-            <p
+      {photos.some((p) => p.usage === "candidate") && (() => {
+        const candidatePhotos = photos.filter((p) => p.usage === "candidate");
+        const allSelected =
+          candidatePhotos.length > 0 &&
+          candidatePhotos.every((p) => selectedPhotoIds.has(p.id));
+        const someSelected = selectedPhotoIds.size > 0;
+        const gridMin =
+          photoViewSize === "large"
+            ? "180px"
+            : photoViewSize === "medium"
+              ? "130px"
+              : "90px";
+        return (
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <h3 className={styles.sectionTitle}>Create Scenes from Photos</h3>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateTemplateScenes}
+                disabled={creatingTemplates || selectedPhotoIds.size === 0}
+              >
+                {creatingTemplates
+                  ? "Creating…"
+                  : selectedPhotoIds.size === 0
+                    ? "Select photos to create scenes"
+                    : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+
+            {/* Toolbar: select-all + view size */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 500, color: "#5a6a7e", cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                  onChange={() => {
+                    if (allSelected) {
+                      setSelectedPhotoIds(new Set());
+                    } else {
+                      setSelectedPhotoIds(new Set(candidatePhotos.map((p) => p.id)));
+                    }
+                  }}
+                  style={{ width: 15, height: 15, accentColor: "#1a56db", cursor: "pointer" }}
+                />
+                {allSelected ? "Deselect all" : "Select all"}
+              </label>
+
+              {/* Size toggle */}
+              <div style={{ display: "flex", gap: 2, background: "#f0f3f8", borderRadius: 8, padding: 3 }}>
+                {(["small", "medium", "large"] as const).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setPhotoViewSize(size)}
+                    title={`${size.charAt(0).toUpperCase() + size.slice(1)} thumbnails`}
+                    style={{
+                      width: 30, height: 28,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: size === "small" ? 13 : size === "medium" ? 16 : 20,
+                      background: photoViewSize === size ? "#fff" : "none",
+                      border: "none", borderRadius: 6,
+                      color: photoViewSize === size ? "#1a56db" : "#8898aa",
+                      cursor: "pointer",
+                      boxShadow: photoViewSize === size ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+                    }}
+                  >
+                    ⊞
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {selectedPhotoIds.size === 0 && (
+              <p style={{ color: "var(--color-text-muted)", fontSize: "0.9em", marginBottom: 12 }}>
+                💡 Select one or more candidate photos below, then click the button to create draft scenes
+              </p>
+            )}
+
+            <div
               style={{
-                color: "var(--color-text-muted)",
-                fontSize: "0.9em",
-                marginBottom: "12px",
+                display: "grid",
+                gridTemplateColumns: `repeat(auto-fill, minmax(${gridMin}, 1fr))`,
+                gap: 12,
               }}
             >
-              💡 Select one or more candidate photos below, then click the
-              button to create draft scenes
-            </p>
-          )}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {photos
-              .filter((p) => p.usage === "candidate")
-              .map((photo) => (
+              {candidatePhotos.map((photo) => (
                 <label
                   key={photo.id}
                   style={{
@@ -680,7 +729,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                       }
                       setSelectedPhotoIds(newSet);
                     }}
-                    style={{ marginBottom: 8 }}
+                    style={{ marginBottom: 6 }}
                   />
                   <img
                     src={storageKeyToUrl(photo.storageKey)}
@@ -692,19 +741,18 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                       borderRadius: 8,
                       border: selectedPhotoIds.has(photo.id)
                         ? "2px solid var(--color-primary)"
-                        : "none",
+                        : "2px solid transparent",
                     }}
                   />
-                  <span
-                    style={{ fontSize: 12, marginTop: 4, textAlign: "center" }}
-                  >
+                  <span style={{ fontSize: 11, marginTop: 4, textAlign: "center", color: "#5a6a7e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
                     {photo.name}
                   </span>
                 </label>
               ))}
-          </div>
-        </section>
-      )}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Style preset selector */}
       <section className={styles.section}>
