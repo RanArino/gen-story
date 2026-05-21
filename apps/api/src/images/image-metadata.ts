@@ -9,12 +9,12 @@ export const PREVIEW_MAX_EDGE = 640;
 export const AI_INPUT_MAX_EDGE = 1536;
 
 export async function convertHeicToJpeg(body: Uint8Array): Promise<Uint8Array> {
-  const arrayBuffer = body.buffer.slice(
-    body.byteOffset,
-    body.byteOffset + body.byteLength,
-  );
+  // heic-decode reads the buffer as a typed array (it spreads `buffer.slice(...)`),
+  // so it must receive a Uint8Array/Buffer — passing a raw ArrayBuffer throws
+  // "Spread syntax requires ...iterable". The @types/heic-convert `ArrayBufferLike`
+  // annotation is wrong, hence the cast.
   const output = await convert({
-    buffer: arrayBuffer,
+    buffer: Buffer.from(body) as unknown as ArrayBufferLike,
     format: "JPEG",
     quality: 0.95,
   });
