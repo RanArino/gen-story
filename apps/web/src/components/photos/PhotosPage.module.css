@@ -32,6 +32,123 @@
   cursor: not-allowed;
 }
 
+/* ── Manage toolbar ── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.selectAllLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5a6a7e;
+  cursor: pointer;
+  user-select: none;
+}
+
+.selectAllCheckbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: #1a56db;
+}
+
+.viewSizeGroup {
+  display: flex;
+  gap: 2px;
+  background: #f0f3f8;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.viewSizeBtn {
+  width: 30px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: #8898aa;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  line-height: 1;
+}
+
+.viewSizeBtn:hover {
+  color: #152033;
+  background: #e5e9f0;
+}
+
+.viewSizeBtnActive {
+  background: #fff;
+  color: #1a56db;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Bulk action bar ── */
+
+.bulkBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.bulkCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a56db;
+  margin-right: 4px;
+}
+
+.bulkBtn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.bulkBtnUsage {
+  background: #fff;
+  border-color: #c3d3ef;
+  color: #2c4a8a;
+}
+
+.bulkBtnUsage:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.bulkBtnDelete {
+  background: #fff;
+  border-color: #fca5a5;
+  color: #dc3545;
+  margin-left: auto;
+}
+
+.bulkBtnDelete:hover {
+  background: #fee2e2;
+}
+
+/* ── Dropzone ── */
+
 .dropzone {
   border: 2px dashed #c3cfe0;
   border-radius: 12px;
@@ -70,9 +187,11 @@
   font-size: 14px;
 }
 
+/* ── Photo grid ── */
+
 .photoGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-min, 200px), 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -84,7 +203,13 @@
   padding: 14px;
 }
 
+.photoCardSelected {
+  outline: 2px solid #1a56db;
+  outline-offset: 1px;
+}
+
 .photoThumb {
+  position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
   background: #e5e9f0;
@@ -96,6 +221,30 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Checkbox overlay on the photo thumbnail */
+.cardCheckbox {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cardCheckbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #1a56db;
+  cursor: pointer;
+  /* always visible so users know it's there */
+  opacity: 1;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .photoName {
@@ -197,6 +346,8 @@
   color: #dc3545;
 }
 
+/* ── Deleted section ── */
+
 .deletedSection {
   margin-top: 32px;
   padding-top: 24px;
@@ -231,6 +382,8 @@
   color: #8898aa;
   margin: 0;
 }
+
+/* ── Footer ── */
 
 .footer {
   display: flex;
