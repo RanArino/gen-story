@@ -778,24 +778,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           {systemStylePresets.map((p) => (
             <button
               key={p.id}
-              className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
+              className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
               onClick={() => handleStyleChange(p.id)}
               title={p.description}
             >
               {p.previewImageUrl && (
-                <img
-                  src={p.previewImageUrl}
-                  alt={p.name}
-                  style={{
-                    width: "100%",
-                    height: "100px",
-                    objectFit: "cover",
-                    borderRadius: "4px",
-                    marginBottom: "8px",
-                  }}
-                />
+                <img src={p.previewImageUrl} alt={p.name} />
               )}
-              {p.name}
+              <span className={styles.styleBtnCardLabel}>{p.name}</span>
             </button>
           ))}
           {userStylePresets.length > 0 && (
