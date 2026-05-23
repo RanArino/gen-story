@@ -36,4 +36,27 @@
 
 ---
 
+## Fix 3: StoryboardPage — Primary Photo section shows all candidate photos as if selected
+
+**Request:** Even if the user selects only one image and clicks "Select photos to create scenes", the PRIMARY PHOTO section under each scene card displays every candidate photo, making them all look selected/assigned.
+
+**Root cause:** `sceneDtoToState()` does not map `scene.photoAssets` into `SceneState`. So `SceneCard` has no way to know which photo is already assigned as primary. It falls back to rendering all `candidatePhotos` as identical clickable buttons — no visual distinction between "assigned" and "unassigned".
+
+**Fix:**
+1. Add `photoAssets: ScenePhotoAssetDto[]` to `SceneState` and populate it from `SceneDto` in `sceneDtoToState`.
+2. In `SceneCard`, derive the current primary photo from `scene.photoAssets`.
+3. Show the assigned primary photo highlighted (border/active style); show others as dimmed "click to reassign" options.
+4. After a successful `handleAssignPhoto` call, update `scene.photoAssets` locally via `onUpdate` so the UI reflects the change immediately without a full reload.
+
+### Tasks
+- [x] Add `photoAssets` field to `SceneState` type and `sceneDtoToState()`
+- [x] In `SceneCard.handleAssignPhoto`: call `onUpdate({ photoAssets: [...] })` after the API call succeeds
+- [x] In `SceneCard` Primary Photo UI: visually distinguish the assigned primary photo from unassigned candidates
+
+### Files to change
+
+- `apps/web/src/components/storyboard/StoryboardPage.tsx`
+
+---
+
 _Add future fixes below as new `## Fix N` sections._
