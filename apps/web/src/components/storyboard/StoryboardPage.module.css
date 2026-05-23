@@ -358,6 +358,11 @@
   border-color: #1a56db;
 }
 
+.photoAssignBtnActive {
+  border-color: #1a56db;
+  box-shadow: 0 0 0 2px rgba(26, 86, 219, 0.25);
+}
+
 .photoAssignThumb {
   width: 56px;
   height: 56px;

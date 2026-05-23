@@ -7,6 +7,7 @@ import type {
   PhotoAssetDto,
   ProjectPhotoAnalysisDto,
   SceneDto,
+  ScenePhotoAssetDto,
   StoryboardDto,
   StylePresetDto,
   TestGenerationBatchDto,
@@ -99,6 +100,7 @@ type SceneState = UpsertSceneInput & {
   id?: string;
   kind: string;
   bridge: { fromSceneId: string; toSceneId: string } | null;
+  photoAssets: ScenePhotoAssetDto[];
 };
 
 function sceneDtoToState(scene: SceneDto): SceneState {
@@ -116,6 +118,7 @@ function sceneDtoToState(scene: SceneDto): SceneState {
     lightingDirection: scene.lightingDirection,
     motionDirection: scene.motionDirection,
     notes: scene.notes,
+    photoAssets: scene.photoAssets,
   };
 }
 
@@ -340,6 +343,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         orderIndex: prev.length,
         kind: "photo",
         bridge: null,
+        photoAssets: [],
       },
     ]);
   }
@@ -1198,6 +1202,12 @@ function SceneCard({
     setAssigningPhoto(photoAssetId);
     try {
       await assignPhotosToScene(scene.id, [{ photoAssetId, role }]);
+      onUpdate({
+        photoAssets: [
+          ...scene.photoAssets.filter((pa) => pa.role !== role),
+          { photoAssetId, role },
+        ],
+      });
     } catch {
       // silently ignore — scene will show stale state until next save
     } finally {
@@ -1345,24 +1355,32 @@ function SceneCard({
         {scene.id && !isComplement && candidatePhotos.length > 0 && (
           <SceneField label="Primary photo" htmlFor={`${id}-photo`}>
             <div className={styles.photoAssignRow}>
-              {candidatePhotos.map((p) => (
-                <button
-                  key={p.id}
-                  className={styles.photoAssignBtn}
-                  onClick={() => handleAssignPhoto(p.id, "primary")}
-                  disabled={assigningPhoto !== null}
-                  title={p.name}
-                >
-                  <img
-                    src={storageKeyToUrl(p.storageKey)}
-                    alt={p.name}
-                    className={styles.photoAssignThumb}
-                  />
-                </button>
-              ))}
+              {candidatePhotos.map((p) => {
+                const isAssigned = scene.photoAssets.some(
+                  (pa) => pa.role === "primary" && pa.photoAssetId === p.id,
+                );
+                return (
+                  <button
+                    key={p.id}
+                    className={`${styles.photoAssignBtn}${isAssigned ? ` ${styles.photoAssignBtnActive}` : ""}`}
+                    onClick={() => handleAssignPhoto(p.id, "primary")}
+                    disabled={assigningPhoto !== null}
+                    title={isAssigned ? `${p.name} (assigned)` : p.name}
+                    style={{ opacity: isAssigned ? 1 : 0.45 }}
+                  >
+                    <img
+                      src={storageKeyToUrl(p.storageKey)}
+                      alt={p.name}
+                      className={styles.photoAssignThumb}
+                    />
+                  </button>
+                );
+              })}
             </div>
             <p className={styles.photoAssignHint}>
-              Click a photo to assign it as primary for this scene.
+              {scene.photoAssets.some((pa) => pa.role === "primary")
+                ? "Click another photo to reassign the primary."
+                : "Click a photo to assign it as primary for this scene."}
             </p>
           </SceneField>
         )}
