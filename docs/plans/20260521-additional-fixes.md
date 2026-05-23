@@ -59,4 +59,25 @@
 
 ---
 
+---
+
+## Fix 4: PhotosPage — usage buttons overflow at small thumbnail size
+
+**Request:** On `projects/[projectId]/photos` Manage tab, when the user selects the "Small" view size, the per-card usage buttons (CANDIDATE / REFERENCE / EXCLUDED) overflow the card width and get clipped — only "CANDIDATE" is fully visible, "REFERENCE" is cut, "EXCLUDED" is hidden.
+
+**Root cause:** `.usageRow` is a single-line flexbox (`display: flex` with no wrap). Each `.usageBtn` has `flex: 1` but the uppercase label text has an intrinsic minimum width that exceeds `(120px card − 28px padding) / 3 ≈ 30px`, so flex shrinking fails and the row overflows.
+
+**Fix:** Allow `.usageRow` to wrap and let each button take a sensible minimum width so they reflow to a second line at small sizes.
+
+### Tasks
+- [x] Add `flex-wrap: wrap` to `.usageRow`
+- [x] Set each `.usageBtn` to `flex: 1 1 60px` and `min-width: 0` so buttons can shrink/wrap without overflowing
+
+### Files changed
+
+- `apps/web/src/components/photos/PhotosPage.module.css`
+
+
+---
+
 _Add future fixes below as new `## Fix N` sections._
