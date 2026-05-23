@@ -259,11 +259,13 @@
 
 .usageRow {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
 .usageBtn {
-  flex: 1;
+  flex: 1 1 60px;
+  min-width: 0;
   padding: 4px 2px;
   font-size: 11px;
   font-weight: 600;
