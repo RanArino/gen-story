@@ -20,6 +20,143 @@
   margin-bottom: 0;
 }
 
+.accordionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.accordionToggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.accordionToggle .sectionTitle {
+  margin: 0;
+  transition: color 0.15s;
+}
+
+.accordionToggle:hover .sectionTitle {
+  color: #1a56db;
+}
+
+.accordionCaret {
+  font-size: 13px;
+  color: #8898aa;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.accordionToggle:hover .accordionCaret {
+  color: #1a56db;
+}
+
+.accordionBody {
+  margin-top: 12px;
+}
+
+.accordionSummary {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #5a6a7e;
+  margin-left: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.accordionSummary > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.accordionSummaryMuted {
+  color: #a0aab8;
+  font-style: italic;
+}
+
+.accordionSummaryStyle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.accordionSummaryThumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.aiAssistCard {
+  background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%);
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 28px;
+}
+
+.aiAssistHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.aiAssistTitleBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+.aiAssistTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #152033;
+}
+
+.aiAssistIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.aiAssistSubtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #4c5468;
+  line-height: 1.5;
+}
+
+.aiAssistSubtitle strong {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.aiAssistBody {
+  margin-top: 4px;
+}
+
 .toneGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -296,6 +433,26 @@
   cursor: not-allowed;
 }
 
+.deleteBtn {
+  padding: 4px 8px;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  background: #fff5f5;
+  color: #dc2626;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.deleteBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .sceneFields {
   display: flex;
   flex-direction: column;
@@ -317,6 +474,8 @@
 }
 
 .fieldInput {
+  width: 100%;
+  box-sizing: border-box;
   padding: 7px 10px;
   border: 1px solid #d0d9e8;
   border-radius: 7px;

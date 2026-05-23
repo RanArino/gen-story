@@ -155,6 +155,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [complementBusy, setComplementBusy] = useState(false);
   const [photoViewSize, setPhotoViewSize] = useState<"small" | "medium" | "large">("small");
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
+  const [accordionOpen, setAccordionOpen] = useState({
+    tone: true,
+    style: true,
+    commonPrompt: true,
+  });
   const [proposalCtx, setProposalCtx] = useState<{
     fromSceneId: string;
     toSceneId: string;
@@ -290,6 +295,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         commonPrompt,
       });
       setStoryboard(updated);
+      if (commonPrompt === "") {
+        setAccordionOpen((prev) => ({ ...prev, commonPrompt: true }));
+      }
       setSaveMsg("Common prompt saved!");
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
@@ -332,6 +340,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   function updateScene(idx: number, patch: Partial<SceneState>) {
     setScenes((prev) =>
       prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+    );
+  }
+
+  function deleteScene(idx: number) {
+    setScenes((prev) =>
+      prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, orderIndex: i })),
     );
   }
 
@@ -544,6 +558,13 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const selectedAnalysisTone = photoAnalysis?.emotionCandidates.find(
     (candidate) => candidate.value === storyboard.tone,
   );
+  const selectedToneLabel =
+    TONES.find((t) => t.value === storyboard.tone)?.label ??
+    selectedAnalysisTone?.label ??
+    storyboard.tone;
+  const selectedStyle = stylePresets.find(
+    (p) => p.id === storyboard.stylePresetId,
+  );
 
   return (
     <AppShell projectId={projectId}>
@@ -554,9 +575,78 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       {error && <ErrorAlert message={error} />}
 
-      {/* Tone selector */}
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Emotion / Tone</h3>
+      {/* AI assistant card — top-level, scope-explicit. Only affects Tone. */}
+      <section className={styles.aiAssistCard}>
+        <div className={styles.aiAssistHeader}>
+          <div className={styles.aiAssistTitleBlock}>
+            <h3 className={styles.aiAssistTitle}>
+              <span className={styles.aiAssistIcon} aria-hidden>
+                ✨
+              </span>
+              AI Photo Analysis
+            </h3>
+            <p className={styles.aiAssistSubtitle}>
+              Suggests an <strong>emotion / tone</strong> based on your candidate
+              photos. Click a suggestion to apply it to the Tone setting below.
+              Style preset, Common prompt, and Scenes are not auto-filled.
+            </p>
+          </div>
+          {analyzablePhotoCount > 0 && (
+            <button
+              className="btn btn-primary"
+              onClick={handleAnalyzePhotos}
+              disabled={analyzingPhotos}
+            >
+              {analyzingPhotos
+                ? "Analyzing…"
+                : photoAnalysis
+                  ? "Re-analyze"
+                  : "Analyze photos"}
+            </button>
+          )}
+        </div>
+
+        <div className={styles.aiAssistBody}>
+          {analyzablePhotoCount === 0 ? (
+            <p className={styles.analysisEmpty}>
+              Mark at least one photo as candidate or reference on the Photos
+              page to enable analysis.
+            </p>
+          ) : photoAnalysis ? (
+            <div className={styles.analysisPanel}>
+              <p className={styles.analysisSummary}>
+                {photoAnalysis.storySummary}
+              </p>
+              <div className={styles.analysisCandidates}>
+                {photoAnalysis.emotionCandidates.map((candidate) => (
+                  <button
+                    key={candidate.value}
+                    className={`${styles.analysisCandidate} ${storyboard.tone === candidate.value ? styles.analysisCandidateActive : ""}`}
+                    onClick={() => handleToneChange(candidate.value)}
+                  >
+                    <strong>{candidate.label}</strong>
+                    <span>{candidate.description}</span>
+                    <small>{candidate.reason}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className={styles.analysisEmpty}>
+              Click <strong>Analyze photos</strong> to generate tone suggestions
+              based on your selected photo set.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* 1. Emotion / Tone */}
+      <CollapsibleSection
+        title="Emotion / Tone"
+        open={accordionOpen.tone}
+        onToggle={() => setAccordionOpen((prev) => ({ ...prev, tone: !prev.tone }))}
+        summary={<span>{selectedToneLabel}</span>}
+      >
         <div className={styles.toneGrid}>
           {TONES.map((t) => (
             <button
@@ -578,52 +668,217 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </button>
           )}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>AI Photo Analysis</h3>
-          {analyzablePhotoCount > 0 && (
-            <button
-              className="btn btn-secondary"
-              onClick={handleAnalyzePhotos}
-              disabled={analyzingPhotos}
-            >
-              {analyzingPhotos ? "Analyzing…" : "Analyze photos"}
-            </button>
+      {/* 2. Style preset */}
+      <CollapsibleSection
+        title="Style preset"
+        open={accordionOpen.style}
+        onToggle={() => setAccordionOpen((prev) => ({ ...prev, style: !prev.style }))}
+        summary={
+          selectedStyle ? (
+            <span className={styles.accordionSummaryStyle}>
+              {selectedStyle.previewImageUrl && (
+                <img
+                  src={selectedStyle.previewImageUrl}
+                  alt=""
+                  className={styles.accordionSummaryThumb}
+                />
+              )}
+              <span>{selectedStyle.name}</span>
+            </span>
+          ) : (
+            <span>AI recommend</span>
+          )
+        }
+        headerAction={
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowCustomStyleModal(true)}
+          >
+            Create custom style
+          </button>
+        }
+      >
+        <div className={styles.styleGrid}>
+          <button
+            className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
+            onClick={() => handleStyleChange(null)}
+          >
+            AI recommend
+          </button>
+          {systemStylePresets.length > 0 && (
+            <span className={styles.styleGroupLabel}>System styles</span>
           )}
+          {systemStylePresets.map((p) => (
+            <button
+              key={p.id}
+              className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
+              onClick={() => handleStyleChange(p.id)}
+              title={p.description}
+            >
+              {p.previewImageUrl && (
+                <img src={p.previewImageUrl} alt={p.name} />
+              )}
+              <span className={styles.styleBtnCardLabel}>{p.name}</span>
+            </button>
+          ))}
+          {userStylePresets.length > 0 && (
+            <span className={styles.styleGroupLabel}>Custom styles</span>
+          )}
+          {userStylePresets.map((p) => (
+            <button
+              key={p.id}
+              className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
+              onClick={() => handleStyleChange(p.id)}
+              title={p.description}
+            >
+              {p.name}
+            </button>
+          ))}
         </div>
-        {analyzablePhotoCount === 0 ? (
-          <p className={styles.analysisEmpty}>
-            Mark at least one photo as candidate or reference to analyze tone.
-          </p>
-        ) : photoAnalysis ? (
-          <div className={styles.analysisPanel}>
-            <p className={styles.analysisSummary}>
-              {photoAnalysis.storySummary}
-            </p>
-            <div className={styles.analysisCandidates}>
-              {photoAnalysis.emotionCandidates.map((candidate) => (
+        {showCustomStyleModal && (
+          <div className={styles.modalOverlay} role="presentation">
+            <div
+              className={styles.modalContent}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="custom-style-title"
+            >
+              <h4 id="custom-style-title" className={styles.modalTitle}>
+                Create custom style
+              </h4>
+              <label className={styles.sceneField}>
+                <span className={styles.fieldLabel}>Style name</span>
+                <input
+                  className={styles.fieldInput}
+                  type="text"
+                  value={customStyleForm.name}
+                  onChange={(event) =>
+                    setCustomStyleForm((prev) => ({
+                      ...prev,
+                      name: event.target.value,
+                    }))
+                  }
+                  disabled={savingCustomStyle}
+                  placeholder="Vintage family film"
+                />
+              </label>
+              <label className={styles.sceneField}>
+                <span className={styles.fieldLabel}>Description</span>
+                <textarea
+                  className={styles.fieldInput}
+                  value={customStyleForm.description}
+                  onChange={(event) =>
+                    setCustomStyleForm((prev) => ({
+                      ...prev,
+                      description: event.target.value,
+                    }))
+                  }
+                  disabled={savingCustomStyle}
+                  rows={2}
+                  placeholder="Warm grain, soft highlights, muted color."
+                />
+              </label>
+              <label className={styles.sceneField}>
+                <span className={styles.fieldLabel}>Style prompt</span>
+                <textarea
+                  className={styles.fieldInput}
+                  value={customStyleForm.prompt}
+                  onChange={(event) =>
+                    setCustomStyleForm((prev) => ({
+                      ...prev,
+                      prompt: event.target.value,
+                    }))
+                  }
+                  disabled={savingCustomStyle}
+                  rows={5}
+                  placeholder="Describe the visual treatment to apply during image generation."
+                />
+              </label>
+              <div className={styles.modalActions}>
                 <button
-                  key={candidate.value}
-                  className={`${styles.analysisCandidate} ${storyboard.tone === candidate.value ? styles.analysisCandidateActive : ""}`}
-                  onClick={() => handleToneChange(candidate.value)}
+                  className="btn btn-primary"
+                  onClick={handleCreateCustomStyle}
+                  disabled={
+                    savingCustomStyle ||
+                    !customStyleForm.name.trim() ||
+                    !customStyleForm.prompt.trim()
+                  }
                 >
-                  <strong>{candidate.label}</strong>
-                  <span>{candidate.description}</span>
-                  <small>{candidate.reason}</small>
+                  {savingCustomStyle ? "Creating..." : "Create style"}
                 </button>
-              ))}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowCustomStyleModal(false)}
+                  disabled={savingCustomStyle}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        ) : (
-          <p className={styles.analysisEmpty}>
-            Run analysis to get emotion candidates from the selected photo set.
-          </p>
         )}
-      </section>
+      </CollapsibleSection>
 
-      {/* Create template scenes from photos */}
+      {/* 3. Common prompt */}
+      <CollapsibleSection
+        title="Common prompt"
+        open={accordionOpen.commonPrompt}
+        onToggle={() => setAccordionOpen((prev) => ({ ...prev, commonPrompt: !prev.commonPrompt }))}
+        summary={
+          storyboard.commonPrompt ? (
+            <span title={storyboard.commonPrompt}>
+              {storyboard.commonPrompt}
+            </span>
+          ) : (
+            <span className={styles.accordionSummaryMuted}>Not set</span>
+          )
+        }
+        headerAction={
+          <button
+            className="btn btn-secondary"
+            onClick={() => saveCommonPrompt("")}
+            disabled={savingCommonPrompt}
+          >
+            Regenerate from tone &amp; style
+          </button>
+        }
+      >
+        <p className={styles.photoAssignHint}>
+          Applied to every scene&apos;s image generation. Auto-generated from
+          the storyboard tone and style; edit it to guide all scenes
+          consistently.
+        </p>
+        <textarea
+          className={styles.fieldInput}
+          rows={10}
+          value={commonPromptDraft}
+          onChange={(e) => setCommonPromptDraft(e.target.value)}
+          placeholder="Common prompt applied to every scene"
+        />
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginTop: 8,
+          }}
+        >
+          <button
+            className="btn btn-primary"
+            onClick={() => saveCommonPrompt(commonPromptDraft)}
+            disabled={
+              savingCommonPrompt ||
+              commonPromptDraft === (storyboard.commonPrompt ?? "")
+            }
+          >
+            {savingCommonPrompt ? "Saving…" : "Save common prompt"}
+          </button>
+        </div>
+      </CollapsibleSection>
+
+      {/* 4. Create Scenes from Photos — always visible, right above Scenes */}
       {photos.some((p) => p.usage === "candidate") && (() => {
         const candidatePhotos = photos.filter((p) => p.usage === "candidate");
         const allSelected =
@@ -758,184 +1013,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         );
       })()}
 
-      {/* Style preset selector */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Style preset</h3>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowCustomStyleModal(true)}
-          >
-            Create custom style
-          </button>
-        </div>
-        <div className={styles.styleGrid}>
-          <button
-            className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
-            onClick={() => handleStyleChange(null)}
-          >
-            AI recommend
-          </button>
-          {systemStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>System styles</span>
-          )}
-          {systemStylePresets.map((p) => (
-            <button
-              key={p.id}
-              className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
-              onClick={() => handleStyleChange(p.id)}
-              title={p.description}
-            >
-              {p.previewImageUrl && (
-                <img src={p.previewImageUrl} alt={p.name} />
-              )}
-              <span className={styles.styleBtnCardLabel}>{p.name}</span>
-            </button>
-          ))}
-          {userStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>Custom styles</span>
-          )}
-          {userStylePresets.map((p) => (
-            <button
-              key={p.id}
-              className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
-              onClick={() => handleStyleChange(p.id)}
-              title={p.description}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-        {showCustomStyleModal && (
-          <div className={styles.modalOverlay} role="presentation">
-            <div
-              className={styles.modalContent}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="custom-style-title"
-            >
-              <h4 id="custom-style-title" className={styles.modalTitle}>
-                Create custom style
-              </h4>
-              <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>Style name</span>
-                <input
-                  className={styles.fieldInput}
-                  type="text"
-                  value={customStyleForm.name}
-                  onChange={(event) =>
-                    setCustomStyleForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
-                  disabled={savingCustomStyle}
-                  placeholder="Vintage family film"
-                />
-              </label>
-              <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>Description</span>
-                <textarea
-                  className={styles.fieldInput}
-                  value={customStyleForm.description}
-                  onChange={(event) =>
-                    setCustomStyleForm((prev) => ({
-                      ...prev,
-                      description: event.target.value,
-                    }))
-                  }
-                  disabled={savingCustomStyle}
-                  rows={2}
-                  placeholder="Warm grain, soft highlights, muted color."
-                />
-              </label>
-              <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>Style prompt</span>
-                <textarea
-                  className={styles.fieldInput}
-                  value={customStyleForm.prompt}
-                  onChange={(event) =>
-                    setCustomStyleForm((prev) => ({
-                      ...prev,
-                      prompt: event.target.value,
-                    }))
-                  }
-                  disabled={savingCustomStyle}
-                  rows={5}
-                  placeholder="Describe the visual treatment to apply during image generation."
-                />
-              </label>
-              <div className={styles.modalActions}>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleCreateCustomStyle}
-                  disabled={
-                    savingCustomStyle ||
-                    !customStyleForm.name.trim() ||
-                    !customStyleForm.prompt.trim()
-                  }
-                >
-                  {savingCustomStyle ? "Creating..." : "Create style"}
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowCustomStyleModal(false)}
-                  disabled={savingCustomStyle}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Common project prompt */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Common prompt</h3>
-          <button
-            className="btn btn-secondary"
-            onClick={() => saveCommonPrompt("")}
-            disabled={savingCommonPrompt}
-          >
-            Regenerate from tone &amp; style
-          </button>
-        </div>
-        <p className={styles.photoAssignHint}>
-          Applied to every scene&apos;s image generation. Auto-generated from
-          the storyboard tone and style; edit it to guide all scenes
-          consistently.
-        </p>
-        <textarea
-          className={styles.fieldInput}
-          rows={4}
-          value={commonPromptDraft}
-          onChange={(e) => setCommonPromptDraft(e.target.value)}
-          placeholder="Common prompt applied to every scene"
-        />
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            marginTop: 8,
-          }}
-        >
-          <button
-            className="btn btn-primary"
-            onClick={() => saveCommonPrompt(commonPromptDraft)}
-            disabled={
-              savingCommonPrompt ||
-              commonPromptDraft === (storyboard.commonPrompt ?? "")
-            }
-          >
-            {savingCommonPrompt ? "Saving…" : "Save common prompt"}
-          </button>
-        </div>
-      </section>
-
-      {/* Scene list */}
+      {/* 5. Scene list */}
       <section className={styles.section} data-scenes-section>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>Scenes ({scenes.length})</h3>
@@ -987,6 +1065,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   onDragHandleEnd={() => setSceneDragIndex(null)}
                   onUpdate={(patch) => updateScene(idx, patch)}
                   onMove={(dir) => moveScene(idx, dir)}
+                  onDelete={() => deleteScene(idx)}
                   onAiFill={handleAiFill}
                   isAiFilling={aiFillingSceneId === scene.id}
                   isBusy={saving || aiFillingSceneId !== null}
@@ -1064,6 +1143,45 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         />
       )}
     </AppShell>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  open,
+  onToggle,
+  children,
+  headerAction,
+  summary,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  headerAction?: React.ReactNode;
+  summary?: React.ReactNode;
+}) {
+  return (
+    <section className={styles.section}>
+      <div className={styles.accordionHeader}>
+        <button
+          type="button"
+          className={styles.accordionToggle}
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span className={styles.accordionCaret}>{open ? "▾" : "▸"}</span>
+          <h3 className={styles.sectionTitle}>{title}</h3>
+        </button>
+        {!open && summary !== undefined && (
+          <div className={styles.accordionSummary}>{summary}</div>
+        )}
+        {headerAction && (
+          <div onClick={(e) => e.stopPropagation()}>{headerAction}</div>
+        )}
+      </div>
+      {open && <div className={styles.accordionBody}>{children}</div>}
+    </section>
   );
 }
 
@@ -1160,6 +1278,7 @@ function SceneCard({
   onDragHandleEnd,
   onUpdate,
   onMove,
+  onDelete,
   onAiFill,
   isAiFilling,
   isBusy,
@@ -1174,6 +1293,7 @@ function SceneCard({
   onDragHandleEnd: () => void;
   onUpdate: (patch: Partial<SceneState>) => void;
   onMove: (dir: -1 | 1) => void;
+  onDelete: () => void;
   onAiFill: (sceneId: string) => void;
   isAiFilling: boolean;
   isBusy: boolean;
@@ -1257,6 +1377,14 @@ function SceneCard({
             title="Move down"
           >
             ↓
+          </button>
+          <button
+            className={styles.deleteBtn}
+            onClick={onDelete}
+            disabled={isBusy}
+            title="Delete this scene"
+          >
+            ×
           </button>
         </div>
       </div>
