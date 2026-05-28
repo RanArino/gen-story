@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { createProject } from "../../lib/api-client";
 import { AppShell } from "../AppShell";
@@ -8,17 +9,19 @@ import { ErrorAlert } from "../ErrorAlert";
 import styles from "./ProjectCreatePage.module.css";
 
 const OCCASIONS = [
-  { value: "", label: "None / General" },
-  { value: "anniversary", label: "Anniversary" },
-  { value: "graduation", label: "Graduation" },
-  { value: "birthday", label: "Birthday" },
-  { value: "travel", label: "Travel" },
-  { value: "wedding", label: "Wedding" },
-  { value: "other", label: "Other" },
+  { value: "", labelKey: "general" },
+  { value: "anniversary", labelKey: "anniversary" },
+  { value: "graduation", labelKey: "graduation" },
+  { value: "birthday", labelKey: "birthday" },
+  { value: "travel", labelKey: "travel" },
+  { value: "wedding", labelKey: "wedding" },
+  { value: "other", labelKey: "other" },
 ] as const;
 
 export function ProjectCreatePage() {
   const router = useRouter();
+  const t = useTranslations("projects");
+  const tCommon = useTranslations("common");
   const [name, setName] = useState("");
   const [occasion, setOccasion] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +36,7 @@ export function ProjectCreatePage() {
       const project = await createProject(name.trim(), occasion || undefined);
       router.push(`/projects/${project.id}/photos`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
+      setError(err instanceof Error ? err.message : t("createFailed"));
       setSubmitting(false);
     }
   }
@@ -41,20 +44,20 @@ export function ProjectCreatePage() {
   return (
     <AppShell>
       <div className="screen-header">
-        <h2>New project</h2>
-        <p>Give your story project a name and occasion</p>
+        <h2>{t("createTitle")}</h2>
+        <p>{t("createSubtitle")}</p>
       </div>
 
       <form onSubmit={handleSubmit} className={`card ${styles.form}`}>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="proj-name">
-            Project name
+            {t("nameLabel")}
           </label>
           <input
             id="proj-name"
             className={styles.input}
             type="text"
-            placeholder="e.g. Family reunion 2025"
+            placeholder={t("namePlaceholder")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -64,7 +67,7 @@ export function ProjectCreatePage() {
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="proj-occasion">
-            Occasion (optional)
+            {t("occasionLabel")}
           </label>
           <select
             id="proj-occasion"
@@ -74,7 +77,7 @@ export function ProjectCreatePage() {
           >
             {OCCASIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(`occasions.${o.labelKey}`)}
               </option>
             ))}
           </select>
@@ -88,14 +91,14 @@ export function ProjectCreatePage() {
             className="btn btn-secondary"
             onClick={() => router.push("/projects")}
           >
-            Cancel
+            {tCommon("cancel")}
           </button>
           <button
             type="submit"
             className="btn btn-primary"
             disabled={submitting || !name.trim()}
           >
-            {submitting ? "Creating…" : "Create project"}
+            {submitting ? t("creating") : t("createButton")}
           </button>
         </div>
       </form>

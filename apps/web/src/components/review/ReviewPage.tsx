@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import type {
   GeneratedImageDto,
@@ -37,6 +38,8 @@ function latestRequest(r: SceneReview): GenerationRequestDto | null {
 }
 
 export function ReviewPage({ projectId }: { projectId: string }) {
+  const t = useTranslations("review");
+  const tCommon = useTranslations("common");
   const [reviews, setReviews] = useState<SceneReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +101,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       await adoptGeneratedImage(sceneId, imageId);
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to adopt image");
+      setError(e instanceof Error ? e.message : t("errors.adopt"));
     }
   }
 
@@ -108,7 +111,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       await retryGenerationRequest(requestId);
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to retry");
+      setError(e instanceof Error ? e.message : t("errors.retry"));
     }
   }
 
@@ -150,7 +153,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       setRegenSceneId(null);
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to queue re-generation");
+      setError(e instanceof Error ? e.message : t("errors.regen"));
     }
   }
 
@@ -161,7 +164,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   if (loading) {
     return (
       <AppShell projectId={projectId}>
-        <p style={{ color: "#8898aa" }}>Loading…</p>
+        <p style={{ color: "#8898aa" }}>{tCommon("loading")}</p>
       </AppShell>
     );
   }
@@ -169,11 +172,8 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
-        <h2>Review</h2>
-        <p>
-          Compare generated images with source photos. Adopt the ones you want
-          to keep.
-        </p>
+        <h2>{t("title")}</h2>
+        <p>{t("subtitle")}</p>
       </div>
 
       {error && <ErrorAlert message={error} />}
@@ -181,32 +181,26 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       {reviews.length > 0 && (
         <div className={styles.controls}>
           <div className={styles.controlGroup}>
-            <span className={styles.controlLabel}>View</span>
+            <span className={styles.controlLabel}>{t("controls.view")}</span>
             {(["card", "timeline", "table"] as const).map((v) => (
               <button
                 key={v}
                 className={`${styles.controlBtn} ${view === v ? styles.controlBtnActive : ""}`}
                 onClick={() => setView(v)}
               >
-                {v[0]!.toUpperCase() + v.slice(1)}
+                {t(`controls.views.${v}`)}
               </button>
             ))}
           </div>
           <div className={styles.controlGroup}>
-            <span className={styles.controlLabel}>Show</span>
-            {(
-              [
-                ["all", "All"],
-                ["original", "Original only"],
-                ["generated", "Generated only"],
-              ] as const
-            ).map(([value, label]) => (
+            <span className={styles.controlLabel}>{t("controls.show")}</span>
+            {(["all", "original", "generated"] as const).map((value) => (
               <button
                 key={value}
                 className={`${styles.controlBtn} ${filter === value ? styles.controlBtnActive : ""}`}
                 onClick={() => setFilter(value)}
               >
-                {label}
+                {t(`controls.filters.${value}`)}
               </button>
             ))}
           </div>
@@ -215,13 +209,13 @@ export function ReviewPage({ projectId }: { projectId: string }) {
 
       {reviews.length === 0 && (
         <div className="card">
-          <p>No scenes found.</p>
+          <p>{t("noScenes")}</p>
           <Link
             href={`/projects/${projectId}/generate`}
             className="btn btn-primary"
             style={{ marginTop: 12 }}
           >
-            ← Back to Generate
+            {t("backToGenerate")}
           </Link>
         </div>
       )}
@@ -256,7 +250,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
             href={`/projects/${projectId}/generate`}
             className="btn btn-secondary"
           >
-            ← Back to Generate
+            {t("backToGenerate")}
           </Link>
           {storyboardId && (
             <Link
@@ -264,7 +258,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
               className="btn btn-secondary"
               style={{ marginLeft: 8 }}
             >
-              Generation history
+              {t("generationHistory")}
             </Link>
           )}
           {storyboardId && (
@@ -274,7 +268,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
               className="btn btn-primary"
               style={{ marginLeft: "auto" }}
             >
-              Export Storyboard JSON
+              {t("exportJson")}
             </a>
           )}
         </div>
@@ -308,11 +302,13 @@ function SceneReviewCard({
 }) {
   const { scene, generatedImages, primaryPhoto, requests } = review;
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const t = useTranslations("review");
 
   const latest = latestRequest(review);
   const latestRequestStatus = latest?.status ?? null;
   const latestErrorMessage = latest?.errorMessage ?? null;
   const latestRequestId = latest?.id ?? null;
+  const formatRelativeTime = useFormatRelativeTime();
 
   const adoptedImage = generatedImages.find((img) => img.adoptedAt !== null);
 
@@ -320,12 +316,14 @@ function SceneReviewCard({
     <div className={`card ${styles.sceneCard}`}>
       <div className={styles.sceneHeader}>
         <h3 className={styles.sceneTitle}>{scene.title}</h3>
-        {adoptedImage && <span className={styles.adoptedBadge}>✓ Adopted</span>}
+        {adoptedImage && (
+          <span className={styles.adoptedBadge}>{t("card.adoptedBadge")}</span>
+        )}
         {latestRequestStatus === "failed" && (
-          <span className={styles.failedBadge}>Generation failed</span>
+          <span className={styles.failedBadge}>{t("card.failedBadge")}</span>
         )}
         <button className={styles.regenBtn} onClick={onRegen}>
-          Re-generate
+          {t("card.regenerate")}
         </button>
       </div>
 
@@ -337,7 +335,7 @@ function SceneReviewCard({
         {/* Source photo */}
         {filter !== "generated" && (
           <div className={styles.comparisonCol}>
-            <p className={styles.colLabel}>Source photo</p>
+            <p className={styles.colLabel}>{t("card.sourcePhoto")}</p>
             <div className={styles.imgBox}>
               {primaryPhoto ? (
                 <img
@@ -346,7 +344,9 @@ function SceneReviewCard({
                   className={styles.img}
                 />
               ) : (
-                <div className={styles.imgPlaceholder}>No photo assigned</div>
+                <div className={styles.imgPlaceholder}>
+                  {t("card.noPhotoAssigned")}
+                </div>
               )}
             </div>
           </div>
@@ -355,7 +355,7 @@ function SceneReviewCard({
         {/* Adopted image */}
         {filter !== "original" && (
           <div className={styles.comparisonCol}>
-            <p className={styles.colLabel}>Generated image</p>
+            <p className={styles.colLabel}>{t("card.generatedImage")}</p>
             <div className={styles.imgBox}>
               {adoptedImage ? (
                 <img
@@ -366,15 +366,15 @@ function SceneReviewCard({
               ) : generatedImages.length === 0 ? (
                 <div className={styles.imgPlaceholder}>
                   {latestRequestStatus === "failed"
-                    ? "Generation failed"
+                    ? t("card.generationFailed")
                     : latestRequestStatus === "running" ||
                         latestRequestStatus === "queued"
-                      ? "Generating…"
-                      : "Not generated yet"}
+                      ? t("card.generatingState")
+                      : t("card.notGeneratedYet")}
                 </div>
               ) : (
                 <div className={styles.imgPlaceholder}>
-                  No image adopted yet
+                  {t("card.noImageAdopted")}
                 </div>
               )}
             </div>
@@ -389,7 +389,7 @@ function SceneReviewCard({
             className="btn btn-secondary"
             onClick={() => onRetry(latestRequestId)}
           >
-            Retry generation
+            {t("card.retryGeneration")}
           </button>
         )}
 
@@ -399,7 +399,7 @@ function SceneReviewCard({
             className="btn btn-secondary"
             style={{ fontSize: 13 }}
           >
-            Go to Generate →
+            {t("card.goToGenerate")}
           </Link>
         )}
       </div>
@@ -411,7 +411,7 @@ function SceneReviewCard({
             className={styles.historyToggle}
             onClick={() => setHistoryExpanded((v) => !v)}
           >
-            Generation history ({requests.length})
+            {t("card.historyHeader", { count: requests.length })}
             <span className={styles.historyChevron}>
               {historyExpanded ? "▲" : "▼"}
             </span>
@@ -453,7 +453,7 @@ function SceneReviewCard({
                             className={styles.adoptedBadge}
                             style={{ fontSize: 11 }}
                           >
-                            Adopted
+                            {t("card.adopted")}
                           </span>
                         ) : (
                           <button
@@ -461,7 +461,7 @@ function SceneReviewCard({
                             style={{ fontSize: 12, padding: "4px 10px" }}
                             onClick={() => onAdopt(scene.id, img.id)}
                           >
-                            Adopt
+                            {t("card.adopt")}
                           </button>
                         ))}
                     </div>
@@ -491,14 +491,17 @@ function StatusChip({ status }: { status: string }) {
   );
 }
 
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+function useFormatRelativeTime() {
+  const t = useTranslations("review.time");
+  return (iso: string): string => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t("justNow");
+    if (mins < 60) return t("minutesAgo", { count: mins });
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return t("hoursAgo", { count: hours });
+    return t("daysAgo", { count: Math.floor(hours / 24) });
+  };
 }
 
 type RegenFields = {
@@ -553,6 +556,8 @@ function RegenModal({
   onConfirm: (fields: RegenFields) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("review.regenModal");
+  const tSel = useTranslations("selections");
   const [fields, setFields] = useState<RegenFields>({
     imagePrompt: scene.imagePrompt ?? "",
     emotion: scene.emotion ?? "",
@@ -579,16 +584,15 @@ function RegenModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className={styles.modalTitle}>
-          Re-generate — {scene.title || "Untitled scene"}
+          {t("title", {
+            sceneTitle: scene.title || t("untitledScene"),
+          })}
         </h3>
-        <p className={styles.modalSubtitle}>
-          Adjust settings then confirm to queue a new generation.
-          Changes will be saved to the scene.
-        </p>
+        <p className={styles.modalSubtitle}>{t("subtitle")}</p>
 
         <div className={styles.modalFields}>
           <label className={styles.modalLabel}>
-            Image prompt
+            {t("imagePrompt")}
             <textarea
               className={styles.modalTextarea}
               rows={3}
@@ -599,7 +603,7 @@ function RegenModal({
 
           <div className={styles.modalSelects}>
             <label className={styles.modalLabel}>
-              Emotion
+              {t("emotion")}
               <select
                 className={styles.modalSelect}
                 value={fields.emotion}
@@ -607,13 +611,15 @@ function RegenModal({
               >
                 <option value="">—</option>
                 {EMOTION_OPTIONS.map((o) => (
-                  <option key={o} value={o}>{o}</option>
+                  <option key={o} value={o}>
+                    {tSel(`emotion.${o}`)}
+                  </option>
                 ))}
               </select>
             </label>
 
             <label className={styles.modalLabel}>
-              Camera
+              {t("camera")}
               <select
                 className={styles.modalSelect}
                 value={fields.cameraDirection}
@@ -621,13 +627,15 @@ function RegenModal({
               >
                 <option value="">—</option>
                 {CAMERA_OPTIONS.map((o) => (
-                  <option key={o} value={o}>{o}</option>
+                  <option key={o} value={o}>
+                    {tSel(`camera.${o}`)}
+                  </option>
                 ))}
               </select>
             </label>
 
             <label className={styles.modalLabel}>
-              Lighting
+              {t("lighting")}
               <select
                 className={styles.modalSelect}
                 value={fields.lightingDirection}
@@ -635,13 +643,15 @@ function RegenModal({
               >
                 <option value="">—</option>
                 {LIGHTING_OPTIONS.map((o) => (
-                  <option key={o} value={o}>{o}</option>
+                  <option key={o} value={o}>
+                    {tSel(`lighting.${o}`)}
+                  </option>
                 ))}
               </select>
             </label>
 
             <label className={styles.modalLabel}>
-              Motion
+              {t("motion")}
               <select
                 className={styles.modalSelect}
                 value={fields.motionDirection}
@@ -649,7 +659,9 @@ function RegenModal({
               >
                 <option value="">—</option>
                 {MOTION_OPTIONS.map((o) => (
-                  <option key={o} value={o}>{o}</option>
+                  <option key={o} value={o}>
+                    {tSel(`motion.${o}`)}
+                  </option>
                 ))}
               </select>
             </label>
@@ -658,14 +670,14 @@ function RegenModal({
 
         <div className={styles.modalFooter}>
           <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
+            {t("cancel")}
           </button>
           <button
             className="btn btn-primary"
             onClick={handleSubmit}
             disabled={submitting}
           >
-            {submitting ? "Queuing…" : "Queue generation"}
+            {submitting ? t("queuing") : t("queue")}
           </button>
         </div>
       </div>
@@ -691,6 +703,7 @@ function TimelineView({
   reviews: SceneReview[];
   filter: "all" | "original" | "generated";
 }) {
+  const t = useTranslations("review.timeline");
   return (
     <div className={styles.timeline}>
       {reviews.map((r, index) => {
@@ -699,7 +712,9 @@ function TimelineView({
           <div key={r.scene.id} className={styles.timelineItem}>
             <div className={styles.timelineMarker}>{index + 1}</div>
             <div className={styles.timelineCard}>
-              <p className={styles.colLabel}>{r.scene.title || "Untitled"}</p>
+              <p className={styles.colLabel}>
+                {r.scene.title || t("untitled")}
+              </p>
               <div className={styles.timelineImages}>
                 {filter !== "generated" && (
                   <div className={styles.imgBox}>
@@ -712,8 +727,8 @@ function TimelineView({
                     ) : (
                       <div className={styles.imgPlaceholder}>
                         {r.scene.kind === "complement"
-                          ? "Complement scene"
-                          : "No photo"}
+                          ? t("complementScene")
+                          : t("noPhoto")}
                       </div>
                     )}
                   </div>
@@ -727,7 +742,9 @@ function TimelineView({
                         className={styles.img}
                       />
                     ) : (
-                      <div className={styles.imgPlaceholder}>Not generated</div>
+                      <div className={styles.imgPlaceholder}>
+                        {t("notGenerated")}
+                      </div>
                     )}
                   </div>
                 )}
@@ -747,17 +764,18 @@ function TableView({
   reviews: SceneReview[];
   filter: "all" | "original" | "generated";
 }) {
+  const t = useTranslations("review.table");
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>#</th>
-            <th>Title</th>
-            <th>Emotion</th>
-            <th>Camera</th>
-            {filter !== "generated" && <th>Source photo</th>}
-            {filter !== "original" && <th>Generated image</th>}
+            <th>{t("hash")}</th>
+            <th>{t("title")}</th>
+            <th>{t("emotion")}</th>
+            <th>{t("camera")}</th>
+            {filter !== "generated" && <th>{t("sourcePhoto")}</th>}
+            {filter !== "original" && <th>{t("generatedImage")}</th>}
           </tr>
         </thead>
         <tbody>
@@ -766,7 +784,7 @@ function TableView({
             return (
               <tr key={r.scene.id}>
                 <td>{index + 1}</td>
-                <td>{r.scene.title || "Untitled"}</td>
+                <td>{r.scene.title || t("untitled")}</td>
                 <td>{r.scene.emotion || "—"}</td>
                 <td>{r.scene.cameraDirection || "—"}</td>
                 {filter !== "generated" && (

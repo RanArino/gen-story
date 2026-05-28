@@ -3,6 +3,7 @@ import type {
   GeneratedImageDto,
   GenerationRequestDto,
   GenerationRequestWithSceneTitleDto,
+  Language,
   MeDto,
   PhotoAssetDto,
   ProjectDto,
@@ -11,6 +12,7 @@ import type {
   StylePresetDto,
   StoryboardDto,
   TestGenerationBatchDto,
+  UserPreferenceDto,
 } from "@gen-story/shared";
 
 export class ApiError extends Error {
@@ -465,7 +467,32 @@ export async function resetTestGenerationBatch(
   return data.batch;
 }
 
-export function exportStoryboardUrl(storyboardId: string): string {
+export function exportStoryboardUrl(
+  storyboardId: string,
+  language?: Language,
+): string {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-  return `${base}/api/storyboards/${storyboardId}/export.json`;
+  const qs = language ? `?lang=${language}` : "";
+  return `${base}/api/storyboards/${storyboardId}/export.json${qs}`;
+}
+
+// ── User preferences ──────────────────────────────────────────────────────────
+
+export async function getUserLanguagePreference(): Promise<UserPreferenceDto> {
+  const data = await request<{ preference: UserPreferenceDto }>(
+    "GET",
+    "/api/user/preferences",
+  );
+  return data.preference;
+}
+
+export async function setUserLanguagePreference(
+  language: Language,
+): Promise<UserPreferenceDto> {
+  const data = await request<{ preference: UserPreferenceDto }>(
+    "PUT",
+    "/api/user/preferences",
+    { language },
+  );
+  return data.preference;
 }

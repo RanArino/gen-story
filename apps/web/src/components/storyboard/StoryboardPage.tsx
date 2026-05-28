@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useState } from "react";
 import type {
   ComplementSceneProposalDto,
@@ -85,16 +86,13 @@ const EMOTION_OPTIONS = [
   "Gratitude",
 ];
 
-const DEFAULT_SCENE: Omit<UpsertSceneInput, "orderIndex"> = {
-  title: "New scene",
-  description: "Describe what happens in this scene.",
-  imagePrompt: "A cinematic moment capturing the essence of the scene.",
+const DEFAULT_SCENE_FIXED = {
   emotion: "Joy",
   cameraDirection: "Wide",
   lightingDirection: "Natural",
   motionDirection: "Slow pan",
   notes: "",
-};
+} as const;
 
 type SceneState = UpsertSceneInput & {
   id?: string;
@@ -123,6 +121,8 @@ function sceneDtoToState(scene: SceneDto): SceneState {
 }
 
 export function StoryboardPage({ projectId }: { projectId: string }) {
+  const t = useTranslations("storyboard");
+  const tCommon = useTranslations("common");
   const [storyboard, setStoryboard] = useState<StoryboardDto | null>(null);
   const [scenes, setScenes] = useState<SceneState[]>([]);
   const [stylePresets, setStylePresets] = useState<StylePresetDto[]>([]);
@@ -212,7 +212,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       });
       setStoryboard(sb);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create storyboard");
+      setError(e instanceof Error ? e.message : t("scenes.failedInit"));
     }
   }
 
@@ -228,7 +228,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       });
       setStoryboard(updated);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save tone");
+      setError(e instanceof Error ? e.message : t("scenes.failedTone"));
     }
   }
 
@@ -238,10 +238,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     try {
       const analysis = await analyzeProjectPhotos(projectId);
       setPhotoAnalysis(analysis);
-      setSaveMsg("Photo analysis complete!");
+      setSaveMsg(t("ai.completeMsg"));
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to analyze photos");
+      setError(e instanceof Error ? e.message : t("scenes.failedAnalyze"));
     } finally {
       setAnalyzingPhotos(false);
     }
@@ -259,7 +259,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       });
       setStoryboard(updated);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save style");
+      setError(e instanceof Error ? e.message : t("scenes.failedStyle"));
     }
   }
 
@@ -271,12 +271,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setStylePresets((prev) => [...prev, newStyle]);
       setCustomStyleForm({ name: "", description: "", prompt: "" });
       setShowCustomStyleModal(false);
-      setSaveMsg("Custom style created!");
+      setSaveMsg(t("style.createdMsg"));
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to create custom style",
-      );
+      setError(e instanceof Error ? e.message : t("style.failed"));
     } finally {
       setSavingCustomStyle(false);
     }
@@ -298,10 +296,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       if (commonPrompt === "") {
         setAccordionOpen((prev) => ({ ...prev, commonPrompt: true }));
       }
-      setSaveMsg("Common prompt saved!");
+      setSaveMsg(t("commonPrompt.savedMsg"));
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save common prompt");
+      setError(e instanceof Error ? e.message : t("commonPrompt.failed"));
     } finally {
       setSavingCommonPrompt(false);
     }
@@ -318,7 +316,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setScenes((prev) => [...prev, ...newScenes.map(sceneDtoToState)]);
       setSelectedPhotoIds(new Set());
       setSaveMsg(
-        `${newScenes.length} scene${newScenes.length !== 1 ? "s" : ""} created! Scroll down to edit.`,
+        t(
+          newScenes.length === 1
+            ? "createScenes.createdMsg"
+            : "createScenes.createdMsgPlural",
+          { count: newScenes.length },
+        ),
       );
       setTimeout(() => setSaveMsg(null), 4000);
       // Scroll to scenes section after a short delay
@@ -329,9 +332,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         }
       }, 300);
     } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to create template scenes",
-      );
+      setError(e instanceof Error ? e.message : t("createScenes.failed"));
     } finally {
       setCreatingTemplates(false);
     }
@@ -353,7 +354,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     setScenes((prev) => [
       ...prev,
       {
-        ...DEFAULT_SCENE,
+        ...DEFAULT_SCENE_FIXED,
+        title: t("scenes.defaultTitle"),
+        description: t("scenes.defaultDescription"),
+        imagePrompt: t("scenes.defaultImagePrompt"),
         orderIndex: prev.length,
         kind: "photo",
         bridge: null,
@@ -388,7 +392,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         );
         setScenes(saved.map(sceneDtoToState));
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Failed to reorder scenes");
+        setError(e instanceof Error ? e.message : t("scenes.failedReorder"));
       }
     }
   }
@@ -414,10 +418,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         })),
       );
       setScenes(saved.map(sceneDtoToState));
-      setSaveMsg("Saved");
+      setSaveMsg(t("saved"));
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save scenes");
+      setError(e instanceof Error ? e.message : t("scenes.failedSave"));
     } finally {
       setSaving(false);
     }
@@ -433,10 +437,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           scene.id === sceneId ? sceneDtoToState(filled) : scene,
         ),
       );
-      setSaveMsg("AI fill saved");
+      setSaveMsg(t("aiFillSaved"));
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to fill scene");
+      setError(e instanceof Error ? e.message : t("scenes.failedFill"));
     } finally {
       setAiFillingSceneId(null);
     }
@@ -453,12 +457,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       await insertComplementScene(sbId, fromSceneId, toSceneId);
       const sceneList = await listScenes(sbId);
       setScenes(sceneList.map(sceneDtoToState));
-      setSaveMsg("Complement scene inserted");
+      setSaveMsg(t("complement.inserted"));
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to insert complement scene",
-      );
+      setError(e instanceof Error ? e.message : t("complement.failedInsert"));
     } finally {
       setComplementBusy(false);
     }
@@ -479,9 +481,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       );
       setProposalCtx({ fromSceneId, toSceneId, proposals });
     } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to propose complement scenes",
-      );
+      setError(e instanceof Error ? e.message : t("complement.failedPropose"));
     } finally {
       setComplementBusy(false);
     }
@@ -517,10 +517,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         }),
       );
       setProposalCtx(null);
-      setSaveMsg("Proposal applied — review and Save scenes");
+      setSaveMsg(t("complement.appliedReview"));
       setTimeout(() => setSaveMsg(null), 4000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to apply proposal");
+      setError(e instanceof Error ? e.message : t("complement.failedApply"));
     } finally {
       setComplementBusy(false);
     }
@@ -529,7 +529,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   if (loading) {
     return (
       <AppShell projectId={projectId}>
-        <p style={{ color: "#8898aa" }}>Loading…</p>
+        <p style={{ color: "#8898aa" }}>{tCommon("loading")}</p>
       </AppShell>
     );
   }
@@ -538,12 +538,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     return (
       <AppShell projectId={projectId}>
         <div className="screen-header">
-          <h2>Storyboard</h2>
-          <p>No storyboard yet — initialize one to start building scenes.</p>
+          <h2>{t("title")}</h2>
+          <p>{t("noStoryboard")}</p>
         </div>
         {error && <ErrorAlert message={error} />}
         <button className="btn btn-primary" onClick={initStoryboard}>
-          Initialize storyboard
+          {t("initialize")}
         </button>
       </AppShell>
     );
@@ -558,10 +558,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const selectedAnalysisTone = photoAnalysis?.emotionCandidates.find(
     (candidate) => candidate.value === storyboard.tone,
   );
-  const selectedToneLabel =
-    TONES.find((t) => t.value === storyboard.tone)?.label ??
-    selectedAnalysisTone?.label ??
-    storyboard.tone;
+  const fixedTone = TONES.find((tn) => tn.value === storyboard.tone);
+  const selectedToneLabel = fixedTone
+    ? t(`tones.${fixedTone.value}.label`)
+    : (selectedAnalysisTone?.label ?? storyboard.tone);
   const selectedStyle = stylePresets.find(
     (p) => p.id === storyboard.stylePresetId,
   );
@@ -569,8 +569,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
-        <h2>Storyboard</h2>
-        <p>Choose an emotion &amp; style, then edit your scenes.</p>
+        <h2>{t("title")}</h2>
+        <p>{t("subtitle")}</p>
       </div>
 
       {error && <ErrorAlert message={error} />}
@@ -583,12 +583,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               <span className={styles.aiAssistIcon} aria-hidden>
                 ✨
               </span>
-              AI Photo Analysis
+              {t("ai.title")}
             </h3>
             <p className={styles.aiAssistSubtitle}>
-              Suggests an <strong>emotion / tone</strong> based on your candidate
-              photos. Click a suggestion to apply it to the Tone setting below.
-              Style preset, Common prompt, and Scenes are not auto-filled.
+              {t.rich("ai.subtitle", {
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </p>
           </div>
           {analyzablePhotoCount > 0 && (
@@ -598,20 +598,17 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               disabled={analyzingPhotos}
             >
               {analyzingPhotos
-                ? "Analyzing…"
+                ? t("ai.analyzing")
                 : photoAnalysis
-                  ? "Re-analyze"
-                  : "Analyze photos"}
+                  ? t("ai.reanalyze")
+                  : t("ai.analyze")}
             </button>
           )}
         </div>
 
         <div className={styles.aiAssistBody}>
           {analyzablePhotoCount === 0 ? (
-            <p className={styles.analysisEmpty}>
-              Mark at least one photo as candidate or reference on the Photos
-              page to enable analysis.
-            </p>
+            <p className={styles.analysisEmpty}>{t("ai.emptyNoPhotos")}</p>
           ) : photoAnalysis ? (
             <div className={styles.analysisPanel}>
               <p className={styles.analysisSummary}>
@@ -633,8 +630,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </div>
           ) : (
             <p className={styles.analysisEmpty}>
-              Click <strong>Analyze photos</strong> to generate tone suggestions
-              based on your selected photo set.
+              {t.rich("ai.emptyClickToStart", {
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </p>
           )}
         </div>
@@ -642,20 +640,20 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       {/* 1. Emotion / Tone */}
       <CollapsibleSection
-        title="Emotion / Tone"
+        title={t("sections.tone")}
         open={accordionOpen.tone}
         onToggle={() => setAccordionOpen((prev) => ({ ...prev, tone: !prev.tone }))}
         summary={<span>{selectedToneLabel}</span>}
       >
         <div className={styles.toneGrid}>
-          {TONES.map((t) => (
+          {TONES.map((tn) => (
             <button
-              key={t.value}
-              className={`${styles.toneBtn} ${storyboard.tone === t.value ? styles.toneBtnActive : ""}`}
-              onClick={() => handleToneChange(t.value)}
+              key={tn.value}
+              className={`${styles.toneBtn} ${storyboard.tone === tn.value ? styles.toneBtnActive : ""}`}
+              onClick={() => handleToneChange(tn.value)}
             >
-              <strong>{t.label}</strong>
-              <span>{t.desc}</span>
+              <strong>{t(`tones.${tn.value}.label`)}</strong>
+              <span>{t(`tones.${tn.value}.desc`)}</span>
             </button>
           ))}
           {!fixedToneSelected && selectedAnalysisTone && (
@@ -672,7 +670,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       {/* 2. Style preset */}
       <CollapsibleSection
-        title="Style preset"
+        title={t("sections.style")}
         open={accordionOpen.style}
         onToggle={() => setAccordionOpen((prev) => ({ ...prev, style: !prev.style }))}
         summary={
@@ -688,7 +686,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               <span>{selectedStyle.name}</span>
             </span>
           ) : (
-            <span>AI recommend</span>
+            <span>{t("style.aiRecommend")}</span>
           )
         }
         headerAction={
@@ -696,7 +694,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             className="btn btn-secondary"
             onClick={() => setShowCustomStyleModal(true)}
           >
-            Create custom style
+            {t("style.createCustom")}
           </button>
         }
       >
@@ -705,10 +703,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
             onClick={() => handleStyleChange(null)}
           >
-            AI recommend
+            {t("style.aiRecommend")}
           </button>
           {systemStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>System styles</span>
+            <span className={styles.styleGroupLabel}>{t("style.systemStyles")}</span>
           )}
           {systemStylePresets.map((p) => (
             <button
@@ -724,7 +722,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </button>
           ))}
           {userStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>Custom styles</span>
+            <span className={styles.styleGroupLabel}>{t("style.customStyles")}</span>
           )}
           {userStylePresets.map((p) => (
             <button
@@ -746,10 +744,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               aria-labelledby="custom-style-title"
             >
               <h4 id="custom-style-title" className={styles.modalTitle}>
-                Create custom style
+                {t("style.createCustom")}
               </h4>
               <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>Style name</span>
+                <span className={styles.fieldLabel}>{t("style.name")}</span>
                 <input
                   className={styles.fieldInput}
                   type="text"
@@ -761,11 +759,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                     }))
                   }
                   disabled={savingCustomStyle}
-                  placeholder="Vintage family film"
+                  placeholder={t("style.namePlaceholder")}
                 />
               </label>
               <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>Description</span>
+                <span className={styles.fieldLabel}>{t("style.description")}</span>
                 <textarea
                   className={styles.fieldInput}
                   value={customStyleForm.description}
@@ -777,11 +775,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   }
                   disabled={savingCustomStyle}
                   rows={2}
-                  placeholder="Warm grain, soft highlights, muted color."
+                  placeholder={t("style.descriptionPlaceholder")}
                 />
               </label>
               <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>Style prompt</span>
+                <span className={styles.fieldLabel}>{t("style.prompt")}</span>
                 <textarea
                   className={styles.fieldInput}
                   value={customStyleForm.prompt}
@@ -793,7 +791,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   }
                   disabled={savingCustomStyle}
                   rows={5}
-                  placeholder="Describe the visual treatment to apply during image generation."
+                  placeholder={t("style.promptPlaceholder")}
                 />
               </label>
               <div className={styles.modalActions}>
@@ -806,14 +804,16 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                     !customStyleForm.prompt.trim()
                   }
                 >
-                  {savingCustomStyle ? "Creating..." : "Create style"}
+                  {savingCustomStyle
+                    ? t("style.creating")
+                    : t("style.createStyle")}
                 </button>
                 <button
                   className="btn btn-secondary"
                   onClick={() => setShowCustomStyleModal(false)}
                   disabled={savingCustomStyle}
                 >
-                  Cancel
+                  {tCommon("cancel")}
                 </button>
               </div>
             </div>
@@ -823,7 +823,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       {/* 3. Common prompt */}
       <CollapsibleSection
-        title="Common prompt"
+        title={t("sections.commonPrompt")}
         open={accordionOpen.commonPrompt}
         onToggle={() => setAccordionOpen((prev) => ({ ...prev, commonPrompt: !prev.commonPrompt }))}
         summary={
@@ -832,7 +832,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               {storyboard.commonPrompt}
             </span>
           ) : (
-            <span className={styles.accordionSummaryMuted}>Not set</span>
+            <span className={styles.accordionSummaryMuted}>
+              {t("commonPrompt.notSet")}
+            </span>
           )
         }
         headerAction={
@@ -841,21 +843,17 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             onClick={() => saveCommonPrompt("")}
             disabled={savingCommonPrompt}
           >
-            Regenerate from tone &amp; style
+            {t("commonPrompt.regenerate")}
           </button>
         }
       >
-        <p className={styles.photoAssignHint}>
-          Applied to every scene&apos;s image generation. Auto-generated from
-          the storyboard tone and style; edit it to guide all scenes
-          consistently.
-        </p>
+        <p className={styles.photoAssignHint}>{t("commonPrompt.intro")}</p>
         <textarea
           className={styles.fieldInput}
           rows={10}
           value={commonPromptDraft}
           onChange={(e) => setCommonPromptDraft(e.target.value)}
-          placeholder="Common prompt applied to every scene"
+          placeholder={t("commonPrompt.placeholder")}
         />
         <div
           style={{
@@ -873,7 +871,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               commonPromptDraft === (storyboard.commonPrompt ?? "")
             }
           >
-            {savingCommonPrompt ? "Saving…" : "Save common prompt"}
+            {savingCommonPrompt
+              ? t("commonPrompt.saving")
+              : t("commonPrompt.save")}
           </button>
         </div>
       </CollapsibleSection>
@@ -894,17 +894,24 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         return (
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>Create Scenes from Photos</h3>
+              <h3 className={styles.sectionTitle}>
+                {t("sections.createScenes")}
+              </h3>
               <button
                 className="btn btn-primary"
                 onClick={handleCreateTemplateScenes}
                 disabled={creatingTemplates || selectedPhotoIds.size === 0}
               >
                 {creatingTemplates
-                  ? "Creating…"
+                  ? t("createScenes.creating")
                   : selectedPhotoIds.size === 0
-                    ? "Select photos to create scenes"
-                    : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
+                    ? t("createScenes.selectPhotosCta")
+                    : t(
+                        selectedPhotoIds.size === 1
+                          ? "createScenes.addAsScene"
+                          : "createScenes.addAsScenes",
+                        { count: selectedPhotoIds.size },
+                      )}
               </button>
             </div>
 
@@ -924,7 +931,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   }}
                   style={{ width: 15, height: 15, accentColor: "#1a56db", cursor: "pointer" }}
                 />
-                {allSelected ? "Deselect all" : "Select all"}
+                {allSelected
+                  ? t("createScenes.deselectAll")
+                  : t("createScenes.selectAll")}
               </label>
 
               {/* Size toggle */}
@@ -933,7 +942,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   <button
                     key={size}
                     onClick={() => setPhotoViewSize(size)}
-                    title={`${size.charAt(0).toUpperCase() + size.slice(1)} thumbnails`}
+                    title={t("createScenes.thumbsTitle", {
+                      size: size.charAt(0).toUpperCase() + size.slice(1),
+                    })}
                     style={{
                       width: 30, height: 28,
                       display: "flex", alignItems: "center", justifyContent: "center",
@@ -953,7 +964,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
             {selectedPhotoIds.size === 0 && (
               <p style={{ color: "var(--color-text-muted)", fontSize: "0.9em", marginBottom: 12 }}>
-                💡 Select one or more candidate photos below, then click the button to create draft scenes
+                {t("createScenes.hint")}
               </p>
             )}
 
@@ -1016,25 +1027,27 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       {/* 5. Scene list */}
       <section className={styles.section} data-scenes-section>
         <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Scenes ({scenes.length})</h3>
+          <h3 className={styles.sectionTitle}>
+            {t("sections.scenes", { count: scenes.length })}
+          </h3>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {saveMsg && <span className={styles.saveMsg}>{saveMsg}</span>}
             <button className="btn btn-secondary" onClick={addScene}>
-              + Add scene
+              {t("scenes.addScene")}
             </button>
             <button
               className="btn btn-primary"
               onClick={saveScenes}
               disabled={saving || aiFillingSceneId !== null}
             >
-              {saving ? "Saving…" : "Save scenes"}
+              {saving ? t("saving") : t("saveScenes")}
             </button>
           </div>
         </div>
 
         {scenes.length === 0 && (
           <div className={`card ${styles.emptyScenes}`}>
-            <p>No scenes yet. Click "Add scene" to start.</p>
+            <p>{t("scenes.empty")}</p>
           </div>
         )}
 
@@ -1103,7 +1116,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             className="btn btn-primary"
             style={{ marginLeft: "auto" }}
           >
-            Continue to Generate →
+            {t("footer.continueToGenerate")}
           </Link>
         ) : (
           <div
@@ -1116,7 +1129,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           >
             {testBatch?.status === "pending" && (
               <span style={{ fontSize: 13, color: "#888" }}>
-                Test in progress…
+                {t("footer.testInProgress")}
               </span>
             )}
             <button
@@ -1124,7 +1137,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               onClick={() => setShowTestModal(true)}
               disabled={scenes.length === 0}
             >
-              {testBatch ? "View Test Generation" : "Test Generation →"}
+              {testBatch
+                ? t("footer.viewTestGeneration")
+                : t("footer.startTestGeneration")}
             </button>
           </div>
         )}
@@ -1194,6 +1209,7 @@ function ComplementGap({
   onInsertBlank: () => void;
   onPropose: () => void;
 }) {
+  const t = useTranslations("storyboard");
   return (
     <div className={styles.complementGap}>
       <button
@@ -1201,18 +1217,18 @@ function ComplementGap({
         className={styles.complementGapBtn}
         onClick={onInsertBlank}
         disabled={disabled}
-        title="Insert a blank complement scene here"
+        title={t("complement.insertBlankTitle")}
       >
-        + Complement scene
+        {t("complement.insertBlank")}
       </button>
       <button
         type="button"
         className={styles.complementGapBtn}
         onClick={onPropose}
         disabled={disabled}
-        title="Let AI propose bridging scenes"
+        title={t("complement.aiProposeTitle")}
       >
-        ✨ AI propose
+        {t("complement.aiPropose")}
       </button>
     </div>
   );
@@ -1229,15 +1245,15 @@ function ComplementProposalModal({
   onApply: (proposal: ComplementSceneProposalDto) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("storyboard");
+  const tCommon = useTranslations("common");
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-        <h3 className={styles.sectionTitle}>AI complement scene proposals</h3>
-        <p className={styles.photoAssignHint}>
-          Pick a bridging scene to insert. You can edit it before saving.
-        </p>
+        <h3 className={styles.sectionTitle}>{t("complement.modalTitle")}</h3>
+        <p className={styles.photoAssignHint}>{t("complement.modalHint")}</p>
         {proposals.length === 0 && (
-          <p className={styles.analysisEmpty}>No proposals returned.</p>
+          <p className={styles.analysisEmpty}>{t("complement.noProposals")}</p>
         )}
         {proposals.map((proposal, index) => (
           <div key={index} className={`card ${styles.proposalCard}`}>
@@ -1250,7 +1266,7 @@ function ComplementProposalModal({
               onClick={() => onApply(proposal)}
               disabled={busy}
             >
-              {busy ? "Applying…" : "Use this scene"}
+              {busy ? t("complement.applying") : t("complement.useScene")}
             </button>
           </div>
         ))}
@@ -1260,7 +1276,7 @@ function ComplementProposalModal({
           onClick={onClose}
           disabled={busy}
         >
-          Cancel
+          {tCommon("cancel")}
         </button>
       </div>
     </div>
@@ -1300,6 +1316,8 @@ function SceneCard({
 }) {
   const [assigningPhoto, setAssigningPhoto] = useState<string | null>(null);
   const id = useId();
+  const t = useTranslations("storyboard");
+  const tSel = useTranslations("selections");
 
   const isComplement = scene.kind === "complement";
   const candidatePhotos = photos.filter((p) => p.usage === "candidate");
@@ -1307,9 +1325,11 @@ function SceneCard({
     if (!isComplement || !scene.bridge) return null;
     const sceneTitle = (sceneId: string) => {
       const found = scenes.find((s) => s.id === sceneId);
-      if (!found) return "a scene";
+      if (!found) return t("scenes.sceneAnonymous");
       const order = scenes.indexOf(found) + 1;
-      return found.title ? `Scene ${order} · ${found.title}` : `Scene ${order}`;
+      return found.title
+        ? t("scenes.sceneWithTitle", { index: order, title: found.title })
+        : t("scenes.sceneLabel", { index: order });
     };
     return `${sceneTitle(scene.bridge.fromSceneId)} → ${sceneTitle(scene.bridge.toSceneId)}`;
   })();
@@ -1349,24 +1369,27 @@ function SceneCard({
           onDragStart={onDragHandleStart}
           onDragEnd={onDragHandleEnd}
           style={{ cursor: "grab" }}
-          title="Drag to reorder this scene"
+          title={t("scenes.dragTitle")}
         >
-          ⠿ {isComplement ? `Complement ${idx + 1}` : `Scene ${idx + 1}`}
+          ⠿{" "}
+          {isComplement
+            ? t("scenes.complementLabel", { index: idx + 1 })
+            : t("scenes.sceneLabel", { index: idx + 1 })}
         </span>
         <div className={styles.sceneHeaderActions}>
           <button
             className={styles.aiFillBtn}
             onClick={() => scene.id && onAiFill(scene.id)}
             disabled={!scene.id || isBusy}
-            title="Fill blank fields with AI"
+            title={t("aiFillTitle")}
           >
-            {isAiFilling ? "Filling..." : "AI fill"}
+            {isAiFilling ? t("aiFilling") : t("aiFill")}
           </button>
           <button
             className={styles.moveBtn}
             onClick={() => onMove(-1)}
             disabled={idx === 0 || isBusy}
-            title="Move up"
+            title={t("scenes.moveUp")}
           >
             ↑
           </button>
@@ -1374,7 +1397,7 @@ function SceneCard({
             className={styles.moveBtn}
             onClick={() => onMove(1)}
             disabled={idx === total - 1 || isBusy}
-            title="Move down"
+            title={t("scenes.moveDown")}
           >
             ↓
           </button>
@@ -1382,7 +1405,7 @@ function SceneCard({
             className={styles.deleteBtn}
             onClick={onDelete}
             disabled={isBusy}
-            title="Delete this scene"
+            title={t("scenes.deleteTitle")}
           >
             ×
           </button>
@@ -1391,12 +1414,12 @@ function SceneCard({
 
       {bridgeLabel && (
         <p className={styles.photoAssignHint}>
-          AI-only bridging scene · {bridgeLabel}
+          {t("scenes.bridgingScene", { label: bridgeLabel })}
         </p>
       )}
 
       <div className={styles.sceneFields}>
-        <SceneField label="Title" htmlFor={`${id}-title`}>
+        <SceneField label={t("fields.title")} htmlFor={`${id}-title`}>
           <input
             id={`${id}-title`}
             className={styles.fieldInput}
@@ -1405,7 +1428,7 @@ function SceneCard({
           />
         </SceneField>
 
-        <SceneField label="Description" htmlFor={`${id}-desc`}>
+        <SceneField label={t("fields.description")} htmlFor={`${id}-desc`}>
           <textarea
             id={`${id}-desc`}
             className={styles.fieldInput}
@@ -1415,7 +1438,7 @@ function SceneCard({
           />
         </SceneField>
 
-        <SceneField label="Image prompt" htmlFor={`${id}-prompt`}>
+        <SceneField label={t("fields.imagePrompt")} htmlFor={`${id}-prompt`}>
           <textarea
             id={`${id}-prompt`}
             className={styles.fieldInput}
@@ -1426,7 +1449,7 @@ function SceneCard({
         </SceneField>
 
         <div className={styles.selectRow}>
-          <SceneField label="Emotion" htmlFor={`${id}-emotion`}>
+          <SceneField label={t("fields.emotion")} htmlFor={`${id}-emotion`}>
             <select
               id={`${id}-emotion`}
               className={styles.fieldInput}
@@ -1434,12 +1457,14 @@ function SceneCard({
               onChange={(e) => onUpdate({ emotion: e.target.value })}
             >
               {EMOTION_OPTIONS.map((o) => (
-                <option key={o}>{o}</option>
+                <option key={o} value={o}>
+                  {tSel(`emotion.${o}`)}
+                </option>
               ))}
             </select>
           </SceneField>
 
-          <SceneField label="Camera" htmlFor={`${id}-camera`}>
+          <SceneField label={t("fields.camera")} htmlFor={`${id}-camera`}>
             <select
               id={`${id}-camera`}
               className={styles.fieldInput}
@@ -1447,12 +1472,14 @@ function SceneCard({
               onChange={(e) => onUpdate({ cameraDirection: e.target.value })}
             >
               {CAMERA_OPTIONS.map((o) => (
-                <option key={o}>{o}</option>
+                <option key={o} value={o}>
+                  {tSel(`camera.${o}`)}
+                </option>
               ))}
             </select>
           </SceneField>
 
-          <SceneField label="Lighting" htmlFor={`${id}-lighting`}>
+          <SceneField label={t("fields.lighting")} htmlFor={`${id}-lighting`}>
             <select
               id={`${id}-lighting`}
               className={styles.fieldInput}
@@ -1460,12 +1487,14 @@ function SceneCard({
               onChange={(e) => onUpdate({ lightingDirection: e.target.value })}
             >
               {LIGHTING_OPTIONS.map((o) => (
-                <option key={o}>{o}</option>
+                <option key={o} value={o}>
+                  {tSel(`lighting.${o}`)}
+                </option>
               ))}
             </select>
           </SceneField>
 
-          <SceneField label="Motion" htmlFor={`${id}-motion`}>
+          <SceneField label={t("fields.motion")} htmlFor={`${id}-motion`}>
             <select
               id={`${id}-motion`}
               className={styles.fieldInput}
@@ -1473,7 +1502,9 @@ function SceneCard({
               onChange={(e) => onUpdate({ motionDirection: e.target.value })}
             >
               {MOTION_OPTIONS.map((o) => (
-                <option key={o}>{o}</option>
+                <option key={o} value={o}>
+                  {tSel(`motion.${o}`)}
+                </option>
               ))}
             </select>
           </SceneField>
@@ -1481,7 +1512,7 @@ function SceneCard({
 
         {/* Photo assignment — only available after scene is saved (has ID) */}
         {scene.id && !isComplement && candidatePhotos.length > 0 && (
-          <SceneField label="Primary photo" htmlFor={`${id}-photo`}>
+          <SceneField label={t("fields.primaryPhoto")} htmlFor={`${id}-photo`}>
             <div className={styles.photoAssignRow}>
               {candidatePhotos.map((p) => {
                 const isAssigned = scene.photoAssets.some(
@@ -1507,8 +1538,8 @@ function SceneCard({
             </div>
             <p className={styles.photoAssignHint}>
               {scene.photoAssets.some((pa) => pa.role === "primary")
-                ? "Click another photo to reassign the primary."
-                : "Click a photo to assign it as primary for this scene."}
+                ? t("scenes.primaryClickReassign")
+                : t("scenes.primaryClickAssign")}
             </p>
           </SceneField>
         )}

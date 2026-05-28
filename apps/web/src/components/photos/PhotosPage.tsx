@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoAssetDto } from "@gen-story/shared";
 import type { PhotoUsage } from "../../lib/api-client";
@@ -24,6 +25,8 @@ const ACCEPTED = "image/jpeg,image/jpg,image/png,image/heic,image/webp";
 const MAX_PHOTOS = 20;
 
 export function PhotosPage({ projectId }: { projectId: string }) {
+  const t = useTranslations("photos");
+  const tCommon = useTranslations("common");
   const [photos, setPhotos] = useState<PhotoAssetDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,12 +58,12 @@ export function PhotosPage({ projectId }: { projectId: string }) {
     const activePhotos = photos.filter((p) => p.deletedAt === null);
     const slots = MAX_PHOTOS - activePhotos.length;
     if (slots <= 0) {
-      setError(`Maximum ${MAX_PHOTOS} photos per project.`);
+      setError(t("errors.maxPhotos", { max: MAX_PHOTOS }));
       return;
     }
     const toUpload = fileArr.slice(0, slots);
     if (toUpload.length < fileArr.length) {
-      setError(`Only ${slots} more photo(s) can be added (max ${MAX_PHOTOS}).`);
+      setError(t("errors.slotsLeft", { slots, max: MAX_PHOTOS }));
     }
 
     for (const file of toUpload) {
@@ -70,7 +73,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
         const asset = await uploadPhotoAsset(projectId, file);
         setPhotos((prev) => [...prev, asset]);
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Upload failed");
+        setError(e instanceof Error ? e.message : t("errors.uploadFailed"));
       } finally {
         setUploading((prev) => prev.filter((id) => id !== tempId));
       }
@@ -95,7 +98,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
       const updated = await patchPhotoAsset(photoId, usage);
       setPhotos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Update failed");
+      setError(e instanceof Error ? e.message : t("errors.updateFailed"));
     }
   }
 
@@ -109,7 +112,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
       });
       await refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Delete failed");
+      setError(e instanceof Error ? e.message : t("errors.deleteFailed"));
     }
   }
 
@@ -118,7 +121,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
       await restorePhotoAsset(photoId);
       await refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Restore failed");
+      setError(e instanceof Error ? e.message : t("errors.restoreFailed"));
     }
   }
 
@@ -145,7 +148,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
         next.map((p) => p.id),
       );
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Reorder failed");
+      setError(e instanceof Error ? e.message : t("errors.reorderFailed"));
       await refresh();
     }
   }
@@ -178,7 +181,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
       try {
         await deletePhotoAsset(id);
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Delete failed");
+        setError(e instanceof Error ? e.message : t("errors.deleteFailed"));
       }
     }
     setSelectedIds(new Set());
@@ -194,7 +197,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
           prev.map((p) => (p.id === updated.id ? updated : p)),
         );
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Update failed");
+        setError(e instanceof Error ? e.message : t("errors.updateFailed"));
       }
     }
   }
@@ -202,8 +205,8 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
-        <h2>Photos</h2>
-        <p>Upload and manage the photos for this project</p>
+        <h2>{t("title")}</h2>
+        <p>{t("subtitle")}</p>
       </div>
 
       <div className={styles.tabs}>
@@ -211,14 +214,14 @@ export function PhotosPage({ projectId }: { projectId: string }) {
           className={`${styles.tab} ${tab === "upload" ? styles.tabActive : ""}`}
           onClick={() => setTab("upload")}
         >
-          Upload
+          {t("tabs.upload")}
         </button>
         <button
           className={`${styles.tab} ${tab === "manage" ? styles.tabActive : ""}`}
           onClick={() => setTab("manage")}
           disabled={activePhotos.length === 0}
         >
-          Manage ({activePhotos.length})
+          {t("tabs.manage", { count: activePhotos.length })}
         </button>
       </div>
 
@@ -245,10 +248,12 @@ export function PhotosPage({ projectId }: { projectId: string }) {
           />
           <div className={styles.dropzoneIcon}>📷</div>
           <p className={styles.dropzoneText}>
-            Drop photos here or <strong>click to browse</strong>
+            {t.rich("dropzone.primary", {
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
           <p className={styles.dropzoneHint}>
-            JPG, PNG, HEIC, WebP · up to {MAX_PHOTOS} photos
+            {t("dropzone.hint", { max: MAX_PHOTOS })}
           </p>
         </div>
       )}
@@ -268,28 +273,28 @@ export function PhotosPage({ projectId }: { projectId: string }) {
                 onChange={toggleSelectAll}
                 className={styles.selectAllCheckbox}
               />
-              {allSelected ? "Deselect all" : "Select all"}
+              {allSelected ? t("deselectAll") : t("selectAll")}
             </label>
 
             <div className={styles.viewSizeGroup}>
               <button
                 className={`${styles.viewSizeBtn} ${viewSize === "small" ? styles.viewSizeBtnActive : ""}`}
                 onClick={() => setViewSize("small")}
-                title="Small thumbnails"
+                title={t("viewSize.small")}
               >
                 ⊞
               </button>
               <button
                 className={`${styles.viewSizeBtn} ${viewSize === "medium" ? styles.viewSizeBtnActive : ""}`}
                 onClick={() => setViewSize("medium")}
-                title="Medium thumbnails"
+                title={t("viewSize.medium")}
               >
                 ▦
               </button>
               <button
                 className={`${styles.viewSizeBtn} ${viewSize === "large" ? styles.viewSizeBtnActive : ""}`}
                 onClick={() => setViewSize("large")}
-                title="Large thumbnails"
+                title={t("viewSize.large")}
               >
                 ◻
               </button>
@@ -300,37 +305,37 @@ export function PhotosPage({ projectId }: { projectId: string }) {
           {someSelected && (
             <div className={styles.bulkBar}>
               <span className={styles.bulkCount}>
-                {selectedIds.size} selected
+                {t("bulk.selectedCount", { count: selectedIds.size })}
               </span>
               <button
                 className={`${styles.bulkBtn} ${styles.bulkBtnUsage}`}
                 onClick={() => handleBulkUsage("candidate")}
               >
-                Set candidate
+                {t("bulk.setCandidate")}
               </button>
               <button
                 className={`${styles.bulkBtn} ${styles.bulkBtnUsage}`}
                 onClick={() => handleBulkUsage("reference")}
               >
-                Set reference
+                {t("bulk.setReference")}
               </button>
               <button
                 className={`${styles.bulkBtn} ${styles.bulkBtnUsage}`}
                 onClick={() => handleBulkUsage("excluded")}
               >
-                Set excluded
+                {t("bulk.setExcluded")}
               </button>
               <button
                 className={`${styles.bulkBtn} ${styles.bulkBtnDelete}`}
                 onClick={handleBulkDelete}
               >
-                Delete selected
+                {t("bulk.deleteSelected")}
               </button>
             </div>
           )}
 
           {loading ? (
-            <p className={styles.hint}>Loading…</p>
+            <p className={styles.hint}>{tCommon("loading")}</p>
           ) : (
             <div
               className={styles.photoGrid}
@@ -362,7 +367,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
               {uploading.map((id) => (
                 <div key={id} className={`card ${styles.uploadingCard}`}>
                   <div className={styles.uploadingSpinner} />
-                  <p className={styles.hint}>Uploading…</p>
+                  <p className={styles.hint}>{t("uploading")}</p>
                 </div>
               ))}
             </div>
@@ -370,10 +375,10 @@ export function PhotosPage({ projectId }: { projectId: string }) {
 
           {deletedPhotos.length > 0 && (
             <section className={styles.deletedSection}>
-              <h3 className={styles.deletedTitle}>Recently deleted</h3>
-              <p className={styles.deletedHint}>
-                Deleted photos are kept for 7 days.
-              </p>
+              <h3 className={styles.deletedTitle}>
+                {t("deletedSectionTitle")}
+              </h3>
+              <p className={styles.deletedHint}>{t("deletedSectionHint")}</p>
               <div className={styles.photoGrid}>
                 {deletedPhotos.map((photo) => (
                   <DeletedPhotoCard
@@ -394,14 +399,14 @@ export function PhotosPage({ projectId }: { projectId: string }) {
           onClick={() => setTab("upload")}
           style={{ display: tab === "manage" ? "inline-flex" : "none" }}
         >
-          + Add more photos
+          {t("addMore")}
         </button>
         <Link
           href={`/projects/${projectId}/storyboard`}
           className="btn btn-primary"
           style={{ marginLeft: "auto" }}
         >
-          Continue to Storyboard →
+          {t("continueToStoryboard")}
         </Link>
       </div>
     </AppShell>
@@ -431,6 +436,7 @@ function PhotoCard({
   onUsageChange: (id: string, usage: UsageValue) => void;
   onDelete: (id: string) => void;
 }) {
+  const t = useTranslations("photos");
   const imgUrl = storageKeyToUrl(photo.storageKey);
 
   return (
@@ -445,14 +451,14 @@ function PhotoCard({
         onDropOn();
       }}
       style={{ opacity: isDragging ? 0.4 : 1, cursor: "grab" }}
-      title={`Drag to reorder (position ${index + 1})`}
+      title={t("dragHint", { index: index + 1 })}
     >
       <div className={styles.photoThumb}>
         <img src={imgUrl} alt={photo.name} className={styles.thumbImg} />
         <label
           className={styles.cardCheckbox}
           onClick={(e) => e.stopPropagation()}
-          title="Select photo"
+          title={t("selectPhotoTitle")}
         >
           <input
             type="checkbox"
@@ -469,16 +475,16 @@ function PhotoCard({
             className={`${styles.usageBtn} ${photo.usage === u ? styles.usageBtnActive : ""}`}
             onClick={() => onUsageChange(photo.id, u)}
           >
-            {u}
+            {t(`usage.${u}`)}
           </button>
         ))}
       </div>
       <button
         className={styles.deleteBtn}
         onClick={() => onDelete(photo.id)}
-        title="Delete photo"
+        title={t("deleteTitle")}
       >
-        Delete
+        {t("delete")}
       </button>
     </div>
   );
@@ -491,6 +497,7 @@ function DeletedPhotoCard({
   photo: PhotoAssetDto;
   onRestore: (id: string) => void;
 }) {
+  const t = useTranslations("photos");
   const imgUrl = storageKeyToUrl(photo.storageKey);
   const deletedDate = photo.deletedAt
     ? new Date(photo.deletedAt).toLocaleDateString()
@@ -507,14 +514,16 @@ function DeletedPhotoCard({
       </div>
       <p className={styles.photoName}>{photo.name}</p>
       {deletedDate && (
-        <p className={styles.deletedDate}>Deleted {deletedDate}</p>
+        <p className={styles.deletedDate}>
+          {t("deletedAt", { date: deletedDate })}
+        </p>
       )}
       <button
         className="btn btn-secondary"
         style={{ fontSize: 12, padding: "4px 10px", marginTop: 6 }}
         onClick={() => onRestore(photo.id)}
       >
-        Restore
+        {t("restore")}
       </button>
     </div>
   );

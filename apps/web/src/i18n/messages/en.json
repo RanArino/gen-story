@@ -1,0 +1,466 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "restore": "Restore",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "retry": "Retry",
+    "appName": "Gen Story",
+    "appTitle": "Story Builder"
+  },
+  "nav": {
+    "projects": "Projects",
+    "settings": "Settings",
+    "stepPhotos": "1 · Photos",
+    "stepStoryboard": "2 · Storyboard",
+    "stepGenerate": "3 · Generate",
+    "stepReview": "4 · Review"
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "Your story projects",
+    "newProject": "+ New project",
+    "deleteTitle": "Delete project",
+    "delete": "Delete",
+    "restore": "Restore",
+    "emptyTitle": "No projects yet. Create your first project to get started.",
+    "deletedSectionTitle": "Recently deleted",
+    "deletedSectionHint": "Deleted projects are kept for 7 days.",
+    "updated": "Updated {date}",
+    "deletedAt": "Deleted {date}",
+    "deleteFailed": "Delete failed",
+    "restoreFailed": "Restore failed",
+    "createTitle": "Create new project",
+    "createSubtitle": "Give your project a name to begin.",
+    "nameLabel": "Project name",
+    "namePlaceholder": "Family trip to Hokkaido",
+    "createButton": "Create project",
+    "creating": "Creating…",
+    "createFailed": "Failed to create project",
+    "occasionLabel": "Occasion (optional)",
+    "occasions": {
+      "general": "None / General",
+      "anniversary": "Anniversary",
+      "graduation": "Graduation",
+      "birthday": "Birthday",
+      "travel": "Travel",
+      "wedding": "Wedding",
+      "other": "Other"
+    }
+  },
+  "photos": {
+    "title": "Photos",
+    "subtitle": "Upload and manage the photos for this project",
+    "uploadButton": "Upload photos",
+    "addMore": "+ Add more photos",
+    "continueToStoryboard": "Continue to Storyboard →",
+    "tabs": {
+      "upload": "Upload",
+      "manage": "Manage ({count})"
+    },
+    "dropzone": {
+      "primary": "Drop photos here or <strong>click to browse</strong>",
+      "hint": "JPG, PNG, HEIC, WebP · up to {max} photos"
+    },
+    "primaryBadge": "Primary",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "selectPhotoTitle": "Select photo",
+    "viewSize": {
+      "small": "Small thumbnails",
+      "medium": "Medium thumbnails",
+      "large": "Large thumbnails"
+    },
+    "bulk": {
+      "selectedCount": "{count} selected",
+      "setCandidate": "Set candidate",
+      "setReference": "Set reference",
+      "setExcluded": "Set excluded",
+      "deleteSelected": "Delete selected"
+    },
+    "uploading": "Uploading…",
+    "deletedSectionTitle": "Recently deleted",
+    "deletedSectionHint": "Deleted photos are kept for 7 days.",
+    "deletedAt": "Deleted {date}",
+    "deleteTitle": "Delete photo",
+    "delete": "Delete",
+    "restore": "Restore",
+    "dragHint": "Drag to reorder (position {index})",
+    "usage": {
+      "candidate": "candidate",
+      "reference": "reference",
+      "excluded": "excluded"
+    },
+    "errors": {
+      "uploadFailed": "Upload failed",
+      "updateFailed": "Update failed",
+      "deleteFailed": "Delete failed",
+      "restoreFailed": "Restore failed",
+      "reorderFailed": "Reorder failed",
+      "maxPhotos": "Maximum {max} photos per project.",
+      "slotsLeft": "Only {slots} more photo(s) can be added (max {max})."
+    }
+  },
+  "storyboard": {
+    "title": "Storyboard",
+    "subtitle": "Choose an emotion & style, then edit your scenes.",
+    "noStoryboard": "No storyboard yet — initialize one to start building scenes.",
+    "initialize": "Initialize storyboard",
+    "fields": {
+      "title": "Title",
+      "description": "Description",
+      "imagePrompt": "Image prompt",
+      "notes": "Notes",
+      "emotion": "Emotion",
+      "camera": "Camera",
+      "lighting": "Lighting",
+      "motion": "Motion",
+      "tone": "Tone",
+      "primaryPhoto": "Primary photo"
+    },
+    "selectOption": "Select…",
+    "save": "Save scene",
+    "saveScenes": "Save scenes",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "aiFill": "AI fill",
+    "aiFilling": "Filling...",
+    "aiFillTitle": "Fill blank fields with AI",
+    "aiFillSaved": "AI fill saved",
+    "export": "Export storyboard JSON",
+    "ai": {
+      "title": "AI Photo Analysis",
+      "subtitle": "Suggests an <strong>emotion / tone</strong> based on your candidate photos. Click a suggestion to apply it to the Tone setting below. Style preset, Common prompt, and Scenes are not auto-filled.",
+      "analyze": "Analyze photos",
+      "reanalyze": "Re-analyze",
+      "analyzing": "Analyzing…",
+      "completeMsg": "Photo analysis complete!",
+      "emptyNoPhotos": "Mark at least one photo as candidate or reference on the Photos page to enable analysis.",
+      "emptyClickToStart": "Click <strong>Analyze photos</strong> to generate tone suggestions based on your selected photo set."
+    },
+    "tones": {
+      "warm": { "label": "Warm", "desc": "Heartfelt and nostalgic" },
+      "cinematic": { "label": "Cinematic", "desc": "Dramatic and epic" },
+      "playful": { "label": "Playful", "desc": "Fun and energetic" },
+      "quiet": { "label": "Quiet", "desc": "Peaceful and reflective" }
+    },
+    "sections": {
+      "tone": "Emotion / Tone",
+      "style": "Style preset",
+      "commonPrompt": "Common prompt",
+      "createScenes": "Create Scenes from Photos",
+      "scenes": "Scenes ({count})"
+    },
+    "style": {
+      "aiRecommend": "AI recommend",
+      "systemStyles": "System styles",
+      "customStyles": "Custom styles",
+      "createCustom": "Create custom style",
+      "name": "Style name",
+      "namePlaceholder": "Vintage family film",
+      "description": "Description",
+      "descriptionPlaceholder": "Warm grain, soft highlights, muted color.",
+      "prompt": "Style prompt",
+      "promptPlaceholder": "Describe the visual treatment to apply during image generation.",
+      "creating": "Creating...",
+      "createStyle": "Create style",
+      "createdMsg": "Custom style created!",
+      "failed": "Failed to create custom style"
+    },
+    "commonPrompt": {
+      "notSet": "Not set",
+      "regenerate": "Regenerate from tone & style",
+      "intro": "Applied to every scene's image generation. Auto-generated from the storyboard tone and style; edit it to guide all scenes consistently.",
+      "placeholder": "Common prompt applied to every scene",
+      "save": "Save common prompt",
+      "saving": "Saving…",
+      "savedMsg": "Common prompt saved!",
+      "failed": "Failed to save common prompt"
+    },
+    "createScenes": {
+      "selectPhotosCta": "Select photos to create scenes",
+      "addAsScene": "Add {count} as scene",
+      "addAsScenes": "Add {count} as scenes",
+      "creating": "Creating…",
+      "createdMsg": "{count} scene created! Scroll down to edit.",
+      "createdMsgPlural": "{count} scenes created! Scroll down to edit.",
+      "thumbsTitle": "{size} thumbnails",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "hint": "💡 Select one or more candidate photos below, then click the button to create draft scenes",
+      "failed": "Failed to create template scenes"
+    },
+    "scenes": {
+      "addScene": "+ Add scene",
+      "empty": "No scenes yet. Click \"Add scene\" to start.",
+      "sceneLabel": "Scene {index}",
+      "sceneAnonymous": "a scene",
+      "sceneWithTitle": "Scene {index} · {title}",
+      "complementLabel": "Complement {index}",
+      "defaultTitle": "New scene",
+      "defaultDescription": "Describe what happens in this scene.",
+      "defaultImagePrompt": "A cinematic moment capturing the essence of the scene.",
+      "dragTitle": "Drag to reorder this scene",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "deleteTitle": "Delete this scene",
+      "primaryClickReassign": "Click another photo to reassign the primary.",
+      "primaryClickAssign": "Click a photo to assign it as primary for this scene.",
+      "bridgingScene": "AI-only bridging scene · {label}",
+      "failedSave": "Failed to save scenes",
+      "failedFill": "Failed to fill scene",
+      "failedReorder": "Failed to reorder scenes",
+      "failedTone": "Failed to save tone",
+      "failedStyle": "Failed to save style",
+      "failedAnalyze": "Failed to analyze photos",
+      "failedInit": "Failed to create storyboard"
+    },
+    "complement": {
+      "insertBlank": "+ Complement scene",
+      "insertBlankTitle": "Insert a blank complement scene here",
+      "aiPropose": "✨ AI propose",
+      "aiProposeTitle": "Let AI propose bridging scenes",
+      "modalTitle": "AI complement scene proposals",
+      "modalHint": "Pick a bridging scene to insert. You can edit it before saving.",
+      "noProposals": "No proposals returned.",
+      "applying": "Applying…",
+      "useScene": "Use this scene",
+      "inserted": "Complement scene inserted",
+      "appliedReview": "Proposal applied — review and Save scenes",
+      "failedInsert": "Failed to insert complement scene",
+      "failedPropose": "Failed to propose complement scenes",
+      "failedApply": "Failed to apply proposal"
+    },
+    "footer": {
+      "continueToGenerate": "Continue to Generate →",
+      "testInProgress": "Test in progress…",
+      "viewTestGeneration": "View Test Generation",
+      "startTestGeneration": "Test Generation →"
+    }
+  },
+  "testGeneration": {
+    "title": "Test Generation — Preview 3 Styles",
+    "intro": "Generate 3 sample images to verify your style selection before bulk generation. Confirm the one you like to proceed.",
+    "startCta": "Generate 3 Test Samples",
+    "starting": "Starting…",
+    "confirmedNotice": "✓ Test confirmed. You can now proceed with bulk generation.",
+    "progress": "Progress: {done} of {total} complete",
+    "variantHeader": "Variant {index} — {status}",
+    "variantAlt": "Test variant {index}",
+    "stateFailed": "Failed",
+    "stateGenerating": "Generating…",
+    "confirmStyle": "Confirm this style",
+    "confirming": "Confirming…",
+    "confirmedBadge": "✓ Confirmed",
+    "regenerate": "Generate new tests",
+    "errors": {
+      "start": "Failed to start test generation.",
+      "confirm": "Failed to confirm.",
+      "reset": "Failed to reset."
+    }
+  },
+  "generate": {
+    "title": "Generate",
+    "subtitle": "Generate AI images for each scene in your storyboard.",
+    "noScenes": "No scenes found. Please add scenes in the Storyboard step first.",
+    "goToStoryboard": "Go to Storyboard →",
+    "progress": {
+      "completed": "{done} / {total} completed",
+      "failed": "{count} failed",
+      "generating": "Generating…"
+    },
+    "actions": {
+      "starting": "Starting…",
+      "start": "Start generation",
+      "retryFailed": "Retry failed scenes",
+      "reviewImages": "Review images →"
+    },
+    "row": {
+      "retry": "Retry",
+      "cancel": "Cancel"
+    },
+    "status": {
+      "none": "Not started",
+      "queued": "Waiting",
+      "running": "Generating…",
+      "succeeded": "Done",
+      "failed": "Failed",
+      "canceled": "Canceled"
+    },
+    "errors": {
+      "start": "Failed to start generation",
+      "retry": "Failed to retry",
+      "cancel": "Failed to cancel"
+    }
+  },
+  "review": {
+    "title": "Review",
+    "subtitle": "Compare generated images with source photos. Adopt the ones you want to keep.",
+    "noScenes": "No scenes found.",
+    "backToGenerate": "← Back to Generate",
+    "generationHistory": "Generation history",
+    "exportJson": "Export Storyboard JSON",
+    "controls": {
+      "view": "View",
+      "show": "Show",
+      "views": {
+        "card": "Card",
+        "timeline": "Timeline",
+        "table": "Table"
+      },
+      "filters": {
+        "all": "All",
+        "original": "Original only",
+        "generated": "Generated only"
+      }
+    },
+    "card": {
+      "adoptedBadge": "✓ Adopted",
+      "failedBadge": "Generation failed",
+      "regenerate": "Re-generate",
+      "sourcePhoto": "Source photo",
+      "generatedImage": "Generated image",
+      "noPhotoAssigned": "No photo assigned",
+      "generationFailed": "Generation failed",
+      "generatingState": "Generating…",
+      "notGeneratedYet": "Not generated yet",
+      "noImageAdopted": "No image adopted yet",
+      "retryGeneration": "Retry generation",
+      "goToGenerate": "Go to Generate →",
+      "historyHeader": "Generation history ({count})",
+      "adopt": "Adopt",
+      "adopted": "Adopted"
+    },
+    "regenModal": {
+      "title": "Re-generate — {sceneTitle}",
+      "untitledScene": "Untitled scene",
+      "subtitle": "Adjust settings then confirm to queue a new generation. Changes will be saved to the scene.",
+      "imagePrompt": "Image prompt",
+      "emotion": "Emotion",
+      "camera": "Camera",
+      "lighting": "Lighting",
+      "motion": "Motion",
+      "cancel": "Cancel",
+      "queue": "Queue generation",
+      "queuing": "Queuing…"
+    },
+    "timeline": {
+      "untitled": "Untitled",
+      "complementScene": "Complement scene",
+      "noPhoto": "No photo",
+      "notGenerated": "Not generated"
+    },
+    "table": {
+      "hash": "#",
+      "title": "Title",
+      "emotion": "Emotion",
+      "camera": "Camera",
+      "sourcePhoto": "Source photo",
+      "generatedImage": "Generated image",
+      "untitled": "Untitled"
+    },
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago"
+    },
+    "errors": {
+      "adopt": "Failed to adopt image",
+      "retry": "Failed to retry",
+      "regen": "Failed to queue re-generation"
+    }
+  },
+  "generationHistory": {
+    "title": "Generation History",
+    "subtitle": "All generation requests for this project, grouped by scene.",
+    "backToReview": "← Back to Review",
+    "totalRequest": "{count} request",
+    "totalRequests": "{count} requests",
+    "noRequests": "No generation requests yet.",
+    "goToGenerate": "Go to Generate →",
+    "editStoryboard": "Edit Storyboard",
+    "generateCta": "Generate →",
+    "untitledScene": "Untitled scene",
+    "tableHeaders": {
+      "status": "Status",
+      "created": "Created",
+      "completed": "Completed",
+      "error": "Error"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "App preferences",
+    "languageLabel": "Language",
+    "languageHelp": "The interface, AI-generated text, and exported storyboards will use this language.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveFailed": "Failed to save settings",
+    "language": {
+      "en": "English",
+      "ja": "日本語"
+    }
+  },
+  "errors": {
+    "validation_error": "The information you provided is not valid.",
+    "not_found": "We couldn't find what you were looking for.",
+    "conflict": "This action conflicts with the current state.",
+    "invalid_state": "This action is not allowed right now.",
+    "unknown": "Something went wrong. Please try again."
+  },
+  "selections": {
+    "camera": {
+      "Wide": "Wide",
+      "Extreme Wide": "Extreme Wide",
+      "Medium": "Medium",
+      "Close-up": "Close-up",
+      "Extreme Close-up": "Extreme Close-up",
+      "Aerial": "Aerial",
+      "Overhead": "Overhead",
+      "POV": "POV",
+      "Low Angle": "Low Angle",
+      "Telephoto": "Telephoto",
+      "Voyeur": "Voyeur"
+    },
+    "lighting": {
+      "Golden hour": "Golden hour",
+      "Natural": "Natural",
+      "Dramatic": "Dramatic",
+      "Night": "Night",
+      "Soft": "Soft",
+      "Backlit": "Backlit",
+      "Silhouette": "Silhouette",
+      "Volumetric": "Volumetric"
+    },
+    "motion": {
+      "Slow pan": "Slow pan",
+      "Static": "Static",
+      "Zoom in": "Zoom in",
+      "Zoom out": "Zoom out",
+      "Tracking": "Tracking"
+    },
+    "emotion": {
+      "Joy": "Joy",
+      "Nostalgia": "Nostalgia",
+      "Love": "Love",
+      "Pride": "Pride",
+      "Wonder": "Wonder",
+      "Calm": "Calm",
+      "Excitement": "Excitement",
+      "Gratitude": "Gratitude"
+    },
+    "tone": {
+      "warm": "Warm",
+      "cinematic": "Cinematic",
+      "playful": "Playful",
+      "quiet": "Quiet"
+    }
+  }
+}

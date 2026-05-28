@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import type { GenerationRequestWithSceneTitleDto } from "@gen-story/shared";
 import { listStoryboardGenerationRequests, listStoryboards } from "../../lib/api-client";
@@ -15,6 +16,8 @@ type SceneGroup = {
 };
 
 export function GenerationHistoryPage({ projectId }: { projectId: string }) {
+  const t = useTranslations("generationHistory");
+  const tCommon = useTranslations("common");
   const [groups, setGroups] = useState<SceneGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
   if (loading) {
     return (
       <AppShell projectId={projectId}>
-        <p style={{ color: "#8898aa" }}>Loading…</p>
+        <p style={{ color: "#8898aa" }}>{tCommon("loading")}</p>
       </AppShell>
     );
   }
@@ -60,8 +63,8 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
-        <h2>Generation History</h2>
-        <p>All generation requests for this project, grouped by scene.</p>
+        <h2>{t("title")}</h2>
+        <p>{t("subtitle")}</p>
       </div>
 
       {error && <ErrorAlert message={error} />}
@@ -71,20 +74,22 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
           href={`/projects/${projectId}/review`}
           className="btn btn-secondary"
         >
-          ← Back to Review
+          {t("backToReview")}
         </Link>
-        <span className={styles.total}>{total} request{total !== 1 ? "s" : ""}</span>
+        <span className={styles.total}>
+          {t(total === 1 ? "totalRequest" : "totalRequests", { count: total })}
+        </span>
       </div>
 
       {groups.length === 0 && (
         <div className="card">
-          <p>No generation requests yet.</p>
+          <p>{t("noRequests")}</p>
           <Link
             href={`/projects/${projectId}/generate`}
             className="btn btn-primary"
             style={{ marginTop: 12 }}
           >
-            Go to Generate →
+            {t("goToGenerate")}
           </Link>
         </div>
       )}
@@ -93,15 +98,15 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
         {groups.map((group) => (
           <div key={group.sceneId} className="card">
             <h3 className={styles.sceneTitle}>
-              {group.sceneTitle || "Untitled scene"}
+              {group.sceneTitle || t("untitledScene")}
             </h3>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Completed</th>
-                  <th>Error</th>
+                  <th>{t("tableHeaders.status")}</th>
+                  <th>{t("tableHeaders.created")}</th>
+                  <th>{t("tableHeaders.completed")}</th>
+                  <th>{t("tableHeaders.error")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,13 +138,13 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
             href={`/projects/${projectId}/storyboard`}
             className="btn btn-secondary"
           >
-            Edit Storyboard
+            {t("editStoryboard")}
           </Link>
           <Link
             href={`/projects/${projectId}/generate`}
             className="btn btn-primary"
           >
-            Generate →
+            {t("generateCta")}
           </Link>
         </div>
       )}
@@ -148,6 +153,7 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
 }
 
 function StatusChip({ status }: { status: string }) {
+  const t = useTranslations("generate.status");
   const colorMap: Record<string, string> = {
     succeeded: "#166534",
     failed: "#b91c1c",
@@ -162,6 +168,9 @@ function StatusChip({ status }: { status: string }) {
     queued: "#fef9c3",
     canceled: "#f3f4f6",
   };
+  const labelKey = ["succeeded", "failed", "running", "queued", "canceled"].includes(status)
+    ? status
+    : null;
   return (
     <span
       style={{
@@ -174,7 +183,7 @@ function StatusChip({ status }: { status: string }) {
         color: colorMap[status] ?? "#4a5568",
       }}
     >
-      {status}
+      {labelKey ? t(labelKey) : status}
     </span>
   );
 }

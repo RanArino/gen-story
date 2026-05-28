@@ -72,6 +72,10 @@
   padding: 32px;
 }
 
+.sidebarFooter {
+  margin-top: auto;
+}
+
 /* Shared utility classes used by page components */
 :global(.screen-header) {
   margin-bottom: 24px;

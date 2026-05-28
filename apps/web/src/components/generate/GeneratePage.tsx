@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GenerationRequestDto, SceneDto } from "@gen-story/shared";
 import {
@@ -52,6 +53,8 @@ function isTerminal(status: GenStatus) {
 }
 
 export function GeneratePage({ projectId }: { projectId: string }) {
+  const t = useTranslations("generate");
+  const tCommon = useTranslations("common");
   const [progress, setProgress] = useState<SceneProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState(false);
@@ -136,7 +139,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
         }, 2000);
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to start generation");
+      setError(e instanceof Error ? e.message : t("errors.start"));
     } finally {
       setLaunching(false);
     }
@@ -156,7 +159,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
         }, 2000);
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to retry");
+      setError(e instanceof Error ? e.message : t("errors.retry"));
     }
   }
 
@@ -175,7 +178,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
         ),
       );
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to cancel");
+      setError(e instanceof Error ? e.message : t("errors.cancel"));
     }
   }
 
@@ -191,7 +194,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
   if (loading) {
     return (
       <AppShell projectId={projectId}>
-        <p style={{ color: "#8898aa" }}>Loading…</p>
+        <p style={{ color: "#8898aa" }}>{tCommon("loading")}</p>
       </AppShell>
     );
   }
@@ -200,18 +203,16 @@ export function GeneratePage({ projectId }: { projectId: string }) {
     return (
       <AppShell projectId={projectId}>
         <div className="screen-header">
-          <h2>Generate</h2>
+          <h2>{t("title")}</h2>
         </div>
         <div className="card">
-          <p>
-            No scenes found. Please add scenes in the Storyboard step first.
-          </p>
+          <p>{t("noScenes")}</p>
           <Link
             href={`/projects/${projectId}/storyboard`}
             className="btn btn-primary"
             style={{ marginTop: 12 }}
           >
-            Go to Storyboard →
+            {t("goToStoryboard")}
           </Link>
         </div>
       </AppShell>
@@ -221,8 +222,8 @@ export function GeneratePage({ projectId }: { projectId: string }) {
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
-        <h2>Generate</h2>
-        <p>Generate AI images for each scene in your storyboard.</p>
+        <h2>{t("title")}</h2>
+        <p>{t("subtitle")}</p>
       </div>
 
       {error && <ErrorAlert message={error} />}
@@ -232,13 +233,20 @@ export function GeneratePage({ projectId }: { projectId: string }) {
         <div className={styles.progressHeader}>
           <div>
             <span className={styles.progressCount}>
-              {succeeded} / {total} completed
+              {t("progress.completed", { done: succeeded, total })}
             </span>
             {failed > 0 && (
-              <span className={styles.failedCount}>{failed} failed</span>
+              <span className={styles.failedCount}>
+                {t("progress.failed", { count: failed })}
+              </span>
             )}
           </div>
-          {anyActive && <div className={styles.spinner} title="Generating…" />}
+          {anyActive && (
+            <div
+              className={styles.spinner}
+              title={t("progress.generating")}
+            />
+          )}
         </div>
         {total > 0 && (
           <div className={styles.progressBar}>
@@ -259,10 +267,10 @@ export function GeneratePage({ projectId }: { projectId: string }) {
             disabled={launching || anyActive}
           >
             {launching
-              ? "Starting…"
+              ? t("actions.starting")
               : noneStarted
-                ? "Start generation"
-                : "Retry failed scenes"}
+                ? t("actions.start")
+                : t("actions.retryFailed")}
           </button>
         )}
         {allDone && succeeded > 0 && (
@@ -270,7 +278,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
             href={`/projects/${projectId}/review`}
             className="btn btn-primary"
           >
-            Review images →
+            {t("actions.reviewImages")}
           </Link>
         )}
       </div>
@@ -295,7 +303,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
                   style={{ fontSize: 12, padding: "4px 10px" }}
                   onClick={() => retryScene(p)}
                 >
-                  Retry
+                  {t("row.retry")}
                 </button>
               )}
               {(p.status === "queued" || p.status === "running") && (
@@ -304,7 +312,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
                   style={{ fontSize: 12, padding: "4px 10px" }}
                   onClick={() => cancelScene(p)}
                 >
-                  Cancel
+                  {t("row.cancel")}
                 </button>
               )}
             </div>
@@ -316,17 +324,10 @@ export function GeneratePage({ projectId }: { projectId: string }) {
 }
 
 function StatusBadge({ status }: { status: GenStatus }) {
-  const label: Record<GenStatus, string> = {
-    none: "Not started",
-    queued: "Waiting",
-    running: "Generating…",
-    succeeded: "Done",
-    failed: "Failed",
-    canceled: "Canceled",
-  };
+  const t = useTranslations("generate");
   return (
     <span className={`${styles.badge} ${styles[`badge_${status}`]}`}>
-      {label[status]}
+      {t(`status.${status}`)}
     </span>
   );
 }
