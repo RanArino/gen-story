@@ -39,8 +39,11 @@ import {
 import type {
   ApplicationDependencies,
   ComplementSceneProposal,
+  Language,
   UseCaseResult,
+  UserPreference,
 } from "./ports";
+import { DEFAULT_LANGUAGE, isLanguage } from "./ports";
 
 function success<T>(value: T): UseCaseResult<T> {
   return {
@@ -641,7 +644,21 @@ export async function createTemplateScenesFromPhotos(
 
 export type AnalyzeProjectPhotosInput = {
   projectId: string;
+  language?: Language;
 };
+
+async function resolvePrincipalLanguage(
+  deps: ApplicationDependencies,
+  explicit?: Language,
+): Promise<Language> {
+  if (explicit && isLanguage(explicit)) return explicit;
+  const principal = await deps.authContext.getCurrentPrincipal();
+  if (principal) {
+    const pref = await deps.userPreferences.findByUserId(principal.user.id);
+    if (pref) return pref.language;
+  }
+  return DEFAULT_LANGUAGE;
+}
 
 function isAnalyzablePhoto(photo: PhotoAsset): boolean {
   return (
@@ -671,10 +688,12 @@ export async function analyzeProjectPhotos(
 
     const storyboards = await deps.storyboards.findByProjectId(project.id);
     const storyboard = storyboards[0] ?? null;
+    const language = await resolvePrincipalLanguage(deps, input.language);
     const generated = await deps.photoAnalysisGeneration.analyzeProjectPhotos({
       project,
       storyboard,
       photos,
+      language,
     });
     const timestamp = now();
     const existing = await deps.projectPhotoAnalyses.findLatestByProjectId(
@@ -729,6 +748,7 @@ export async function getProjectPhotoAnalysis(
 
 export type FillSceneWithAiInput = {
   sceneId: string;
+  language?: Language;
 };
 
 const sceneFillFields = [
@@ -810,6 +830,7 @@ export async function fillSceneWithAi(
       }
     }
 
+    const language = await resolvePrincipalLanguage(deps, input.language);
     const suggestion = await deps.sceneFillGeneration.generateSceneFill({
       project,
       storyboard,
@@ -818,6 +839,7 @@ export async function fillSceneWithAi(
       stylePreset,
       projectPhotos,
       siblingScenes,
+      language,
     });
 
     const updatedScene = {
@@ -926,6 +948,7 @@ export type ProposeComplementScenesInput = {
   storyboardId: string;
   fromSceneId: string;
   toSceneId: string;
+  language?: Language;
 };
 
 export async function proposeComplementScenes(
@@ -961,6 +984,7 @@ export async function proposeComplementScenes(
     }
 
     const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
+    const language = await resolvePrincipalLanguage(deps, input.language);
     const proposals =
       await deps.complementSceneProposal.proposeComplementScenes({
         project,
@@ -970,6 +994,7 @@ export async function proposeComplementScenes(
         stylePreset,
         projectPhotos,
         siblingScenes: scenes,
+        language,
       });
 
     return success(proposals.slice(0, 3));
@@ -1769,11 +1794,13 @@ export type StoryboardExportData = {
   tone: string;
   stylePresetName: string | null;
   exportedAt: string;
+  language: Language;
   scenes: StoryboardExportScene[];
 };
 
 export type ExportStoryboardAsJsonInput = {
   storyboardId: string;
+  language?: Language;
 };
 
 export async function exportStoryboardAsJson(
@@ -1831,14 +1858,76 @@ export async function exportStoryboardAsJson(
       });
     }
 
+    const language = await resolvePrincipalLanguage(deps, input.language);
     return success({
       storyboardId: storyboard.id,
       projectId: storyboard.projectId,
       tone: storyboard.tone,
       stylePresetName,
       exportedAt: new Date().toISOString(),
+      language,
       scenes: exportScenes,
     });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function getUserPreference(
+  deps: ApplicationDependencies,
+  userId: string,
+): Promise<UseCaseResult<UserPreference>> {
+  try {
+    const trimmedUserId = userId.trim();
+    if (!trimmedUserId) {
+      return failure("validation_error", "userId is required");
+    }
+
+    const existing = await deps.userPreferences.findByUserId(trimmedUserId);
+    if (existing) {
+      return success(existing);
+    }
+
+    return success({
+      userId: trimmedUserId,
+      language: DEFAULT_LANGUAGE,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type SetUserPreferenceInput = {
+  userId: string;
+  language: Language;
+};
+
+export async function setUserPreference(
+  deps: ApplicationDependencies,
+  input: SetUserPreferenceInput,
+): Promise<UseCaseResult<UserPreference>> {
+  try {
+    const trimmedUserId = input.userId.trim();
+    if (!trimmedUserId) {
+      return failure("validation_error", "userId is required");
+    }
+
+    if (!isLanguage(input.language)) {
+      return failure(
+        "validation_error",
+        `language must be one of: en, ja`,
+      );
+    }
+
+    const preference: UserPreference = {
+      userId: trimmedUserId,
+      language: input.language,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await deps.userPreferences.upsert(preference);
+    return success(preference);
   } catch (error) {
     return validationFailure(error);
   }

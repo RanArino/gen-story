@@ -14,6 +14,7 @@ export type {
   ImageGenerationPort,
   ImagePreprocessingPort,
   JobQueuePort,
+  Language,
   ObjectStoragePort,
   OrganizationRepositoryPort,
   PhotoAnalysisGenerationInput,
@@ -33,7 +34,14 @@ export type {
   UseCaseError,
   UseCaseErrorCode,
   UseCaseResult,
+  UserPreference,
+  UserPreferenceRepositoryPort,
   UserRepositoryPort,
+} from "./ports";
+export {
+  DEFAULT_LANGUAGE,
+  SUPPORTED_LANGUAGES,
+  isLanguage,
 } from "./ports";
 export {
   analyzeProjectPhotos,
@@ -49,6 +57,8 @@ export {
   exportStoryboardAsJson,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
+  getUserPreference,
+  setUserPreference,
   insertComplementScene,
   markGeneratedImageAdopted,
   markGenerationRequestCompleted,
@@ -84,6 +94,7 @@ export type {
   ReorderScenesInput,
   RequestTestGenerationInput,
   ResetTestGenerationInput,
+  SetUserPreferenceInput,
   StoryboardExportData,
   StoryboardExportScene,
   UpdatePhotoCurationInput,

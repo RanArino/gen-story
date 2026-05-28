@@ -1,3 +1,30 @@
+export type Language = "en" | "ja";
+export const SUPPORTED_LANGUAGES: Language[] = ["en", "ja"];
+export const DEFAULT_LANGUAGE: Language = "en";
+
+export function isLanguage(value: unknown): value is Language {
+  return (
+    typeof value === "string" &&
+    (SUPPORTED_LANGUAGES as string[]).includes(value)
+  );
+}
+
+export type UserPreferenceDto = {
+  userId: string;
+  language: Language;
+  updatedAt: string;
+};
+
+export {
+  CAMERA_OPTIONS,
+  LIGHTING_OPTIONS,
+  MOTION_OPTIONS,
+  EMOTION_OPTIONS,
+  TONE_OPTIONS,
+  getLocalizedLabels,
+} from "./i18n-labels";
+export type { LocalizedLabels } from "./i18n-labels";
+
 export type ApiHealthDto = {
   status: "ok";
   service: string;
