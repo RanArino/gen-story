@@ -90,6 +90,15 @@ const responseJsonSchema = {
   required: ["emotionCandidates", "photoInsights", "storySummary"],
 } as const;
 
+function languageDirective(
+  language: PhotoAnalysisGenerationInput["language"],
+): string {
+  if (language === "ja") {
+    return 'Respond in Japanese. The emotion candidate `label`, `description`, and `reason` fields, every photo insight free-text field (`summary`, `people`, `setting`, `event`, `atmosphere`), and `storySummary` MUST be written in natural Japanese. Emotion candidate `value` fields MUST remain lowercase snake_case English (e.g., "joy", "nostalgia").';
+  }
+  return "Respond in English. All free-text fields MUST be English.";
+}
+
 function buildPrompt(input: PhotoAnalysisGenerationInput): string {
   const photoList = input.photos
     .map(
@@ -100,9 +109,10 @@ function buildPrompt(input: PhotoAnalysisGenerationInput): string {
 
   return [
     "Analyze these curated project photos for an anniversary-style storyboard.",
+    languageDirective(input.language),
     "Return only JSON matching the provided schema.",
     "Use the given photoAssetId exactly for each photo insight.",
-    "Emotion candidate values must be lowercase snake_case strings.",
+    "Emotion candidate values must be lowercase snake_case English strings.",
     "Each candidate should be useful as a storyboard tone.",
     `Project: ${input.project.name}`,
     `Current storyboard tone: ${input.storyboard?.tone ?? "none"}`,

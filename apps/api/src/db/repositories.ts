@@ -38,6 +38,7 @@ import {
 import type {
   GeneratedImageRepositoryPort,
   GenerationRequestRepositoryPort,
+  Language,
   OrganizationRepositoryPort,
   PhotoAssetRepositoryPort,
   ProjectPhotoAnalysisRepositoryPort,
@@ -46,8 +47,11 @@ import type {
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
   TestGenerationBatchRepositoryPort,
+  UserPreference,
+  UserPreferenceRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
+import { isLanguage } from "@gen-story/application";
 
 import type { GenStoryDatabase } from "./client";
 import {
@@ -62,6 +66,7 @@ import {
   storyboards,
   stylePresets,
   testGenerationBatches,
+  userPreferences,
   users,
 } from "./schema";
 
@@ -1408,6 +1413,50 @@ export class SqliteTestGenerationBatchRepository implements TestGenerationBatchR
   }
 }
 
+type UserPreferenceRow = typeof userPreferences.$inferSelect;
+
+function mapUserPreference(row: UserPreferenceRow): UserPreference {
+  const language: Language = isLanguage(row.language) ? row.language : "en";
+  return {
+    userId: row.userId,
+    language,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export class SqliteUserPreferenceRepository
+  implements UserPreferenceRepositoryPort
+{
+  constructor(private readonly db: GenStoryDatabase) {}
+
+  async findByUserId(userId: string): Promise<UserPreference | null> {
+    const row = await this.db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .get();
+
+    return row == null ? null : mapUserPreference(row);
+  }
+
+  async upsert(preference: UserPreference): Promise<void> {
+    await this.db
+      .insert(userPreferences)
+      .values({
+        userId: preference.userId,
+        language: preference.language,
+        updatedAt: preference.updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: userPreferences.userId,
+        set: {
+          language: preference.language,
+          updatedAt: preference.updatedAt,
+        },
+      });
+  }
+}
+
 export function createSqliteRepositories(db: GenStoryDatabase) {
   return {
     users: new SqliteUserRepository(db),
@@ -1421,5 +1470,6 @@ export function createSqliteRepositories(db: GenStoryDatabase) {
     generatedImages: new SqliteGeneratedImageRepository(db),
     projectPhotoAnalyses: new SqliteProjectPhotoAnalysisRepository(db),
     testGenerationBatches: new SqliteTestGenerationBatchRepository(db),
+    userPreferences: new SqliteUserPreferenceRepository(db),
   };
 }

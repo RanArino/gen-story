@@ -50,6 +50,13 @@ const responseJsonSchema = {
   ],
 } as const;
 
+function languageDirective(language: SceneFillGenerationInput["language"]): string {
+  if (language === "ja") {
+    return 'Respond in Japanese. All title, description, image prompt, and any free-text fields MUST be written in natural Japanese. Selection enum values such as cameraDirection, lightingDirection, motionDirection, and emotion MUST remain in English (e.g., "Wide", "Close-up", "Joy").';
+  }
+  return "Respond in English. All title, description, image prompt, and any free-text fields MUST be English.";
+}
+
 function buildPrompt(input: SceneFillGenerationInput): string {
   const siblings = input.siblingScenes
     .filter((scene) => scene.id !== input.scene.id)
@@ -61,6 +68,7 @@ function buildPrompt(input: SceneFillGenerationInput): string {
 
   return [
     "You are drafting one scene of an anniversary-style storyboard.",
+    languageDirective(input.language),
     "The FIRST image is this scene's primary photo; any following images are other project photos for context.",
     "Generate scene fields grounded in what is actually visible in the primary photo.",
     "Return only JSON matching the provided schema.",
@@ -73,7 +81,7 @@ function buildPrompt(input: SceneFillGenerationInput): string {
     `Primary photo: name="${input.primaryPhoto.name}", notes="${input.primaryPhoto.notes ?? ""}"`,
     `This is scene ${input.scene.orderIndex + 1}.`,
     siblings ? `Other scenes in the storyboard:\n${siblings}` : "",
-    "emotion/cameraDirection/lightingDirection/motionDirection should be short label-style values.",
+    "emotion/cameraDirection/lightingDirection/motionDirection should be short label-style values (always English).",
   ]
     .filter(Boolean)
     .join("\n");

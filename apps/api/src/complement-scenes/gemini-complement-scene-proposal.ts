@@ -59,9 +59,19 @@ const responseJsonSchema = {
   required: ["proposals"],
 } as const;
 
+function languageDirective(
+  language: ComplementSceneProposalInput["language"],
+): string {
+  if (language === "ja") {
+    return 'Respond in Japanese. All title, description, image prompt, and any free-text fields MUST be written in natural Japanese. Selection enum values such as cameraDirection, lightingDirection, motionDirection, and emotion MUST remain in English (e.g., "Wide", "Close-up", "Joy").';
+  }
+  return "Respond in English. All title, description, image prompt, and any free-text fields MUST be English.";
+}
+
 function buildPrompt(input: ComplementSceneProposalInput): string {
   return [
     "Propose 1-3 AI-only 'complement scenes' that bridge two adjacent storyboard scenes.",
+    languageDirective(input.language),
     "A complement scene has no source photo; it is fully AI-generated to smooth the narrative.",
     "Use the provided project photos as visual context for consistency.",
     "Return only JSON matching the provided schema.",
@@ -73,7 +83,7 @@ function buildPrompt(input: ComplementSceneProposalInput): string {
       : "Visual style: AI's choice, consistent with the tone.",
     `Bridge from scene "${input.fromScene.title || "(untitled)"}": ${input.fromScene.description || "(no description)"}`,
     `Bridge to scene "${input.toScene.title || "(untitled)"}": ${input.toScene.description || "(no description)"}`,
-    "emotion/cameraDirection/lightingDirection/motionDirection should be short label-style values.",
+    "emotion/cameraDirection/lightingDirection/motionDirection should be short label-style values (always English).",
   ].join("\n");
 }
 

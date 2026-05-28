@@ -68,6 +68,7 @@ function createInput() {
     stylePreset,
     projectPhotos: [primaryPhoto],
     siblingScenes: [scene],
+    language: "en" as const,
   };
 }
 
