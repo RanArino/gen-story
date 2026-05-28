@@ -151,7 +151,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Uploaded primary photo preview inside each scene card | ✅ | Template-created scenes assigned with uploaded photo as primary; preview visible in scene editor |
 | Per-scene AI fill button for empty text fields | ✅ | Scene cards expose an AI fill action that fills blank title, description, image prompt, emotion, camera, lighting, and motion fields while preserving user-edited values |
 | Beginner-friendly labels for selections | ⚠️ | English labels present; no i18n yet |
-| Labels follow app language setting | ❌ | No language setting |
+| Labels follow app language setting | 🟡 | In progress — see `docs/plans/20260526-multi-language-japanese-english.md` |
 
 ---
 
@@ -159,11 +159,11 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 | Requirement | Status | Notes |
 |---|---|---|
-| UI language: Japanese and English | ❌ | English-only; no i18n framework |
-| AI-generated content follows selected language | ❌ | Requires AI generation + i18n |
-| Language switcher in app settings | ❌ | No settings screen |
-| Selection labels follow language | ❌ | Hard-coded English |
-| Exported storyboard follows language | ❌ | No export yet |
+| UI language: Japanese and English | 🟡 | In progress — see `docs/plans/20260526-multi-language-japanese-english.md` |
+| AI-generated content follows selected language | 🟡 | In progress — see `docs/plans/20260526-multi-language-japanese-english.md` |
+| Language switcher in app settings | 🟡 | In progress — see `docs/plans/20260526-multi-language-japanese-english.md` |
+| Selection labels follow language | 🟡 | In progress — see `docs/plans/20260526-multi-language-japanese-english.md` |
+| Exported storyboard follows language | 🟡 | In progress — see `docs/plans/20260526-multi-language-japanese-english.md` |
 
 ---
 
@@ -317,8 +317,8 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Test generation workflow | 4 | 0 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 0 | 3 |
 | Scene content | 17 | 0 | 0 | 0 |
-| Scene editing UX | 4 | 1 | 0 | 1 |
-| Language / i18n | 0 | 0 | 0 | 5 |
+| Scene editing UX | 4 | 1 | 1 | 0 |
+| Language / i18n | 0 | 0 | 5 | 0 |
 | Generated image handling | 8 | 2 | 0 | 0 |
 | Storyboard viewing & export | 6 | 0 | 0 | 0 |
 | Image generation infra | 13 | 2 | 0 | 2 |
