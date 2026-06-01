@@ -8,10 +8,14 @@ import {
   type SceneBridge,
   type ScenePhotoAsset,
   type StylePreset,
+  type TestAdjustmentId,
   type TestGenerationBatch,
   type TestGenerationBatchStatus,
   type Timestamp,
+  isTestAdjustmentId,
 } from "./model";
+
+export const MAX_ADJUSTMENTS_PER_VARIANT = 3;
 
 function assertScenePhotoAssets(scenePhotoAssets: ScenePhotoAsset[]): void {
   const primaryCount = scenePhotoAssets.filter(
@@ -249,6 +253,61 @@ export function resetTestGenerationBatch(
     completedAt: null,
     createdAt,
   };
+}
+
+export function assertAdjustmentsValid(ids: TestAdjustmentId[]): void {
+  if (ids.length > MAX_ADJUSTMENTS_PER_VARIANT) {
+    throw new Error(
+      `At most ${MAX_ADJUSTMENTS_PER_VARIANT} adjustments may be applied per variant.`,
+    );
+  }
+
+  const seen = new Set<string>();
+
+  for (const id of ids) {
+    if (!isTestAdjustmentId(id)) {
+      throw new Error(`Unknown adjustment id: ${String(id)}.`);
+    }
+
+    if (seen.has(id)) {
+      throw new Error(`Duplicate adjustment id: ${id}.`);
+    }
+
+    seen.add(id);
+  }
+}
+
+export function appendAdjustmentsToCommonPrompt(
+  commonPrompt: string,
+  ids: TestAdjustmentId[],
+  suffixesById: Record<TestAdjustmentId, string>,
+): string {
+  let result = commonPrompt;
+
+  for (const id of ids) {
+    const suffix = suffixesById[id];
+
+    if (!suffix) {
+      continue;
+    }
+
+    const trimmedSuffix = suffix.trim();
+
+    if (!trimmedSuffix) {
+      continue;
+    }
+
+    if (result.includes(trimmedSuffix)) {
+      continue;
+    }
+
+    result =
+      result.trim().length === 0
+        ? trimmedSuffix
+        : `${result.trim()} ${trimmedSuffix}`;
+  }
+
+  return result;
 }
 
 export function composeCommonPrompt(input: {

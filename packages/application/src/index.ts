@@ -38,13 +38,10 @@ export type {
   UserPreferenceRepositoryPort,
   UserRepositoryPort,
 } from "./ports";
-export {
-  DEFAULT_LANGUAGE,
-  SUPPORTED_LANGUAGES,
-  isLanguage,
-} from "./ports";
+export { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, isLanguage } from "./ports";
 export {
   analyzeProjectPhotos,
+  applyAdjustmentToTestVariant,
   assignPhotosToScene,
   cancelGenerationRequest,
   confirmTestGeneration,
@@ -79,6 +76,7 @@ export {
 } from "./use-cases";
 export type {
   AnalyzeProjectPhotosInput,
+  ApplyAdjustmentToTestVariantInput,
   CancelGenerationRequestInput,
   ConfirmTestGenerationInput,
   CreateCustomStyleInput,

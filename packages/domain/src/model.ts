@@ -26,6 +26,30 @@ export type GenerationRequestStatus =
   | "failed"
   | "canceled";
 
+export type TestAdjustmentId =
+  | "warmer"
+  | "cooler"
+  | "more_cinematic"
+  | "darker"
+  | "brighter"
+  | "more_candid";
+
+export const TEST_ADJUSTMENT_IDS: TestAdjustmentId[] = [
+  "warmer",
+  "cooler",
+  "more_cinematic",
+  "darker",
+  "brighter",
+  "more_candid",
+];
+
+export function isTestAdjustmentId(value: unknown): value is TestAdjustmentId {
+  return (
+    typeof value === "string" &&
+    (TEST_ADJUSTMENT_IDS as string[]).includes(value)
+  );
+}
+
 export type User = {
   id: UserId;
   organizationId: OrganizationId;
@@ -137,6 +161,7 @@ export type GenerationRequest = {
   inputJson: Record<string, unknown>;
   errorMessage: string | null;
   sourceGenerationRequestId: GenerationRequestId | null;
+  appliedAdjustments: TestAdjustmentId[];
   startedAt: Timestamp | null;
   completedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -296,6 +321,7 @@ export type CreateGenerationRequestInput = {
   status?: GenerationRequestStatus;
   errorMessage?: string | null;
   sourceGenerationRequestId?: GenerationRequestId | null;
+  appliedAdjustments?: TestAdjustmentId[];
   startedAt?: Timestamp | null;
   completedAt?: Timestamp | null;
   createdAt: Timestamp;
@@ -557,6 +583,7 @@ export function createGenerationRequest(
     inputJson: { ...input.inputJson },
     errorMessage: trimOptionalText(input.errorMessage) || null,
     sourceGenerationRequestId: input.sourceGenerationRequestId ?? null,
+    appliedAdjustments: [...(input.appliedAdjustments ?? [])],
     startedAt: input.startedAt ?? null,
     completedAt: input.completedAt ?? null,
     createdAt: input.createdAt,

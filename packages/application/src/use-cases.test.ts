@@ -11,7 +11,9 @@ import {
   createStoryboard,
   createTemplateScene,
   createStylePreset,
+  createTestGenerationBatch,
   createUser,
+  type TestAdjustmentId,
   type GeneratedImage,
   type GenerationRequest,
   type GenerationRequestStatus,
@@ -58,7 +60,9 @@ import type {
 } from "./ports";
 import {
   analyzeProjectPhotos,
+  applyAdjustmentToTestVariant,
   assignPhotosToScene,
+  confirmTestGeneration,
   createGenerationRequestUseCase,
   createCustomStyle,
   createProjectUseCase,
@@ -285,9 +289,7 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .slice(0, limit);
   }
 
-  async findByStoryboardId(
-    storyboardId: string,
-  ): Promise<GenerationRequest[]> {
+  async findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]> {
     return this.store
       .values()
       .filter((r) => r.storyboardId === storyboardId)
@@ -297,6 +299,8 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.store.save(generationRequest);
   }
+
+  async softDelete(_id: string, _deletedAt: string): Promise<void> {}
 }
 
 class InMemoryGeneratedImageRepository implements GeneratedImageRepositoryPort {
@@ -334,9 +338,7 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
   }
 }
 
-class InMemoryUserPreferenceRepository
-  implements UserPreferenceRepositoryPort
-{
+class InMemoryUserPreferenceRepository implements UserPreferenceRepositoryPort {
   private readonly items = new Map<string, UserPreference>();
 
   async findByUserId(userId: string): Promise<UserPreference | null> {
@@ -717,9 +719,9 @@ describe("application use cases", () => {
         prompt: "Warm film stock with gentle halation.",
       });
 
-      await expect(deps.stylePresets.findById(result.value.id)).resolves.toEqual(
-        result.value,
-      );
+      await expect(
+        deps.stylePresets.findById(result.value.id),
+      ).resolves.toEqual(result.value);
     }
   });
 
@@ -2174,5 +2176,151 @@ describe("application use cases", () => {
     const photo1 = await deps.photoAssets.findById("photo_1");
     expect(photo2?.position).toBe(0);
     expect(photo1?.position).toBe(1);
+  });
+
+  describe("test-generation adjustments", () => {
+    const SUFFIXES: Record<TestAdjustmentId, string> = {
+      warmer: "warmer color temperature",
+      cooler: "cooler color temperature",
+      more_cinematic: "stronger cinematic grade",
+      darker: "lower-key lighting",
+      brighter: "higher-key lighting",
+      more_candid: "candid documentary feel",
+    };
+
+    async function seedBatch(opts?: { adjustments?: TestAdjustmentId[] }) {
+      const deps = createDependencies();
+      const ts = new Date().toISOString();
+      await deps.projects.save(
+        createProject({
+          id: "p1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Proj",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      );
+      await deps.storyboards.save(
+        createStoryboard({
+          id: "sb1",
+          projectId: "p1",
+          tone: "cinematic",
+          commonPrompt: "Base prompt.",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      );
+      await deps.scenes.save(
+        createScene({
+          id: "s1",
+          projectId: "p1",
+          storyboardId: "sb1",
+          orderIndex: 0,
+          title: "T",
+          description: "D",
+          imagePrompt: "P",
+          emotion: "",
+          cameraDirection: "",
+          lightingDirection: "",
+          motionDirection: "",
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      );
+      await deps.testGenerationBatches.save(
+        createTestGenerationBatch({
+          id: "batch_1",
+          storyboardId: "sb1",
+          status: "pending",
+          createdAt: ts,
+        }),
+      );
+      await deps.generationRequests.save(
+        createGenerationRequest({
+          id: "variant_1",
+          projectId: "p1",
+          storyboardId: "sb1",
+          sceneId: "s1",
+          inputJson: { testBatchId: "batch_1", testVariant: 0 },
+          appliedAdjustments: opts?.adjustments ?? [],
+          createdAt: ts,
+          updatedAt: ts,
+        }),
+      );
+      return deps;
+    }
+
+    it("applyAdjustmentToTestVariant queues a new request with adjustments", async () => {
+      const deps = await seedBatch();
+
+      const result = await applyAdjustmentToTestVariant(deps, {
+        storyboardId: "sb1",
+        variantId: "variant_1",
+        adjustmentIds: ["warmer", "more_cinematic"],
+        adjustmentSuffixes: SUFFIXES,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.appliedAdjustments).toEqual([
+          "warmer",
+          "more_cinematic",
+        ]);
+        expect(result.value.sourceGenerationRequestId).toBe("variant_1");
+        expect(result.value.status).toBe("queued");
+      }
+    });
+
+    it("applyAdjustmentToTestVariant rejects more than 3 adjustments", async () => {
+      const deps = await seedBatch();
+      const result = await applyAdjustmentToTestVariant(deps, {
+        storyboardId: "sb1",
+        variantId: "variant_1",
+        adjustmentIds: ["warmer", "cooler", "darker", "brighter"],
+        adjustmentSuffixes: SUFFIXES,
+      });
+      expect(result.ok).toBe(false);
+    });
+
+    it("confirmTestGeneration appends adjustments to commonPrompt once", async () => {
+      const deps = await seedBatch({
+        adjustments: ["warmer", "more_cinematic"],
+      });
+
+      const result = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "variant_1",
+        adjustmentSuffixes: SUFFIXES,
+      });
+      expect(result.ok).toBe(true);
+
+      const sb1 = await deps.storyboards.findById("sb1");
+      expect(sb1?.commonPrompt).toBe(
+        "Base prompt. warmer color temperature stronger cinematic grade",
+      );
+
+      const reconfirm = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "variant_1",
+        adjustmentSuffixes: SUFFIXES,
+      });
+      expect(reconfirm.ok).toBe(false);
+    });
+
+    it("confirmTestGeneration with no adjustments leaves commonPrompt unchanged", async () => {
+      const deps = await seedBatch({ adjustments: [] });
+      const before = (await deps.storyboards.findById("sb1"))?.commonPrompt;
+
+      const result = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "variant_1",
+        adjustmentSuffixes: SUFFIXES,
+      });
+      expect(result.ok).toBe(true);
+
+      const after = (await deps.storyboards.findById("sb1"))?.commonPrompt;
+      expect(after).toBe(before);
+    });
   });
 });
