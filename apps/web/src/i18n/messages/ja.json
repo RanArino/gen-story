@@ -258,10 +258,26 @@
     "confirming": "確定中…",
     "confirmedBadge": "✓ 確定済み",
     "regenerate": "新しいテストを生成",
+    "adjustments": {
+      "heading": "このバリアントを調整",
+      "saveHint": "このバリアントを確定すると、選択した調整がプロジェクトの共通プロンプトに保存されます。",
+      "apply": "調整を適用",
+      "applying": "適用中…",
+      "limit": "バリアントごとに最大3つまで選択できます。",
+      "labels": {
+        "warmer": "より温かく",
+        "cooler": "より涼しく",
+        "more_cinematic": "より映画的に",
+        "darker": "より暗く",
+        "brighter": "より明るく",
+        "more_candid": "よりスナップ風に"
+      }
+    },
     "errors": {
       "start": "テスト生成の開始に失敗しました。",
       "confirm": "確定に失敗しました。",
-      "reset": "リセットに失敗しました。"
+      "reset": "リセットに失敗しました。",
+      "apply": "調整の適用に失敗しました。"
     }
   },
   "generate": {

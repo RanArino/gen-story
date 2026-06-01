@@ -258,10 +258,26 @@
     "confirming": "Confirming…",
     "confirmedBadge": "✓ Confirmed",
     "regenerate": "Generate new tests",
+    "adjustments": {
+      "heading": "Adjust this variant",
+      "saveHint": "These adjustments will be saved to the project prompt when you confirm this variant.",
+      "apply": "Apply adjustments",
+      "applying": "Applying…",
+      "limit": "Up to 3 adjustments per variant.",
+      "labels": {
+        "warmer": "Warmer",
+        "cooler": "Cooler",
+        "more_cinematic": "More cinematic",
+        "darker": "Darker",
+        "brighter": "Brighter",
+        "more_candid": "More candid"
+      }
+    },
     "errors": {
       "start": "Failed to start test generation.",
       "confirm": "Failed to confirm.",
-      "reset": "Failed to reset."
+      "reset": "Failed to reset.",
+      "apply": "Failed to apply adjustments."
     }
   },
   "generate": {
