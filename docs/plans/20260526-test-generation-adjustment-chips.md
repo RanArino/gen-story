@@ -47,6 +47,9 @@ This plan closes two `❌` rows in `docs/gap-analysis.md` §6:
 - Observation: The storyboard already has an editable `commonPrompt` field surfaced in the StoryboardPage UI with Save and Regenerate actions.
   Evidence: `gap-analysis.md` §5. Implication: writing the confirmed-variant suffix back to `storyboards.commonPrompt` will be visible to the user, who can edit or remove it.
 
+- Observation: There is no `TestGenerationVariant` type or `test_generation_variants` table. What the plan calls "variants" are `GenerationRequest` objects whose `inputJson` contains `{ testBatchId, testVariant: 0|1|2 }`. The frontend identifies them this way in `TestGenerationModal.tsx:52–61`. All Milestone 2/3/4 work targets `GenerationRequest` / `generation_requests` instead.
+  Evidence: `packages/domain/src/model.ts:131` — only `TestGenerationBatch` exists; `apps/api/src/db/schema.ts:194` — only `generation_requests` and `test_generation_batches` tables exist. `packages/application/src/use-cases.ts:1675` — `inputJson: { ...preprocessed, testBatchId: batch.id, testVariant: i }`.
+
 
 ## Decision Log
 
@@ -134,9 +137,11 @@ The shared package is OK to depend on — it is the API contract layer.
 
 Files: `packages/domain/src/model.ts`, `packages/domain/src/rules.ts`, `packages/domain/src/index.ts`, plus tests under `packages/domain/src/`.
 
-1. Extend the `TestGenerationVariant` type (or whatever the per-slot record is named today — verify in `model.ts` near line 191) with:
+1. Extend the existing `GenerationRequest` type (`packages/domain/src/model.ts:131`) with:
 
-       appliedAdjustments: TestAdjustmentId[]; // default []
+       appliedAdjustments?: TestAdjustmentId[]; // undefined means [] — test variants only
+
+   There is no `TestGenerationVariant` type; "variants" are `GenerationRequest` objects identified by `inputJson.testBatchId`. Making the field optional keeps the change non-breaking for the many non-test `GenerationRequest` usages.
 
    The domain package may not import from `@gen-story/shared`. To keep the layer boundary, redefine the union locally:
 
@@ -160,9 +165,9 @@ Note on layer boundary: the suffix dictionary itself lives in `@gen-story/shared
 
 Files: `apps/api/src/db/schema.ts`, then a generated migration under `drizzle/migrations/`.
 
-1. Find the `test_generation_variants` table (or wherever variants are persisted — verify schema location from `gap-analysis.md` §6 references and from `db/schema.ts`). Add column:
+1. There is no `test_generation_variants` table. Variants are `GenerationRequest` rows in the `generation_requests` table (`apps/api/src/db/schema.ts:194`). Add column there:
 
-   - `appliedAdjustmentsJson` text NOT NULL DEFAULT `'[]'` — stores a JSON array of `TestAdjustmentId` values.
+   - `appliedAdjustmentsJson` text NOT NULL DEFAULT `'[]'` — stores a JSON array of `TestAdjustmentId` values. Defaults to `'[]'` for all existing non-test generation requests.
 
 2. Generate and apply:
 
@@ -183,7 +188,7 @@ Files: `packages/application/src/ports.ts`, `packages/application/src/use-cases.
    - Load the variant; compute the effective `commonPrompt` for this re-roll by passing the chip suffixes into `appendAdjustmentsToCommonPrompt` over the storyboard's current `commonPrompt`.
    - Persist `appliedAdjustments = adjustmentIds` on the variant row (replacing previous chip selections for this slot).
    - Queue a new generation request for that slot, supplying the per-request effective `commonPrompt`. The existing image-worker / OpenAI adapter does not need to change — the prompt composer already accepts `commonPrompt` as an input field; we pass the augmented value at request time without mutating the storyboard.
-   - Mark the previous variant image (if any) as superseded for that slot. Reuse whatever "supersede" or "delete-on-retry" pattern the existing retry path uses.
+   - Soft-delete the previous `GenerationRequest` for that slot (set `deletedAt`) so that `listGenerationRequests` no longer returns it. The new request takes its place; the frontend's filter by `testBatchId` will then see exactly 3 requests again. Confirm that `listGenerationRequests` already respects `deletedAt` before applying this pattern.
 
 2. Route:
 
@@ -191,7 +196,7 @@ Files: `packages/application/src/ports.ts`, `packages/application/src/use-cases.
 
    Body: `{ adjustmentIds: TestAdjustmentId[] }`. Returns the updated variant DTO.
 
-3. Extend `TestGenerationVariantDto` with `appliedAdjustments`. Map in `dto-mappers.ts`. Export from `@gen-story/shared`.
+3. Extend the existing `GenerationRequestDto` (`packages/shared/src/index.ts:142`) with `appliedAdjustments: TestAdjustmentId[]`. There is no separate `TestGenerationVariantDto`; the frontend already uses `GenerationRequestDto` for variant display. Update `toGenerationRequestDto` in `apps/api/src/http/dto-mappers.ts:202` to map the new field (default to `[]` when `appliedAdjustments` is undefined).
 
 4. Add route tests covering: happy path, empty array (no-op restoring original commonPrompt), > 3 ids (400), unknown id (400), variant not found (404).
 
@@ -200,11 +205,11 @@ Files: `packages/application/src/ports.ts`, `packages/application/src/use-cases.
 
 Files: `packages/application/src/use-cases.ts` (the existing `confirmTestGenerationBatch` use case — name may differ; verify from `apps/api/src/http/routes.ts:1587` route handler), `packages/application/src/use-cases.test.ts`.
 
-1. In the confirm use case, after marking the variant as confirmed, mutate the storyboard:
+1. In the confirm use case, after marking the batch as confirmed, load the confirmed `GenerationRequest` (already done at `use-cases.ts:1718`) and mutate the storyboard:
 
        storyboard.commonPrompt = appendAdjustmentsToCommonPrompt(
          storyboard.commonPrompt,
-         confirmedVariant.appliedAdjustments,
+         req.appliedAdjustments ?? [],
          SUFFIXES_BY_ID,
        );
 
@@ -316,9 +321,10 @@ Before committing:
 
 - New shared exports: `TestAdjustmentId`, `TestAdjustment`, `TEST_ADJUSTMENTS`, `MAX_ADJUSTMENTS_PER_VARIANT`.
 - New domain types: `TestAdjustmentId` mirrored locally; rule helpers `assertAdjustmentsValid`, `appendAdjustmentsToCommonPrompt`.
+- Modified domain type: `GenerationRequest` gains `appliedAdjustments?: TestAdjustmentId[]`.
 - New use case: `applyAdjustmentToTestVariant`.
-- Modified use case: existing `confirmTestGenerationBatch` (verify exact name from `packages/application/src/use-cases.ts`) gains the commonPrompt-append step.
-- New API endpoint: `POST /api/storyboards/:storyboardId/test-generation/variants/:variantId/adjustments`.
-- Modified DTO: `TestGenerationVariantDto` gains `appliedAdjustments`.
-- DB: one new column `test_generation_variants.applied_adjustments_json`.
+- Modified use case: `confirmTestGeneration` (`packages/application/src/use-cases.ts:1694`) gains the commonPrompt-append step.
+- New API endpoint: `POST /api/storyboards/:storyboardId/test-generation/variants/:variantId/adjustments` (`:variantId` is a `GenerationRequest.id`).
+- Modified DTO: existing `GenerationRequestDto` gains `appliedAdjustments: TestAdjustmentId[]`; `toGenerationRequestDto` updated to map it.
+- DB: one new column `generation_requests.applied_adjustments_json` (NOT `test_generation_variants` — that table does not exist).
 - No new third-party dependencies.
