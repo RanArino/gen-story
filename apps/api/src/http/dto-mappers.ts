@@ -211,6 +211,7 @@ export function toGenerationRequestDto(
     inputJson: req.inputJson,
     errorMessage: req.errorMessage,
     sourceGenerationRequestId: req.sourceGenerationRequestId,
+    appliedAdjustments: req.appliedAdjustments ?? [],
     startedAt: req.startedAt,
     completedAt: req.completedAt,
     createdAt: req.createdAt,

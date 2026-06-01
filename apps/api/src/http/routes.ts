@@ -5,6 +5,7 @@ import { resolve, sep } from "node:path";
 import {
   assignPhotosToScene,
   analyzeProjectPhotos,
+  applyAdjustmentToTestVariant,
   cancelGenerationRequest,
   confirmTestGeneration,
   createGenerationRequestUseCase,
@@ -35,7 +36,12 @@ import {
   type AuthPrincipal,
 } from "@gen-story/application";
 import { isLanguage as isLanguageValue } from "@gen-story/application";
-import { getLocalizedLabels } from "@gen-story/shared";
+import {
+  getLocalizedLabels,
+  isTestAdjustmentId,
+  TEST_ADJUSTMENTS,
+  type TestAdjustmentId,
+} from "@gen-story/shared";
 
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
@@ -1611,9 +1617,17 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
+      const adjustmentSuffixes = Object.fromEntries(
+        Object.entries(TEST_ADJUSTMENTS).map(([id, def]) => [
+          id,
+          def.promptSuffix,
+        ]),
+      ) as Record<TestAdjustmentId, string>;
+
       const result = await confirmTestGeneration(deps, {
         storyboardId,
         confirmedGenerationRequestId: body.confirmedGenerationRequestId,
+        adjustmentSuffixes,
       });
 
       if (!result.ok) {
@@ -1650,6 +1664,70 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       sendJson(res, 200, { batch: toTestGenerationBatchDto(result.value) });
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/test-generation/variants/:variantId/adjustments
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/test-generation/variants/:variantId/adjustments",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const variantId = getParam(params, "variantId");
+      const body = await readJsonBody(req);
+
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("adjustmentIds" in body) ||
+        !Array.isArray(body.adjustmentIds)
+      ) {
+        sendJson(res, 422, badRequestBody("adjustmentIds (array) is required"));
+        return;
+      }
+
+      const rawIds = body.adjustmentIds as unknown[];
+      for (const id of rawIds) {
+        if (!isTestAdjustmentId(id)) {
+          sendJson(
+            res,
+            422,
+            badRequestBody(`Unknown adjustment id: ${String(id)}`),
+          );
+          return;
+        }
+      }
+      const adjustmentIds = rawIds as TestAdjustmentId[];
+
+      const adjustmentSuffixes = Object.fromEntries(
+        Object.entries(TEST_ADJUSTMENTS).map(([id, def]) => [
+          id,
+          def.promptSuffix,
+        ]),
+      ) as Record<TestAdjustmentId, string>;
+
+      const result = await applyAdjustmentToTestVariant(deps, {
+        storyboardId,
+        variantId,
+        adjustmentIds,
+        adjustmentSuffixes,
+      });
+
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, {
+        generationRequest: toGenerationRequestDto(result.value),
+      });
     },
   );
 
