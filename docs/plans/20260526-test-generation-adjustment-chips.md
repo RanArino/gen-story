@@ -25,14 +25,14 @@ This plan closes two `❌` rows in `docs/gap-analysis.md` §6:
 
 ## Progress
 
-- [ ] Edit `docs/gap-analysis.md` in the same change as this plan: flip the two §6 `❌` rows to `🟡 In progress` with a notes pointer to this file, and update the summary table (§6 Test generation workflow → `In progress` +2 / `Missing` −2).
-- [ ] Milestone 1 — Curated adjustment dictionary in `packages/shared`.
-- [ ] Milestone 2 — Domain support: per-variant `appliedAdjustments` list on `TestGenerationVariant`.
-- [ ] Milestone 3 — DB migration for the new column.
-- [ ] Milestone 4 — Use case + API endpoint to re-roll a single variant slot with one or more adjustments.
-- [ ] Milestone 5 — On confirm, append the confirmed variant's adjustment suffixes to `storyboards.commonPrompt`.
-- [ ] Milestone 6 — Web UI: chip row under each variant; client wired to the new endpoint.
-- [ ] Milestone 7 — End-to-end validation: chip click re-rolls slot, confirm updates commonPrompt.
+- [x] Edit `docs/gap-analysis.md` in the same change as this plan: flip the two §6 `❌` rows to `🟡 In progress` with a notes pointer to this file, and update the summary table (§6 Test generation workflow → `In progress` +2 / `Missing` −2).
+- [x] Milestone 1 — Curated adjustment dictionary in `packages/shared` (`adjustments.ts`, re-exported from `index.ts`).
+- [x] Milestone 2 — Domain support: `TestAdjustmentId` union, `appliedAdjustments` on `GenerationRequest`, `assertAdjustmentsValid`/`appendAdjustmentsToCommonPrompt` rule helpers + tests.
+- [x] Milestone 3 — DB migration `0008_yummy_silver_sable.sql` adds `generation_requests.applied_adjustments_json` (default `'[]'`).
+- [x] Milestone 4 — `applyAdjustmentToTestVariant` use case + `POST /api/storyboards/:storyboardId/test-generation/variants/:variantId/adjustments` route. Soft-deletes the previous variant request, queues a new one with `commonPromptOverride`. Route tests cover happy path, > 3 ids, unknown id, missing variant, empty array.
+- [x] Milestone 5 — `confirmTestGeneration` accepts `adjustmentSuffixes` and appends the confirmed variant's suffixes to `storyboards.commonPrompt` once (de-duplicated via substring match).
+- [x] Milestone 6 — `AdjustmentChips` component + `applyTestVariantAdjustments` API client helper. `TestGenerationModal` renders chips per variant with selection state, "Apply adjustments" button, and `saveHint`. EN/JA i18n added.
+- [ ] Milestone 7 — Manual end-to-end validation (`pnpm dev`, real OpenAI call). Type-check, lint, and unit/integration tests all green. Awaiting user run to capture screenshots.
 - [ ] Flip the two rows in `docs/gap-analysis.md` from `🟡` to `✅` when Milestone 7 passes; update summary table accordingly.
 
 
