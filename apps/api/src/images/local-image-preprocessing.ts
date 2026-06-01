@@ -36,6 +36,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
     storyboardId: string;
     sceneId: string;
     inputJson: Record<string, unknown>;
+    commonPromptOverride?: string;
   }): Promise<Record<string, unknown>> {
     const scene = await this.deps.scenes.findById(input.sceneId);
 
@@ -67,7 +68,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       motionDirection: scene.motionDirection ?? "",
       tone: storyboard.tone ?? "",
       stylePresetPrompt: stylePreset?.prompt ?? null,
-      commonPrompt: storyboard.commonPrompt ?? "",
+      commonPrompt: input.commonPromptOverride ?? storyboard.commonPrompt ?? "",
     });
 
     const normalizedInputImages: NormalizedInputImage[] = [];

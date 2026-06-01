@@ -252,9 +252,7 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .slice(0, limit);
   }
 
-  async findByStoryboardId(
-    storyboardId: string,
-  ): Promise<GenerationRequest[]> {
+  async findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]> {
     return this.store
       .values()
       .filter((r) => r.storyboardId === storyboardId)
@@ -264,6 +262,8 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.store.save(generationRequest);
   }
+
+  async softDelete(_id: string, _deletedAt: string): Promise<void> {}
 }
 
 class InMemoryGeneratedImageRepository implements GeneratedImageRepositoryPort {
@@ -449,9 +449,7 @@ class InMemoryPhotoAnalysisGeneration implements PhotoAnalysisGenerationPort {
   }
 }
 
-class InMemoryUserPreferenceRepository
-  implements UserPreferenceRepositoryPort
-{
+class InMemoryUserPreferenceRepository implements UserPreferenceRepositoryPort {
   private readonly items = new Map<string, UserPreference>();
 
   async findByUserId(userId: string): Promise<UserPreference | null> {
