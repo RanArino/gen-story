@@ -4,9 +4,11 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import type {
   GenerationRequestDto,
+  TestAdjustmentId,
   TestGenerationBatchDto,
 } from "@gen-story/shared";
 import {
+  applyTestVariantAdjustments,
   confirmTestGenerationBatch,
   listGeneratedImages,
   listGenerationRequests,
@@ -14,6 +16,7 @@ import {
   resetTestGenerationBatch,
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
+import { AdjustmentChips } from "./AdjustmentChips";
 
 type Props = {
   storyboardId: string;
@@ -45,6 +48,12 @@ export function TestGenerationModal({
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAdjustments, setPendingAdjustments] = useState<
+    Record<string, TestAdjustmentId[]>
+  >({});
+  const [applyingVariantId, setApplyingVariantId] = useState<string | null>(
+    null,
+  );
 
   const refreshRequests = useCallback(async () => {
     if (!sceneId) return;
@@ -110,6 +119,30 @@ export function TestGenerationModal({
     } catch (e) {
       setError(e instanceof Error ? e.message : t("errors.confirm"));
       setConfirming(null);
+    }
+  }
+
+  async function handleApplyAdjustments(variantId: string) {
+    const ids = pendingAdjustments[variantId] ?? [];
+    setApplyingVariantId(variantId);
+    setError(null);
+    try {
+      const newReq = await applyTestVariantAdjustments(
+        storyboardId,
+        variantId,
+        ids,
+      );
+      setPendingAdjustments((prev) => {
+        const next = { ...prev };
+        delete next[variantId];
+        next[newReq.id] = newReq.appliedAdjustments;
+        return next;
+      });
+      await refreshRequests();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("errors.apply"));
+    } finally {
+      setApplyingVariantId(null);
     }
   }
 
@@ -237,6 +270,13 @@ export function TestGenerationModal({
                 const entry = images.find((img) => img.requestId === req.id);
                 const isConfirmed =
                   batch.confirmedGenerationRequestId === req.id;
+                const chipSelection =
+                  pendingAdjustments[req.id] ?? req.appliedAdjustments;
+                const isApplying = applyingVariantId === req.id;
+                const isInFlight =
+                  req.status === "queued" || req.status === "running";
+                const canAdjust =
+                  batch.status !== "completed" && !isConfirmed && !isApplying;
                 return (
                   <div
                     key={req.id}
@@ -289,13 +329,68 @@ export function TestGenerationModal({
                           : t("stateGenerating")}
                       </div>
                     )}
+                    {batch.status !== "completed" && (
+                      <div style={{ marginTop: 8 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#555",
+                          }}
+                        >
+                          {t("adjustments.heading")}
+                        </div>
+                        <AdjustmentChips
+                          selected={chipSelection}
+                          disabled={!canAdjust || isInFlight}
+                          onChange={(next) =>
+                            setPendingAdjustments((prev) => ({
+                              ...prev,
+                              [req.id]: next,
+                            }))
+                          }
+                        />
+                        <button
+                          className="btn btn-secondary"
+                          style={{
+                            width: "100%",
+                            fontSize: 12,
+                            marginTop: 8,
+                          }}
+                          onClick={() => handleApplyAdjustments(req.id)}
+                          disabled={
+                            !canAdjust ||
+                            isInFlight ||
+                            (pendingAdjustments[req.id] === undefined &&
+                              chipSelection.length === 0)
+                          }
+                        >
+                          {isApplying
+                            ? t("adjustments.applying")
+                            : t("adjustments.apply")}
+                        </button>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "#888",
+                            marginTop: 4,
+                          }}
+                        >
+                          {t("adjustments.saveHint")}
+                        </div>
+                      </div>
+                    )}
                     {batch.status !== "completed" &&
                       req.status === "succeeded" && (
                         <button
                           className="btn btn-primary"
-                          style={{ width: "100%", fontSize: 13 }}
+                          style={{
+                            width: "100%",
+                            fontSize: 13,
+                            marginTop: 8,
+                          }}
                           onClick={() => handleConfirm(req.id)}
-                          disabled={confirming !== null}
+                          disabled={confirming !== null || isApplying}
                         >
                           {confirming === req.id
                             ? t("confirming")
