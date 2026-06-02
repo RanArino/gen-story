@@ -15,7 +15,10 @@ test("complete Phase 1 product flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
 
   // 2. Create a new project
-  await page.getByRole("link", { name: /New project/i }).first().click();
+  await page
+    .getByRole("link", { name: /New project/i })
+    .first()
+    .click();
   await expect(page).toHaveURL(/\/projects\/new/);
 
   await page.getByLabel("Project name").fill("E2E Test Project");
@@ -35,11 +38,15 @@ test("complete Phase 1 product flow", async ({ page }) => {
   );
 
   // Wait for upload to complete (manage tab becomes enabled)
-  await expect(page.getByRole("button", { name: /Manage \(1\)/i })).toBeEnabled({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: /Manage \(1\)/i })).toBeEnabled(
+    { timeout: 15_000 },
+  );
 
   // 5. Switch to manage tab and set usage to candidate
   await page.getByRole("button", { name: /Manage/i }).click();
-  await expect(page.getByRole("button", { name: "candidate" }).first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "candidate" }).first(),
+  ).toBeVisible();
   await page.getByRole("button", { name: "candidate" }).first().click();
 
   // 6. Navigate to storyboard
@@ -62,8 +69,14 @@ test("complete Phase 1 product flow", async ({ page }) => {
 
   // Fill in scene title
   await page.locator("input[id*='title']").first().fill("Opening shot");
-  await page.locator("textarea[id*='desc']").first().fill("A wide establishing shot.");
-  await page.locator("textarea[id*='prompt']").first().fill("Cinematic wide shot, golden hour.");
+  await page
+    .locator("textarea[id*='desc']")
+    .first()
+    .fill("A wide establishing shot.");
+  await page
+    .locator("textarea[id*='prompt']")
+    .first()
+    .fill("Cinematic wide shot, golden hour.");
 
   // 10. Save scenes
   await page.getByRole("button", { name: /Save scenes/i }).click();
@@ -99,7 +112,9 @@ test("complete Phase 1 product flow", async ({ page }) => {
   if (await adoptBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await adoptBtn.click();
     // Wait for adopted badge to appear
-    await expect(page.getByText("✓ Adopted").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("✓ Adopted").first()).toBeVisible({
+      timeout: 10_000,
+    });
   }
 });
 

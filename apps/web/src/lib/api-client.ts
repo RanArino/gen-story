@@ -357,12 +357,14 @@ export async function getTestGenerationBatch(
 export async function requestTestGenerationBatch(
   storyboardId: string,
   sceneId: string,
-): Promise<{ batch: TestGenerationBatchDto; generationRequests: GenerationRequestDto[] }> {
-  return request<{ batch: TestGenerationBatchDto; generationRequests: GenerationRequestDto[] }>(
-    "POST",
-    `/api/storyboards/${storyboardId}/test-generation`,
-    { sceneId },
-  );
+): Promise<{
+  batch: TestGenerationBatchDto;
+  generationRequests: GenerationRequestDto[];
+}> {
+  return request<{
+    batch: TestGenerationBatchDto;
+    generationRequests: GenerationRequestDto[];
+  }>("POST", `/api/storyboards/${storyboardId}/test-generation`, { sceneId });
 }
 
 export async function confirmTestGenerationBatch(

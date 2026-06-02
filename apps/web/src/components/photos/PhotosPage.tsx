@@ -36,7 +36,9 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   }, [projectId]);
 
   useEffect(() => {
-    refresh().catch((e: Error) => setError(e.message)).finally(() => setLoading(false));
+    refresh()
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   }, [refresh]);
 
   async function handleFiles(files: FileList | File[]) {
@@ -137,7 +139,10 @@ export function PhotosPage({ projectId }: { projectId: string }) {
       {tab === "upload" && (
         <div
           className={`${styles.dropzone} ${dragOver ? styles.dropzoneActive : ""}`}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
@@ -277,7 +282,11 @@ function DeletedPhotoCard({
   return (
     <div className={`card ${styles.photoCard} ${styles.photoCardDeleted}`}>
       <div className={styles.photoThumb}>
-        <img src={imgUrl} alt={photo.name} className={`${styles.thumbImg} ${styles.thumbDeleted}`} />
+        <img
+          src={imgUrl}
+          alt={photo.name}
+          className={`${styles.thumbImg} ${styles.thumbDeleted}`}
+        />
       </div>
       <p className={styles.photoName}>{photo.name}</p>
       {deletedDate && (

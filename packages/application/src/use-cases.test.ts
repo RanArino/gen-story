@@ -316,7 +316,9 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
 class InMemoryTestGenerationBatchRepository implements TestGenerationBatchRepositoryPort {
   constructor(private readonly store: MemoryStore<TestGenerationBatch>) {}
 
-  async findLatestByStoryboardId(storyboardId: string): Promise<TestGenerationBatch | null> {
+  async findLatestByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch | null> {
     return (
       this.store
         .values()

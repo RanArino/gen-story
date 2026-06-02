@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import type { GeneratedImageDto, PhotoAssetDto, SceneDto } from "@gen-story/shared";
+import type {
+  GeneratedImageDto,
+  PhotoAssetDto,
+  SceneDto,
+} from "@gen-story/shared";
 import {
   adoptGeneratedImage,
   exportStoryboardUrl,
@@ -80,7 +84,9 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   }, [projectId]);
 
   useEffect(() => {
-    load().catch((e: Error) => setError(e.message)).finally(() => setLoading(false));
+    load()
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   }, [load]);
 
   async function handleAdopt(sceneId: string, imageId: string) {
@@ -115,7 +121,10 @@ export function ReviewPage({ projectId }: { projectId: string }) {
     <AppShell projectId={projectId}>
       <div className="screen-header">
         <h2>Review</h2>
-        <p>Compare generated images with source photos. Adopt the ones you want to keep.</p>
+        <p>
+          Compare generated images with source photos. Adopt the ones you want
+          to keep.
+        </p>
       </div>
 
       {error && <ErrorAlert message={error} />}
@@ -123,7 +132,11 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       {reviews.length === 0 && (
         <div className="card">
           <p>No scenes found.</p>
-          <Link href={`/projects/${projectId}/generate`} className="btn btn-primary" style={{ marginTop: 12 }}>
+          <Link
+            href={`/projects/${projectId}/generate`}
+            className="btn btn-primary"
+            style={{ marginTop: 12 }}
+          >
             ← Back to Generate
           </Link>
         </div>
@@ -143,7 +156,10 @@ export function ReviewPage({ projectId }: { projectId: string }) {
 
       {reviews.length > 0 && (
         <div className={styles.footer}>
-          <Link href={`/projects/${projectId}/generate`} className="btn btn-secondary">
+          <Link
+            href={`/projects/${projectId}/generate`}
+            className="btn btn-secondary"
+          >
             ← Back to Generate
           </Link>
           {storyboardId && (
@@ -173,18 +189,25 @@ function SceneReviewCard({
   onAdopt: (sceneId: string, imageId: string) => void;
   onRetry: (requestId: string) => void;
 }) {
-  const { scene, generatedImages, primaryPhoto, latestRequestStatus, latestErrorMessage, latestRequestId } = review;
+  const {
+    scene,
+    generatedImages,
+    primaryPhoto,
+    latestRequestStatus,
+    latestErrorMessage,
+    latestRequestId,
+  } = review;
 
   const adoptedImage = generatedImages.find((img) => img.adoptedAt !== null);
-  const unadoptedImages = generatedImages.filter((img) => img.adoptedAt === null);
+  const unadoptedImages = generatedImages.filter(
+    (img) => img.adoptedAt === null,
+  );
 
   return (
     <div className={`card ${styles.sceneCard}`}>
       <div className={styles.sceneHeader}>
         <h3 className={styles.sceneTitle}>{scene.title}</h3>
-        {adoptedImage && (
-          <span className={styles.adoptedBadge}>✓ Adopted</span>
-        )}
+        {adoptedImage && <span className={styles.adoptedBadge}>✓ Adopted</span>}
         {latestRequestStatus === "failed" && (
           <span className={styles.failedBadge}>Generation failed</span>
         )}
@@ -225,9 +248,10 @@ function SceneReviewCard({
               <div className={styles.imgPlaceholder}>
                 {latestRequestStatus === "failed"
                   ? "Generation failed"
-                  : latestRequestStatus === "running" || latestRequestStatus === "queued"
-                  ? "Generating…"
-                  : "Not generated yet"}
+                  : latestRequestStatus === "running" ||
+                      latestRequestStatus === "queued"
+                    ? "Generating…"
+                    : "Not generated yet"}
               </div>
             ) : (
               <div className={styles.imgPlaceholder}>No image adopted yet</div>
@@ -253,7 +277,10 @@ function SceneReviewCard({
               {adoptedImage ? "Other candidates:" : "Select image to adopt:"}
             </p>
             <div className={styles.candidateRow}>
-              {[...(adoptedImage ? [adoptedImage] : []), ...unadoptedImages].map((img) => (
+              {[
+                ...(adoptedImage ? [adoptedImage] : []),
+                ...unadoptedImages,
+              ].map((img) => (
                 <div key={img.id} className={styles.candidateItem}>
                   <img
                     src={storageKeyToUrl(img.storageKey)}
@@ -261,7 +288,12 @@ function SceneReviewCard({
                     className={`${styles.candidateThumb} ${img.adoptedAt ? styles.candidateThumbAdopted : ""}`}
                   />
                   {img.adoptedAt ? (
-                    <span className={styles.adoptedBadge} style={{ fontSize: 11 }}>Adopted</span>
+                    <span
+                      className={styles.adoptedBadge}
+                      style={{ fontSize: 11 }}
+                    >
+                      Adopted
+                    </span>
                   ) : (
                     <button
                       className="btn btn-primary"
@@ -278,7 +310,11 @@ function SceneReviewCard({
         )}
 
         {generatedImages.length === 0 && latestRequestStatus !== "failed" && (
-          <Link href={`/projects/${projectId}/generate`} className="btn btn-secondary" style={{ fontSize: 13 }}>
+          <Link
+            href={`/projects/${projectId}/generate`}
+            className="btn btn-secondary"
+            style={{ fontSize: 13 }}
+          >
             Go to Generate →
           </Link>
         )}

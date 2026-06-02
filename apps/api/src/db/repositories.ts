@@ -1319,7 +1319,9 @@ export class SqliteProjectPhotoAnalysisRepository implements ProjectPhotoAnalysi
 
 type TestGenerationBatchRow = typeof testGenerationBatches.$inferSelect;
 
-function mapTestGenerationBatch(row: TestGenerationBatchRow): TestGenerationBatch {
+function mapTestGenerationBatch(
+  row: TestGenerationBatchRow,
+): TestGenerationBatch {
   return createTestGenerationBatch({
     id: row.id,
     storyboardId: row.storyboardId,
@@ -1330,9 +1332,7 @@ function mapTestGenerationBatch(row: TestGenerationBatchRow): TestGenerationBatc
   });
 }
 
-export class SqliteTestGenerationBatchRepository
-  implements TestGenerationBatchRepositoryPort
-{
+export class SqliteTestGenerationBatchRepository implements TestGenerationBatchRepositoryPort {
   constructor(private readonly db: GenStoryDatabase) {}
 
   async findLatestByStoryboardId(

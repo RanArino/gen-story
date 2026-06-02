@@ -1244,7 +1244,12 @@ export function buildRouter(deps: ApplicationDependencies): Router {
 
       const storyboardId = getParam(params, "storyboardId");
       const body = await readJsonBody(req);
-      if (!body || typeof body !== "object" || !("sceneId" in body) || typeof body.sceneId !== "string") {
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("sceneId" in body) ||
+        typeof body.sceneId !== "string"
+      ) {
         sendJson(res, 422, badRequestBody("sceneId is required"));
         return;
       }
@@ -1255,13 +1260,19 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       });
 
       if (!result.ok) {
-        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
         return;
       }
 
       sendJson(res, 201, {
         batch: toTestGenerationBatchDto(result.value.batch),
-        generationRequests: result.value.generationRequests.map(toGenerationRequestDto),
+        generationRequests: result.value.generationRequests.map(
+          toGenerationRequestDto,
+        ),
       });
     },
   );
@@ -1275,9 +1286,12 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       if (principal == null) return;
 
       const storyboardId = getParam(params, "storyboardId");
-      const batch = await deps.testGenerationBatches.findLatestByStoryboardId(storyboardId);
+      const batch =
+        await deps.testGenerationBatches.findLatestByStoryboardId(storyboardId);
 
-      sendJson(res, 200, { batch: batch ? toTestGenerationBatchDto(batch) : null });
+      sendJson(res, 200, {
+        batch: batch ? toTestGenerationBatchDto(batch) : null,
+      });
     },
   );
 
@@ -1291,8 +1305,17 @@ export function buildRouter(deps: ApplicationDependencies): Router {
 
       const storyboardId = getParam(params, "storyboardId");
       const body = await readJsonBody(req);
-      if (!body || typeof body !== "object" || !("confirmedGenerationRequestId" in body) || typeof body.confirmedGenerationRequestId !== "string") {
-        sendJson(res, 422, badRequestBody("confirmedGenerationRequestId is required"));
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("confirmedGenerationRequestId" in body) ||
+        typeof body.confirmedGenerationRequestId !== "string"
+      ) {
+        sendJson(
+          res,
+          422,
+          badRequestBody("confirmedGenerationRequestId is required"),
+        );
         return;
       }
 
@@ -1302,7 +1325,11 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       });
 
       if (!result.ok) {
-        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
         return;
       }
 
@@ -1322,7 +1349,11 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       const result = await resetTestGeneration(deps, { storyboardId });
 
       if (!result.ok) {
-        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
         return;
       }
 
@@ -1342,7 +1373,11 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       const result = await exportStoryboardAsJson(deps, { storyboardId });
 
       if (!result.ok) {
-        sendJson(res, useCaseErrorToStatus(result.error.code), errorBody(result.error.code, result.error.message));
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
         return;
       }
 

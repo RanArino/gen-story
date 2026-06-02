@@ -9,8 +9,15 @@ export const PREVIEW_MAX_EDGE = 640;
 export const AI_INPUT_MAX_EDGE = 1536;
 
 export async function convertHeicToJpeg(body: Uint8Array): Promise<Uint8Array> {
-  const arrayBuffer = body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength);
-  const output = await convert({ buffer: arrayBuffer, format: "JPEG", quality: 0.95 });
+  const arrayBuffer = body.buffer.slice(
+    body.byteOffset,
+    body.byteOffset + body.byteLength,
+  );
+  const output = await convert({
+    buffer: arrayBuffer,
+    format: "JPEG",
+    quality: 0.95,
+  });
   return new Uint8Array(output);
 }
 
