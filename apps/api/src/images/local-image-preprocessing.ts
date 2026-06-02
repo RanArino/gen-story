@@ -64,6 +64,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       emotion: scene.emotion ?? "",
       cameraDirection: scene.cameraDirection ?? "",
       lightingDirection: scene.lightingDirection ?? "",
+      motionDirection: scene.motionDirection ?? "",
       tone: storyboard.tone ?? "",
       stylePresetPrompt: stylePreset?.prompt ?? null,
       commonPrompt: storyboard.commonPrompt ?? "",

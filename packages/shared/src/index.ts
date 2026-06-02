@@ -127,6 +127,10 @@ export type GenerationRequestDto = {
   updatedAt: string;
 };
 
+export type GenerationRequestWithSceneTitleDto = GenerationRequestDto & {
+  sceneTitle: string | null;
+};
+
 export type GeneratedImageDto = {
   id: string;
   projectId: string;

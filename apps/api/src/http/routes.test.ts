@@ -716,6 +716,44 @@ describe("GET /api/style-presets", () => {
   });
 });
 
+describe("POST /api/style-presets", () => {
+  it("creates a custom style preset", async () => {
+    const { status, body } = await req(base, "POST", "/api/style-presets", {
+      name: "Vintage Film",
+      description: "Soft grain and faded color.",
+      prompt: "Warm film stock with gentle halation.",
+    });
+
+    expect(status).toBe(201);
+    expect(body).toMatchObject({
+      stylePreset: {
+        scope: "user",
+        name: "Vintage Film",
+        description: "Soft grain and faded color.",
+        prompt: "Warm film stock with gentle halation.",
+        previewImageUrl: null,
+      },
+    });
+
+    const presetId = (body as { stylePreset: { id: string } }).stylePreset.id;
+    await expect(deps.stylePresets.findById(presetId)).resolves.toMatchObject({
+      scope: "user",
+      name: "Vintage Film",
+    });
+  });
+
+  it("validates required custom style fields", async () => {
+    const { status, body } = await req(base, "POST", "/api/style-presets", {
+      name: "",
+      description: "",
+      prompt: "",
+    });
+
+    expect(status).toBe(422);
+    expect(body).toMatchObject({ error: { code: "validation_error" } });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Generation requests (queued only)
 // ---------------------------------------------------------------------------

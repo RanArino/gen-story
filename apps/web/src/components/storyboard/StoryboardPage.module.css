@@ -152,6 +152,27 @@
   color: #fff;
 }
 
+.styleGroupLabel {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a6a7e;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #152033;
+}
+
+.modalActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .emptyScenes {
   color: #8898aa;
   font-size: 14px;

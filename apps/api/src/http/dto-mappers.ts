@@ -20,6 +20,7 @@ import type {
   StylePresetDto,
   StoryboardDto,
   TestGenerationBatchDto,
+  GenerationRequestWithSceneTitleDto,
 } from "@gen-story/shared";
 
 import type {
@@ -155,7 +156,10 @@ export function toSceneDto(scene: Scene): SceneDto {
 }
 
 export function toStylePresetDto(preset: StylePreset): StylePresetDto {
-  const previewImageUrl = `/public/style-previews/${preset.name.toLowerCase().replace(/\s+/g, "-")}.jpg`;
+  const previewImageUrl =
+    preset.scope === "system"
+      ? `/public/style-previews/${preset.name.toLowerCase().replace(/\s+/g, "-")}.jpg`
+      : null;
   return {
     id: preset.id,
     scope: preset.scope,
@@ -198,6 +202,13 @@ export function toGenerationRequestDto(
     createdAt: req.createdAt,
     updatedAt: req.updatedAt,
   };
+}
+
+export function toGenerationRequestWithSceneTitleDto(
+  req: GenerationRequest,
+  sceneTitle: string | null,
+): GenerationRequestWithSceneTitleDto {
+  return { ...toGenerationRequestDto(req), sceneTitle };
 }
 
 export function toGeneratedImageDto(img: GeneratedImage): GeneratedImageDto {

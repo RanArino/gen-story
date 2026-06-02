@@ -82,6 +82,7 @@ export interface GenerationRequestRepositoryPort {
   ): Promise<GenerationRequest[]>;
   findQueued(): Promise<GenerationRequest[]>;
   findRecent(limit: number): Promise<GenerationRequest[]>;
+  findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]>;
   save(generationRequest: GenerationRequest): Promise<void>;
 }
 

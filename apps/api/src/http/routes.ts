@@ -8,6 +8,7 @@ import {
   cancelGenerationRequest,
   confirmTestGeneration,
   createGenerationRequestUseCase,
+  createCustomStyle,
   createProjectUseCase,
   createTemplateScenesFromPhotos,
   deletePhotoAsset,
@@ -37,6 +38,7 @@ import {
   toComplementSceneProposalDto,
   toGeneratedImageDto,
   toGenerationRequestDto,
+  toGenerationRequestWithSceneTitleDto,
   toMeDto,
   toPhotoAssetDto,
   toProjectDto,
@@ -63,6 +65,7 @@ import {
   AnalyzeProjectPhotosSchema,
   ComplementSceneBridgeSchema,
   CreateGenerationRequestSchema,
+  CreateCustomStyleSchema,
   ReorderPhotosSchema,
   ReorderScenesSchema,
   CreateProjectSchema,
@@ -1042,6 +1045,42 @@ export function buildRouter(deps: ApplicationDependencies): Router {
     sendJson(res, 200, { stylePresets: stylePresets.map(toStylePresetDto) });
   });
 
+  // POST /api/style-presets
+  router.add("POST", "/api/style-presets", async (req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    let rawBody: unknown;
+    try {
+      rawBody = await readJsonBody(req);
+    } catch (err) {
+      sendJson(
+        res,
+        400,
+        badRequestBody(err instanceof Error ? err.message : "Bad request."),
+      );
+      return;
+    }
+
+    const parsed = CreateCustomStyleSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+      return;
+    }
+
+    const result = await createCustomStyle(deps, parsed.data);
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
+
+    sendJson(res, 201, { stylePreset: toStylePresetDto(result.value) });
+  });
+
   // GET /api/scenes/:sceneId/generation-requests
   router.add(
     "GET",
@@ -1605,6 +1644,50 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       sendJson(res, 200, { batch: toTestGenerationBatchDto(result.value) });
+    },
+  );
+
+  // GET /api/storyboards/:storyboardId/generation-requests
+  router.add(
+    "GET",
+    "/api/storyboards/:storyboardId/generation-requests",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      const [requests, scenes] = await Promise.all([
+        deps.generationRequests.findByStoryboardId(storyboardId),
+        deps.scenes.findByStoryboardId(storyboardId),
+      ]);
+
+      const sceneTitleById = new Map(
+        scenes.map((s) => [s.id, s.title ?? null]),
+      );
+
+      sendJson(res, 200, {
+        generationRequests: requests.map((r) =>
+          toGenerationRequestWithSceneTitleDto(
+            r,
+            sceneTitleById.get(r.sceneId) ?? null,
+          ),
+        ),
+      });
     },
   );
 

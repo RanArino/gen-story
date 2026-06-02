@@ -58,6 +58,7 @@ import {
   analyzeProjectPhotos,
   assignPhotosToScene,
   createGenerationRequestUseCase,
+  createCustomStyle,
   createProjectUseCase,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
@@ -278,6 +279,15 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .values()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit);
+  }
+
+  async findByStoryboardId(
+    storyboardId: string,
+  ): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.storyboardId === storyboardId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async save(generationRequest: GenerationRequest): Promise<void> {
@@ -628,6 +638,54 @@ function createDependencies(initial?: {
 }
 
 describe("application use cases", () => {
+  it("creates a user-scoped custom style preset", async () => {
+    const deps = createDependencies();
+
+    const result = await createCustomStyle(deps, {
+      name: " Vintage Film ",
+      description: " Soft grain and faded color. ",
+      prompt: " Warm film stock with gentle halation. ",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toMatchObject({
+        scope: "user",
+        name: "Vintage Film",
+        description: "Soft grain and faded color.",
+        prompt: "Warm film stock with gentle halation.",
+      });
+
+      await expect(deps.stylePresets.findById(result.value.id)).resolves.toEqual(
+        result.value,
+      );
+    }
+  });
+
+  it("rejects a custom style without a name or prompt", async () => {
+    const deps = createDependencies();
+
+    const missingName = await createCustomStyle(deps, {
+      name: "",
+      description: "",
+      prompt: "painterly",
+    });
+    const missingPrompt = await createCustomStyle(deps, {
+      name: "Painterly",
+      description: "",
+      prompt: "",
+    });
+
+    expect(missingName).toMatchObject({
+      ok: false,
+      error: { code: "validation_error" },
+    });
+    expect(missingPrompt).toMatchObject({
+      ok: false,
+      error: { code: "validation_error" },
+    });
+  });
+
   it("creates a project through repository ports", async () => {
     const deps = createDependencies({
       users: [

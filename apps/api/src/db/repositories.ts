@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import {
   createGeneratedImage,
@@ -1048,6 +1048,26 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
       .from(generationRequests)
       .orderBy(generationRequests.createdAt)
       .limit(limit);
+
+    return rows.map(mapGenerationRequest);
+  }
+
+  async findByStoryboardId(
+    storyboardId: string,
+  ): Promise<GenerationRequest[]> {
+    const rows = await this.db
+      .select()
+      .from(generationRequests)
+      .where(
+        and(
+          eq(generationRequests.storyboardId, storyboardId),
+          isNull(generationRequests.deletedAt),
+        ),
+      )
+      .orderBy(
+        desc(generationRequests.createdAt),
+        desc(generationRequests.id),
+      );
 
     return rows.map(mapGenerationRequest);
   }

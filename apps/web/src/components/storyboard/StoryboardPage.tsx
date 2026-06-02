@@ -14,6 +14,7 @@ import type {
 import {
   analyzeProjectPhotos,
   assignPhotosToScene,
+  createCustomStyle,
   createTemplateScenesFromPhotos,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
@@ -141,6 +142,13 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [showTestModal, setShowTestModal] = useState(false);
   const [commonPromptDraft, setCommonPromptDraft] = useState("");
   const [savingCommonPrompt, setSavingCommonPrompt] = useState(false);
+  const [showCustomStyleModal, setShowCustomStyleModal] = useState(false);
+  const [customStyleForm, setCustomStyleForm] = useState({
+    name: "",
+    description: "",
+    prompt: "",
+  });
+  const [savingCustomStyle, setSavingCustomStyle] = useState(false);
   const [complementBusy, setComplementBusy] = useState(false);
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
   const [proposalCtx, setProposalCtx] = useState<{
@@ -150,6 +158,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   } | null>(null);
 
   const sbId = storyboard?.id;
+  const systemStylePresets = stylePresets.filter((p) => p.scope === "system");
+  const userStylePresets = stylePresets.filter((p) => p.scope === "user");
 
   useEffect(() => {
     setCommonPromptDraft(storyboard?.commonPrompt ?? "");
@@ -241,6 +251,25 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setStoryboard(updated);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save style");
+    }
+  }
+
+  async function handleCreateCustomStyle() {
+    setSavingCustomStyle(true);
+    setError(null);
+    try {
+      const newStyle = await createCustomStyle(customStyleForm);
+      setStylePresets((prev) => [...prev, newStyle]);
+      setCustomStyleForm({ name: "", description: "", prompt: "" });
+      setShowCustomStyleModal(false);
+      setSaveMsg("Custom style created!");
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to create custom style",
+      );
+    } finally {
+      setSavingCustomStyle(false);
     }
   }
 
@@ -679,7 +708,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       {/* Style preset selector */}
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Style preset</h3>
+        <div className={styles.sectionHeader}>
+          <h3 className={styles.sectionTitle}>Style preset</h3>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowCustomStyleModal(true)}
+          >
+            Create custom style
+          </button>
+        </div>
         <div className={styles.styleGrid}>
           <button
             className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
@@ -687,7 +724,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           >
             AI recommend
           </button>
-          {stylePresets.map((p) => (
+          {systemStylePresets.length > 0 && (
+            <span className={styles.styleGroupLabel}>System styles</span>
+          )}
+          {systemStylePresets.map((p) => (
             <button
               key={p.id}
               className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
@@ -710,7 +750,102 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               {p.name}
             </button>
           ))}
+          {userStylePresets.length > 0 && (
+            <span className={styles.styleGroupLabel}>Custom styles</span>
+          )}
+          {userStylePresets.map((p) => (
+            <button
+              key={p.id}
+              className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
+              onClick={() => handleStyleChange(p.id)}
+              title={p.description}
+            >
+              {p.name}
+            </button>
+          ))}
         </div>
+        {showCustomStyleModal && (
+          <div className={styles.modalOverlay} role="presentation">
+            <div
+              className={styles.modalContent}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="custom-style-title"
+            >
+              <h4 id="custom-style-title" className={styles.modalTitle}>
+                Create custom style
+              </h4>
+              <label className={styles.sceneField}>
+                <span className={styles.fieldLabel}>Style name</span>
+                <input
+                  className={styles.fieldInput}
+                  type="text"
+                  value={customStyleForm.name}
+                  onChange={(event) =>
+                    setCustomStyleForm((prev) => ({
+                      ...prev,
+                      name: event.target.value,
+                    }))
+                  }
+                  disabled={savingCustomStyle}
+                  placeholder="Vintage family film"
+                />
+              </label>
+              <label className={styles.sceneField}>
+                <span className={styles.fieldLabel}>Description</span>
+                <textarea
+                  className={styles.fieldInput}
+                  value={customStyleForm.description}
+                  onChange={(event) =>
+                    setCustomStyleForm((prev) => ({
+                      ...prev,
+                      description: event.target.value,
+                    }))
+                  }
+                  disabled={savingCustomStyle}
+                  rows={2}
+                  placeholder="Warm grain, soft highlights, muted color."
+                />
+              </label>
+              <label className={styles.sceneField}>
+                <span className={styles.fieldLabel}>Style prompt</span>
+                <textarea
+                  className={styles.fieldInput}
+                  value={customStyleForm.prompt}
+                  onChange={(event) =>
+                    setCustomStyleForm((prev) => ({
+                      ...prev,
+                      prompt: event.target.value,
+                    }))
+                  }
+                  disabled={savingCustomStyle}
+                  rows={5}
+                  placeholder="Describe the visual treatment to apply during image generation."
+                />
+              </label>
+              <div className={styles.modalActions}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateCustomStyle}
+                  disabled={
+                    savingCustomStyle ||
+                    !customStyleForm.name.trim() ||
+                    !customStyleForm.prompt.trim()
+                  }
+                >
+                  {savingCustomStyle ? "Creating..." : "Create style"}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowCustomStyleModal(false)}
+                  disabled={savingCustomStyle}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Common project prompt */}

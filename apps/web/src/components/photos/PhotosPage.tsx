@@ -44,7 +44,11 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   }, [refresh]);
 
   async function handleFiles(files: FileList | File[]) {
-    const fileArr = Array.from(files);
+    const fileArr: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f != null) fileArr.push(f);
+    }
     const activePhotos = photos.filter((p) => p.deletedAt === null);
     const slots = MAX_PHOTOS - activePhotos.length;
     if (slots <= 0) {

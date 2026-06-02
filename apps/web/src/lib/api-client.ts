@@ -2,6 +2,7 @@ import type {
   ComplementSceneProposalDto,
   GeneratedImageDto,
   GenerationRequestDto,
+  GenerationRequestWithSceneTitleDto,
   MeDto,
   PhotoAssetDto,
   ProjectDto,
@@ -333,6 +334,20 @@ export async function listStylePresets(): Promise<StylePresetDto[]> {
   return data.stylePresets;
 }
 
+export async function createCustomStyle(input: {
+  name: string;
+  description: string;
+  prompt: string;
+  referenceImageStorageKey?: string;
+}): Promise<StylePresetDto> {
+  const data = await request<{ stylePreset: StylePresetDto }>(
+    "POST",
+    "/api/style-presets",
+    input,
+  );
+  return data.stylePreset;
+}
+
 // ── Generation Requests ───────────────────────────────────────────────────────
 
 export async function createGenerationRequest(
@@ -353,6 +368,15 @@ export async function listGenerationRequests(
     "GET",
     `/api/scenes/${sceneId}/generation-requests`,
   );
+  return data.generationRequests;
+}
+
+export async function listStoryboardGenerationRequests(
+  storyboardId: string,
+): Promise<GenerationRequestWithSceneTitleDto[]> {
+  const data = await request<{
+    generationRequests: GenerationRequestWithSceneTitleDto[];
+  }>("GET", `/api/storyboards/${storyboardId}/generation-requests`);
   return data.generationRequests;
 }
 
