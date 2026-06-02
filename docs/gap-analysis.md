@@ -40,7 +40,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Per-photo memo / notes field | ✅ | `notes` column on `photo_assets` |
 | Photo usage states: candidate / excluded / reference | ✅ | `curationStatus` column + `PATCH` endpoint |
 | Manual photo ordering (upload order) | ✅ | Implicit via `createdAt` ordering |
-| Manual drag-and-drop reordering | 🟡 | Planned in `docs/plans/20260517-small-refactoring.md` (Workstream D); adds `position` column + reorder endpoints + DnD UI |
+| Manual drag-and-drop reordering | ✅ | `photo_assets.position` column + `PATCH /api/projects/:id/photos/order`; HTML5 drag-and-drop on `PhotosPage` |
 | AI-recommended ordering (opt-in toggle) | ❌ | No AI ordering logic |
 | Checksum-based exact duplicate detection within project | ✅ | SHA-256 checksum on ingest |
 | Duplicate presented to user (not auto-deleted) | ✅ | Returns conflict error with details |
@@ -87,7 +87,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Per-project common prompt (auto-generated from emotion + style) | ✅ | `storyboards.commonPrompt` column; `upsertStoryboard` auto-generates it from tone + style preset via the domain rule `composeCommonPrompt` when no value is stored |
 | Common prompt editable by user | ✅ | Editable "Common prompt" textarea on `StoryboardPage` with a "Save common prompt" action and a "Regenerate from tone & style" button |
 | Prompt consistency mechanism across scenes | ✅ | `storyboard.commonPrompt` is composed into every scene's generation prompt via `composeImagePrompt` in `prompt-composer.ts`, alongside `storyboard.tone` and `stylePreset.prompt` |
-| Story-level AI context across uploaded photos | ⚠️ | Per-scene AI fill uses storyboard tone, style preset, project photos, and sibling scenes as context; no real multi-photo vision analysis yet |
+| Story-level AI context across uploaded photos | ✅ | Per-scene AI fill sends the project's uploaded photos to Gemini vision alongside storyboard tone, style, common prompt, and sibling scenes |
 
 ---
 
@@ -112,7 +112,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Template scene creation from uploaded photos | ✅ | `POST /api/storyboards/:storyboardId/template-scenes` creates draft scenes from photos; source photo assigned as primary; title/description/imagePrompt blank for manual editing |
 | AI proposes scene composition from photos | ❌ | User builds scenes manually |
 | AI proposes scene ordering (opt-in toggle) | ❌ | No AI ordering |
-| User can reorder scenes | ✅ | Scene list UI; no DnD yet |
+| User can reorder scenes | ✅ | Scene list move buttons + HTML5 drag-and-drop; persisted via `PUT /api/storyboards/:id/scene-order` |
 | User can adjust / edit scene composition | ✅ | Full scene edit form |
 | Storyboard status: draft / editing / ready / completed | ✅ | Domain + DB |
 
@@ -132,13 +132,13 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Color / lighting direction (selection) | ✅ | `scenes.lighting_direction`; translated to cinematic lighting descriptors in generation prompt; 8 options including Backlit, Silhouette, Volumetric |
 | Animation movement direction (selection) | ✅ | `scenes.motion_direction`; stored only — not yet composed into generation prompt |
 | User editing notes | ✅ | `scenes.notes` |
-| AI-only complement scene (no source photo) | 🟡 | Planned in `docs/plans/20260517-small-refactoring.md` (Workstream B); `scenes.kind` + optional photo assets |
-| Complement scene marks which scenes it bridges | 🟡 | Planned (Workstream B); `bridge_from_scene_id` / `bridge_to_scene_id` columns |
-| AI generates 1–3 proposals for complement scenes | 🟡 | Planned (Workstream B/C); `ComplementSceneProposalPort` + proposals endpoint |
-| Hover "+" between scenes to insert complement | 🟡 | Planned (Workstream B); inter-scene insert affordance on `StoryboardPage` |
-| AI-generated scene title (not manual-only) | ⚠️ | Per-scene AI fill drafts blank titles while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
-| AI-generated scene description | ⚠️ | Per-scene AI fill drafts blank descriptions while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
-| AI-generated image prompt per scene | ⚠️ | Per-scene AI fill drafts blank image prompts while preserving user edits; v1 uses deterministic metadata-based generation, not real photo vision |
+| AI-only complement scene (no source photo) | ✅ | `scenes.kind = 'complement'`; `createComplementScene` produces photo-free scenes (migration `0005`) |
+| Complement scene marks which scenes it bridges | ✅ | `bridge_from_scene_id` / `bridge_to_scene_id` columns; `SceneBridge` on the domain model |
+| AI generates 1–3 proposals for complement scenes | ✅ | `ComplementSceneProposalPort` + `POST /api/storyboards/:id/complement-scenes/proposals` (returns ≤3) |
+| Hover "+" between scenes to insert complement | ✅ | Inter-scene hover gap on `StoryboardPage` with blank-insert and AI-propose modal |
+| AI-generated scene title (not manual-only) | ✅ | Per-scene AI fill drafts blank titles via Gemini vision over the scene's primary photo, preserving user edits |
+| AI-generated scene description | ✅ | Per-scene AI fill drafts blank descriptions via Gemini vision, preserving user edits |
+| AI-generated image prompt per scene | ✅ | Per-scene AI fill drafts blank image prompts via Gemini vision, preserving user edits |
 
 ---
 
@@ -188,9 +188,9 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | Card view inside app | ✅ | `ReviewPage` card layout |
-| Timeline view | 🟡 | Planned in `docs/plans/20260517-small-refactoring.md` (Workstream E); client-side view on `ReviewPage` |
-| Table / spreadsheet view | 🟡 | Planned (Workstream E); client-side table view on `ReviewPage` |
-| Filter: original only / generated only | 🟡 | Planned (Workstream E); client-side filter control on `ReviewPage` |
+| Timeline view | ✅ | Client-side timeline view on `ReviewPage` with a Card/Timeline/Table switcher |
+| Table / spreadsheet view | ✅ | Client-side table view on `ReviewPage` (order, title, emotion, camera, source, generated) |
+| Filter: original only / generated only | ✅ | Client-side All / Original only / Generated only filter on `ReviewPage` |
 | JSON export | ✅ | `GET /api/storyboards/:id/export.json` with `Content-Disposition: attachment`; "Export Storyboard JSON" button on ReviewPage |
 | Structured data for CapCut / video generation pipeline | ✅ | Export JSON includes storyboard metadata, per-scene fields (title, emotion, camera, prompt), adopted image URLs, and source photo URLs |
 
@@ -310,17 +310,17 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Area | Implemented | Partial | In progress | Missing |
 |---|---|---|---|---|
 | Project management | 5 | 0 | 0 | 0 |
-| Photo upload & management | 13 | 0 | 1 (DnD) | 1 (AI order) |
+| Photo upload & management | 14 | 0 | 0 | 1 |
 | Emotion / AI photo analysis | 7 | 0 | 0 | 0 |
 | Image style selection | 1 | 2 | 0 | 4 |
-| Common project prompt | 3 | 1 | 0 | 0 |
+| Common project prompt | 4 | 0 | 0 | 0 |
 | Test generation workflow | 4 | 0 | 0 | 2 |
 | Storyboard composition | 5 | 0 | 0 | 3 |
-| Scene content | 10 | 3 | 4 (complement) | 0 |
+| Scene content | 17 | 0 | 0 | 0 |
 | Scene editing UX | 4 | 1 | 0 | 1 |
 | Language / i18n | 0 | 0 | 0 | 5 |
 | Generated image handling | 5 | 2 | 0 | 3 |
-| Storyboard viewing & export | 3 | 0 | 3 | 0 |
+| Storyboard viewing & export | 6 | 0 | 0 | 0 |
 | Image generation infra | 13 | 2 | 0 | 2 |
 | Generation history | 5 | 0 | 0 | 2 |
 | File lifecycle & cleanup | 5 | 1 | 0 | 0 |
@@ -335,8 +335,8 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 
 ### High Priority — Core Phase 1 Value
 
-1. ⚠️ **Real photo-aware AI scene descriptions and image prompts**
-   Per-scene AI fill now drafts blank scene fields from metadata and storyboard context. The remaining gap is true photo vision analysis for people, places, events, and atmosphere across uploaded photos.
+1. ✅ **Real photo-aware AI scene descriptions and image prompts** (COMPLETED)
+   Per-scene AI fill now uses Gemini vision over the scene's primary photo plus the project's uploaded photos, grounded in storyboard tone, style, and common prompt. The Gemini adapter is the runtime default and throws a clear error when `GEMINI_API_KEY` is unset.
 
 2. ✅ **AI photo analysis → emotion candidates** (COMPLETED)
    Project photo analysis now analyzes uploaded candidate/reference photos, persists photo insights, proposes emotion/tone candidates, and lets the user apply one candidate to the storyboard tone. Gemini is used when `GEMINI_API_KEY` is configured; local development falls back to deterministic suggestions.
@@ -355,14 +355,14 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 6. ✅ **Style preset preview images** (COMPLETED)
    9 preview images in `public/style-previews/`, wired into `StylePresetDto` and displayed in StoryboardPage style gallery.
 
-7. **Drag-and-drop photo reordering**
-   Specified as a core photo management feature; currently only implicit ordering is available.
+7. ✅ **Drag-and-drop photo reordering** (COMPLETED)
+   `photo_assets.position` column + `PATCH /api/projects/:id/photos/order`; HTML5 drag-and-drop on `PhotosPage`, and scene drag-and-drop on `StoryboardPage` via `PUT /api/storyboards/:id/scene-order`.
 
-8. **AI-only complement scenes (inter-scene "+")**
-   Needed to bridge shots and produce a coherent storyboard; requires optional photo assignment on scenes.
+8. ✅ **AI-only complement scenes (inter-scene "+")** (COMPLETED)
+   `scenes.kind = 'complement'` with optional photo assignment and a recorded `bridge`; hover "+" on `StoryboardPage` inserts a blank complement scene or applies an AI proposal.
 
-9. **Timeline and table views of storyboard**
-   Two of three specified storyboard viewing modes are missing.
+9. ✅ **Timeline and table views of storyboard** (COMPLETED)
+   `ReviewPage` has a Card/Timeline/Table view switcher plus an All / Original only / Generated only filter.
 
 10. ✅ **Cancel generation request** (COMPLETED)
    `POST /api/generation-requests/:generationRequestId/cancel` endpoint added with graceful handling for in-flight jobs. UI cancel button added to GeneratePage for queued/running requests.

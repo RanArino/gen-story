@@ -15,7 +15,11 @@ import {
   exportStoryboardAsJson,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
+  insertComplementScene,
   markGeneratedImageAdopted,
+  proposeComplementScenes,
+  reorderPhotos,
+  reorderScenes,
   requestTestGeneration,
   resetTestGeneration,
   restorePhotoAsset,
@@ -30,6 +34,7 @@ import {
 
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
+  toComplementSceneProposalDto,
   toGeneratedImageDto,
   toGenerationRequestDto,
   toMeDto,
@@ -56,7 +61,10 @@ import { getParam, Router } from "./router";
 import {
   AssignScenePhotosSchema,
   AnalyzeProjectPhotosSchema,
+  ComplementSceneBridgeSchema,
   CreateGenerationRequestSchema,
+  ReorderPhotosSchema,
+  ReorderScenesSchema,
   CreateProjectSchema,
   CreateTemplateScenesSchema,
   FillSceneWithAiSchema,
@@ -783,6 +791,245 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       sendJson(res, 200, toSceneDto(result.value));
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/complement-scenes
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/complement-scenes",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = ComplementSceneBridgeSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await insertComplementScene(deps, {
+        storyboardId,
+        fromSceneId: parsed.data.fromSceneId,
+        toSceneId: parsed.data.toSceneId,
+      });
+
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 201, toSceneDto(result.value));
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/complement-scenes/proposals
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/complement-scenes/proposals",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = ComplementSceneBridgeSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await proposeComplementScenes(deps, {
+        storyboardId,
+        fromSceneId: parsed.data.fromSceneId,
+        toSceneId: parsed.data.toSceneId,
+      });
+
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, {
+        proposals: result.value.map(toComplementSceneProposalDto),
+      });
+    },
+  );
+
+  // PATCH /api/projects/:projectId/photos/order
+  router.add(
+    "PATCH",
+    "/api/projects/:projectId/photos/order",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const projectId = getParam(params, "projectId");
+      const project = await deps.projects.findById(projectId);
+      if (project == null) {
+        sendJson(res, 404, notFoundBody("Project not found."));
+        return;
+      }
+      if (project.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = ReorderPhotosSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await reorderPhotos(deps, {
+        projectId,
+        photoAssetIds: parsed.data.photoAssetIds,
+      });
+
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, { photoAssets: result.value.map(toPhotoAssetDto) });
+    },
+  );
+
+  // PUT /api/storyboards/:storyboardId/scene-order
+  router.add(
+    "PUT",
+    "/api/storyboards/:storyboardId/scene-order",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = ReorderScenesSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await reorderScenes(deps, {
+        storyboardId,
+        sceneIds: parsed.data.sceneIds,
+      });
+
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, { scenes: result.value.map(toSceneDto) });
     },
   );
 

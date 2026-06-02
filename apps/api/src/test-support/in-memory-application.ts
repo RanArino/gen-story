@@ -1,5 +1,8 @@
 import type {
   ApplicationDependencies,
+  ComplementSceneProposal,
+  ComplementSceneProposalInput,
+  ComplementSceneProposalPort,
   GeneratedImageRepositoryPort,
   GenerationRequestRepositoryPort,
   ImageGenerationPort,
@@ -378,6 +381,24 @@ class InMemorySceneFillGeneration implements SceneFillGenerationPort {
   }
 }
 
+class InMemoryComplementSceneProposal implements ComplementSceneProposalPort {
+  async proposeComplementScenes(
+    input: ComplementSceneProposalInput,
+  ): Promise<ComplementSceneProposal[]> {
+    return [
+      {
+        title: `Bridge ${input.fromScene.id} → ${input.toScene.id}`,
+        description: `AI bridging scene for ${input.project.name}`,
+        imagePrompt: `AI bridging image prompt for ${input.storyboard.tone}`,
+        emotion: "Calm",
+        cameraDirection: "Wide",
+        lightingDirection: "Natural",
+        motionDirection: "Slow pan",
+      },
+    ];
+  }
+}
+
 class InMemoryPhotoAnalysisGeneration implements PhotoAnalysisGenerationPort {
   async analyzeProjectPhotos(
     input: PhotoAnalysisGenerationInput,
@@ -496,6 +517,7 @@ export function createInMemoryApplicationDependencies(
     imagePreprocessing: new InMemoryImagePreprocessing(),
     imageGeneration: new InMemoryImageGeneration(),
     sceneFillGeneration: new InMemorySceneFillGeneration(),
+    complementSceneProposal: new InMemoryComplementSceneProposal(),
     photoAnalysisGeneration: new InMemoryPhotoAnalysisGeneration(),
     jobQueue: new InMemoryJobQueue(),
     progressEvents: new InMemoryProgressEvents(),

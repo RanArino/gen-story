@@ -438,6 +438,98 @@ describe("GET /api/storyboards/:storyboardId/scenes and PUT scenes", () => {
   });
 });
 
+describe("POST /api/storyboards/:storyboardId/complement-scenes", () => {
+  async function seedTwoScenes() {
+    const created = await req(base, "POST", "/api/projects", {
+      name: "Complement Test",
+    });
+    const projectId = (created.body as Record<string, unknown>).id as string;
+    await req(base, "PUT", "/api/storyboards/sb-comp", {
+      projectId,
+      tone: "warm",
+    });
+    await req(base, "PUT", "/api/storyboards/sb-comp/scenes", {
+      scenes: [
+        {
+          sceneId: "scene-a",
+          orderIndex: 0,
+          title: "Opening",
+          description: "The start",
+          imagePrompt: "A bright morning",
+          emotion: "happy",
+          cameraDirection: "wide",
+          lightingDirection: "warm",
+          motionDirection: "static",
+        },
+        {
+          sceneId: "scene-b",
+          orderIndex: 1,
+          title: "Ending",
+          description: "The close",
+          imagePrompt: "A quiet evening",
+          emotion: "calm",
+          cameraDirection: "close",
+          lightingDirection: "soft",
+          motionDirection: "static",
+        },
+      ],
+    });
+  }
+
+  it("inserts a complement scene between two adjacent scenes", async () => {
+    await seedTwoScenes();
+
+    const result = await req(
+      base,
+      "POST",
+      "/api/storyboards/sb-comp/complement-scenes",
+      { fromSceneId: "scene-a", toSceneId: "scene-b" },
+    );
+    expect(result.status).toBe(201);
+    expect(result.body).toMatchObject({
+      kind: "complement",
+      bridge: { fromSceneId: "scene-a", toSceneId: "scene-b" },
+    });
+
+    const getResult = await req(base, "GET", "/api/storyboards/sb-comp/scenes");
+    const scenesBody = getResult.body as {
+      scenes: Array<Record<string, unknown>>;
+    };
+    expect(scenesBody.scenes).toHaveLength(3);
+  });
+
+  it("returns AI complement-scene proposals", async () => {
+    await seedTwoScenes();
+
+    const result = await req(
+      base,
+      "POST",
+      "/api/storyboards/sb-comp/complement-scenes/proposals",
+      { fromSceneId: "scene-a", toSceneId: "scene-b" },
+    );
+    expect(result.status).toBe(200);
+    const body = result.body as { proposals: unknown[] };
+    expect(body.proposals.length).toBeGreaterThan(0);
+  });
+
+  it("reorders scenes via PUT /scene-order", async () => {
+    await seedTwoScenes();
+
+    const result = await req(
+      base,
+      "PUT",
+      "/api/storyboards/sb-comp/scene-order",
+      { sceneIds: ["scene-b", "scene-a"] },
+    );
+    expect(result.status).toBe(200);
+    const body = result.body as { scenes: Array<{ id: string }> };
+    expect(body.scenes.map((scene) => scene.id)).toEqual([
+      "scene-b",
+      "scene-a",
+    ]);
+  });
+});
+
 describe("POST /api/scenes/:sceneId/ai-fill", () => {
   it("fills an authorized scene and returns the updated scene DTO", async () => {
     const {

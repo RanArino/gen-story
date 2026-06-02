@@ -68,6 +68,19 @@ export const CreateTemplateScenesSchema = z.object({
   photoAssetIds: z.array(z.string().min(1)).min(1).max(20),
 });
 
+export const ReorderPhotosSchema = z.object({
+  photoAssetIds: z.array(z.string().min(1)).min(1),
+});
+
+export const ReorderScenesSchema = z.object({
+  sceneIds: z.array(z.string().min(1)).min(1),
+});
+
+export const ComplementSceneBridgeSchema = z.object({
+  fromSceneId: z.string().min(1),
+  toSceneId: z.string().min(1),
+});
+
 export const CreateGenerationRequestSchema = z.object({
   generationRequestId: z.string().optional(),
   inputJson: z.record(z.unknown()).default({}),

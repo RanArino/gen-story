@@ -27,11 +27,11 @@ A reader can see it working by: running migrations on a fresh DB, opening a stor
 
 
 - [x] (2026-05-17 10:02Z) Workstream A — Tech debt: repaired migration journal + snapshots; fixed `db:generate` cwd bug; resolved Prettier drift across 21 files. Fresh `db:migrate` applies all 5 migrations; `db:generate` reports no drift; `pnpm format` passes; typecheck/lint/test green.
-- [ ] Workstream B — Complement scenes: schema, domain, application, API, UI.
-- [ ] Workstream C — Photo-aware AI: Gemini-backed scene fill + complement proposals.
-- [ ] Workstream D — Drag-and-drop reordering for photos and scenes.
-- [ ] Workstream E — Timeline/table views + original/generated filter on ReviewPage.
-- [ ] Final: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm format` all green; `docs/gap-analysis.md` synchronized.
+- [x] (2026-05-17 15:05Z) Workstream B — Complement scenes: domain (`SceneKind`/`SceneBridge`, `createComplementScene`, `assertComplementSceneBridge`, optional photo assets); migration `0005_medical_professor_monster` adds `kind`/`bridge_from_scene_id`/`bridge_to_scene_id` to `scenes`; `ComplementSceneProposalPort` + `insertComplementScene`/`proposeComplementScenes` use cases; routes `POST /api/storyboards/:id/complement-scenes` and `.../proposals`; DTOs carry `kind`/`bridge`; `StoryboardPage` hover "+" gap with blank-insert and AI-propose modal; complement cards render photo-free with bridge label. Typecheck/lint green; 22 application + 75 API tests pass.
+- [x] (2026-05-17 15:25Z) Workstream C — Photo-aware AI: `GeminiSceneFillGenerationAdapter` and `GeminiComplementSceneProposalAdapter` send the project's normalized photos to Gemini vision with tone/style/common-prompt context; wired as the runtime default in `create-api-context.ts` (no deterministic fallback — throws a clear error when `GEMINI_API_KEY` is unset); unit tests inject a mock client so CI needs no key; `.env.example` documents the new model vars. Removed the unused `LocalComplementSceneProposalAdapter`. 80 API tests pass.
+- [x] (2026-05-17 15:45Z) Workstream D — Drag-and-drop reordering: `photo_assets.position` column (migration `0006_wise_northstar`); `reorderPhotos`/`reorderScenes` use cases; `PATCH /api/projects/:id/photos/order` and `PUT /api/storyboards/:id/scene-order`; HTML5 drag-and-drop on `PhotosPage` (photo grid) and `StoryboardPage` (scene drag handle). 24 application + 81 API tests pass.
+- [x] (2026-05-17 16:05Z) Workstream E — Storyboard views: `ReviewPage` gains a Card/Timeline/Table view switcher and an All / Original only / Generated only filter; `TimelineView` and `TableView` are pure client-side renderers over already-fetched data (no API change).
+- [x] (2026-05-17 16:05Z) Final: `pnpm typecheck`, `pnpm lint` (1 pre-existing domain warning), `pnpm test` (125 tests), `pnpm build`, `pnpm format` all green; `docs/gap-analysis.md` synchronized.
 
 
 ## Surprises & Discoveries
@@ -57,7 +57,19 @@ A reader can see it working by: running migrations on a fresh DB, opening a stor
 ## Outcomes & Retrospective
 
 
-To be completed at milestone boundaries and at completion.
+All five workstreams (A–E) are complete. Final state: `pnpm typecheck`, `pnpm lint`
+(one pre-existing unused-import warning in `packages/domain/src/rules.ts`), `pnpm test`
+(20 domain + 24 application + 81 API = 125 tests), `pnpm build`, and `pnpm format` are green.
+
+- Workstream A — repaired the Drizzle migration journal and the `db:generate` cwd bug; cleared Prettier drift.
+- Workstream B — complement scenes end-to-end: domain model, migration `0005`, ports, use cases, API routes, and the `StoryboardPage` hover "+" UI.
+- Workstream C — photo-aware AI: Gemini vision adapters for scene fill and complement proposals, wired as the runtime default; tests inject mock clients.
+- Workstream D — drag-and-drop reordering: `photo_assets.position` (migration `0006`), reorder use cases + endpoints, HTML5 DnD on photos and scenes.
+- Workstream E — `ReviewPage` Card/Timeline/Table view switcher and original/generated filter (pure client-side).
+
+Retrospective notes:
+- Adding `kind`/`bridge` to the domain `Scene` required threading the new fields through every `createScene`/`buildScene` path; `buildScene` had to explicitly carry them so the scenes `PUT` upsert never drops complement metadata.
+- The combined-plan approach kept the migration sequence coherent (`0005`, `0006` appended cleanly after the Workstream A journal repair).
 
 
 ## Context and Orientation

@@ -66,6 +66,7 @@ export type PhotoAsset = {
   checksum: string;
   sourceKind: string;
   notes: string | null;
+  position: number;
   deletedAt: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -76,12 +77,21 @@ export type ScenePhotoAsset = {
   role: ScenePhotoRole;
 };
 
+export type SceneKind = "photo" | "complement";
+
+export type SceneBridge = {
+  fromSceneId: SceneId;
+  toSceneId: SceneId;
+};
+
 export type Scene = {
   id: SceneId;
   projectId: ProjectId;
   storyboardId: StoryboardId;
   orderIndex: number;
   status: SceneStatus;
+  kind: SceneKind;
+  bridge: SceneBridge | null;
   title: string;
   description: string;
   imagePrompt: string;
@@ -227,6 +237,7 @@ export type CreatePhotoAssetInput = {
   sourceKind: string;
   notes?: string | null;
   usage?: PhotoUsage;
+  position?: number;
   deletedAt?: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -250,6 +261,8 @@ export type CreateSceneInput = {
   storyboardId: StoryboardId;
   orderIndex: number;
   status?: SceneStatus;
+  kind?: SceneKind;
+  bridge?: SceneBridge | null;
   title: string;
   description: string;
   imagePrompt: string;
@@ -394,6 +407,7 @@ export function createPhotoAsset(input: CreatePhotoAssetInput): PhotoAsset {
     checksum: trimRequiredText(input.checksum, "Photo asset checksum"),
     sourceKind: trimRequiredText(input.sourceKind, "Photo asset source kind"),
     notes: trimOptionalText(input.notes) || null,
+    position: input.position ?? 0,
     deletedAt: input.deletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
@@ -421,6 +435,8 @@ export function createScene(input: CreateSceneInput): Scene {
     storyboardId: input.storyboardId,
     orderIndex: input.orderIndex,
     status: input.status ?? "draft",
+    kind: input.kind ?? "photo",
+    bridge: input.bridge ?? null,
     title: trimOptionalText(input.title),
     description: trimOptionalText(input.description),
     imagePrompt: trimOptionalText(input.imagePrompt),
@@ -453,6 +469,8 @@ export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
     storyboardId: input.storyboardId,
     orderIndex: input.orderIndex,
     status: "draft",
+    kind: "photo",
+    bridge: null,
     title: "",
     description: "",
     imagePrompt: "",
@@ -464,6 +482,51 @@ export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
     photoAssets: input.photoAssetId
       ? [{ photoAssetId: input.photoAssetId, role: "primary" }]
       : [],
+    adoptedGeneratedImageId: null,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+  };
+}
+
+export type CreateComplementSceneInput = {
+  id: SceneId;
+  projectId: ProjectId;
+  storyboardId: StoryboardId;
+  orderIndex: number;
+  bridge: SceneBridge;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export function createComplementScene(
+  input: CreateComplementSceneInput,
+): Scene {
+  if (input.bridge.fromSceneId === input.bridge.toSceneId) {
+    throw new Error(
+      "A complement scene bridge must reference two distinct scenes.",
+    );
+  }
+
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    storyboardId: input.storyboardId,
+    orderIndex: input.orderIndex,
+    status: "draft",
+    kind: "complement",
+    bridge: {
+      fromSceneId: input.bridge.fromSceneId,
+      toSceneId: input.bridge.toSceneId,
+    },
+    title: "",
+    description: "",
+    imagePrompt: "",
+    emotion: "",
+    cameraDirection: "",
+    lightingDirection: "",
+    motionDirection: "",
+    notes: "",
+    photoAssets: [],
     adoptedGeneratedImageId: null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,

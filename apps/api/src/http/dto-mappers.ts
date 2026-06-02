@@ -22,7 +22,25 @@ import type {
   TestGenerationBatchDto,
 } from "@gen-story/shared";
 
-import type { AuthPrincipal } from "@gen-story/application";
+import type {
+  AuthPrincipal,
+  ComplementSceneProposal,
+} from "@gen-story/application";
+import type { ComplementSceneProposalDto } from "@gen-story/shared";
+
+export function toComplementSceneProposalDto(
+  proposal: ComplementSceneProposal,
+): ComplementSceneProposalDto {
+  return {
+    title: proposal.title,
+    description: proposal.description,
+    imagePrompt: proposal.imagePrompt,
+    emotion: proposal.emotion,
+    cameraDirection: proposal.cameraDirection,
+    lightingDirection: proposal.lightingDirection,
+    motionDirection: proposal.motionDirection,
+  };
+}
 
 export function toMeDto(principal: AuthPrincipal): MeDto {
   return {
@@ -60,6 +78,7 @@ export function toPhotoAssetDto(asset: PhotoAsset): PhotoAssetDto {
     checksum: asset.checksum,
     sourceKind: asset.sourceKind,
     notes: asset.notes,
+    position: asset.position,
     deletedAt: asset.deletedAt,
     createdAt: asset.createdAt,
     updatedAt: asset.updatedAt,
@@ -115,6 +134,8 @@ export function toSceneDto(scene: Scene): SceneDto {
     storyboardId: scene.storyboardId,
     orderIndex: scene.orderIndex,
     status: scene.status,
+    kind: scene.kind,
+    bridge: scene.bridge,
     title: scene.title,
     description: scene.description,
     imagePrompt: scene.imagePrompt,

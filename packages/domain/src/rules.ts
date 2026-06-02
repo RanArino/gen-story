@@ -5,6 +5,7 @@ import {
   type PhotoAsset,
   type PhotoUsage,
   type Scene,
+  type SceneBridge,
   type ScenePhotoAsset,
   type StylePreset,
   type TestGenerationBatch,
@@ -28,6 +29,28 @@ function assertScenePhotoAssets(scenePhotoAssets: ScenePhotoAsset[]): void {
     }
 
     seenPhotoAssetIds.add(scenePhotoAsset.photoAssetId);
+  }
+}
+
+export function assertComplementSceneBridge(
+  bridge: SceneBridge,
+  siblingScenes: ReadonlyArray<{ id: string }>,
+): void {
+  if (bridge.fromSceneId === bridge.toSceneId) {
+    throw new Error(
+      "A complement scene bridge must reference two distinct scenes.",
+    );
+  }
+
+  const siblingIds = new Set(siblingScenes.map((scene) => scene.id));
+
+  if (
+    !siblingIds.has(bridge.fromSceneId) ||
+    !siblingIds.has(bridge.toSceneId)
+  ) {
+    throw new Error(
+      "A complement scene bridge must reference existing sibling scenes.",
+    );
   }
 }
 
