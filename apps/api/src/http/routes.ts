@@ -485,6 +485,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         tone: parsed.data.tone,
         status: parsed.data.status,
         stylePresetId: parsed.data.stylePresetId,
+        commonPrompt: parsed.data.commonPrompt,
       });
 
       if (!result.ok) {

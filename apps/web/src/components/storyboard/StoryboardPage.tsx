@@ -127,8 +127,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [aiFillingSceneId, setAiFillingSceneId] = useState<string | null>(null);
   const [testBatch, setTestBatch] = useState<TestGenerationBatchDto | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [commonPromptDraft, setCommonPromptDraft] = useState("");
+  const [savingCommonPrompt, setSavingCommonPrompt] = useState(false);
 
   const sbId = storyboard?.id;
+
+  useEffect(() => {
+    setCommonPromptDraft(storyboard?.commonPrompt ?? "");
+  }, [storyboard?.commonPrompt]);
 
   const load = useCallback(async () => {
     const [sbs, presets, photoList, latestPhotoAnalysis] = await Promise.all([
@@ -216,6 +222,28 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setStoryboard(updated);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save style");
+    }
+  }
+
+  async function saveCommonPrompt(commonPrompt: string) {
+    if (!sbId) return;
+    const prev = storyboard!;
+    setSavingCommonPrompt(true);
+    setError(null);
+    try {
+      const updated = await upsertStoryboard(sbId, {
+        projectId,
+        tone: prev.tone,
+        stylePresetId: prev.stylePresetId,
+        commonPrompt,
+      });
+      setStoryboard(updated);
+      setSaveMsg("Common prompt saved!");
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save common prompt");
+    } finally {
+      setSavingCommonPrompt(false);
     }
   }
 
@@ -544,6 +572,43 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               {p.name}
             </button>
           ))}
+        </div>
+      </section>
+
+      {/* Common project prompt */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h3 className={styles.sectionTitle}>Common prompt</h3>
+          <button
+            className="btn btn-secondary"
+            onClick={() => saveCommonPrompt("")}
+            disabled={savingCommonPrompt}
+          >
+            Regenerate from tone &amp; style
+          </button>
+        </div>
+        <p className={styles.photoAssignHint}>
+          Applied to every scene&apos;s image generation. Auto-generated from the
+          storyboard tone and style; edit it to guide all scenes consistently.
+        </p>
+        <textarea
+          className={styles.fieldInput}
+          rows={4}
+          value={commonPromptDraft}
+          onChange={(e) => setCommonPromptDraft(e.target.value)}
+          placeholder="Common prompt applied to every scene"
+        />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => saveCommonPrompt(commonPromptDraft)}
+            disabled={
+              savingCommonPrompt ||
+              commonPromptDraft === (storyboard.commonPrompt ?? "")
+            }
+          >
+            {savingCommonPrompt ? "Saving…" : "Save common prompt"}
+          </button>
         </div>
       </section>
 

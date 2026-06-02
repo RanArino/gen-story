@@ -62,6 +62,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       lightingDirection: scene.lightingDirection ?? "",
       tone: storyboard.tone ?? "",
       stylePresetPrompt: stylePreset?.prompt ?? null,
+      commonPrompt: storyboard.commonPrompt ?? "",
     });
 
     const normalizedInputImages: NormalizedInputImage[] = [];

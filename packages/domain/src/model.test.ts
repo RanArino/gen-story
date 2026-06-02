@@ -82,10 +82,24 @@ describe("domain factories", () => {
       status: "draft",
       tone: "Tender and reflective",
       stylePresetId: "style_1",
+      commonPrompt: "",
       sceneIds: ["scene_2", "scene_1"],
       createdAt: "2026-05-02T00:00:00.000Z",
       updatedAt: "2026-05-02T00:00:00.000Z",
     });
+  });
+
+  it("trims and preserves a supplied storyboard common prompt", () => {
+    const storyboard = createStoryboard({
+      id: "storyboard_1",
+      projectId: "project_1",
+      tone: "Tender and reflective",
+      commonPrompt: "  Warm nostalgic family film.  ",
+      createdAt: "2026-05-02T00:00:00.000Z",
+      updatedAt: "2026-05-02T00:00:00.000Z",
+    });
+
+    expect(storyboard.commonPrompt).toBe("Warm nostalgic family film.");
   });
 
   it("creates a photo asset with candidate usage by default", () => {

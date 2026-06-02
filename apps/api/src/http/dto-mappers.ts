@@ -101,6 +101,7 @@ export function toStoryboardDto(storyboard: Storyboard): StoryboardDto {
     status: storyboard.status,
     tone: storyboard.tone,
     stylePresetId: storyboard.stylePresetId,
+    commonPrompt: storyboard.commonPrompt,
     sceneIds: storyboard.sceneIds,
     createdAt: storyboard.createdAt,
     updatedAt: storyboard.updatedAt,

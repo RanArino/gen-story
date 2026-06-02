@@ -64,12 +64,22 @@ export function composeImagePrompt(input: {
   lightingDirection: string;
   tone: string;
   stylePresetPrompt: string | null;
+  commonPrompt: string;
 }): string {
-  const { imagePrompt, emotion, cameraDirection, lightingDirection, tone, stylePresetPrompt } = input;
+  const {
+    imagePrompt,
+    emotion,
+    cameraDirection,
+    lightingDirection,
+    tone,
+    stylePresetPrompt,
+    commonPrompt,
+  } = input;
 
   const segments: string[] = [];
 
   if (stylePresetPrompt) segments.push(stylePresetPrompt);
+  if (commonPrompt.trim()) segments.push(commonPrompt.trim());
   segments.push(CAMERA_DESCRIPTORS[cameraDirection] ?? "cinematic framing");
   if (imagePrompt) segments.push(imagePrompt);
   segments.push(EMOTION_DESCRIPTORS[emotion] ?? "emotional cinematic atmosphere");

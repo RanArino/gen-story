@@ -63,6 +63,7 @@ export {
 export {
   canStartTestGeneration,
   completeTestGenerationBatch,
+  composeCommonPrompt,
   replaceScenePhotoAssets,
   resetTestGenerationBatch,
   retryGenerationRequest,

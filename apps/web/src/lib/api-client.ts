@@ -201,6 +201,7 @@ export async function upsertStoryboard(
     tone: string;
     stylePresetId?: string | null;
     status?: string;
+    commonPrompt?: string;
   },
 ): Promise<StoryboardDto> {
   return request<StoryboardDto>(

@@ -227,3 +227,31 @@ export function resetTestGenerationBatch(
     createdAt,
   };
 }
+
+export function composeCommonPrompt(input: {
+  tone: string;
+  stylePresetName: string | null;
+  stylePresetPrompt: string | null;
+}): string {
+  const tone = input.tone.trim();
+  const styleName = (input.stylePresetName ?? "").trim();
+  const stylePrompt = (input.stylePresetPrompt ?? "").trim();
+
+  const clauses: string[] = [];
+
+  if (tone) {
+    clauses.push(`Overall emotional tone: ${tone}.`);
+  }
+
+  if (styleName && stylePrompt) {
+    clauses.push(`Visual style: ${styleName} — ${stylePrompt}.`);
+  } else if (styleName) {
+    clauses.push(`Visual style: ${styleName}.`);
+  } else if (stylePrompt) {
+    clauses.push(`Visual style: ${stylePrompt}.`);
+  }
+
+  clauses.push("Keep this tone and style consistent across every scene.");
+
+  return clauses.join(" ");
+}
