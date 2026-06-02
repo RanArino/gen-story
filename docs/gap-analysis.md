@@ -281,8 +281,8 @@ Accepted on 2026-06-02 from `docs/ux-enhancement-proposals.md` (sections A–D).
 | A1. Live generation panel with thumbnails & ETA | ❌ | Proposal A1; replaces the flat status list on `GeneratePage` |
 | A2. Background generation + global progress chip | ❌ | Proposal A2; polling hook hoisted into `AppShell` |
 | A3. Variants per scene (N candidates per request) | ❌ | Proposal A3; `inputJson.variants`; extends §11 "One generated image per scene" |
-| A4. Composed-prompt preview before submit | ❌ | Proposal A4; new `POST /api/scenes/:id/preview-prompt` |
-| A5. Negative prompt field (scene + project) | ❌ | Proposal A5 + H7; add `negativePrompt` to `scenes` and `storyboards`, designed as a "deviation fence" |
+| A4. Composed-prompt preview before submit | 🟡 | In progress — see `docs/plans/20260602-prompt-preview-and-negative-fence.md`; new `POST /api/scenes/:id/preview-prompt` |
+| A5. Negative prompt field (scene + project) | 🟡 | In progress — see `docs/plans/20260602-prompt-preview-and-negative-fence.md`; adds `negativePrompt` to `scenes` and `storyboards` as a "deviation fence" (A5 + H7) |
 | A6. Adjustment chips on test generation | 🟡 | Already tracked in §6; see `docs/plans/20260526-test-generation-adjustment-chips.md` |
 | A7. Estimated cost / coin preview | ❌ | Proposal A7; static per-model price table in `packages/shared` |
 | A8. Failure clustering & recovery hints | ❌ | Proposal A8; error-class → hint banner on `GeneratePage` |
@@ -378,7 +378,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | File lifecycle & cleanup | 5 | 1 | 0 | 0 |
 | Local release readiness | 11 | 0 | 0 | 0 |
 | Technical debt & infrastructure | 2 | 0 | 0 | 0 |
-| Accepted UX proposals — A (feedback/flow) | 0 | 0 | 1 | 7 |
+| Accepted UX proposals — A (feedback/flow) | 0 | 0 | 3 | 5 |
 | Accepted UX proposals — B (composition) | 0 | 0 | 0 | 7 |
 | Accepted UX proposals — C (review/adoption) | 0 | 0 | 0 | 7 |
 | Accepted UX proposals — D (transparency/lineage) | 0 | 0 | 0 | 2 |
@@ -446,4 +446,4 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 
 ### Accepted UX Enhancement Proposals (A–D)
 
-See **§18** for the full list of proposals accepted on 2026-06-02 from `docs/ux-enhancement-proposals.md`. None have ExecPlans yet; the recommended sequencing is in that doc's "Recommended top picks" (chain reference H1, Base Negative A5/H7, invariant re-injection H4, and text-free plate H2 are the highest-leverage for series consistency).
+See **§18** for the full list of proposals accepted on 2026-06-02 from `docs/ux-enhancement-proposals.md`. A4 (composed-prompt preview) and A5/H7 (negative-prompt deviation fence) now have an ExecPlan: `docs/plans/20260602-prompt-preview-and-negative-fence.md`; the remaining proposals do not. The recommended sequencing for the rest is in that doc's "Recommended top picks" (chain reference H1, invariant re-injection H4, and text-free plate H2 are the highest-leverage for series consistency).
