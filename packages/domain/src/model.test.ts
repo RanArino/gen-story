@@ -83,6 +83,7 @@ describe("domain factories", () => {
       tone: "Tender and reflective",
       stylePresetId: "style_1",
       commonPrompt: "",
+      negativePrompt: "",
       sceneIds: ["scene_2", "scene_1"],
       createdAt: "2026-05-02T00:00:00.000Z",
       updatedAt: "2026-05-02T00:00:00.000Z",
