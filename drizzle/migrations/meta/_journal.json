@@ -64,6 +64,13 @@
       "when": 1779979121387,
       "tag": "0008_yummy_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1780403049615,
+      "tag": "0009_pink_master_chief",
+      "breakpoints": true
     }
   ]
 }
