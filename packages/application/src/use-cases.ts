@@ -376,6 +376,7 @@ export type UpsertStoryboardInput = {
   tone: string;
   stylePresetId?: string | null;
   commonPrompt?: string;
+  negativePrompt?: string;
   sceneIds?: string[];
 };
 
@@ -450,6 +451,8 @@ export async function upsertStoryboard(
       tone: input.tone,
       stylePresetId: effectiveStylePresetId,
       commonPrompt,
+      negativePrompt:
+        input.negativePrompt ?? existingStoryboard?.negativePrompt ?? "",
       sceneIds: input.sceneIds ?? existingStoryboard?.sceneIds ?? [],
       createdAt: existingStoryboard?.createdAt ?? now(),
       updatedAt: now(),
@@ -477,6 +480,7 @@ export type SceneInput = {
   lightingDirection: string;
   motionDirection: string;
   notes?: string;
+  negativePrompt?: string;
   photoAssets?: ScenePhotoAsset[];
   adoptedGeneratedImageId?: string | null;
 };
@@ -504,6 +508,7 @@ function buildScene(existingScene: Scene | null, input: SceneInput): Scene {
     lightingDirection: input.lightingDirection,
     motionDirection: input.motionDirection,
     notes: input.notes ?? existingScene?.notes,
+    negativePrompt: input.negativePrompt ?? existingScene?.negativePrompt,
     photoAssets: input.photoAssets ?? existingScene?.photoAssets,
     adoptedGeneratedImageId:
       input.adoptedGeneratedImageId ??
