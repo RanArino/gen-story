@@ -136,6 +136,7 @@ export function toStoryboardDto(storyboard: Storyboard): StoryboardDto {
     tone: storyboard.tone,
     stylePresetId: storyboard.stylePresetId,
     commonPrompt: storyboard.commonPrompt,
+    negativePrompt: storyboard.negativePrompt,
     sceneIds: storyboard.sceneIds,
     createdAt: storyboard.createdAt,
     updatedAt: storyboard.updatedAt,
@@ -159,6 +160,7 @@ export function toSceneDto(scene: Scene): SceneDto {
     lightingDirection: scene.lightingDirection,
     motionDirection: scene.motionDirection,
     notes: scene.notes,
+    negativePrompt: scene.negativePrompt,
     photoAssets: scene.photoAssets.map((spa) => ({
       photoAssetId: spa.photoAssetId,
       role: spa.role,
