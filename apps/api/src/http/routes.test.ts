@@ -705,6 +705,146 @@ describe("POST /api/scenes/:sceneId/ai-fill", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Composed-prompt preview
+// ---------------------------------------------------------------------------
+
+describe("POST /api/scenes/:sceneId/preview-prompt", () => {
+  async function seedPreviewScene(options?: {
+    organizationId?: string;
+    ownerUserId?: string;
+    storyboardNegativePrompt?: string;
+    sceneNegativePrompt?: string;
+    idPrefix?: string;
+  }) {
+    const { createProject, createScene, createStoryboard } =
+      await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    const prefix = options?.idPrefix ?? "pv";
+
+    await deps.projects.save(
+      createProject({
+        id: `${prefix}-proj`,
+        organizationId: options?.organizationId ?? LOCAL_ORGANIZATION_ID,
+        ownerUserId: options?.ownerUserId ?? LOCAL_USER_ID,
+        name: "Preview Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: `${prefix}-sb`,
+        projectId: `${prefix}-proj`,
+        tone: "warm",
+        negativePrompt: options?.storyboardNegativePrompt ?? "",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createScene({
+        id: `${prefix}-scene`,
+        projectId: `${prefix}-proj`,
+        storyboardId: `${prefix}-sb`,
+        orderIndex: 0,
+        title: "Beach day",
+        description: "A warm afternoon",
+        imagePrompt: "a family at the beach",
+        emotion: "Joy",
+        cameraDirection: "Medium",
+        lightingDirection: "Natural",
+        motionDirection: "",
+        negativePrompt: options?.sceneNegativePrompt ?? "",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    return `${prefix}-scene`;
+  }
+
+  it("returns the composed prompt and base negative for a persisted scene", async () => {
+    const sceneId = await seedPreviewScene();
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/scenes/${sceneId}/preview-prompt`,
+      {},
+    );
+
+    expect(status).toBe(200);
+    const result = body as { prompt: string; negativePrompt: string };
+    expect(result.prompt).toContain("a family at the beach");
+    // Base floor is always injected and folded into the prompt as `avoid: …`.
+    expect(result.negativePrompt).toContain("watermark");
+    expect(result.negativePrompt).toContain("deformed hands");
+    expect(result.prompt).toContain("avoid: ");
+    expect(result.prompt).toContain("watermark");
+  });
+
+  it("reflects an unsaved imagePrompt override", async () => {
+    const sceneId = await seedPreviewScene({ idPrefix: "pv-ov" });
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/scenes/${sceneId}/preview-prompt`,
+      { imagePrompt: "a dog running in the park" },
+    );
+
+    expect(status).toBe(200);
+    const result = body as { prompt: string; negativePrompt: string };
+    expect(result.prompt).toContain("a dog running in the park");
+    expect(result.prompt).not.toContain("a family at the beach");
+  });
+
+  it("merges a projectNegativePrompt override into the avoid clause", async () => {
+    const sceneId = await seedPreviewScene({ idPrefix: "pv-neg" });
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/scenes/${sceneId}/preview-prompt`,
+      { projectNegativePrompt: "no balloons" },
+    );
+
+    expect(status).toBe(200);
+    const result = body as { prompt: string; negativePrompt: string };
+    expect(result.negativePrompt).toContain("no balloons");
+    expect(result.negativePrompt).toContain("watermark");
+    expect(result.prompt).toMatch(/avoid: .*no balloons/);
+  });
+
+  it("returns 404 for an unknown scene", async () => {
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/scenes/missing-preview-scene/preview-prompt",
+      {},
+    );
+
+    expect(status).toBe(404);
+  });
+
+  it("returns 403 for a scene in another organization", async () => {
+    const sceneId = await seedPreviewScene({
+      organizationId: "other-org",
+      ownerUserId: "other-user",
+      idPrefix: "pv-foreign",
+    });
+
+    const { status } = await req(
+      base,
+      "POST",
+      `/api/scenes/${sceneId}/preview-prompt`,
+      {},
+    );
+
+    expect(status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Style presets
 // ---------------------------------------------------------------------------
 
