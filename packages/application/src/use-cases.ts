@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   appendAdjustmentsToCommonPrompt,
@@ -675,10 +675,39 @@ function isAnalyzablePhoto(photo: PhotoAsset): boolean {
   );
 }
 
+// Fingerprint of everything that materially changes a photo analysis result:
+// the analyzable photo set (content + the metadata fed into the prompt) and the
+// response language. When this matches the stored hash we can return the cached
+// analysis instead of paying for another AI call.
+function computeAnalysisInputsHash(
+  photos: PhotoAsset[],
+  language: Language,
+): string {
+  const fingerprint = photos
+    .map((photo) => ({
+      id: photo.id,
+      checksum: photo.checksum,
+      usage: photo.usage,
+      name: photo.name,
+      notes: photo.notes ?? "",
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return createHash("sha256")
+    .update(JSON.stringify({ language, photos: fingerprint }))
+    .digest("hex");
+}
+
+export type AnalyzeProjectPhotosResult = {
+  analysis: ProjectPhotoAnalysis;
+  // True when the stored analysis was reused because inputs were unchanged
+  // (no AI call was made).
+  cached: boolean;
+};
+
 export async function analyzeProjectPhotos(
   deps: ApplicationDependencies,
   input: AnalyzeProjectPhotosInput,
-): Promise<UseCaseResult<ProjectPhotoAnalysis>> {
+): Promise<UseCaseResult<AnalyzeProjectPhotosResult>> {
   try {
     const project = await getProjectOrNotFound(deps, input.projectId);
     if (isFailure(project)) return project;
@@ -694,9 +723,19 @@ export async function analyzeProjectPhotos(
       );
     }
 
+    const language = await resolvePrincipalLanguage(deps, input.language);
+    const inputsHash = computeAnalysisInputsHash(photos, language);
+    const existing = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
+
+    // Skip the (paid) AI call when nothing relevant changed since last time.
+    if (existing && existing.inputsHash === inputsHash) {
+      return success({ analysis: existing, cached: true });
+    }
+
     const storyboards = await deps.storyboards.findByProjectId(project.id);
     const storyboard = storyboards[0] ?? null;
-    const language = await resolvePrincipalLanguage(deps, input.language);
     const generated = await deps.photoAnalysisGeneration.analyzeProjectPhotos({
       project,
       storyboard,
@@ -704,9 +743,6 @@ export async function analyzeProjectPhotos(
       language,
     });
     const timestamp = now();
-    const existing = await deps.projectPhotoAnalyses.findLatestByProjectId(
-      project.id,
-    );
     const analysis = createProjectPhotoAnalysis({
       id: existing?.id ?? randomUUID(),
       projectId: project.id,
@@ -714,6 +750,7 @@ export async function analyzeProjectPhotos(
       photoInsights: generated.photoInsights,
       storySummary: generated.storySummary,
       model: generated.model,
+      inputsHash,
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp,
     });
@@ -730,7 +767,7 @@ export async function analyzeProjectPhotos(
       },
     });
 
-    return success(analysis);
+    return success({ analysis, cached: false });
   } catch (error) {
     return validationFailure(error);
   }
