@@ -1884,7 +1884,110 @@ describe("application use cases", () => {
     );
     expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(1);
     if (result.ok) {
-      expect(result.value.model).toBe("test-model");
+      expect(result.value.cached).toBe(false);
+      expect(result.value.analysis.model).toBe("test-model");
+    }
+  });
+
+  it("reuses the stored analysis when inputs are unchanged", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_1",
+          projectId: "project_1",
+          name: "candidate.jpg",
+          usage: "candidate",
+          storageKey: "candidate.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "candidate",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const first = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+    expect(first.ok).toBe(true);
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
+
+    const second = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+    expect(second.ok).toBe(true);
+    // No second AI call: the cached analysis is reused.
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
+    expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(1);
+    if (first.ok && second.ok) {
+      expect(second.value.cached).toBe(true);
+      expect(second.value.analysis.id).toBe(first.value.analysis.id);
+    }
+  });
+
+  it("re-runs analysis after a photo changes", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_1",
+          projectId: "project_1",
+          name: "candidate.jpg",
+          usage: "candidate",
+          storageKey: "candidate.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "candidate",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const first = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+    expect(first.ok).toBe(true);
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
+
+    // A new candidate photo changes the analyzable set.
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: "photo_2",
+        projectId: "project_1",
+        name: "added.jpg",
+        usage: "candidate",
+        storageKey: "added.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: "added",
+        sourceKind: "upload",
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      }),
+    );
+
+    const second = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+    expect(second.ok).toBe(true);
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(2);
+    if (second.ok) {
+      expect(second.value.cached).toBe(false);
     }
   });
 
