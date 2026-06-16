@@ -1,0 +1,1 @@
+ALTER TABLE `project_photo_analyses` ADD `inputs_hash` text DEFAULT '' NOT NULL;

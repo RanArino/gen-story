@@ -277,6 +277,7 @@ export const projectPhotoAnalyses = sqliteTable(
     photoInsightsJson: text("photo_insights_json").notNull(),
     storySummary: text("story_summary").notNull(),
     model: text("model").notNull(),
+    inputsHash: text("inputs_hash").notNull().default(""),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     deletedAt: text("deleted_at"),
