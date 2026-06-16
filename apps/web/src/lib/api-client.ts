@@ -190,13 +190,12 @@ export async function getProjectPhotoAnalysis(
 
 export async function analyzeProjectPhotos(
   projectId: string,
-): Promise<ProjectPhotoAnalysisDto> {
-  const data = await request<{ photoAnalysis: ProjectPhotoAnalysisDto }>(
-    "POST",
-    `/api/projects/${projectId}/photo-analysis`,
-    {},
-  );
-  return data.photoAnalysis;
+): Promise<{ photoAnalysis: ProjectPhotoAnalysisDto; cached: boolean }> {
+  const data = await request<{
+    photoAnalysis: ProjectPhotoAnalysisDto;
+    cached: boolean;
+  }>("POST", `/api/projects/${projectId}/photo-analysis`, {});
+  return { photoAnalysis: data.photoAnalysis, cached: data.cached };
 }
 
 // ── Storyboards ───────────────────────────────────────────────────────────────
