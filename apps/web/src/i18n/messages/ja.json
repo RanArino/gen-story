@@ -121,7 +121,9 @@
       "lighting": "ライティング",
       "motion": "モーション",
       "tone": "トーン",
-      "primaryPhoto": "メイン写真"
+      "primaryPhoto": "メイン写真",
+      "sceneNegativePrompt": "シーン別ネガティブプロンプト",
+      "sceneNegativePromptPlaceholder": "このシーンだけで避けたい要素（任意）"
     },
     "selectOption": "選択…",
     "save": "シーンを保存",
@@ -144,17 +146,30 @@
       "emptyClickToStart": "<strong>写真を分析</strong> をクリックして、選択した写真からトーンの候補を生成してください。"
     },
     "tones": {
-      "warm": { "label": "温かい", "desc": "心温まる懐かしさ" },
-      "cinematic": { "label": "映画的", "desc": "ドラマチックで壮大" },
-      "playful": { "label": "陽気", "desc": "楽しく活発" },
-      "quiet": { "label": "静か", "desc": "穏やかで内省的" }
+      "warm": {
+        "label": "温かい",
+        "desc": "心温まる懐かしさ"
+      },
+      "cinematic": {
+        "label": "映画的",
+        "desc": "ドラマチックで壮大"
+      },
+      "playful": {
+        "label": "陽気",
+        "desc": "楽しく活発"
+      },
+      "quiet": {
+        "label": "静か",
+        "desc": "穏やかで内省的"
+      }
     },
     "sections": {
       "tone": "感情 / トーン",
       "style": "スタイルプリセット",
       "commonPrompt": "共通プロンプト",
       "createScenes": "写真からシーンを作成",
-      "scenes": "シーン({count})"
+      "scenes": "シーン({count})",
+      "negativePrompt": "ネガティブプロンプト（逸脱フェンス）"
     },
     "style": {
       "aiRecommend": "AIにおまかせ",
@@ -241,6 +256,16 @@
       "testInProgress": "テスト中…",
       "viewTestGeneration": "テスト生成を表示",
       "startTestGeneration": "テスト生成 →"
+    },
+    "negativePrompt": {
+      "notSet": "未設定",
+      "intro": "すべてのシーンの画像生成から除外したい要素を指定します。シリーズを意図した見た目の範囲内に保つための「フェンス」です。これに加えて、基本の抑制（文字・透かし・崩れた手など）が常に適用されます。",
+      "placeholder": "避けたい要素（例: 文字, 透かし, 余計な人物）",
+      "save": "ネガティブプロンプトを保存",
+      "saving": "保存中…",
+      "savedMsg": "ネガティブプロンプトを保存しました！",
+      "failed": "ネガティブプロンプトの保存に失敗しました",
+      "insertFence": "推奨フェンスを挿入"
     }
   },
   "testGeneration": {
@@ -478,5 +503,14 @@
       "playful": "陽気",
       "quiet": "静か"
     }
+  },
+  "composedPrompt": {
+    "title": "モデルに送信される内容",
+    "promptLabel": "プロンプト",
+    "avoidLabel": "避ける（Avoid）",
+    "avoidNone": "（なし）",
+    "note": "プレビューのみ — 画像は生成されません。",
+    "loading": "プレビューを作成中…",
+    "failed": "プレビューの読み込みに失敗しました"
   }
 }
