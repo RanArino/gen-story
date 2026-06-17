@@ -322,6 +322,21 @@ Accepted on 2026-06-02 from `docs/ux-enhancement-proposals.md` (sections A–D).
 
 ---
 
+## 19. Local Test Feedback — Storyboard UX Redesign & Story Cohesion
+
+Raised 2026-06-17 from local testing. An earlier, narrower implementation (a `story` field plus a `sticky; top:0` jump bar, with the photo grid and per-scene picker left as-is) was built and **reverted in full** at the user's request: the screen stayed a tall text form, the photo library was shown three times (persistent grid, per-scene picker, and as the natural card hero), and the jump bar scrolled away. Re-scoped UX-first; see `docs/plans/20260617-story-worldview-and-storyboard-navigation.md`.
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Author-owned Story / Worldview field, seeded from AI `storySummary`, editable, persisted, regenerable | 🟡 | In progress — separate from `commonPrompt`; lives in the consolidated config panel |
+| Story composed into every scene's image-generation prompt (cohesion) | 🟡 | In progress — single-site change in `composeImagePrompt` reaches real generation + preview |
+| Visual-first scene board with three user-switchable view modes (Rows / Split / Gallery) | 🟡 | In progress — image (assigned source photo) leads; view choice persisted client-side |
+| Persistent sticky photo filmstrip navigator (scroll-spy + click-jump, internal scroll) | 🟡 | In progress — in-page sticky column; replaces the scroll-away jump bar |
+| "Add scenes" modal listing only unused photos + per-scene single-photo "Change" picker | 🟡 | In progress — stops showing the whole photo library three times |
+| Consolidated, default-collapsed project-config panel so the board is primary content | 🟡 | In progress — tone/style/common/negative/story grouped |
+
+---
+
 ## Phase 2 — Video Generation (Future)
 
 All Phase 2 items are **🔮 not started** and explicitly out of scope for the initial release.
@@ -382,6 +397,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Accepted UX proposals — B (composition) | 0 | 0 | 0 | 7 |
 | Accepted UX proposals — C (review/adoption) | 0 | 0 | 0 | 7 |
 | Accepted UX proposals — D (transparency/lineage) | 0 | 0 | 0 | 2 |
+| Local test feedback — storyboard UX & story (§19) | 0 | 0 | 6 | 0 |
 
 The accepted-proposal counts (§18) are tracked separately from the REQUIREMENTS_INIT requirement areas above; A6 is also counted under "Test generation workflow", and B1 under "Image generation infra" (§13), so those two overlap intentionally.
 
