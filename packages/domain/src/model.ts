@@ -138,6 +138,7 @@ export type Storyboard = {
   tone: string;
   stylePresetId: StylePresetId | null;
   commonPrompt: string;
+  story: string;
   negativePrompt: string;
   sceneIds: SceneId[];
   createdAt: Timestamp;
@@ -280,6 +281,7 @@ export type CreateStoryboardInput = {
   tone: string;
   stylePresetId?: StylePresetId | null;
   commonPrompt?: string;
+  story?: string;
   negativePrompt?: string;
   sceneIds?: SceneId[];
   createdAt: Timestamp;
@@ -456,6 +458,7 @@ export function createStoryboard(input: CreateStoryboardInput): Storyboard {
     tone: trimRequiredText(input.tone, "Storyboard tone"),
     stylePresetId: input.stylePresetId ?? null,
     commonPrompt: (input.commonPrompt ?? "").trim(),
+    story: (input.story ?? "").trim(),
     negativePrompt: (input.negativePrompt ?? "").trim(),
     sceneIds: [...(input.sceneIds ?? [])],
     createdAt: input.createdAt,

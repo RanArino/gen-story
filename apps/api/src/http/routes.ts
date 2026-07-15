@@ -512,6 +512,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         status: parsed.data.status,
         stylePresetId: parsed.data.stylePresetId,
         commonPrompt: parsed.data.commonPrompt,
+        story: parsed.data.story,
         negativePrompt: parsed.data.negativePrompt,
       });
 

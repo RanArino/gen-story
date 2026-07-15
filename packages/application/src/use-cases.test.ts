@@ -1145,6 +1145,68 @@ describe("application use cases", () => {
     });
   }
 
+  function createStoryDeps() {
+    return createDependencies({
+      users: [
+        createUser({
+          id: "user_1",
+          organizationId: "org_1",
+          email: "ran@example.com",
+          displayName: "Ran",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      organizations: [
+        createOrganization({
+          id: "org_1",
+          name: "Family Studio",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projectPhotoAnalyses: [
+        createProjectPhotoAnalysis({
+          id: "analysis_1",
+          projectId: "project_1",
+          emotionCandidates: [
+            {
+              value: "Reflective",
+              label: "Reflective",
+              description: "Quiet and thoughtful",
+              reason: "The photos suggest a calm family arc.",
+            },
+          ],
+          photoInsights: [
+            {
+              photoAssetId: "photo_1",
+              summary: "A family by the sea.",
+              people: "Family members",
+              setting: "Seaside town",
+              event: "Family gathering",
+              atmosphere: "Warm and reflective",
+            },
+          ],
+          storySummary:
+            "A family grows across seasons around the same seaside town.",
+          model: "local-deterministic",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+  }
+
   it("auto-generates a common prompt for a new storyboard when none is provided", async () => {
     const deps = createCommonPromptDeps();
 
@@ -1227,6 +1289,70 @@ describe("application use cases", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.commonPrompt).toBe("Warm nostalgic family film.");
+    }
+  });
+
+  it("seeds a storyboard story from the latest photo analysis", async () => {
+    const deps = createStoryDeps();
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.story).toBe(
+        "A family grows across seasons around the same seaside town.",
+      );
+    }
+  });
+
+  it("keeps an existing non-empty story when none is provided", async () => {
+    const deps = createStoryDeps();
+
+    await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      story: "Hand-written worldview.",
+    });
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Joyful",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.story).toBe("Hand-written worldview.");
+    }
+  });
+
+  it("regenerates the story when an explicit empty value is provided", async () => {
+    const deps = createStoryDeps();
+
+    await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      story: "Hand-written worldview.",
+    });
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Joyful",
+      story: "",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.story).toBe(
+        "A family grows across seasons around the same seaside town.",
+      );
     }
   });
 

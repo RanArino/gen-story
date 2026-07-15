@@ -218,6 +218,7 @@ export async function upsertStoryboard(
     stylePresetId?: string | null;
     status?: string;
     commonPrompt?: string;
+    story?: string;
     negativePrompt?: string;
   },
 ): Promise<StoryboardDto> {
@@ -261,6 +262,7 @@ export type PreviewScenePromptOverrides = {
   sceneNegativePrompt?: string;
   projectNegativePrompt?: string;
   commonPrompt?: string;
+  story?: string;
 };
 
 export type ComposedPromptPreview = {

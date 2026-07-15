@@ -102,6 +102,7 @@ export type StoryboardDto = {
   tone: string;
   stylePresetId: string | null;
   commonPrompt: string;
+  story: string;
   negativePrompt: string;
   sceneIds: string[];
   createdAt: string;

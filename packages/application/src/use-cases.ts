@@ -376,6 +376,7 @@ export type UpsertStoryboardInput = {
   tone: string;
   stylePresetId?: string | null;
   commonPrompt?: string;
+  story?: string;
   negativePrompt?: string;
   sceneIds?: string[];
 };
@@ -412,6 +413,31 @@ async function resolveCommonPrompt(
   });
 }
 
+async function resolveStory(
+  deps: ApplicationDependencies,
+  args: {
+    requestedStory: string | undefined;
+    existingStory: string;
+    projectId: string;
+  },
+): Promise<string> {
+  if (args.requestedStory === undefined) {
+    if (args.existingStory.trim() !== "") {
+      return args.existingStory;
+    }
+  } else {
+    const trimmed = args.requestedStory.trim();
+    if (trimmed !== "") {
+      return trimmed;
+    }
+  }
+
+  const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+    args.projectId,
+  );
+  return analysis?.storySummary.trim() ?? "";
+}
+
 export async function upsertStoryboard(
   deps: ApplicationDependencies,
   input: UpsertStoryboardInput,
@@ -443,6 +469,11 @@ export async function upsertStoryboard(
       tone: input.tone,
       stylePresetId: effectiveStylePresetId,
     });
+    const story = await resolveStory(deps, {
+      requestedStory: input.story,
+      existingStory: existingStoryboard?.story ?? "",
+      projectId: input.projectId,
+    });
 
     const storyboard = createStoryboard({
       id: input.storyboardId,
@@ -451,6 +482,7 @@ export async function upsertStoryboard(
       tone: input.tone,
       stylePresetId: effectiveStylePresetId,
       commonPrompt,
+      story,
       negativePrompt:
         input.negativePrompt ?? existingStoryboard?.negativePrompt ?? "",
       sceneIds: input.sceneIds ?? existingStoryboard?.sceneIds ?? [],

@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useId, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type {
   ComplementSceneProposalDto,
   PhotoAssetDto,
@@ -103,6 +110,30 @@ type SceneState = UpsertSceneInput & {
   photoAssets: ScenePhotoAssetDto[];
 };
 
+type SceneViewMode = "split" | "gallery";
+
+const VIEW_MODE_STORAGE_KEY = "gen-story:storyboard-view";
+
+function isSceneViewMode(value: string | null): value is SceneViewMode {
+  return value === "split" || value === "gallery";
+}
+
+function sceneAnchorId(scene: SceneState, idx: number): string {
+  return `scene-${scene.id ?? `draft-${idx}`}`;
+}
+
+function primaryPhotoForScene(
+  scene: SceneState,
+  photos: PhotoAssetDto[],
+): PhotoAssetDto | null {
+  const primaryId = scene.photoAssets.find(
+    (pa) => pa.role === "primary",
+  )?.photoAssetId;
+  return primaryId
+    ? (photos.find((photo) => photo.id === primaryId) ?? null)
+    : null;
+}
+
 function sceneDtoToState(scene: SceneDto): SceneState {
   return {
     id: scene.id,
@@ -148,6 +179,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [showTestModal, setShowTestModal] = useState(false);
   const [commonPromptDraft, setCommonPromptDraft] = useState("");
   const [savingCommonPrompt, setSavingCommonPrompt] = useState(false);
+  const [storyDraft, setStoryDraft] = useState("");
+  const [savingStory, setSavingStory] = useState(false);
   const [negativePromptDraft, setNegativePromptDraft] = useState("");
   const [savingNegativePrompt, setSavingNegativePrompt] = useState(false);
   const [showCustomStyleModal, setShowCustomStyleModal] = useState(false);
@@ -162,10 +195,22 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     "small" | "medium" | "large"
   >("small");
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
+  const [showAddScenesModal, setShowAddScenesModal] = useState(false);
+  const [sceneViewMode, setSceneViewMode] = useState<SceneViewMode>("split");
+  const [activeSceneAnchor, setActiveSceneAnchor] = useState<string | null>(
+    null,
+  );
+  const [galleryEditingIndex, setGalleryEditingIndex] = useState<number | null>(
+    null,
+  );
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const projectSettingsInitializedRef = useRef(false);
   const [accordionOpen, setAccordionOpen] = useState({
+    projectSettings: true,
     tone: true,
     style: true,
     commonPrompt: true,
+    story: true,
     negativePrompt: true,
   });
   const [proposalCtx, setProposalCtx] = useState<{
@@ -177,6 +222,24 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const sbId = storyboard?.id;
   const systemStylePresets = stylePresets.filter((p) => p.scope === "system");
   const userStylePresets = stylePresets.filter((p) => p.scope === "user");
+  const candidatePhotos = useMemo(
+    () => photos.filter((photo) => photo.usage === "candidate"),
+    [photos],
+  );
+  const usedPrimaryPhotoIds = useMemo(
+    () =>
+      new Set(
+        scenes
+          .flatMap((scene) => scene.photoAssets)
+          .filter((asset) => asset.role === "primary")
+          .map((asset) => asset.photoAssetId),
+      ),
+    [scenes],
+  );
+  const unusedCandidatePhotos = useMemo(
+    () => candidatePhotos.filter((photo) => !usedPrimaryPhotoIds.has(photo.id)),
+    [candidatePhotos, usedPrimaryPhotoIds],
+  );
 
   const analyzablePhotos = photos.filter(
     (photo) => photo.usage === "candidate" || photo.usage === "reference",
@@ -205,8 +268,84 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   }, [storyboard?.commonPrompt]);
 
   useEffect(() => {
+    setStoryDraft(storyboard?.story ?? "");
+  }, [storyboard?.story]);
+
+  useEffect(() => {
     setNegativePromptDraft(storyboard?.negativePrompt ?? "");
   }, [storyboard?.negativePrompt]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedMode = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    setSceneViewMode(isSceneViewMode(storedMode) ? storedMode : "split");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, sceneViewMode);
+  }, [sceneViewMode]);
+
+  useEffect(() => {
+    if (!storyboard || projectSettingsInitializedRef.current) return;
+    projectSettingsInitializedRef.current = true;
+    const configured =
+      storyboard.tone.trim() !== "" &&
+      (storyboard.stylePresetId != null ||
+        storyboard.commonPrompt.trim() !== "" ||
+        storyboard.story.trim() !== "" ||
+        storyboard.negativePrompt.trim() !== "");
+    setAccordionOpen((prev) => ({ ...prev, projectSettings: !configured }));
+  }, [storyboard]);
+
+  useEffect(() => {
+    if (sceneViewMode !== "split") return;
+    const board = boardRef.current;
+    if (!board) return;
+    const scrollRoot = board.closest("main");
+    if (!scrollRoot) return;
+    const sceneNodes = scenes
+      .map((scene, idx) => document.getElementById(sceneAnchorId(scene, idx)))
+      .filter((node): node is HTMLElement => node != null);
+    if (sceneNodes.length === 0) return;
+
+    // The active scene is the topmost one whose top edge has reached the
+    // activation line just below the scroll root's top — not the scene with the
+    // largest visible area, which would highlight the next (often taller) scene
+    // right after a click-jump.
+    let raf = 0;
+    const computeActive = () => {
+      raf = 0;
+      const activationLine = scrollRoot.getBoundingClientRect().top + 120;
+      let activeId = sceneNodes[0]!.id;
+      for (const node of sceneNodes) {
+        if (node.getBoundingClientRect().top <= activationLine) {
+          activeId = node.id;
+        } else {
+          break;
+        }
+      }
+      setActiveSceneAnchor(activeId);
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(computeActive);
+    };
+    computeActive();
+    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scrollRoot.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [scenes, sceneViewMode]);
+
+  useEffect(() => {
+    setSelectedPhotoIds((prev) => {
+      const allowed = new Set(unusedCandidatePhotos.map((photo) => photo.id));
+      const next = new Set([...prev].filter((id) => allowed.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [unusedCandidatePhotos]);
 
   const load = useCallback(async () => {
     const [sbs, presets, photoList, latestPhotoAnalysis] = await Promise.all([
@@ -348,6 +487,31 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     }
   }
 
+  async function saveStory(story: string) {
+    if (!sbId) return;
+    const prev = storyboard!;
+    setSavingStory(true);
+    setError(null);
+    try {
+      const updated = await upsertStoryboard(sbId, {
+        projectId,
+        tone: prev.tone,
+        stylePresetId: prev.stylePresetId,
+        story,
+      });
+      setStoryboard(updated);
+      if (story === "") {
+        setAccordionOpen((prev) => ({ ...prev, story: true }));
+      }
+      setSaveMsg(t("story.savedMsg"));
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("story.failed"));
+    } finally {
+      setSavingStory(false);
+    }
+  }
+
   async function saveNegativePrompt(negativePrompt: string) {
     if (!sbId) return;
     const prev = storyboard!;
@@ -380,6 +544,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       );
       setScenes((prev) => [...prev, ...newScenes.map(sceneDtoToState)]);
       setSelectedPhotoIds(new Set());
+      setShowAddScenesModal(false);
       setSaveMsg(
         t(
           newScenes.length === 1
@@ -628,6 +793,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const selectedStyle = stylePresets.find(
     (p) => p.id === storyboard.stylePresetId,
   );
+  const allUnusedSelected =
+    unusedCandidatePhotos.length > 0 &&
+    unusedCandidatePhotos.every((photo) => selectedPhotoIds.has(photo.id));
+  const someUnusedSelected = selectedPhotoIds.size > 0;
+  const selectedGalleryScene =
+    galleryEditingIndex == null ? null : (scenes[galleryEditingIndex] ?? null);
 
   return (
     <AppShell projectId={projectId}>
@@ -726,543 +897,340 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         </div>
       </section>
 
-      {/* 1. Emotion / Tone */}
       <CollapsibleSection
-        title={t("sections.tone")}
-        open={accordionOpen.tone}
+        title={t("sections.projectSettings")}
+        open={accordionOpen.projectSettings}
         onToggle={() =>
-          setAccordionOpen((prev) => ({ ...prev, tone: !prev.tone }))
+          setAccordionOpen((prev) => ({
+            ...prev,
+            projectSettings: !prev.projectSettings,
+          }))
         }
-        summary={<span>{selectedToneLabel}</span>}
+        summary={
+          <span>
+            {selectedToneLabel}
+            {selectedStyle ? ` / ${selectedStyle.name}` : ""}
+          </span>
+        }
       >
-        <div className={styles.toneGrid}>
-          {TONES.map((tn) => (
-            <button
-              key={tn.value}
-              className={`${styles.toneBtn} ${storyboard.tone === tn.value ? styles.toneBtnActive : ""}`}
-              onClick={() => handleToneChange(tn.value)}
-            >
-              <strong>{t(`tones.${tn.value}.label`)}</strong>
-              <span>{t(`tones.${tn.value}.desc`)}</span>
-            </button>
-          ))}
-          {!fixedToneSelected && selectedAnalysisTone && (
-            <button
-              className={`${styles.toneBtn} ${styles.toneBtnActive}`}
-              onClick={() => handleToneChange(selectedAnalysisTone.value)}
-            >
-              <strong>{selectedAnalysisTone.label}</strong>
-              <span>{selectedAnalysisTone.description}</span>
-            </button>
-          )}
+        <div className={styles.projectSettingsGrid}>
+          <section className={styles.projectSettingBlock}>
+            <div className={styles.sectionHeader}>
+              <h4 className={styles.settingTitle}>{t("sections.tone")}</h4>
+              <span className={styles.settingSummary}>{selectedToneLabel}</span>
+            </div>
+            <div className={styles.toneGrid}>
+              {TONES.map((tn) => (
+                <button
+                  key={tn.value}
+                  className={`${styles.toneBtn} ${storyboard.tone === tn.value ? styles.toneBtnActive : ""}`}
+                  onClick={() => handleToneChange(tn.value)}
+                >
+                  <strong>{t(`tones.${tn.value}.label`)}</strong>
+                  <span>{t(`tones.${tn.value}.desc`)}</span>
+                </button>
+              ))}
+              {!fixedToneSelected && selectedAnalysisTone && (
+                <button
+                  className={`${styles.toneBtn} ${styles.toneBtnActive}`}
+                  onClick={() => handleToneChange(selectedAnalysisTone.value)}
+                >
+                  <strong>{selectedAnalysisTone.label}</strong>
+                  <span>{selectedAnalysisTone.description}</span>
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className={styles.projectSettingBlock}>
+            <div className={styles.sectionHeader}>
+              <h4 className={styles.settingTitle}>{t("sections.style")}</h4>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowCustomStyleModal(true)}
+              >
+                {t("style.createCustom")}
+              </button>
+            </div>
+            <div className={styles.styleGrid}>
+              <button
+                className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
+                onClick={() => handleStyleChange(null)}
+              >
+                {t("style.aiRecommend")}
+              </button>
+              {systemStylePresets.length > 0 && (
+                <span className={styles.styleGroupLabel}>
+                  {t("style.systemStyles")}
+                </span>
+              )}
+              {systemStylePresets.map((p) => (
+                <button
+                  key={p.id}
+                  className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
+                  onClick={() => handleStyleChange(p.id)}
+                  title={p.description}
+                >
+                  {p.previewImageUrl && (
+                    <img src={p.previewImageUrl} alt={p.name} />
+                  )}
+                  <span className={styles.styleBtnCardLabel}>{p.name}</span>
+                </button>
+              ))}
+              {userStylePresets.length > 0 && (
+                <span className={styles.styleGroupLabel}>
+                  {t("style.customStyles")}
+                </span>
+              )}
+              {userStylePresets.map((p) => (
+                <button
+                  key={p.id}
+                  className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
+                  onClick={() => handleStyleChange(p.id)}
+                  title={p.description}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className={styles.projectSettingBlock}>
+            <div className={styles.sectionHeader}>
+              <h4 className={styles.settingTitle}>
+                {t("sections.commonPrompt")}
+              </h4>
+              <button
+                className="btn btn-secondary"
+                onClick={() => saveCommonPrompt("")}
+                disabled={savingCommonPrompt}
+              >
+                {t("commonPrompt.regenerate")}
+              </button>
+            </div>
+            <p className={styles.photoAssignHint}>{t("commonPrompt.intro")}</p>
+            <textarea
+              className={styles.fieldInput}
+              rows={6}
+              value={commonPromptDraft}
+              onChange={(e) => setCommonPromptDraft(e.target.value)}
+              placeholder={t("commonPrompt.placeholder")}
+            />
+            <div className={styles.inlineActions}>
+              <button
+                className="btn btn-primary"
+                onClick={() => saveCommonPrompt(commonPromptDraft)}
+                disabled={
+                  savingCommonPrompt ||
+                  commonPromptDraft === (storyboard.commonPrompt ?? "")
+                }
+              >
+                {savingCommonPrompt
+                  ? t("commonPrompt.saving")
+                  : t("commonPrompt.save")}
+              </button>
+            </div>
+          </section>
+
+          <section className={styles.projectSettingBlock}>
+            <div className={styles.sectionHeader}>
+              <h4 className={styles.settingTitle}>{t("sections.story")}</h4>
+              <button
+                className="btn btn-secondary"
+                onClick={() => saveStory("")}
+                disabled={savingStory}
+              >
+                {t("story.regenerate")}
+              </button>
+            </div>
+            <p className={styles.photoAssignHint}>{t("story.intro")}</p>
+            <textarea
+              className={styles.fieldInput}
+              rows={5}
+              value={storyDraft}
+              onChange={(e) => setStoryDraft(e.target.value)}
+              placeholder={
+                photoAnalysis?.storySummary || t("story.placeholder")
+              }
+            />
+            <div className={styles.inlineActions}>
+              <button
+                className="btn btn-primary"
+                onClick={() => saveStory(storyDraft)}
+                disabled={
+                  savingStory || storyDraft === (storyboard.story ?? "")
+                }
+              >
+                {savingStory ? t("story.saving") : t("story.save")}
+              </button>
+            </div>
+          </section>
+
+          <section className={styles.projectSettingBlock}>
+            <div className={styles.sectionHeader}>
+              <h4 className={styles.settingTitle}>
+                {t("sections.negativePrompt")}
+              </h4>
+            </div>
+            <p className={styles.photoAssignHint}>
+              {t("negativePrompt.intro")}
+            </p>
+            <textarea
+              className={styles.fieldInput}
+              rows={4}
+              value={negativePromptDraft}
+              onChange={(e) => setNegativePromptDraft(e.target.value)}
+              placeholder={t("negativePrompt.placeholder")}
+            />
+            <div className={styles.inlineActions}>
+              <button
+                className="btn btn-primary"
+                onClick={() => saveNegativePrompt(negativePromptDraft)}
+                disabled={
+                  savingNegativePrompt ||
+                  negativePromptDraft === (storyboard.negativePrompt ?? "")
+                }
+              >
+                {savingNegativePrompt
+                  ? t("negativePrompt.saving")
+                  : t("negativePrompt.save")}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  setNegativePromptDraft((prev) => {
+                    const trimmed = prev.trim();
+                    return trimmed
+                      ? `${trimmed}, ${RECOMMENDED_NEGATIVE_FENCE}`
+                      : RECOMMENDED_NEGATIVE_FENCE;
+                  })
+                }
+                disabled={savingNegativePrompt}
+              >
+                {t("negativePrompt.insertFence")}
+              </button>
+            </div>
+          </section>
         </div>
       </CollapsibleSection>
 
-      {/* 2. Style preset */}
-      <CollapsibleSection
-        title={t("sections.style")}
-        open={accordionOpen.style}
-        onToggle={() =>
-          setAccordionOpen((prev) => ({ ...prev, style: !prev.style }))
-        }
-        summary={
-          selectedStyle ? (
-            <span className={styles.accordionSummaryStyle}>
-              {selectedStyle.previewImageUrl && (
-                <img
-                  src={selectedStyle.previewImageUrl}
-                  alt=""
-                  className={styles.accordionSummaryThumb}
-                />
-              )}
-              <span>{selectedStyle.name}</span>
-            </span>
-          ) : (
-            <span>{t("style.aiRecommend")}</span>
-          )
-        }
-        headerAction={
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowCustomStyleModal(true)}
+      {showCustomStyleModal && (
+        <div className={styles.modalOverlay} role="presentation">
+          <div
+            className={styles.modalContent}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="custom-style-title"
           >
-            {t("style.createCustom")}
-          </button>
-        }
-      >
-        <div className={styles.styleGrid}>
-          <button
-            className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
-            onClick={() => handleStyleChange(null)}
-          >
-            {t("style.aiRecommend")}
-          </button>
-          {systemStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>
-              {t("style.systemStyles")}
-            </span>
-          )}
-          {systemStylePresets.map((p) => (
-            <button
-              key={p.id}
-              className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
-              onClick={() => handleStyleChange(p.id)}
-              title={p.description}
-            >
-              {p.previewImageUrl && (
-                <img src={p.previewImageUrl} alt={p.name} />
-              )}
-              <span className={styles.styleBtnCardLabel}>{p.name}</span>
-            </button>
-          ))}
-          {userStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>
-              {t("style.customStyles")}
-            </span>
-          )}
-          {userStylePresets.map((p) => (
-            <button
-              key={p.id}
-              className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
-              onClick={() => handleStyleChange(p.id)}
-              title={p.description}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-        {showCustomStyleModal && (
-          <div className={styles.modalOverlay} role="presentation">
-            <div
-              className={styles.modalContent}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="custom-style-title"
-            >
-              <h4 id="custom-style-title" className={styles.modalTitle}>
-                {t("style.createCustom")}
-              </h4>
-              <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>{t("style.name")}</span>
-                <input
-                  className={styles.fieldInput}
-                  type="text"
-                  value={customStyleForm.name}
-                  onChange={(event) =>
-                    setCustomStyleForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
-                  disabled={savingCustomStyle}
-                  placeholder={t("style.namePlaceholder")}
-                />
-              </label>
-              <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>
-                  {t("style.description")}
-                </span>
-                <textarea
-                  className={styles.fieldInput}
-                  value={customStyleForm.description}
-                  onChange={(event) =>
-                    setCustomStyleForm((prev) => ({
-                      ...prev,
-                      description: event.target.value,
-                    }))
-                  }
-                  disabled={savingCustomStyle}
-                  rows={2}
-                  placeholder={t("style.descriptionPlaceholder")}
-                />
-              </label>
-              <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>{t("style.prompt")}</span>
-                <textarea
-                  className={styles.fieldInput}
-                  value={customStyleForm.prompt}
-                  onChange={(event) =>
-                    setCustomStyleForm((prev) => ({
-                      ...prev,
-                      prompt: event.target.value,
-                    }))
-                  }
-                  disabled={savingCustomStyle}
-                  rows={5}
-                  placeholder={t("style.promptPlaceholder")}
-                />
-              </label>
-              <div className={styles.modalActions}>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleCreateCustomStyle}
-                  disabled={
-                    savingCustomStyle ||
-                    !customStyleForm.name.trim() ||
-                    !customStyleForm.prompt.trim()
-                  }
-                >
-                  {savingCustomStyle
-                    ? t("style.creating")
-                    : t("style.createStyle")}
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowCustomStyleModal(false)}
-                  disabled={savingCustomStyle}
-                >
-                  {tCommon("cancel")}
-                </button>
-              </div>
+            <h4 id="custom-style-title" className={styles.modalTitle}>
+              {t("style.createCustom")}
+            </h4>
+            <label className={styles.sceneField}>
+              <span className={styles.fieldLabel}>{t("style.name")}</span>
+              <input
+                className={styles.fieldInput}
+                type="text"
+                value={customStyleForm.name}
+                onChange={(event) =>
+                  setCustomStyleForm((prev) => ({
+                    ...prev,
+                    name: event.target.value,
+                  }))
+                }
+                disabled={savingCustomStyle}
+                placeholder={t("style.namePlaceholder")}
+              />
+            </label>
+            <label className={styles.sceneField}>
+              <span className={styles.fieldLabel}>
+                {t("style.description")}
+              </span>
+              <textarea
+                className={styles.fieldInput}
+                value={customStyleForm.description}
+                onChange={(event) =>
+                  setCustomStyleForm((prev) => ({
+                    ...prev,
+                    description: event.target.value,
+                  }))
+                }
+                disabled={savingCustomStyle}
+                rows={2}
+                placeholder={t("style.descriptionPlaceholder")}
+              />
+            </label>
+            <label className={styles.sceneField}>
+              <span className={styles.fieldLabel}>{t("style.prompt")}</span>
+              <textarea
+                className={styles.fieldInput}
+                value={customStyleForm.prompt}
+                onChange={(event) =>
+                  setCustomStyleForm((prev) => ({
+                    ...prev,
+                    prompt: event.target.value,
+                  }))
+                }
+                disabled={savingCustomStyle}
+                rows={5}
+                placeholder={t("style.promptPlaceholder")}
+              />
+            </label>
+            <div className={styles.modalActions}>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateCustomStyle}
+                disabled={
+                  savingCustomStyle ||
+                  !customStyleForm.name.trim() ||
+                  !customStyleForm.prompt.trim()
+                }
+              >
+                {savingCustomStyle
+                  ? t("style.creating")
+                  : t("style.createStyle")}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowCustomStyleModal(false)}
+                disabled={savingCustomStyle}
+              >
+                {tCommon("cancel")}
+              </button>
             </div>
           </div>
-        )}
-      </CollapsibleSection>
-
-      {/* 3. Common prompt */}
-      <CollapsibleSection
-        title={t("sections.commonPrompt")}
-        open={accordionOpen.commonPrompt}
-        onToggle={() =>
-          setAccordionOpen((prev) => ({
-            ...prev,
-            commonPrompt: !prev.commonPrompt,
-          }))
-        }
-        summary={
-          storyboard.commonPrompt ? (
-            <span title={storyboard.commonPrompt}>
-              {storyboard.commonPrompt}
-            </span>
-          ) : (
-            <span className={styles.accordionSummaryMuted}>
-              {t("commonPrompt.notSet")}
-            </span>
-          )
-        }
-        headerAction={
-          <button
-            className="btn btn-secondary"
-            onClick={() => saveCommonPrompt("")}
-            disabled={savingCommonPrompt}
-          >
-            {t("commonPrompt.regenerate")}
-          </button>
-        }
-      >
-        <p className={styles.photoAssignHint}>{t("commonPrompt.intro")}</p>
-        <textarea
-          className={styles.fieldInput}
-          rows={10}
-          value={commonPromptDraft}
-          onChange={(e) => setCommonPromptDraft(e.target.value)}
-          placeholder={t("commonPrompt.placeholder")}
-        />
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            marginTop: 8,
-          }}
-        >
-          <button
-            className="btn btn-primary"
-            onClick={() => saveCommonPrompt(commonPromptDraft)}
-            disabled={
-              savingCommonPrompt ||
-              commonPromptDraft === (storyboard.commonPrompt ?? "")
-            }
-          >
-            {savingCommonPrompt
-              ? t("commonPrompt.saving")
-              : t("commonPrompt.save")}
-          </button>
         </div>
-      </CollapsibleSection>
+      )}
 
-      {/* 3b. Negative prompt (deviation fence) */}
-      <CollapsibleSection
-        title={t("sections.negativePrompt")}
-        open={accordionOpen.negativePrompt}
-        onToggle={() =>
-          setAccordionOpen((prev) => ({
-            ...prev,
-            negativePrompt: !prev.negativePrompt,
-          }))
-        }
-        summary={
-          storyboard.negativePrompt ? (
-            <span title={storyboard.negativePrompt}>
-              {storyboard.negativePrompt}
-            </span>
-          ) : (
-            <span className={styles.accordionSummaryMuted}>
-              {t("negativePrompt.notSet")}
-            </span>
-          )
-        }
-      >
-        <p className={styles.photoAssignHint}>{t("negativePrompt.intro")}</p>
-        <textarea
-          className={styles.fieldInput}
-          rows={4}
-          value={negativePromptDraft}
-          onChange={(e) => setNegativePromptDraft(e.target.value)}
-          placeholder={t("negativePrompt.placeholder")}
-        />
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            marginTop: 8,
-          }}
-        >
-          <button
-            className="btn btn-primary"
-            onClick={() => saveNegativePrompt(negativePromptDraft)}
-            disabled={
-              savingNegativePrompt ||
-              negativePromptDraft === (storyboard.negativePrompt ?? "")
-            }
-          >
-            {savingNegativePrompt
-              ? t("negativePrompt.saving")
-              : t("negativePrompt.save")}
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() =>
-              setNegativePromptDraft((prev) => {
-                const trimmed = prev.trim();
-                return trimmed
-                  ? `${trimmed}, ${RECOMMENDED_NEGATIVE_FENCE}`
-                  : RECOMMENDED_NEGATIVE_FENCE;
-              })
-            }
-            disabled={savingNegativePrompt}
-          >
-            {t("negativePrompt.insertFence")}
-          </button>
-        </div>
-      </CollapsibleSection>
-
-      {/* 4. Create Scenes from Photos — always visible, right above Scenes */}
-      {photos.some((p) => p.usage === "candidate") &&
-        (() => {
-          const candidatePhotos = photos.filter((p) => p.usage === "candidate");
-          const allSelected =
-            candidatePhotos.length > 0 &&
-            candidatePhotos.every((p) => selectedPhotoIds.has(p.id));
-          const someSelected = selectedPhotoIds.size > 0;
-          const gridMin =
-            photoViewSize === "large"
-              ? "180px"
-              : photoViewSize === "medium"
-                ? "130px"
-                : "90px";
-          return (
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>
-                  {t("sections.createScenes")}
-                </h3>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleCreateTemplateScenes}
-                  disabled={creatingTemplates || selectedPhotoIds.size === 0}
-                >
-                  {creatingTemplates
-                    ? t("createScenes.creating")
-                    : selectedPhotoIds.size === 0
-                      ? t("createScenes.selectPhotosCta")
-                      : t(
-                          selectedPhotoIds.size === 1
-                            ? "createScenes.addAsScene"
-                            : "createScenes.addAsScenes",
-                          { count: selectedPhotoIds.size },
-                        )}
-                </button>
-              </div>
-
-              {/* Toolbar: select-all + view size */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 10,
-                }}
-              >
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 7,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "#5a6a7e",
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = someSelected && !allSelected;
-                    }}
-                    onChange={() => {
-                      if (allSelected) {
-                        setSelectedPhotoIds(new Set());
-                      } else {
-                        setSelectedPhotoIds(
-                          new Set(candidatePhotos.map((p) => p.id)),
-                        );
-                      }
-                    }}
-                    style={{
-                      width: 15,
-                      height: 15,
-                      accentColor: "#1a56db",
-                      cursor: "pointer",
-                    }}
-                  />
-                  {allSelected
-                    ? t("createScenes.deselectAll")
-                    : t("createScenes.selectAll")}
-                </label>
-
-                {/* Size toggle */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 2,
-                    background: "#f0f3f8",
-                    borderRadius: 8,
-                    padding: 3,
-                  }}
-                >
-                  {(["small", "medium", "large"] as const).map((size) => (
-                    <button
-                      key={size}
-                      onClick={() => setPhotoViewSize(size)}
-                      title={t("createScenes.thumbsTitle", {
-                        size: size.charAt(0).toUpperCase() + size.slice(1),
-                      })}
-                      style={{
-                        width: 30,
-                        height: 28,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize:
-                          size === "small" ? 13 : size === "medium" ? 16 : 20,
-                        background: photoViewSize === size ? "#fff" : "none",
-                        border: "none",
-                        borderRadius: 6,
-                        color: photoViewSize === size ? "#1a56db" : "#8898aa",
-                        cursor: "pointer",
-                        boxShadow:
-                          photoViewSize === size
-                            ? "0 1px 3px rgba(0,0,0,.1)"
-                            : "none",
-                      }}
-                    >
-                      ⊞
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {selectedPhotoIds.size === 0 && (
-                <p
-                  style={{
-                    color: "var(--color-text-muted)",
-                    fontSize: "0.9em",
-                    marginBottom: 12,
-                  }}
-                >
-                  {t("createScenes.hint")}
-                </p>
-              )}
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(auto-fill, minmax(${gridMin}, 1fr))`,
-                  gap: 12,
-                }}
-              >
-                {candidatePhotos.map((photo) => (
-                  <label
-                    key={photo.id}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      cursor: "pointer",
-                      opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
-                      transition: "opacity 0.2s",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedPhotoIds.has(photo.id)}
-                      onChange={(e) => {
-                        const newSet = new Set(selectedPhotoIds);
-                        if (e.target.checked) {
-                          newSet.add(photo.id);
-                        } else {
-                          newSet.delete(photo.id);
-                        }
-                        setSelectedPhotoIds(newSet);
-                      }}
-                      style={{ marginBottom: 6 }}
-                    />
-                    <img
-                      src={storageKeyToUrl(photo.storageKey)}
-                      alt={photo.name}
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1 / 1",
-                        objectFit: "cover",
-                        borderRadius: 8,
-                        border: selectedPhotoIds.has(photo.id)
-                          ? "2px solid var(--color-primary)"
-                          : "2px solid transparent",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 11,
-                        marginTop: 4,
-                        textAlign: "center",
-                        color: "#5a6a7e",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        maxWidth: "100%",
-                      }}
-                    >
-                      {photo.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </section>
-          );
-        })()}
-
-      {/* 5. Scene list */}
       <section className={styles.section} data-scenes-section>
-        <div className={styles.sectionHeader}>
+        <div className={styles.sceneBoardHeader}>
           <h3 className={styles.sectionTitle}>
             {t("sections.scenes", { count: scenes.length })}
           </h3>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className={styles.sceneBoardActions}>
             {saveMsg && <span className={styles.saveMsg}>{saveMsg}</span>}
+            <div className={styles.viewSwitcher} aria-label={t("view.label")}>
+              {(["split", "gallery"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={
+                    sceneViewMode === mode
+                      ? styles.viewBtnActive
+                      : styles.viewBtn
+                  }
+                  onClick={() => setSceneViewMode(mode)}
+                >
+                  {t(`view.${mode}`)}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowAddScenesModal(true)}
+              disabled={unusedCandidatePhotos.length === 0 || creatingTemplates}
+            >
+              {t("addScenes.open")}
+            </button>
             <button className="btn btn-secondary" onClick={addScene}>
               {t("scenes.addScene")}
             </button>
@@ -1282,56 +1250,325 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           </div>
         )}
 
-        <div className={styles.sceneList}>
-          {scenes.map((scene, idx) => {
-            const nextScene = scenes[idx + 1];
-            return (
-              <div
-                key={scene.id ?? idx}
-                onDragOver={(e) => {
-                  if (sceneDragIndex !== null) e.preventDefault();
-                }}
-                onDrop={() => {
-                  if (sceneDragIndex !== null) {
-                    void handleSceneReorder(sceneDragIndex, idx);
-                  }
-                  setSceneDragIndex(null);
-                }}
-              >
-                <SceneCard
-                  scene={scene}
-                  idx={idx}
-                  total={scenes.length}
-                  scenes={scenes}
-                  photos={photos}
-                  isDragging={sceneDragIndex === idx}
-                  onDragHandleStart={() => setSceneDragIndex(idx)}
-                  onDragHandleEnd={() => setSceneDragIndex(null)}
-                  onUpdate={(patch) => updateScene(idx, patch)}
-                  onMove={(dir) => moveScene(idx, dir)}
-                  onDelete={() => deleteScene(idx)}
-                  onAiFill={handleAiFill}
-                  isAiFilling={aiFillingSceneId === scene.id}
-                  isBusy={saving || aiFillingSceneId !== null}
-                  projectCommonPromptDraft={commonPromptDraft}
-                  projectNegativePromptDraft={negativePromptDraft}
-                />
-                {scene.id && nextScene?.id && (
-                  <ComplementGap
-                    disabled={complementBusy || saving}
-                    onInsertBlank={() =>
-                      handleInsertBlankComplement(scene.id!, nextScene.id!)
+        <div
+          className={`${styles.storyboardLayout} ${
+            sceneViewMode === "split" && scenes.length >= 2
+              ? styles.storyboardLayoutWithRail
+              : ""
+          }`}
+        >
+          <div
+            ref={boardRef}
+            className={
+              sceneViewMode === "gallery"
+                ? styles.galleryGrid
+                : styles.sceneList
+            }
+          >
+            {scenes.map((scene, idx) => {
+              const nextScene = scenes[idx + 1];
+              const anchorId = sceneAnchorId(scene, idx);
+              if (sceneViewMode === "gallery") {
+                const primaryPhoto = primaryPhotoForScene(scene, photos);
+                return (
+                  <button
+                    key={scene.id ?? idx}
+                    id={anchorId}
+                    type="button"
+                    className={styles.galleryTile}
+                    onClick={() => setGalleryEditingIndex(idx)}
+                  >
+                    {primaryPhoto ? (
+                      <img
+                        src={storageKeyToUrl(primaryPhoto.storageKey)}
+                        alt={primaryPhoto.name}
+                      />
+                    ) : (
+                      <span className={styles.photoPlaceholder}>
+                        {t("changePhoto.noPhoto")}
+                      </span>
+                    )}
+                    <span className={styles.galleryTileMeta}>
+                      <strong>
+                        {t("scenes.sceneLabel", { index: idx + 1 })}
+                      </strong>
+                      <span>{scene.title || t("nav.untitled")}</span>
+                    </span>
+                  </button>
+                );
+              }
+              return (
+                <div
+                  key={scene.id ?? idx}
+                  id={anchorId}
+                  onDragOver={(e) => {
+                    if (sceneDragIndex !== null) e.preventDefault();
+                  }}
+                  onDrop={() => {
+                    if (sceneDragIndex !== null) {
+                      void handleSceneReorder(sceneDragIndex, idx);
                     }
-                    onPropose={() =>
-                      handleProposeComplement(scene.id!, nextScene.id!)
-                    }
+                    setSceneDragIndex(null);
+                  }}
+                >
+                  <SceneCard
+                    scene={scene}
+                    idx={idx}
+                    total={scenes.length}
+                    scenes={scenes}
+                    photos={photos}
+                    isDragging={sceneDragIndex === idx}
+                    onDragHandleStart={() => setSceneDragIndex(idx)}
+                    onDragHandleEnd={() => setSceneDragIndex(null)}
+                    onUpdate={(patch) => updateScene(idx, patch)}
+                    onMove={(dir) => moveScene(idx, dir)}
+                    onDelete={() => deleteScene(idx)}
+                    onAiFill={handleAiFill}
+                    isAiFilling={aiFillingSceneId === scene.id}
+                    isBusy={saving || aiFillingSceneId !== null}
+                    projectCommonPromptDraft={commonPromptDraft}
+                    projectStoryDraft={storyDraft}
+                    projectNegativePromptDraft={negativePromptDraft}
                   />
-                )}
-              </div>
-            );
-          })}
+                  {scene.id && nextScene?.id && (
+                    <ComplementGap
+                      disabled={complementBusy || saving}
+                      onInsertBlank={() =>
+                        handleInsertBlankComplement(scene.id!, nextScene.id!)
+                      }
+                      onPropose={() =>
+                        handleProposeComplement(scene.id!, nextScene.id!)
+                      }
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {sceneViewMode === "split" && scenes.length >= 2 && (
+            <nav className={styles.filmstripRail} aria-label={t("nav.label")}>
+              {scenes.map((scene, idx) => {
+                const anchorId = sceneAnchorId(scene, idx);
+                const primaryPhoto = primaryPhotoForScene(scene, photos);
+                return (
+                  <button
+                    key={scene.id ?? idx}
+                    type="button"
+                    className={`${styles.filmstripItem} ${
+                      activeSceneAnchor === anchorId
+                        ? styles.filmstripItemActive
+                        : ""
+                    }`}
+                    style={
+                      primaryPhoto
+                        ? {
+                            backgroundImage: `url(${storageKeyToUrl(primaryPhoto.storageKey)})`,
+                          }
+                        : undefined
+                    }
+                    onClick={() =>
+                      document
+                        .getElementById(anchorId)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                  >
+                    <span>{idx + 1}</span>
+                    <strong>{scene.title || t("nav.untitled")}</strong>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
         </div>
       </section>
+
+      {showAddScenesModal && (
+        <div
+          className={styles.modalOverlay}
+          role="presentation"
+          onClick={() => setShowAddScenesModal(false)}
+        >
+          <div
+            className={styles.modalContent}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-scenes-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.sectionHeader}>
+              <h4 id="add-scenes-title" className={styles.modalTitle}>
+                {t("addScenes.title")}
+              </h4>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateTemplateScenes}
+                disabled={creatingTemplates || selectedPhotoIds.size === 0}
+              >
+                {creatingTemplates
+                  ? t("createScenes.creating")
+                  : selectedPhotoIds.size === 0
+                    ? t("createScenes.selectPhotosCta")
+                    : t(
+                        selectedPhotoIds.size === 1
+                          ? "createScenes.addAsScene"
+                          : "createScenes.addAsScenes",
+                        { count: selectedPhotoIds.size },
+                      )}
+              </button>
+            </div>
+            {unusedCandidatePhotos.length === 0 ? (
+              <p className={styles.analysisEmpty}>{t("addScenes.empty")}</p>
+            ) : (
+              <>
+                <div className={styles.photoModalToolbar}>
+                  <label className={styles.photoModalSelectAll}>
+                    <input
+                      type="checkbox"
+                      checked={allUnusedSelected}
+                      ref={(el) => {
+                        if (el)
+                          el.indeterminate =
+                            someUnusedSelected && !allUnusedSelected;
+                      }}
+                      onChange={() => {
+                        setSelectedPhotoIds(
+                          allUnusedSelected
+                            ? new Set()
+                            : new Set(
+                                unusedCandidatePhotos.map((photo) => photo.id),
+                              ),
+                        );
+                      }}
+                    />
+                    {allUnusedSelected
+                      ? t("createScenes.deselectAll")
+                      : t("createScenes.selectAll")}
+                  </label>
+                  <div className={styles.sizeSwitcher}>
+                    {(["small", "medium", "large"] as const).map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        className={
+                          photoViewSize === size
+                            ? styles.sizeBtnActive
+                            : styles.sizeBtn
+                        }
+                        onClick={() => setPhotoViewSize(size)}
+                        title={t("createScenes.thumbsTitle", {
+                          size: size.charAt(0).toUpperCase() + size.slice(1),
+                        })}
+                      >
+                        {size === "small" ? "S" : size === "medium" ? "M" : "L"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className={styles.photoAssignHint}>{t("addScenes.hint")}</p>
+                <div
+                  className={`${styles.photoPickerGrid} ${styles[`photoPickerGrid${photoViewSize}`]}`}
+                >
+                  {unusedCandidatePhotos.map((photo) => (
+                    <label key={photo.id} className={styles.photoPickerItem}>
+                      <input
+                        type="checkbox"
+                        checked={selectedPhotoIds.has(photo.id)}
+                        onChange={(event) => {
+                          setSelectedPhotoIds((prev) => {
+                            const next = new Set(prev);
+                            if (event.target.checked) {
+                              next.add(photo.id);
+                            } else {
+                              next.delete(photo.id);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                      <img
+                        src={storageKeyToUrl(photo.storageKey)}
+                        alt={photo.name}
+                      />
+                      <span>{photo.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAddScenesModal(false)}
+              disabled={creatingTemplates}
+            >
+              {tCommon("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selectedGalleryScene && galleryEditingIndex != null && (
+        <div
+          className={styles.modalOverlay}
+          role="presentation"
+          onClick={() => setGalleryEditingIndex(null)}
+        >
+          <div
+            className={styles.galleryEditor}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("view.galleryEditor")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SceneCard
+              scene={selectedGalleryScene}
+              idx={galleryEditingIndex}
+              total={scenes.length}
+              scenes={scenes}
+              photos={photos}
+              isDragging={false}
+              onDragHandleStart={() => undefined}
+              onDragHandleEnd={() => undefined}
+              onUpdate={(patch) => updateScene(galleryEditingIndex, patch)}
+              onMove={(dir) => moveScene(galleryEditingIndex, dir)}
+              onDelete={() => {
+                deleteScene(galleryEditingIndex);
+                setGalleryEditingIndex(null);
+              }}
+              onAiFill={handleAiFill}
+              isAiFilling={aiFillingSceneId === selectedGalleryScene.id}
+              isBusy={saving || aiFillingSceneId !== null}
+              projectCommonPromptDraft={commonPromptDraft}
+              projectStoryDraft={storyDraft}
+              projectNegativePromptDraft={negativePromptDraft}
+            />
+            {selectedGalleryScene.id && scenes[galleryEditingIndex + 1]?.id && (
+              <ComplementGap
+                disabled={complementBusy || saving}
+                onInsertBlank={() =>
+                  handleInsertBlankComplement(
+                    selectedGalleryScene.id!,
+                    scenes[galleryEditingIndex + 1]!.id!,
+                  )
+                }
+                onPropose={() =>
+                  handleProposeComplement(
+                    selectedGalleryScene.id!,
+                    scenes[galleryEditingIndex + 1]!.id!,
+                  )
+                }
+              />
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setGalleryEditingIndex(null)}
+            >
+              {tCommon("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {proposalCtx && (
         <ComplementProposalModal
@@ -1532,6 +1769,7 @@ function SceneCard({
   isAiFilling,
   isBusy,
   projectCommonPromptDraft,
+  projectStoryDraft,
   projectNegativePromptDraft,
 }: {
   scene: SceneState;
@@ -1549,15 +1787,19 @@ function SceneCard({
   isAiFilling: boolean;
   isBusy: boolean;
   projectCommonPromptDraft: string;
+  projectStoryDraft: string;
   projectNegativePromptDraft: string;
 }) {
   const [assigningPhoto, setAssigningPhoto] = useState<string | null>(null);
+  const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(true);
   const id = useId();
   const t = useTranslations("storyboard");
   const tSel = useTranslations("selections");
 
   const isComplement = scene.kind === "complement";
   const candidatePhotos = photos.filter((p) => p.usage === "candidate");
+  const primaryPhoto = primaryPhotoForScene(scene, photos);
   const bridgeLabel = (() => {
     if (!isComplement || !scene.bridge) return null;
     const sceneTitle = (sceneId: string) => {
@@ -1585,6 +1827,7 @@ function SceneCard({
           { photoAssetId, role },
         ],
       });
+      setPhotoPickerOpen(false);
     } catch {
       // silently ignore — scene will show stale state until next save
     } finally {
@@ -1592,9 +1835,202 @@ function SceneCard({
     }
   }
 
+  const photoHero = (
+    <div className={styles.scenePhotoPanel}>
+      <div className={styles.primaryPhotoHero}>
+        {primaryPhoto ? (
+          <img
+            className={styles.primaryPhotoImage}
+            src={storageKeyToUrl(primaryPhoto.storageKey)}
+            alt={primaryPhoto.name}
+          />
+        ) : (
+          <span className={styles.photoPlaceholder}>
+            {t("changePhoto.noPhoto")}
+          </span>
+        )}
+      </div>
+      {scene.id && !isComplement && candidatePhotos.length > 0 && (
+        <div className={styles.changePhotoWrap}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setPhotoPickerOpen((open) => !open)}
+            disabled={assigningPhoto !== null}
+          >
+            {t("changePhoto.open")}
+          </button>
+          {photoPickerOpen && (
+            <div className={styles.changePhotoPicker}>
+              {candidatePhotos.map((photo) => {
+                const isAssigned = primaryPhoto?.id === photo.id;
+                return (
+                  <button
+                    key={photo.id}
+                    type="button"
+                    className={`${styles.changePhotoOption} ${
+                      isAssigned ? styles.changePhotoOptionActive : ""
+                    }`}
+                    onClick={() => handleAssignPhoto(photo.id, "primary")}
+                    disabled={assigningPhoto !== null}
+                    title={photo.name}
+                  >
+                    <img
+                      src={storageKeyToUrl(photo.storageKey)}
+                      alt={photo.name}
+                    />
+                    <span>{photo.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const fieldSet = (
+    <div className={styles.sceneFields}>
+      <SceneField label={t("fields.title")} htmlFor={`${id}-title`}>
+        <input
+          id={`${id}-title`}
+          className={styles.fieldInput}
+          value={scene.title}
+          onChange={(e) => onUpdate({ title: e.target.value })}
+        />
+      </SceneField>
+
+      {detailsOpen && (
+        <>
+          <SceneField label={t("fields.description")} htmlFor={`${id}-desc`}>
+            <textarea
+              id={`${id}-desc`}
+              className={styles.fieldInput}
+              rows={2}
+              value={scene.description}
+              onChange={(e) => onUpdate({ description: e.target.value })}
+            />
+          </SceneField>
+
+          <SceneField label={t("fields.imagePrompt")} htmlFor={`${id}-prompt`}>
+            <textarea
+              id={`${id}-prompt`}
+              className={styles.fieldInput}
+              rows={3}
+              value={scene.imagePrompt}
+              onChange={(e) => onUpdate({ imagePrompt: e.target.value })}
+            />
+          </SceneField>
+
+          <SceneField
+            label={t("fields.sceneNegativePrompt")}
+            htmlFor={`${id}-negative`}
+          >
+            <textarea
+              id={`${id}-negative`}
+              className={styles.fieldInput}
+              rows={2}
+              value={scene.negativePrompt ?? ""}
+              onChange={(e) => onUpdate({ negativePrompt: e.target.value })}
+              placeholder={t("fields.sceneNegativePromptPlaceholder")}
+            />
+          </SceneField>
+        </>
+      )}
+
+      <div className={styles.selectRow}>
+        <SceneField label={t("fields.emotion")} htmlFor={`${id}-emotion`}>
+          <select
+            id={`${id}-emotion`}
+            className={styles.fieldInput}
+            value={scene.emotion}
+            onChange={(e) => onUpdate({ emotion: e.target.value })}
+          >
+            {EMOTION_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {tSel(`emotion.${o}`)}
+              </option>
+            ))}
+          </select>
+        </SceneField>
+
+        <SceneField label={t("fields.camera")} htmlFor={`${id}-camera`}>
+          <select
+            id={`${id}-camera`}
+            className={styles.fieldInput}
+            value={scene.cameraDirection}
+            onChange={(e) => onUpdate({ cameraDirection: e.target.value })}
+          >
+            {CAMERA_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {tSel(`camera.${o}`)}
+              </option>
+            ))}
+          </select>
+        </SceneField>
+
+        <SceneField label={t("fields.lighting")} htmlFor={`${id}-lighting`}>
+          <select
+            id={`${id}-lighting`}
+            className={styles.fieldInput}
+            value={scene.lightingDirection}
+            onChange={(e) => onUpdate({ lightingDirection: e.target.value })}
+          >
+            {LIGHTING_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {tSel(`lighting.${o}`)}
+              </option>
+            ))}
+          </select>
+        </SceneField>
+
+        <SceneField label={t("fields.motion")} htmlFor={`${id}-motion`}>
+          <select
+            id={`${id}-motion`}
+            className={styles.fieldInput}
+            value={scene.motionDirection}
+            onChange={(e) => onUpdate({ motionDirection: e.target.value })}
+          >
+            {MOTION_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {tSel(`motion.${o}`)}
+              </option>
+            ))}
+          </select>
+        </SceneField>
+      </div>
+
+      <button
+        type="button"
+        className={styles.detailsToggle}
+        onClick={() => setDetailsOpen((open) => !open)}
+      >
+        {detailsOpen ? t("view.hideDetails") : t("view.showDetails")}
+      </button>
+
+      {scene.id && (
+        <ComposedPromptPreview
+          sceneId={scene.id}
+          overrides={{
+            imagePrompt: scene.imagePrompt,
+            emotion: scene.emotion,
+            cameraDirection: scene.cameraDirection,
+            lightingDirection: scene.lightingDirection,
+            motionDirection: scene.motionDirection,
+            sceneNegativePrompt: scene.negativePrompt ?? "",
+            projectNegativePrompt: projectNegativePromptDraft,
+            commonPrompt: projectCommonPromptDraft,
+            story: projectStoryDraft,
+          }}
+        />
+      )}
+    </div>
+  );
+
   return (
     <div
-      className={`card ${styles.sceneCard}${
+      className={`card ${styles.sceneCard} ${styles.sceneCardSplit}${
         isComplement ? ` ${styles.complementCard}` : ""
       }`}
       style={{ opacity: isDragging ? 0.4 : 1 }}
@@ -1655,161 +2091,9 @@ function SceneCard({
         </p>
       )}
 
-      <div className={styles.sceneFields}>
-        <SceneField label={t("fields.title")} htmlFor={`${id}-title`}>
-          <input
-            id={`${id}-title`}
-            className={styles.fieldInput}
-            value={scene.title}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-          />
-        </SceneField>
-
-        <SceneField label={t("fields.description")} htmlFor={`${id}-desc`}>
-          <textarea
-            id={`${id}-desc`}
-            className={styles.fieldInput}
-            rows={2}
-            value={scene.description}
-            onChange={(e) => onUpdate({ description: e.target.value })}
-          />
-        </SceneField>
-
-        <SceneField label={t("fields.imagePrompt")} htmlFor={`${id}-prompt`}>
-          <textarea
-            id={`${id}-prompt`}
-            className={styles.fieldInput}
-            rows={3}
-            value={scene.imagePrompt}
-            onChange={(e) => onUpdate({ imagePrompt: e.target.value })}
-          />
-        </SceneField>
-
-        <SceneField
-          label={t("fields.sceneNegativePrompt")}
-          htmlFor={`${id}-negative`}
-        >
-          <textarea
-            id={`${id}-negative`}
-            className={styles.fieldInput}
-            rows={2}
-            value={scene.negativePrompt ?? ""}
-            onChange={(e) => onUpdate({ negativePrompt: e.target.value })}
-            placeholder={t("fields.sceneNegativePromptPlaceholder")}
-          />
-        </SceneField>
-
-        <div className={styles.selectRow}>
-          <SceneField label={t("fields.emotion")} htmlFor={`${id}-emotion`}>
-            <select
-              id={`${id}-emotion`}
-              className={styles.fieldInput}
-              value={scene.emotion}
-              onChange={(e) => onUpdate({ emotion: e.target.value })}
-            >
-              {EMOTION_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {tSel(`emotion.${o}`)}
-                </option>
-              ))}
-            </select>
-          </SceneField>
-
-          <SceneField label={t("fields.camera")} htmlFor={`${id}-camera`}>
-            <select
-              id={`${id}-camera`}
-              className={styles.fieldInput}
-              value={scene.cameraDirection}
-              onChange={(e) => onUpdate({ cameraDirection: e.target.value })}
-            >
-              {CAMERA_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {tSel(`camera.${o}`)}
-                </option>
-              ))}
-            </select>
-          </SceneField>
-
-          <SceneField label={t("fields.lighting")} htmlFor={`${id}-lighting`}>
-            <select
-              id={`${id}-lighting`}
-              className={styles.fieldInput}
-              value={scene.lightingDirection}
-              onChange={(e) => onUpdate({ lightingDirection: e.target.value })}
-            >
-              {LIGHTING_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {tSel(`lighting.${o}`)}
-                </option>
-              ))}
-            </select>
-          </SceneField>
-
-          <SceneField label={t("fields.motion")} htmlFor={`${id}-motion`}>
-            <select
-              id={`${id}-motion`}
-              className={styles.fieldInput}
-              value={scene.motionDirection}
-              onChange={(e) => onUpdate({ motionDirection: e.target.value })}
-            >
-              {MOTION_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {tSel(`motion.${o}`)}
-                </option>
-              ))}
-            </select>
-          </SceneField>
-        </div>
-
-        {/* Photo assignment — only available after scene is saved (has ID) */}
-        {scene.id && !isComplement && candidatePhotos.length > 0 && (
-          <SceneField label={t("fields.primaryPhoto")} htmlFor={`${id}-photo`}>
-            <div className={styles.photoAssignRow}>
-              {candidatePhotos.map((p) => {
-                const isAssigned = scene.photoAssets.some(
-                  (pa) => pa.role === "primary" && pa.photoAssetId === p.id,
-                );
-                return (
-                  <button
-                    key={p.id}
-                    className={`${styles.photoAssignBtn}${isAssigned ? ` ${styles.photoAssignBtnActive}` : ""}`}
-                    onClick={() => handleAssignPhoto(p.id, "primary")}
-                    disabled={assigningPhoto !== null}
-                    title={isAssigned ? `${p.name} (assigned)` : p.name}
-                    style={{ opacity: isAssigned ? 1 : 0.45 }}
-                  >
-                    <img
-                      src={storageKeyToUrl(p.storageKey)}
-                      alt={p.name}
-                      className={styles.photoAssignThumb}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-            <p className={styles.photoAssignHint}>
-              {scene.photoAssets.some((pa) => pa.role === "primary")
-                ? t("scenes.primaryClickReassign")
-                : t("scenes.primaryClickAssign")}
-            </p>
-          </SceneField>
-        )}
-
-        {scene.id && (
-          <ComposedPromptPreview
-            sceneId={scene.id}
-            overrides={{
-              imagePrompt: scene.imagePrompt,
-              emotion: scene.emotion,
-              cameraDirection: scene.cameraDirection,
-              lightingDirection: scene.lightingDirection,
-              motionDirection: scene.motionDirection,
-              sceneNegativePrompt: scene.negativePrompt ?? "",
-              projectNegativePrompt: projectNegativePromptDraft,
-              commonPrompt: projectCommonPromptDraft,
-            }}
-          />
-        )}
+      <div className={styles.sceneCardBody}>
+        {photoHero}
+        {fieldSet}
       </div>
     </div>
   );

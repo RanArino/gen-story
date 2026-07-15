@@ -173,6 +173,8 @@
       "tone": "Emotion / Tone",
       "style": "Style preset",
       "commonPrompt": "Common prompt",
+      "story": "Story / Worldview",
+      "projectSettings": "Project settings",
       "createScenes": "Create Scenes from Photos",
       "scenes": "Scenes ({count})",
       "negativePrompt": "Negative prompt (deviation fence)"
@@ -202,6 +204,38 @@
       "saving": "Saving…",
       "savedMsg": "Common prompt saved!",
       "failed": "Failed to save common prompt"
+    },
+    "story": {
+      "notSet": "Not set",
+      "intro": "Defines the shared narrative and worldview for every scene. It is seeded from photo analysis and composed into every image prompt.",
+      "placeholder": "Story and worldview shared by all scenes",
+      "save": "Save story",
+      "saving": "Saving…",
+      "savedMsg": "Story saved!",
+      "failed": "Failed to save story",
+      "regenerate": "Regenerate from analysis"
+    },
+    "view": {
+      "label": "Storyboard view",
+      "split": "Split",
+      "gallery": "Gallery",
+      "showDetails": "Show description and prompt",
+      "hideDetails": "Hide description and prompt",
+      "galleryEditor": "Edit gallery scene"
+    },
+    "nav": {
+      "label": "Scene photo navigator",
+      "untitled": "Untitled"
+    },
+    "addScenes": {
+      "open": "Add scenes",
+      "title": "Add scenes from unused photos",
+      "hint": "Only candidate photos not already assigned as a scene's primary photo are shown.",
+      "empty": "All candidate photos are already assigned to scenes."
+    },
+    "changePhoto": {
+      "open": "Change photo",
+      "noPhoto": "No photo"
     },
     "createScenes": {
       "selectPhotosCta": "Select photos to create scenes",

@@ -13,6 +13,7 @@ describe("composeImagePrompt", () => {
       tone: "warm",
       stylePresetPrompt: "photorealistic cinematic film still",
       commonPrompt: "Overall emotional tone: Reflective.",
+      story: "",
     });
 
     expect(prompt).toContain("Overall emotional tone: Reflective.");
@@ -28,9 +29,45 @@ describe("composeImagePrompt", () => {
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
+      story: "",
     });
 
     expect(prompt).not.toContain("Overall emotional tone");
+  });
+
+  it("includes the story when one is provided", () => {
+    const prompt = composeImagePrompt({
+      imagePrompt: "a child running through a field",
+      emotion: "Joy",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "Slow pan",
+      tone: "warm",
+      stylePresetPrompt: null,
+      commonPrompt: "",
+      story:
+        "A multi-generation family story set around the same seaside town.",
+    });
+
+    expect(prompt).toContain(
+      "A multi-generation family story set around the same seaside town.",
+    );
+  });
+
+  it("omits the story segment when it is empty", () => {
+    const prompt = composeImagePrompt({
+      imagePrompt: "a family at the beach",
+      emotion: "Joy",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "",
+      tone: "warm",
+      stylePresetPrompt: null,
+      commonPrompt: "",
+      story: "",
+    });
+
+    expect(prompt).not.toContain("multi-generation family story");
   });
 
   it("includes the motion direction descriptor for a known value", () => {
@@ -43,6 +80,7 @@ describe("composeImagePrompt", () => {
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
+      story: "",
     });
 
     expect(prompt).toContain("slow lateral camera sweep");
@@ -58,6 +96,7 @@ describe("composeImagePrompt", () => {
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
+      story: "",
     });
 
     expect(prompt).not.toContain("camera sweep");
@@ -73,6 +112,7 @@ describe("composeImagePrompt", () => {
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
+      story: "",
       negativePrompt: "text, watermark, no balloons",
     });
 
@@ -89,6 +129,7 @@ describe("composeImagePrompt", () => {
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
+      story: "",
       negativePrompt: "   ",
     });
     const withAbsent = composeImagePrompt({
@@ -100,6 +141,7 @@ describe("composeImagePrompt", () => {
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
+      story: "",
     });
 
     expect(withEmpty).not.toContain("avoid:");

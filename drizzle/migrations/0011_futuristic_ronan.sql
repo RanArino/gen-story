@@ -1,0 +1,1 @@
+ALTER TABLE `storyboards` ADD `story` text DEFAULT '' NOT NULL;

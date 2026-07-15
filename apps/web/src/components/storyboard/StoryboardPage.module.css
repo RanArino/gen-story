@@ -89,6 +89,41 @@
   font-style: italic;
 }
 
+.projectSettingsGrid {
+  display: grid;
+  gap: 18px;
+}
+
+.projectSettingBlock {
+  padding: 14px 0;
+  border-top: 1px solid #e5e9f0;
+}
+
+.projectSettingBlock:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settingTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #152033;
+}
+
+.settingSummary {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
 .accordionSummaryStyle {
   display: inline-flex;
   align-items: center;
@@ -403,6 +438,73 @@
   font-size: 14px;
 }
 
+.sceneBoardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sceneBoardActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewSwitcher,
+.sizeSwitcher {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: #f0f3f8;
+}
+
+.viewBtn,
+.viewBtnActive,
+.sizeBtn,
+.sizeBtnActive {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #5a6a7e;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewBtn,
+.viewBtnActive {
+  padding: 6px 10px;
+}
+
+.sizeBtn,
+.sizeBtnActive {
+  width: 30px;
+  height: 28px;
+}
+
+.viewBtnActive,
+.sizeBtnActive {
+  background: #fff;
+  color: #1a56db;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.storyboardLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.storyboardLayoutWithRail {
+  grid-template-columns: minmax(0, 1fr) 172px;
+}
+
 .sceneList {
   display: flex;
   flex-direction: column;
@@ -411,6 +513,16 @@
 
 .sceneCard {
   padding: 16px;
+}
+
+.sceneCardBody {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.sceneCardSplit .sceneCardBody {
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 
 .sceneCardHeader {
@@ -500,6 +612,112 @@
   gap: 12px;
 }
 
+.scenePhotoPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+  min-width: 0;
+}
+
+.primaryPhotoHero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 176px;
+  overflow: hidden;
+  border: 1px solid #d0d9e8;
+  border-radius: 8px;
+  background: #f3f6fb;
+}
+
+.primaryPhotoImage {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.primaryPhotoHero img {
+  display: block;
+}
+
+.photoPlaceholder {
+  padding: 12px;
+  color: #8898aa;
+  font-size: 13px;
+  text-align: center;
+}
+
+.changePhotoWrap {
+  position: relative;
+}
+
+.changePhotoPicker {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  gap: 8px;
+  width: min(360px, 80vw);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #d0d9e8;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+}
+
+.changePhotoOption {
+  min-width: 0;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #5a6a7e;
+  cursor: pointer;
+}
+
+.changePhotoOption img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.changePhotoOption span {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changePhotoOptionActive {
+  border-color: #1a56db;
+  background: #eff6ff;
+}
+
+.detailsToggle {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border: 1px solid #d0d9e8;
+  border-radius: 999px;
+  background: #fff;
+  color: #1a56db;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .sceneField {
   display: flex;
   flex-direction: column;
@@ -575,6 +793,180 @@
   margin: 4px 0 0;
   font-size: 11px;
   color: #8898aa;
+}
+
+.filmstripRail {
+  position: sticky;
+  top: 24px;
+  z-index: 20;
+  display: flex;
+  width: 172px;
+  max-height: calc(100vh - 64px);
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.filmstripItem {
+  position: relative;
+  display: flex;
+  min-height: 88px;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background:
+    linear-gradient(to top, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.12)),
+    #d8dee8;
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.filmstripItem span {
+  width: max-content;
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #152033;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.filmstripItem strong {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filmstripItemActive {
+  border-color: #1a56db;
+  box-shadow: 0 0 0 2px rgba(26, 86, 219, 0.22);
+}
+
+.galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.galleryTile {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #d0d9e8;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.galleryTile img {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  object-fit: cover;
+  display: block;
+}
+
+.galleryTileMeta {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 26px 10px 10px;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.82), transparent);
+  color: #fff;
+  text-align: left;
+}
+
+.galleryTileMeta strong,
+.galleryTileMeta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.galleryEditor {
+  width: min(980px, 96vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.photoModalToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.photoModalSelectAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #5a6a7e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.photoPickerGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.photoPickerGridsmall {
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+}
+
+.photoPickerGridmedium {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+.photoPickerGridlarge {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.photoPickerItem {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #5a6a7e;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.photoPickerItem img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.photoPickerItem span {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .saveMsg {
@@ -658,4 +1050,43 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px;
+}
+
+@media (max-width: 980px) {
+  .storyboardLayout,
+  .storyboardLayoutWithRail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filmstripRail {
+    display: none;
+  }
+
+  .sceneCardSplit .sceneCardBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scenePhotoPanel {
+    width: min(100%, 260px);
+  }
+}
+
+@media (max-width: 720px) {
+  .sceneBoardHeader,
+  .sectionHeader,
+  .photoModalToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sceneBoardActions {
+    justify-content: flex-start;
+  }
+
+  .changePhotoPicker {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+    grid-template-columns: repeat(2, minmax(80px, 1fr));
+  }
 }

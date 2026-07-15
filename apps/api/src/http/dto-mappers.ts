@@ -136,6 +136,7 @@ export function toStoryboardDto(storyboard: Storyboard): StoryboardDto {
     tone: storyboard.tone,
     stylePresetId: storyboard.stylePresetId,
     commonPrompt: storyboard.commonPrompt,
+    story: storyboard.story,
     negativePrompt: storyboard.negativePrompt,
     sceneIds: storyboard.sceneIds,
     createdAt: storyboard.createdAt,

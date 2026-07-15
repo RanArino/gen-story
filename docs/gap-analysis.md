@@ -328,12 +328,12 @@ Raised 2026-06-17 from local testing. An earlier, narrower implementation (a `st
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Author-owned Story / Worldview field, seeded from AI `storySummary`, editable, persisted, regenerable | 🟡 | In progress — separate from `commonPrompt`; lives in the consolidated config panel |
-| Story composed into every scene's image-generation prompt (cohesion) | 🟡 | In progress — single-site change in `composeImagePrompt` reaches real generation + preview |
-| Visual-first scene board with three user-switchable view modes (Rows / Split / Gallery) | 🟡 | In progress — image (assigned source photo) leads; view choice persisted client-side |
-| Persistent sticky photo filmstrip navigator (scroll-spy + click-jump, internal scroll) | 🟡 | In progress — in-page sticky column; replaces the scroll-away jump bar |
-| "Add scenes" modal listing only unused photos + per-scene single-photo "Change" picker | 🟡 | In progress — stops showing the whole photo library three times |
-| Consolidated, default-collapsed project-config panel so the board is primary content | 🟡 | In progress — tone/style/common/negative/story grouped |
+| Author-owned Story / Worldview field, seeded from AI `storySummary`, editable, persisted, regenerable | ✅ | `storyboards.story` is persisted, seeded from latest photo analysis when empty, editable/regenerable in the consolidated config panel |
+| Story composed into every scene's image-generation prompt (cohesion) | ✅ | `composeImagePrompt` includes `story`, and preview/generation both pass it through `composeScenePrompt` |
+| Visual-first scene board with user-switchable view modes (Split / Gallery) | ✅ | StoryboardPage has persisted Split / Gallery modes; image-first cards use the assigned source photo (Rows mode was removed after local review as redundant with Split) |
+| Persistent sticky photo filmstrip navigator (scroll-spy + click-jump, internal scroll) | ✅ | Split mode renders an in-page sticky photo rail with scene anchors, active-scene highlighting, and click-jump |
+| "Add scenes" modal listing only unused photos + per-scene single-photo "Change" picker | ✅ | Add scenes opens a modal filtered to unused candidate photos; each scene shows one primary photo with a compact picker |
+| Consolidated, default-collapsed project-config panel so the board is primary content | ✅ | Tone, style, common prompt, story, and negative prompt are grouped under Project settings and collapse once configured |
 
 ---
 
@@ -397,7 +397,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Accepted UX proposals — B (composition) | 0 | 0 | 0 | 7 |
 | Accepted UX proposals — C (review/adoption) | 0 | 0 | 0 | 7 |
 | Accepted UX proposals — D (transparency/lineage) | 0 | 0 | 0 | 2 |
-| Local test feedback — storyboard UX & story (§19) | 0 | 0 | 6 | 0 |
+| Local test feedback — storyboard UX & story (§19) | 6 | 0 | 0 | 0 |
 
 The accepted-proposal counts (§18) are tracked separately from the REQUIREMENTS_INIT requirement areas above; A6 is also counted under "Test generation workflow", and B1 under "Image generation infra" (§13), so those two overlap intentionally.
 

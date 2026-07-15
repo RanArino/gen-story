@@ -111,6 +111,7 @@ export const storyboards = sqliteTable(
     tone: text("tone").notNull(),
     stylePresetId: text("style_preset_id").references(() => stylePresets.id),
     commonPrompt: text("common_prompt").notNull().default(""),
+    story: text("story").notNull().default(""),
     negativePrompt: text("negative_prompt").notNull().default(""),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
