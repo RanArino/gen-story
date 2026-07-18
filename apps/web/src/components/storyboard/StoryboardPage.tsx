@@ -7,6 +7,7 @@ import type {
   PhotoAssetDto,
   ProjectPhotoAnalysisDto,
   SceneDto,
+  ScenePhotoAssetDto,
   StoryboardDto,
   StylePresetDto,
   TestGenerationBatchDto,
@@ -99,6 +100,7 @@ type SceneState = UpsertSceneInput & {
   id?: string;
   kind: string;
   bridge: { fromSceneId: string; toSceneId: string } | null;
+  photoAssets: ScenePhotoAssetDto[];
 };
 
 function sceneDtoToState(scene: SceneDto): SceneState {
@@ -116,6 +118,7 @@ function sceneDtoToState(scene: SceneDto): SceneState {
     lightingDirection: scene.lightingDirection,
     motionDirection: scene.motionDirection,
     notes: scene.notes,
+    photoAssets: scene.photoAssets,
   };
 }
 
@@ -150,7 +153,13 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   });
   const [savingCustomStyle, setSavingCustomStyle] = useState(false);
   const [complementBusy, setComplementBusy] = useState(false);
+  const [photoViewSize, setPhotoViewSize] = useState<"small" | "medium" | "large">("small");
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
+  const [accordionOpen, setAccordionOpen] = useState({
+    tone: true,
+    style: true,
+    commonPrompt: true,
+  });
   const [proposalCtx, setProposalCtx] = useState<{
     fromSceneId: string;
     toSceneId: string;
@@ -286,6 +295,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         commonPrompt,
       });
       setStoryboard(updated);
+      if (commonPrompt === "") {
+        setAccordionOpen((prev) => ({ ...prev, commonPrompt: true }));
+      }
       setSaveMsg("Common prompt saved!");
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
@@ -331,6 +343,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     );
   }
 
+  function deleteScene(idx: number) {
+    setScenes((prev) =>
+      prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, orderIndex: i })),
+    );
+  }
+
   function addScene() {
     setScenes((prev) => [
       ...prev,
@@ -339,6 +357,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         orderIndex: prev.length,
         kind: "photo",
         bridge: null,
+        photoAssets: [],
       },
     ]);
   }
@@ -539,6 +558,13 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const selectedAnalysisTone = photoAnalysis?.emotionCandidates.find(
     (candidate) => candidate.value === storyboard.tone,
   );
+  const selectedToneLabel =
+    TONES.find((t) => t.value === storyboard.tone)?.label ??
+    selectedAnalysisTone?.label ??
+    storyboard.tone;
+  const selectedStyle = stylePresets.find(
+    (p) => p.id === storyboard.stylePresetId,
+  );
 
   return (
     <AppShell projectId={projectId}>
@@ -549,9 +575,78 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       {error && <ErrorAlert message={error} />}
 
-      {/* Tone selector */}
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Emotion / Tone</h3>
+      {/* AI assistant card — top-level, scope-explicit. Only affects Tone. */}
+      <section className={styles.aiAssistCard}>
+        <div className={styles.aiAssistHeader}>
+          <div className={styles.aiAssistTitleBlock}>
+            <h3 className={styles.aiAssistTitle}>
+              <span className={styles.aiAssistIcon} aria-hidden>
+                ✨
+              </span>
+              AI Photo Analysis
+            </h3>
+            <p className={styles.aiAssistSubtitle}>
+              Suggests an <strong>emotion / tone</strong> based on your candidate
+              photos. Click a suggestion to apply it to the Tone setting below.
+              Style preset, Common prompt, and Scenes are not auto-filled.
+            </p>
+          </div>
+          {analyzablePhotoCount > 0 && (
+            <button
+              className="btn btn-primary"
+              onClick={handleAnalyzePhotos}
+              disabled={analyzingPhotos}
+            >
+              {analyzingPhotos
+                ? "Analyzing…"
+                : photoAnalysis
+                  ? "Re-analyze"
+                  : "Analyze photos"}
+            </button>
+          )}
+        </div>
+
+        <div className={styles.aiAssistBody}>
+          {analyzablePhotoCount === 0 ? (
+            <p className={styles.analysisEmpty}>
+              Mark at least one photo as candidate or reference on the Photos
+              page to enable analysis.
+            </p>
+          ) : photoAnalysis ? (
+            <div className={styles.analysisPanel}>
+              <p className={styles.analysisSummary}>
+                {photoAnalysis.storySummary}
+              </p>
+              <div className={styles.analysisCandidates}>
+                {photoAnalysis.emotionCandidates.map((candidate) => (
+                  <button
+                    key={candidate.value}
+                    className={`${styles.analysisCandidate} ${storyboard.tone === candidate.value ? styles.analysisCandidateActive : ""}`}
+                    onClick={() => handleToneChange(candidate.value)}
+                  >
+                    <strong>{candidate.label}</strong>
+                    <span>{candidate.description}</span>
+                    <small>{candidate.reason}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className={styles.analysisEmpty}>
+              Click <strong>Analyze photos</strong> to generate tone suggestions
+              based on your selected photo set.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* 1. Emotion / Tone */}
+      <CollapsibleSection
+        title="Emotion / Tone"
+        open={accordionOpen.tone}
+        onToggle={() => setAccordionOpen((prev) => ({ ...prev, tone: !prev.tone }))}
+        summary={<span>{selectedToneLabel}</span>}
+      >
         <div className={styles.toneGrid}>
           {TONES.map((t) => (
             <button
@@ -573,150 +668,38 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </button>
           )}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>AI Photo Analysis</h3>
-          {analyzablePhotoCount > 0 && (
-            <button
-              className="btn btn-secondary"
-              onClick={handleAnalyzePhotos}
-              disabled={analyzingPhotos}
-            >
-              {analyzingPhotos ? "Analyzing…" : "Analyze photos"}
-            </button>
-          )}
-        </div>
-        {analyzablePhotoCount === 0 ? (
-          <p className={styles.analysisEmpty}>
-            Mark at least one photo as candidate or reference to analyze tone.
-          </p>
-        ) : photoAnalysis ? (
-          <div className={styles.analysisPanel}>
-            <p className={styles.analysisSummary}>
-              {photoAnalysis.storySummary}
-            </p>
-            <div className={styles.analysisCandidates}>
-              {photoAnalysis.emotionCandidates.map((candidate) => (
-                <button
-                  key={candidate.value}
-                  className={`${styles.analysisCandidate} ${storyboard.tone === candidate.value ? styles.analysisCandidateActive : ""}`}
-                  onClick={() => handleToneChange(candidate.value)}
-                >
-                  <strong>{candidate.label}</strong>
-                  <span>{candidate.description}</span>
-                  <small>{candidate.reason}</small>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className={styles.analysisEmpty}>
-            Run analysis to get emotion candidates from the selected photo set.
-          </p>
-        )}
-      </section>
-
-      {/* Create template scenes from photos */}
-      {photos.some((p) => p.usage === "candidate") && (
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Create Scenes from Photos</h3>
-            <button
-              className="btn btn-primary"
-              onClick={handleCreateTemplateScenes}
-              disabled={creatingTemplates || selectedPhotoIds.size === 0}
-            >
-              {creatingTemplates
-                ? "Creating…"
-                : selectedPhotoIds.size === 0
-                  ? "Select photos to create scenes"
-                  : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
-            </button>
-          </div>
-          {selectedPhotoIds.size === 0 && (
-            <p
-              style={{
-                color: "var(--color-text-muted)",
-                fontSize: "0.9em",
-                marginBottom: "12px",
-              }}
-            >
-              💡 Select one or more candidate photos below, then click the
-              button to create draft scenes
-            </p>
-          )}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {photos
-              .filter((p) => p.usage === "candidate")
-              .map((photo) => (
-                <label
-                  key={photo.id}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    cursor: "pointer",
-                    opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
-                    transition: "opacity 0.2s",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedPhotoIds.has(photo.id)}
-                    onChange={(e) => {
-                      const newSet = new Set(selectedPhotoIds);
-                      if (e.target.checked) {
-                        newSet.add(photo.id);
-                      } else {
-                        newSet.delete(photo.id);
-                      }
-                      setSelectedPhotoIds(newSet);
-                    }}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <img
-                    src={storageKeyToUrl(photo.storageKey)}
-                    alt={photo.name}
-                    style={{
-                      width: "100%",
-                      aspectRatio: "1 / 1",
-                      objectFit: "cover",
-                      borderRadius: 8,
-                      border: selectedPhotoIds.has(photo.id)
-                        ? "2px solid var(--color-primary)"
-                        : "none",
-                    }}
-                  />
-                  <span
-                    style={{ fontSize: 12, marginTop: 4, textAlign: "center" }}
-                  >
-                    {photo.name}
-                  </span>
-                </label>
-              ))}
-          </div>
-        </section>
-      )}
-
-      {/* Style preset selector */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Style preset</h3>
+      {/* 2. Style preset */}
+      <CollapsibleSection
+        title="Style preset"
+        open={accordionOpen.style}
+        onToggle={() => setAccordionOpen((prev) => ({ ...prev, style: !prev.style }))}
+        summary={
+          selectedStyle ? (
+            <span className={styles.accordionSummaryStyle}>
+              {selectedStyle.previewImageUrl && (
+                <img
+                  src={selectedStyle.previewImageUrl}
+                  alt=""
+                  className={styles.accordionSummaryThumb}
+                />
+              )}
+              <span>{selectedStyle.name}</span>
+            </span>
+          ) : (
+            <span>AI recommend</span>
+          )
+        }
+        headerAction={
           <button
             className="btn btn-secondary"
             onClick={() => setShowCustomStyleModal(true)}
           >
             Create custom style
           </button>
-        </div>
+        }
+      >
         <div className={styles.styleGrid}>
           <button
             className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
@@ -730,24 +713,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           {systemStylePresets.map((p) => (
             <button
               key={p.id}
-              className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
+              className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
               onClick={() => handleStyleChange(p.id)}
               title={p.description}
             >
               {p.previewImageUrl && (
-                <img
-                  src={p.previewImageUrl}
-                  alt={p.name}
-                  style={{
-                    width: "100%",
-                    height: "100px",
-                    objectFit: "cover",
-                    borderRadius: "4px",
-                    marginBottom: "8px",
-                  }}
-                />
+                <img src={p.previewImageUrl} alt={p.name} />
               )}
-              {p.name}
+              <span className={styles.styleBtnCardLabel}>{p.name}</span>
             </button>
           ))}
           {userStylePresets.length > 0 && (
@@ -846,12 +819,23 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </div>
           </div>
         )}
-      </section>
+      </CollapsibleSection>
 
-      {/* Common project prompt */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Common prompt</h3>
+      {/* 3. Common prompt */}
+      <CollapsibleSection
+        title="Common prompt"
+        open={accordionOpen.commonPrompt}
+        onToggle={() => setAccordionOpen((prev) => ({ ...prev, commonPrompt: !prev.commonPrompt }))}
+        summary={
+          storyboard.commonPrompt ? (
+            <span title={storyboard.commonPrompt}>
+              {storyboard.commonPrompt}
+            </span>
+          ) : (
+            <span className={styles.accordionSummaryMuted}>Not set</span>
+          )
+        }
+        headerAction={
           <button
             className="btn btn-secondary"
             onClick={() => saveCommonPrompt("")}
@@ -859,7 +843,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           >
             Regenerate from tone &amp; style
           </button>
-        </div>
+        }
+      >
         <p className={styles.photoAssignHint}>
           Applied to every scene&apos;s image generation. Auto-generated from
           the storyboard tone and style; edit it to guide all scenes
@@ -867,7 +852,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         </p>
         <textarea
           className={styles.fieldInput}
-          rows={4}
+          rows={10}
           value={commonPromptDraft}
           onChange={(e) => setCommonPromptDraft(e.target.value)}
           placeholder="Common prompt applied to every scene"
@@ -891,9 +876,144 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             {savingCommonPrompt ? "Saving…" : "Save common prompt"}
           </button>
         </div>
-      </section>
+      </CollapsibleSection>
 
-      {/* Scene list */}
+      {/* 4. Create Scenes from Photos — always visible, right above Scenes */}
+      {photos.some((p) => p.usage === "candidate") && (() => {
+        const candidatePhotos = photos.filter((p) => p.usage === "candidate");
+        const allSelected =
+          candidatePhotos.length > 0 &&
+          candidatePhotos.every((p) => selectedPhotoIds.has(p.id));
+        const someSelected = selectedPhotoIds.size > 0;
+        const gridMin =
+          photoViewSize === "large"
+            ? "180px"
+            : photoViewSize === "medium"
+              ? "130px"
+              : "90px";
+        return (
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <h3 className={styles.sectionTitle}>Create Scenes from Photos</h3>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateTemplateScenes}
+                disabled={creatingTemplates || selectedPhotoIds.size === 0}
+              >
+                {creatingTemplates
+                  ? "Creating…"
+                  : selectedPhotoIds.size === 0
+                    ? "Select photos to create scenes"
+                    : `Add ${selectedPhotoIds.size} as scene${selectedPhotoIds.size !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+
+            {/* Toolbar: select-all + view size */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 500, color: "#5a6a7e", cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                  onChange={() => {
+                    if (allSelected) {
+                      setSelectedPhotoIds(new Set());
+                    } else {
+                      setSelectedPhotoIds(new Set(candidatePhotos.map((p) => p.id)));
+                    }
+                  }}
+                  style={{ width: 15, height: 15, accentColor: "#1a56db", cursor: "pointer" }}
+                />
+                {allSelected ? "Deselect all" : "Select all"}
+              </label>
+
+              {/* Size toggle */}
+              <div style={{ display: "flex", gap: 2, background: "#f0f3f8", borderRadius: 8, padding: 3 }}>
+                {(["small", "medium", "large"] as const).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setPhotoViewSize(size)}
+                    title={`${size.charAt(0).toUpperCase() + size.slice(1)} thumbnails`}
+                    style={{
+                      width: 30, height: 28,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: size === "small" ? 13 : size === "medium" ? 16 : 20,
+                      background: photoViewSize === size ? "#fff" : "none",
+                      border: "none", borderRadius: 6,
+                      color: photoViewSize === size ? "#1a56db" : "#8898aa",
+                      cursor: "pointer",
+                      boxShadow: photoViewSize === size ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+                    }}
+                  >
+                    ⊞
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {selectedPhotoIds.size === 0 && (
+              <p style={{ color: "var(--color-text-muted)", fontSize: "0.9em", marginBottom: 12 }}>
+                💡 Select one or more candidate photos below, then click the button to create draft scenes
+              </p>
+            )}
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(auto-fill, minmax(${gridMin}, 1fr))`,
+                gap: 12,
+              }}
+            >
+              {candidatePhotos.map((photo) => (
+                <label
+                  key={photo.id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
+                    transition: "opacity 0.2s",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedPhotoIds.has(photo.id)}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedPhotoIds);
+                      if (e.target.checked) {
+                        newSet.add(photo.id);
+                      } else {
+                        newSet.delete(photo.id);
+                      }
+                      setSelectedPhotoIds(newSet);
+                    }}
+                    style={{ marginBottom: 6 }}
+                  />
+                  <img
+                    src={storageKeyToUrl(photo.storageKey)}
+                    alt={photo.name}
+                    style={{
+                      width: "100%",
+                      aspectRatio: "1 / 1",
+                      objectFit: "cover",
+                      borderRadius: 8,
+                      border: selectedPhotoIds.has(photo.id)
+                        ? "2px solid var(--color-primary)"
+                        : "2px solid transparent",
+                    }}
+                  />
+                  <span style={{ fontSize: 11, marginTop: 4, textAlign: "center", color: "#5a6a7e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                    {photo.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* 5. Scene list */}
       <section className={styles.section} data-scenes-section>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>Scenes ({scenes.length})</h3>
@@ -945,6 +1065,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   onDragHandleEnd={() => setSceneDragIndex(null)}
                   onUpdate={(patch) => updateScene(idx, patch)}
                   onMove={(dir) => moveScene(idx, dir)}
+                  onDelete={() => deleteScene(idx)}
                   onAiFill={handleAiFill}
                   isAiFilling={aiFillingSceneId === scene.id}
                   isBusy={saving || aiFillingSceneId !== null}
@@ -1022,6 +1143,45 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         />
       )}
     </AppShell>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  open,
+  onToggle,
+  children,
+  headerAction,
+  summary,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  headerAction?: React.ReactNode;
+  summary?: React.ReactNode;
+}) {
+  return (
+    <section className={styles.section}>
+      <div className={styles.accordionHeader}>
+        <button
+          type="button"
+          className={styles.accordionToggle}
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span className={styles.accordionCaret}>{open ? "▾" : "▸"}</span>
+          <h3 className={styles.sectionTitle}>{title}</h3>
+        </button>
+        {!open && summary !== undefined && (
+          <div className={styles.accordionSummary}>{summary}</div>
+        )}
+        {headerAction && (
+          <div onClick={(e) => e.stopPropagation()}>{headerAction}</div>
+        )}
+      </div>
+      {open && <div className={styles.accordionBody}>{children}</div>}
+    </section>
   );
 }
 
@@ -1118,6 +1278,7 @@ function SceneCard({
   onDragHandleEnd,
   onUpdate,
   onMove,
+  onDelete,
   onAiFill,
   isAiFilling,
   isBusy,
@@ -1132,6 +1293,7 @@ function SceneCard({
   onDragHandleEnd: () => void;
   onUpdate: (patch: Partial<SceneState>) => void;
   onMove: (dir: -1 | 1) => void;
+  onDelete: () => void;
   onAiFill: (sceneId: string) => void;
   isAiFilling: boolean;
   isBusy: boolean;
@@ -1160,6 +1322,12 @@ function SceneCard({
     setAssigningPhoto(photoAssetId);
     try {
       await assignPhotosToScene(scene.id, [{ photoAssetId, role }]);
+      onUpdate({
+        photoAssets: [
+          ...scene.photoAssets.filter((pa) => pa.role !== role),
+          { photoAssetId, role },
+        ],
+      });
     } catch {
       // silently ignore — scene will show stale state until next save
     } finally {
@@ -1209,6 +1377,14 @@ function SceneCard({
             title="Move down"
           >
             ↓
+          </button>
+          <button
+            className={styles.deleteBtn}
+            onClick={onDelete}
+            disabled={isBusy}
+            title="Delete this scene"
+          >
+            ×
           </button>
         </div>
       </div>
@@ -1307,24 +1483,32 @@ function SceneCard({
         {scene.id && !isComplement && candidatePhotos.length > 0 && (
           <SceneField label="Primary photo" htmlFor={`${id}-photo`}>
             <div className={styles.photoAssignRow}>
-              {candidatePhotos.map((p) => (
-                <button
-                  key={p.id}
-                  className={styles.photoAssignBtn}
-                  onClick={() => handleAssignPhoto(p.id, "primary")}
-                  disabled={assigningPhoto !== null}
-                  title={p.name}
-                >
-                  <img
-                    src={storageKeyToUrl(p.storageKey)}
-                    alt={p.name}
-                    className={styles.photoAssignThumb}
-                  />
-                </button>
-              ))}
+              {candidatePhotos.map((p) => {
+                const isAssigned = scene.photoAssets.some(
+                  (pa) => pa.role === "primary" && pa.photoAssetId === p.id,
+                );
+                return (
+                  <button
+                    key={p.id}
+                    className={`${styles.photoAssignBtn}${isAssigned ? ` ${styles.photoAssignBtnActive}` : ""}`}
+                    onClick={() => handleAssignPhoto(p.id, "primary")}
+                    disabled={assigningPhoto !== null}
+                    title={isAssigned ? `${p.name} (assigned)` : p.name}
+                    style={{ opacity: isAssigned ? 1 : 0.45 }}
+                  >
+                    <img
+                      src={storageKeyToUrl(p.storageKey)}
+                      alt={p.name}
+                      className={styles.photoAssignThumb}
+                    />
+                  </button>
+                );
+              })}
             </div>
             <p className={styles.photoAssignHint}>
-              Click a photo to assign it as primary for this scene.
+              {scene.photoAssets.some((pa) => pa.role === "primary")
+                ? "Click another photo to reassign the primary."
+                : "Click a photo to assign it as primary for this scene."}
             </p>
           </SceneField>
         )}

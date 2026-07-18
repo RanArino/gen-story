@@ -18,6 +18,7 @@ import { ErrorAlert } from "../ErrorAlert";
 import styles from "./PhotosPage.module.css";
 
 type UsageValue = PhotoUsage;
+type ViewSize = "small" | "medium" | "large";
 
 const ACCEPTED = "image/jpeg,image/jpg,image/png,image/heic,image/webp";
 const MAX_PHOTOS = 20;
@@ -31,6 +32,8 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewSize, setViewSize] = useState<ViewSize>("medium");
 
   const refresh = useCallback(async () => {
     const all = await listPhotoAssets(projectId, true);
@@ -99,6 +102,11 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   async function handleDelete(photoId: string) {
     try {
       await deletePhotoAsset(photoId);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(photoId);
+        return next;
+      });
       await refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Delete failed");
@@ -139,6 +147,55 @@ export function PhotosPage({ projectId }: { projectId: string }) {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Reorder failed");
       await refresh();
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allSelected =
+    activePhotos.length > 0 &&
+    activePhotos.every((p) => selectedIds.has(p.id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(activePhotos.map((p) => p.id)));
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selectedIds];
+    for (const id of ids) {
+      try {
+        await deletePhotoAsset(id);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Delete failed");
+      }
+    }
+    setSelectedIds(new Set());
+    await refresh();
+  }
+
+  async function handleBulkUsage(usage: UsageValue) {
+    const ids = [...selectedIds];
+    for (const id of ids) {
+      try {
+        const updated = await patchPhotoAsset(id, usage);
+        setPhotos((prev) =>
+          prev.map((p) => (p.id === updated.id ? updated : p)),
+        );
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Update failed");
+      }
     }
   }
 
@@ -198,16 +255,103 @@ export function PhotosPage({ projectId }: { projectId: string }) {
 
       {tab === "manage" && (
         <>
+          {/* Toolbar: select-all + view size */}
+          <div className={styles.toolbar}>
+            <label className={styles.selectAllLabel}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el)
+                    el.indeterminate = someSelected && !allSelected;
+                }}
+                onChange={toggleSelectAll}
+                className={styles.selectAllCheckbox}
+              />
+              {allSelected ? "Deselect all" : "Select all"}
+            </label>
+
+            <div className={styles.viewSizeGroup}>
+              <button
+                className={`${styles.viewSizeBtn} ${viewSize === "small" ? styles.viewSizeBtnActive : ""}`}
+                onClick={() => setViewSize("small")}
+                title="Small thumbnails"
+              >
+                ⊞
+              </button>
+              <button
+                className={`${styles.viewSizeBtn} ${viewSize === "medium" ? styles.viewSizeBtnActive : ""}`}
+                onClick={() => setViewSize("medium")}
+                title="Medium thumbnails"
+              >
+                ▦
+              </button>
+              <button
+                className={`${styles.viewSizeBtn} ${viewSize === "large" ? styles.viewSizeBtnActive : ""}`}
+                onClick={() => setViewSize("large")}
+                title="Large thumbnails"
+              >
+                ◻
+              </button>
+            </div>
+          </div>
+
+          {/* Bulk action bar */}
+          {someSelected && (
+            <div className={styles.bulkBar}>
+              <span className={styles.bulkCount}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                className={`${styles.bulkBtn} ${styles.bulkBtnUsage}`}
+                onClick={() => handleBulkUsage("candidate")}
+              >
+                Set candidate
+              </button>
+              <button
+                className={`${styles.bulkBtn} ${styles.bulkBtnUsage}`}
+                onClick={() => handleBulkUsage("reference")}
+              >
+                Set reference
+              </button>
+              <button
+                className={`${styles.bulkBtn} ${styles.bulkBtnUsage}`}
+                onClick={() => handleBulkUsage("excluded")}
+              >
+                Set excluded
+              </button>
+              <button
+                className={`${styles.bulkBtn} ${styles.bulkBtnDelete}`}
+                onClick={handleBulkDelete}
+              >
+                Delete selected
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <p className={styles.hint}>Loading…</p>
           ) : (
-            <div className={styles.photoGrid}>
+            <div
+              className={styles.photoGrid}
+              style={
+                {
+                  "--grid-min": viewSize === "small"
+                    ? "120px"
+                    : viewSize === "large"
+                      ? "300px"
+                      : "200px",
+                } as React.CSSProperties
+              }
+            >
               {activePhotos.map((photo, index) => (
                 <PhotoCard
                   key={photo.id}
                   photo={photo}
                   index={index}
                   isDragging={dragIndex === index}
+                  isSelected={selectedIds.has(photo.id)}
+                  onToggleSelect={() => toggleSelect(photo.id)}
                   onDragStart={() => setDragIndex(index)}
                   onDragEnd={() => setDragIndex(null)}
                   onDropOn={() => handleReorder(index)}
@@ -268,6 +412,8 @@ function PhotoCard({
   photo,
   index,
   isDragging,
+  isSelected,
+  onToggleSelect,
   onDragStart,
   onDragEnd,
   onDropOn,
@@ -277,6 +423,8 @@ function PhotoCard({
   photo: PhotoAssetDto;
   index: number;
   isDragging: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onDropOn: () => void;
@@ -287,7 +435,7 @@ function PhotoCard({
 
   return (
     <div
-      className={`card ${styles.photoCard}`}
+      className={`card ${styles.photoCard} ${isSelected ? styles.photoCardSelected : ""}`}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -301,6 +449,17 @@ function PhotoCard({
     >
       <div className={styles.photoThumb}>
         <img src={imgUrl} alt={photo.name} className={styles.thumbImg} />
+        <label
+          className={styles.cardCheckbox}
+          onClick={(e) => e.stopPropagation()}
+          title="Select photo"
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+          />
+        </label>
       </div>
       <p className={styles.photoName}>{photo.name}</p>
       <div className={styles.usageRow}>
