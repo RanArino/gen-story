@@ -56,7 +56,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | User can select target emotion/tone for storyboard | ✅ | `tone` field on storyboard |
-| AI analyzes photos and proposes emotion candidates | ✅ | `POST /api/projects/:projectId/photo-analysis` uses Gemini when `GEMINI_API_KEY` is configured, with deterministic local fallback |
+| AI analyzes photos and proposes emotion candidates | ✅ | `POST /api/projects/:projectId/photo-analysis` uses Gemini when `GEMINI_API_KEY` is configured, with deterministic local fallback. Stores an `inputs_hash` of the analyzable photo set + language and skips the paid AI call (returns `cached: true`) when inputs are unchanged; the storyboard UI confirms before re-analysis, disables the button while up to date, and shows the analysis model + timestamp. See `docs/plans/20260616-photo-analysis-cost-guard.md` |
 | AI reads: person relationships, expressions, age changes | ✅ | Persisted `photoInsights` include people/relationship observations from Gemini-backed photo analysis |
 | AI reads: location, season, photo era | ✅ | Persisted `photoInsights` include setting observations from Gemini-backed photo analysis |
 | AI reads: event type (birthday, wedding, trip, graduation…) | ✅ | Persisted `photoInsights` include event observations from Gemini-backed photo analysis |

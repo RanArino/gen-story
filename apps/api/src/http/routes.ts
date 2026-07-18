@@ -310,7 +310,8 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       sendJson(res, 200, {
-        photoAnalysis: toProjectPhotoAnalysisDto(result.value),
+        photoAnalysis: toProjectPhotoAnalysisDto(result.value.analysis),
+        cached: result.value.cached,
       });
     },
   );

@@ -76,6 +76,7 @@ export {
 } from "./use-cases";
 export type {
   AnalyzeProjectPhotosInput,
+  AnalyzeProjectPhotosResult,
   ApplyAdjustmentToTestVariantInput,
   CancelGenerationRequestInput,
   ConfirmTestGenerationInput,

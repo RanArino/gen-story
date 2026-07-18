@@ -178,6 +178,28 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const systemStylePresets = stylePresets.filter((p) => p.scope === "system");
   const userStylePresets = stylePresets.filter((p) => p.scope === "user");
 
+  const analyzablePhotos = photos.filter(
+    (photo) => photo.usage === "candidate" || photo.usage === "reference",
+  );
+  const analyzablePhotoCount = analyzablePhotos.length;
+  // Advisory "did the inputs change since the last analysis" signal used to gate
+  // the re-analyze button. The server makes the authoritative call (input-hash
+  // compare) and skips the AI request when nothing changed.
+  const analysisStale =
+    photoAnalysis == null ||
+    (() => {
+      const analyzedIds = new Set(
+        photoAnalysis.photoInsights.map((insight) => insight.photoAssetId),
+      );
+      if (analyzedIds.size !== analyzablePhotos.length) return true;
+      if (analyzablePhotos.some((photo) => !analyzedIds.has(photo.id)))
+        return true;
+      const analyzedAt = new Date(photoAnalysis.updatedAt).getTime();
+      return analyzablePhotos.some(
+        (photo) => new Date(photo.updatedAt).getTime() > analyzedAt,
+      );
+    })();
+
   useEffect(() => {
     setCommonPromptDraft(storyboard?.commonPrompt ?? "");
   }, [storyboard?.commonPrompt]);
@@ -245,12 +267,21 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   }
 
   async function handleAnalyzePhotos() {
+    // Re-analysis sends every analyzable photo to the AI again, which costs
+    // tokens. Confirm before spending on a result the user already has.
+    if (
+      photoAnalysis &&
+      !window.confirm(t("ai.confirmReanalyze", { count: analyzablePhotoCount }))
+    ) {
+      return;
+    }
     setAnalyzingPhotos(true);
     setError(null);
     try {
-      const analysis = await analyzeProjectPhotos(projectId);
+      const { photoAnalysis: analysis, cached } =
+        await analyzeProjectPhotos(projectId);
       setPhotoAnalysis(analysis);
-      setSaveMsg(t("ai.completeMsg"));
+      setSaveMsg(cached ? t("ai.cachedMsg") : t("ai.completeMsg"));
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("scenes.failedAnalyze"));
@@ -584,9 +615,6 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     );
   }
 
-  const analyzablePhotoCount = photos.filter(
-    (photo) => photo.usage === "candidate" || photo.usage === "reference",
-  ).length;
   const fixedToneSelected = TONES.some(
     (tone) => tone.value === storyboard.tone,
   );
@@ -627,17 +655,28 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </p>
           </div>
           {analyzablePhotoCount > 0 && (
-            <button
-              className="btn btn-primary"
-              onClick={handleAnalyzePhotos}
-              disabled={analyzingPhotos}
-            >
-              {analyzingPhotos
-                ? t("ai.analyzing")
-                : photoAnalysis
-                  ? t("ai.reanalyze")
-                  : t("ai.analyze")}
-            </button>
+            <div className={styles.aiAssistActions}>
+              <button
+                className="btn btn-primary"
+                onClick={handleAnalyzePhotos}
+                disabled={
+                  analyzingPhotos || (!!photoAnalysis && !analysisStale)
+                }
+              >
+                {analyzingPhotos
+                  ? t("ai.analyzing")
+                  : !photoAnalysis
+                    ? t("ai.analyze")
+                    : analysisStale
+                      ? t("ai.reanalyze")
+                      : t("ai.upToDate")}
+              </button>
+              {photoAnalysis && !analysisStale && !analyzingPhotos && (
+                <small className={styles.aiAssistHint}>
+                  {t("ai.upToDateHint")}
+                </small>
+              )}
+            </div>
           )}
         </div>
 
@@ -648,6 +687,20 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             <div className={styles.analysisPanel}>
               <p className={styles.analysisSummary}>
                 {photoAnalysis.storySummary}
+              </p>
+              <p className={styles.analysisMeta}>
+                <span
+                  className={`${styles.analysisModelBadge} ${photoAnalysis.model === "local-deterministic" ? styles.analysisModelBadgeLocal : ""}`}
+                >
+                  {photoAnalysis.model === "local-deterministic"
+                    ? t("ai.localModelBadge")
+                    : photoAnalysis.model}
+                </span>
+                <span>
+                  {t("ai.analyzedAt", {
+                    when: new Date(photoAnalysis.updatedAt).toLocaleString(),
+                  })}
+                </span>
               </p>
               <div className={styles.analysisCandidates}>
                 {photoAnalysis.emotionCandidates.map((candidate) => (

@@ -210,6 +210,9 @@ export type ProjectPhotoAnalysis = {
   photoInsights: PhotoInsight[];
   storySummary: string;
   model: string;
+  // Fingerprint of the analysis inputs (analyzable photo set + language).
+  // Used to skip redundant AI calls when nothing relevant has changed.
+  inputsHash: string;
   deletedAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -356,6 +359,7 @@ export type CreateProjectPhotoAnalysisInput = {
   photoInsights: PhotoInsight[];
   storySummary: string;
   model: string;
+  inputsHash?: string;
   deletedAt?: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -675,6 +679,7 @@ export function createProjectPhotoAnalysis(
       input.model,
       "Project photo analysis model",
     ),
+    inputsHash: input.inputsHash ?? "",
     deletedAt: input.deletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
