@@ -121,7 +121,9 @@
       "lighting": "Lighting",
       "motion": "Motion",
       "tone": "Tone",
-      "primaryPhoto": "Primary photo"
+      "primaryPhoto": "Primary photo",
+      "sceneNegativePrompt": "Scene negative prompt",
+      "sceneNegativePromptPlaceholder": "Things to avoid for this scene only (optional)"
     },
     "selectOption": "Select…",
     "save": "Save scene",
@@ -144,17 +146,30 @@
       "emptyClickToStart": "Click <strong>Analyze photos</strong> to generate tone suggestions based on your selected photo set."
     },
     "tones": {
-      "warm": { "label": "Warm", "desc": "Heartfelt and nostalgic" },
-      "cinematic": { "label": "Cinematic", "desc": "Dramatic and epic" },
-      "playful": { "label": "Playful", "desc": "Fun and energetic" },
-      "quiet": { "label": "Quiet", "desc": "Peaceful and reflective" }
+      "warm": {
+        "label": "Warm",
+        "desc": "Heartfelt and nostalgic"
+      },
+      "cinematic": {
+        "label": "Cinematic",
+        "desc": "Dramatic and epic"
+      },
+      "playful": {
+        "label": "Playful",
+        "desc": "Fun and energetic"
+      },
+      "quiet": {
+        "label": "Quiet",
+        "desc": "Peaceful and reflective"
+      }
     },
     "sections": {
       "tone": "Emotion / Tone",
       "style": "Style preset",
       "commonPrompt": "Common prompt",
       "createScenes": "Create Scenes from Photos",
-      "scenes": "Scenes ({count})"
+      "scenes": "Scenes ({count})",
+      "negativePrompt": "Negative prompt (deviation fence)"
     },
     "style": {
       "aiRecommend": "AI recommend",
@@ -241,6 +256,16 @@
       "testInProgress": "Test in progress…",
       "viewTestGeneration": "View Test Generation",
       "startTestGeneration": "Test Generation →"
+    },
+    "negativePrompt": {
+      "notSet": "Not set",
+      "intro": "Phrases to keep OUT of every scene's image generation. This is the fence that keeps a series inside its intended look. A base floor (text, watermark, deformed hands, …) is always applied on top of this.",
+      "placeholder": "Things to avoid (e.g. text, watermark, extra people)",
+      "save": "Save negative prompt",
+      "saving": "Saving…",
+      "savedMsg": "Negative prompt saved!",
+      "failed": "Failed to save negative prompt",
+      "insertFence": "Insert recommended fence"
     }
   },
   "testGeneration": {
@@ -478,5 +503,14 @@
       "playful": "Playful",
       "quiet": "Quiet"
     }
+  },
+  "composedPrompt": {
+    "title": "What we'll send to the model",
+    "promptLabel": "Prompt",
+    "avoidLabel": "Avoid",
+    "avoidNone": "(none)",
+    "note": "Preview only — no image is generated.",
+    "loading": "Composing preview…",
+    "failed": "Failed to load preview"
   }
 }

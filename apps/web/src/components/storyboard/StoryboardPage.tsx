@@ -13,6 +13,7 @@ import type {
   StylePresetDto,
   TestGenerationBatchDto,
 } from "@gen-story/shared";
+import { RECOMMENDED_NEGATIVE_FENCE } from "@gen-story/shared";
 import {
   analyzeProjectPhotos,
   assignPhotosToScene,
@@ -35,6 +36,7 @@ import {
 import { TestGenerationModal } from "./TestGenerationModal";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
+import { ComposedPromptPreview } from "../common/ComposedPromptPreview";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./StoryboardPage.module.css";
 
@@ -116,6 +118,7 @@ function sceneDtoToState(scene: SceneDto): SceneState {
     lightingDirection: scene.lightingDirection,
     motionDirection: scene.motionDirection,
     notes: scene.notes,
+    negativePrompt: scene.negativePrompt,
     photoAssets: scene.photoAssets,
   };
 }
@@ -145,6 +148,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [showTestModal, setShowTestModal] = useState(false);
   const [commonPromptDraft, setCommonPromptDraft] = useState("");
   const [savingCommonPrompt, setSavingCommonPrompt] = useState(false);
+  const [negativePromptDraft, setNegativePromptDraft] = useState("");
+  const [savingNegativePrompt, setSavingNegativePrompt] = useState(false);
   const [showCustomStyleModal, setShowCustomStyleModal] = useState(false);
   const [customStyleForm, setCustomStyleForm] = useState({
     name: "",
@@ -153,12 +158,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   });
   const [savingCustomStyle, setSavingCustomStyle] = useState(false);
   const [complementBusy, setComplementBusy] = useState(false);
-  const [photoViewSize, setPhotoViewSize] = useState<"small" | "medium" | "large">("small");
+  const [photoViewSize, setPhotoViewSize] = useState<
+    "small" | "medium" | "large"
+  >("small");
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
   const [accordionOpen, setAccordionOpen] = useState({
     tone: true,
     style: true,
     commonPrompt: true,
+    negativePrompt: true,
   });
   const [proposalCtx, setProposalCtx] = useState<{
     fromSceneId: string;
@@ -173,6 +181,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   useEffect(() => {
     setCommonPromptDraft(storyboard?.commonPrompt ?? "");
   }, [storyboard?.commonPrompt]);
+
+  useEffect(() => {
+    setNegativePromptDraft(storyboard?.negativePrompt ?? "");
+  }, [storyboard?.negativePrompt]);
 
   const load = useCallback(async () => {
     const [sbs, presets, photoList, latestPhotoAnalysis] = await Promise.all([
@@ -305,6 +317,28 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     }
   }
 
+  async function saveNegativePrompt(negativePrompt: string) {
+    if (!sbId) return;
+    const prev = storyboard!;
+    setSavingNegativePrompt(true);
+    setError(null);
+    try {
+      const updated = await upsertStoryboard(sbId, {
+        projectId,
+        tone: prev.tone,
+        stylePresetId: prev.stylePresetId,
+        negativePrompt,
+      });
+      setStoryboard(updated);
+      setSaveMsg(t("negativePrompt.savedMsg"));
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("negativePrompt.failed"));
+    } finally {
+      setSavingNegativePrompt(false);
+    }
+  }
+
   async function handleCreateTemplateScenes() {
     if (!sbId || selectedPhotoIds.size === 0) return;
     setCreatingTemplates(true);
@@ -415,6 +449,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           lightingDirection: s.lightingDirection || "Natural",
           motionDirection: s.motionDirection || "Slow pan",
           notes: s.notes,
+          negativePrompt: s.negativePrompt,
         })),
       );
       setScenes(saved.map(sceneDtoToState));
@@ -642,7 +677,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       <CollapsibleSection
         title={t("sections.tone")}
         open={accordionOpen.tone}
-        onToggle={() => setAccordionOpen((prev) => ({ ...prev, tone: !prev.tone }))}
+        onToggle={() =>
+          setAccordionOpen((prev) => ({ ...prev, tone: !prev.tone }))
+        }
         summary={<span>{selectedToneLabel}</span>}
       >
         <div className={styles.toneGrid}>
@@ -672,7 +709,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       <CollapsibleSection
         title={t("sections.style")}
         open={accordionOpen.style}
-        onToggle={() => setAccordionOpen((prev) => ({ ...prev, style: !prev.style }))}
+        onToggle={() =>
+          setAccordionOpen((prev) => ({ ...prev, style: !prev.style }))
+        }
         summary={
           selectedStyle ? (
             <span className={styles.accordionSummaryStyle}>
@@ -706,7 +745,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             {t("style.aiRecommend")}
           </button>
           {systemStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>{t("style.systemStyles")}</span>
+            <span className={styles.styleGroupLabel}>
+              {t("style.systemStyles")}
+            </span>
           )}
           {systemStylePresets.map((p) => (
             <button
@@ -722,7 +763,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </button>
           ))}
           {userStylePresets.length > 0 && (
-            <span className={styles.styleGroupLabel}>{t("style.customStyles")}</span>
+            <span className={styles.styleGroupLabel}>
+              {t("style.customStyles")}
+            </span>
           )}
           {userStylePresets.map((p) => (
             <button
@@ -763,7 +806,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                 />
               </label>
               <label className={styles.sceneField}>
-                <span className={styles.fieldLabel}>{t("style.description")}</span>
+                <span className={styles.fieldLabel}>
+                  {t("style.description")}
+                </span>
                 <textarea
                   className={styles.fieldInput}
                   value={customStyleForm.description}
@@ -825,7 +870,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       <CollapsibleSection
         title={t("sections.commonPrompt")}
         open={accordionOpen.commonPrompt}
-        onToggle={() => setAccordionOpen((prev) => ({ ...prev, commonPrompt: !prev.commonPrompt }))}
+        onToggle={() =>
+          setAccordionOpen((prev) => ({
+            ...prev,
+            commonPrompt: !prev.commonPrompt,
+          }))
+        }
         summary={
           storyboard.commonPrompt ? (
             <span title={storyboard.commonPrompt}>
@@ -878,151 +928,279 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         </div>
       </CollapsibleSection>
 
+      {/* 3b. Negative prompt (deviation fence) */}
+      <CollapsibleSection
+        title={t("sections.negativePrompt")}
+        open={accordionOpen.negativePrompt}
+        onToggle={() =>
+          setAccordionOpen((prev) => ({
+            ...prev,
+            negativePrompt: !prev.negativePrompt,
+          }))
+        }
+        summary={
+          storyboard.negativePrompt ? (
+            <span title={storyboard.negativePrompt}>
+              {storyboard.negativePrompt}
+            </span>
+          ) : (
+            <span className={styles.accordionSummaryMuted}>
+              {t("negativePrompt.notSet")}
+            </span>
+          )
+        }
+      >
+        <p className={styles.photoAssignHint}>{t("negativePrompt.intro")}</p>
+        <textarea
+          className={styles.fieldInput}
+          rows={4}
+          value={negativePromptDraft}
+          onChange={(e) => setNegativePromptDraft(e.target.value)}
+          placeholder={t("negativePrompt.placeholder")}
+        />
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginTop: 8,
+          }}
+        >
+          <button
+            className="btn btn-primary"
+            onClick={() => saveNegativePrompt(negativePromptDraft)}
+            disabled={
+              savingNegativePrompt ||
+              negativePromptDraft === (storyboard.negativePrompt ?? "")
+            }
+          >
+            {savingNegativePrompt
+              ? t("negativePrompt.saving")
+              : t("negativePrompt.save")}
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() =>
+              setNegativePromptDraft((prev) => {
+                const trimmed = prev.trim();
+                return trimmed
+                  ? `${trimmed}, ${RECOMMENDED_NEGATIVE_FENCE}`
+                  : RECOMMENDED_NEGATIVE_FENCE;
+              })
+            }
+            disabled={savingNegativePrompt}
+          >
+            {t("negativePrompt.insertFence")}
+          </button>
+        </div>
+      </CollapsibleSection>
+
       {/* 4. Create Scenes from Photos — always visible, right above Scenes */}
-      {photos.some((p) => p.usage === "candidate") && (() => {
-        const candidatePhotos = photos.filter((p) => p.usage === "candidate");
-        const allSelected =
-          candidatePhotos.length > 0 &&
-          candidatePhotos.every((p) => selectedPhotoIds.has(p.id));
-        const someSelected = selectedPhotoIds.size > 0;
-        const gridMin =
-          photoViewSize === "large"
-            ? "180px"
-            : photoViewSize === "medium"
-              ? "130px"
-              : "90px";
-        return (
-          <section className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>
-                {t("sections.createScenes")}
-              </h3>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateTemplateScenes}
-                disabled={creatingTemplates || selectedPhotoIds.size === 0}
-              >
-                {creatingTemplates
-                  ? t("createScenes.creating")
-                  : selectedPhotoIds.size === 0
-                    ? t("createScenes.selectPhotosCta")
-                    : t(
-                        selectedPhotoIds.size === 1
-                          ? "createScenes.addAsScene"
-                          : "createScenes.addAsScenes",
-                        { count: selectedPhotoIds.size },
-                      )}
-              </button>
-            </div>
-
-            {/* Toolbar: select-all + view size */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 500, color: "#5a6a7e", cursor: "pointer", userSelect: "none" }}>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
-                  onChange={() => {
-                    if (allSelected) {
-                      setSelectedPhotoIds(new Set());
-                    } else {
-                      setSelectedPhotoIds(new Set(candidatePhotos.map((p) => p.id)));
-                    }
-                  }}
-                  style={{ width: 15, height: 15, accentColor: "#1a56db", cursor: "pointer" }}
-                />
-                {allSelected
-                  ? t("createScenes.deselectAll")
-                  : t("createScenes.selectAll")}
-              </label>
-
-              {/* Size toggle */}
-              <div style={{ display: "flex", gap: 2, background: "#f0f3f8", borderRadius: 8, padding: 3 }}>
-                {(["small", "medium", "large"] as const).map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setPhotoViewSize(size)}
-                    title={t("createScenes.thumbsTitle", {
-                      size: size.charAt(0).toUpperCase() + size.slice(1),
-                    })}
-                    style={{
-                      width: 30, height: 28,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: size === "small" ? 13 : size === "medium" ? 16 : 20,
-                      background: photoViewSize === size ? "#fff" : "none",
-                      border: "none", borderRadius: 6,
-                      color: photoViewSize === size ? "#1a56db" : "#8898aa",
-                      cursor: "pointer",
-                      boxShadow: photoViewSize === size ? "0 1px 3px rgba(0,0,0,.1)" : "none",
-                    }}
-                  >
-                    ⊞
-                  </button>
-                ))}
+      {photos.some((p) => p.usage === "candidate") &&
+        (() => {
+          const candidatePhotos = photos.filter((p) => p.usage === "candidate");
+          const allSelected =
+            candidatePhotos.length > 0 &&
+            candidatePhotos.every((p) => selectedPhotoIds.has(p.id));
+          const someSelected = selectedPhotoIds.size > 0;
+          const gridMin =
+            photoViewSize === "large"
+              ? "180px"
+              : photoViewSize === "medium"
+                ? "130px"
+                : "90px";
+          return (
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <h3 className={styles.sectionTitle}>
+                  {t("sections.createScenes")}
+                </h3>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateTemplateScenes}
+                  disabled={creatingTemplates || selectedPhotoIds.size === 0}
+                >
+                  {creatingTemplates
+                    ? t("createScenes.creating")
+                    : selectedPhotoIds.size === 0
+                      ? t("createScenes.selectPhotosCta")
+                      : t(
+                          selectedPhotoIds.size === 1
+                            ? "createScenes.addAsScene"
+                            : "createScenes.addAsScenes",
+                          { count: selectedPhotoIds.size },
+                        )}
+                </button>
               </div>
-            </div>
 
-            {selectedPhotoIds.size === 0 && (
-              <p style={{ color: "var(--color-text-muted)", fontSize: "0.9em", marginBottom: 12 }}>
-                {t("createScenes.hint")}
-              </p>
-            )}
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(auto-fill, minmax(${gridMin}, 1fr))`,
-                gap: 12,
-              }}
-            >
-              {candidatePhotos.map((photo) => (
+              {/* Toolbar: select-all + view size */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 10,
+                }}
+              >
                 <label
-                  key={photo.id}
                   style={{
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
+                    gap: 7,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "#5a6a7e",
                     cursor: "pointer",
-                    opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
-                    transition: "opacity 0.2s",
+                    userSelect: "none",
                   }}
                 >
                   <input
                     type="checkbox"
-                    checked={selectedPhotoIds.has(photo.id)}
-                    onChange={(e) => {
-                      const newSet = new Set(selectedPhotoIds);
-                      if (e.target.checked) {
-                        newSet.add(photo.id);
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected && !allSelected;
+                    }}
+                    onChange={() => {
+                      if (allSelected) {
+                        setSelectedPhotoIds(new Set());
                       } else {
-                        newSet.delete(photo.id);
+                        setSelectedPhotoIds(
+                          new Set(candidatePhotos.map((p) => p.id)),
+                        );
                       }
-                      setSelectedPhotoIds(newSet);
                     }}
-                    style={{ marginBottom: 6 }}
-                  />
-                  <img
-                    src={storageKeyToUrl(photo.storageKey)}
-                    alt={photo.name}
                     style={{
-                      width: "100%",
-                      aspectRatio: "1 / 1",
-                      objectFit: "cover",
-                      borderRadius: 8,
-                      border: selectedPhotoIds.has(photo.id)
-                        ? "2px solid var(--color-primary)"
-                        : "2px solid transparent",
+                      width: 15,
+                      height: 15,
+                      accentColor: "#1a56db",
+                      cursor: "pointer",
                     }}
                   />
-                  <span style={{ fontSize: 11, marginTop: 4, textAlign: "center", color: "#5a6a7e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
-                    {photo.name}
-                  </span>
+                  {allSelected
+                    ? t("createScenes.deselectAll")
+                    : t("createScenes.selectAll")}
                 </label>
-              ))}
-            </div>
-          </section>
-        );
-      })()}
+
+                {/* Size toggle */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 2,
+                    background: "#f0f3f8",
+                    borderRadius: 8,
+                    padding: 3,
+                  }}
+                >
+                  {(["small", "medium", "large"] as const).map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => setPhotoViewSize(size)}
+                      title={t("createScenes.thumbsTitle", {
+                        size: size.charAt(0).toUpperCase() + size.slice(1),
+                      })}
+                      style={{
+                        width: 30,
+                        height: 28,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize:
+                          size === "small" ? 13 : size === "medium" ? 16 : 20,
+                        background: photoViewSize === size ? "#fff" : "none",
+                        border: "none",
+                        borderRadius: 6,
+                        color: photoViewSize === size ? "#1a56db" : "#8898aa",
+                        cursor: "pointer",
+                        boxShadow:
+                          photoViewSize === size
+                            ? "0 1px 3px rgba(0,0,0,.1)"
+                            : "none",
+                      }}
+                    >
+                      ⊞
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {selectedPhotoIds.size === 0 && (
+                <p
+                  style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: "0.9em",
+                    marginBottom: 12,
+                  }}
+                >
+                  {t("createScenes.hint")}
+                </p>
+              )}
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${gridMin}, 1fr))`,
+                  gap: 12,
+                }}
+              >
+                {candidatePhotos.map((photo) => (
+                  <label
+                    key={photo.id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      cursor: "pointer",
+                      opacity: selectedPhotoIds.has(photo.id) ? 1 : 0.6,
+                      transition: "opacity 0.2s",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedPhotoIds.has(photo.id)}
+                      onChange={(e) => {
+                        const newSet = new Set(selectedPhotoIds);
+                        if (e.target.checked) {
+                          newSet.add(photo.id);
+                        } else {
+                          newSet.delete(photo.id);
+                        }
+                        setSelectedPhotoIds(newSet);
+                      }}
+                      style={{ marginBottom: 6 }}
+                    />
+                    <img
+                      src={storageKeyToUrl(photo.storageKey)}
+                      alt={photo.name}
+                      style={{
+                        width: "100%",
+                        aspectRatio: "1 / 1",
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        border: selectedPhotoIds.has(photo.id)
+                          ? "2px solid var(--color-primary)"
+                          : "2px solid transparent",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 11,
+                        marginTop: 4,
+                        textAlign: "center",
+                        color: "#5a6a7e",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: "100%",
+                      }}
+                    >
+                      {photo.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </section>
+          );
+        })()}
 
       {/* 5. Scene list */}
       <section className={styles.section} data-scenes-section>
@@ -1082,6 +1260,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   onAiFill={handleAiFill}
                   isAiFilling={aiFillingSceneId === scene.id}
                   isBusy={saving || aiFillingSceneId !== null}
+                  projectCommonPromptDraft={commonPromptDraft}
+                  projectNegativePromptDraft={negativePromptDraft}
                 />
                 {scene.id && nextScene?.id && (
                   <ComplementGap
@@ -1298,6 +1478,8 @@ function SceneCard({
   onAiFill,
   isAiFilling,
   isBusy,
+  projectCommonPromptDraft,
+  projectNegativePromptDraft,
 }: {
   scene: SceneState;
   idx: number;
@@ -1313,6 +1495,8 @@ function SceneCard({
   onAiFill: (sceneId: string) => void;
   isAiFilling: boolean;
   isBusy: boolean;
+  projectCommonPromptDraft: string;
+  projectNegativePromptDraft: string;
 }) {
   const [assigningPhoto, setAssigningPhoto] = useState<string | null>(null);
   const id = useId();
@@ -1448,6 +1632,20 @@ function SceneCard({
           />
         </SceneField>
 
+        <SceneField
+          label={t("fields.sceneNegativePrompt")}
+          htmlFor={`${id}-negative`}
+        >
+          <textarea
+            id={`${id}-negative`}
+            className={styles.fieldInput}
+            rows={2}
+            value={scene.negativePrompt ?? ""}
+            onChange={(e) => onUpdate({ negativePrompt: e.target.value })}
+            placeholder={t("fields.sceneNegativePromptPlaceholder")}
+          />
+        </SceneField>
+
         <div className={styles.selectRow}>
           <SceneField label={t("fields.emotion")} htmlFor={`${id}-emotion`}>
             <select
@@ -1542,6 +1740,22 @@ function SceneCard({
                 : t("scenes.primaryClickAssign")}
             </p>
           </SceneField>
+        )}
+
+        {scene.id && (
+          <ComposedPromptPreview
+            sceneId={scene.id}
+            overrides={{
+              imagePrompt: scene.imagePrompt,
+              emotion: scene.emotion,
+              cameraDirection: scene.cameraDirection,
+              lightingDirection: scene.lightingDirection,
+              motionDirection: scene.motionDirection,
+              sceneNegativePrompt: scene.negativePrompt ?? "",
+              projectNegativePrompt: projectNegativePromptDraft,
+              commonPrompt: projectCommonPromptDraft,
+            }}
+          />
         )}
       </div>
     </div>

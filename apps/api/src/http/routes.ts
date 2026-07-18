@@ -43,6 +43,7 @@ import {
   type TestAdjustmentId,
 } from "@gen-story/shared";
 
+import { composeScenePrompt } from "../generation/compose-scene-prompt";
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
   toComplementSceneProposalDto,
@@ -83,6 +84,7 @@ import {
   CreateTemplateScenesSchema,
   FillSceneWithAiSchema,
   PatchPhotoAssetSchema,
+  PreviewScenePromptSchema,
   SetUserPreferenceSchema,
   UploadPhotoAssetSchema,
   UpsertScenesSchema,
@@ -509,6 +511,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         status: parsed.data.status,
         stylePresetId: parsed.data.stylePresetId,
         commonPrompt: parsed.data.commonPrompt,
+        negativePrompt: parsed.data.negativePrompt,
       });
 
       if (!result.ok) {
@@ -610,6 +613,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         lightingDirection: s.lightingDirection,
         motionDirection: s.motionDirection,
         notes: s.notes,
+        negativePrompt: s.negativePrompt,
         photoAssets: s.photoAssets,
       }));
 
@@ -806,6 +810,60 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       sendJson(res, 200, toSceneDto(result.value));
+    },
+  );
+
+  // POST /api/scenes/:sceneId/preview-prompt
+  // Read-only, side-effect-free, no image call. Returns the exact positive and
+  // negative prompt the next generation would use, computed from the persisted
+  // scene/storyboard with optional unsaved-edit overrides applied.
+  router.add(
+    "POST",
+    "/api/scenes/:sceneId/preview-prompt",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const sceneId = getParam(params, "sceneId");
+      const scene = await deps.scenes.findById(sceneId);
+      if (scene == null) {
+        sendJson(res, 404, notFoundBody("Scene not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(scene.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = PreviewScenePromptSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const { prompt, negativePrompt } = await composeScenePrompt(deps, {
+        sceneId,
+        overrides: parsed.data,
+      });
+
+      sendJson(res, 200, { prompt, negativePrompt });
     },
   );
 

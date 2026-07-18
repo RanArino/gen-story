@@ -62,4 +62,47 @@ describe("composeImagePrompt", () => {
 
     expect(prompt).not.toContain("camera sweep");
   });
+
+  it("appends a trailing avoid clause when a negative prompt is provided", () => {
+    const prompt = composeImagePrompt({
+      imagePrompt: "a family at the beach",
+      emotion: "Joy",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "",
+      tone: "warm",
+      stylePresetPrompt: null,
+      commonPrompt: "",
+      negativePrompt: "text, watermark, no balloons",
+    });
+
+    expect(prompt).toMatch(/, avoid: text, watermark, no balloons$/);
+  });
+
+  it("omits the avoid clause when the negative prompt is empty or absent", () => {
+    const withEmpty = composeImagePrompt({
+      imagePrompt: "a family at the beach",
+      emotion: "Joy",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "",
+      tone: "warm",
+      stylePresetPrompt: null,
+      commonPrompt: "",
+      negativePrompt: "   ",
+    });
+    const withAbsent = composeImagePrompt({
+      imagePrompt: "a family at the beach",
+      emotion: "Joy",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "",
+      tone: "warm",
+      stylePresetPrompt: null,
+      commonPrompt: "",
+    });
+
+    expect(withEmpty).not.toContain("avoid:");
+    expect(withAbsent).not.toContain("avoid:");
+  });
 });

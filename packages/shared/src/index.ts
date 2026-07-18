@@ -33,6 +33,12 @@ export {
 } from "./adjustments";
 export type { TestAdjustmentId, TestAdjustment } from "./adjustments";
 
+export {
+  BASE_NEGATIVE_PROMPT,
+  RECOMMENDED_NEGATIVE_FENCE,
+  composeNegativePrompt,
+} from "./negative-prompt";
+
 import type { TestAdjustmentId } from "./adjustments";
 
 export type ApiHealthDto = {
@@ -96,6 +102,7 @@ export type StoryboardDto = {
   tone: string;
   stylePresetId: string | null;
   commonPrompt: string;
+  negativePrompt: string;
   sceneIds: string[];
   createdAt: string;
   updatedAt: string;
@@ -122,6 +129,7 @@ export type SceneDto = {
   lightingDirection: string;
   motionDirection: string;
   notes: string;
+  negativePrompt: string;
   photoAssets: ScenePhotoAssetDto[];
   adoptedGeneratedImageId: string | null;
   createdAt: string;

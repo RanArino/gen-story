@@ -23,6 +23,7 @@ import {
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
+import { ComposedPromptPreview } from "../common/ComposedPromptPreview";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./ReviewPage.module.css";
 
@@ -115,10 +116,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
     }
   }
 
-  async function handleRegen(
-    scene: SceneDto,
-    overrides: RegenFields,
-  ) {
+  async function handleRegen(scene: SceneDto, overrides: RegenFields) {
     if (!storyboardId) return;
     setError(null);
     try {
@@ -158,7 +156,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   }
 
   const regenReview = regenSceneId
-    ? reviews.find((r) => r.scene.id === regenSceneId) ?? null
+    ? (reviews.find((r) => r.scene.id === regenSceneId) ?? null)
     : null;
 
   if (loading) {
@@ -545,7 +543,13 @@ const LIGHTING_OPTIONS = [
   "Silhouette",
   "Volumetric",
 ];
-const MOTION_OPTIONS = ["Slow pan", "Static", "Zoom in", "Zoom out", "Tracking"];
+const MOTION_OPTIONS = [
+  "Slow pan",
+  "Static",
+  "Zoom in",
+  "Zoom out",
+  "Tracking",
+];
 
 function RegenModal({
   scene,
@@ -579,10 +583,7 @@ function RegenModal({
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div
-        className={styles.modalBox}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
         <h3 className={styles.modalTitle}>
           {t("title", {
             sceneTitle: scene.title || t("untitledScene"),
@@ -667,6 +668,17 @@ function RegenModal({
             </label>
           </div>
         </div>
+
+        <ComposedPromptPreview
+          sceneId={scene.id}
+          overrides={{
+            imagePrompt: fields.imagePrompt,
+            emotion: fields.emotion,
+            cameraDirection: fields.cameraDirection,
+            lightingDirection: fields.lightingDirection,
+            motionDirection: fields.motionDirection,
+          }}
+        />
 
         <div className={styles.modalFooter}>
           <button className="btn btn-secondary" onClick={onClose}>

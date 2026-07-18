@@ -45,7 +45,8 @@ const EMOTION_DESCRIPTORS: Record<string, string> = {
 };
 
 const MOTION_DESCRIPTORS: Record<string, string> = {
-  "Slow pan": "slow lateral camera sweep, implied gentle motion across the frame",
+  "Slow pan":
+    "slow lateral camera sweep, implied gentle motion across the frame",
   Static: "locked-off static composition, no implied camera movement",
   "Zoom in":
     "subject-centred framing, foreground pulls toward camera, subtle compression",
@@ -88,6 +89,10 @@ export function composeImagePrompt(input: {
   tone: string;
   stylePresetPrompt: string | null;
   commonPrompt: string;
+  // Already-merged negative phrases. `gpt-image` has no native negative-prompt
+  // field, so when non-empty this is folded into the single returned prompt as
+  // a trailing `avoid: …` clause.
+  negativePrompt?: string;
 }): string {
   const {
     imagePrompt,
@@ -98,6 +103,7 @@ export function composeImagePrompt(input: {
     tone,
     stylePresetPrompt,
     commonPrompt,
+    negativePrompt,
   } = input;
 
   const segments: string[] = [];
@@ -116,6 +122,10 @@ export function composeImagePrompt(input: {
     segments.push(MOTION_DESCRIPTORS[motionDirection]);
   segments.push(depthSuffix(cameraDirection));
   if (TONE_COLOR_MODIFIERS[tone]) segments.push(TONE_COLOR_MODIFIERS[tone]);
+
+  if (negativePrompt && negativePrompt.trim()) {
+    segments.push(`avoid: ${negativePrompt.trim()}`);
+  }
 
   return segments.join(", ");
 }

@@ -124,6 +124,7 @@ export type Scene = {
   lightingDirection: string;
   motionDirection: string;
   notes: string;
+  negativePrompt: string;
   photoAssets: ScenePhotoAsset[];
   adoptedGeneratedImageId: GeneratedImageId | null;
   createdAt: Timestamp;
@@ -137,6 +138,7 @@ export type Storyboard = {
   tone: string;
   stylePresetId: StylePresetId | null;
   commonPrompt: string;
+  negativePrompt: string;
   sceneIds: SceneId[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -275,6 +277,7 @@ export type CreateStoryboardInput = {
   tone: string;
   stylePresetId?: StylePresetId | null;
   commonPrompt?: string;
+  negativePrompt?: string;
   sceneIds?: SceneId[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -296,6 +299,7 @@ export type CreateSceneInput = {
   lightingDirection: string;
   motionDirection: string;
   notes?: string;
+  negativePrompt?: string;
   photoAssets?: ScenePhotoAsset[];
   adoptedGeneratedImageId?: GeneratedImageId | null;
   createdAt: Timestamp;
@@ -448,6 +452,7 @@ export function createStoryboard(input: CreateStoryboardInput): Storyboard {
     tone: trimRequiredText(input.tone, "Storyboard tone"),
     stylePresetId: input.stylePresetId ?? null,
     commonPrompt: (input.commonPrompt ?? "").trim(),
+    negativePrompt: (input.negativePrompt ?? "").trim(),
     sceneIds: [...(input.sceneIds ?? [])],
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
@@ -471,6 +476,7 @@ export function createScene(input: CreateSceneInput): Scene {
     lightingDirection: trimOptionalText(input.lightingDirection),
     motionDirection: trimOptionalText(input.motionDirection),
     notes: trimOptionalText(input.notes),
+    negativePrompt: trimOptionalText(input.negativePrompt),
     photoAssets: [...(input.photoAssets ?? [])],
     adoptedGeneratedImageId: input.adoptedGeneratedImageId ?? null,
     createdAt: input.createdAt,
@@ -505,6 +511,7 @@ export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
     lightingDirection: "",
     motionDirection: "",
     notes: "",
+    negativePrompt: "",
     photoAssets: input.photoAssetId
       ? [{ photoAssetId: input.photoAssetId, role: "primary" }]
       : [],
@@ -552,6 +559,7 @@ export function createComplementScene(
     lightingDirection: "",
     motionDirection: "",
     notes: "",
+    negativePrompt: "",
     photoAssets: [],
     adoptedGeneratedImageId: null,
     createdAt: input.createdAt,

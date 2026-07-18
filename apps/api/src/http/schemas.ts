@@ -23,6 +23,7 @@ export const UpsertStoryboardSchema = z.object({
   status: z.enum(["draft", "editing", "ready", "completed"]).optional(),
   stylePresetId: z.string().nullable().optional(),
   commonPrompt: z.string().optional(),
+  negativePrompt: z.string().optional(),
 });
 
 export const SceneInputSchema = z.object({
@@ -37,6 +38,7 @@ export const SceneInputSchema = z.object({
   lightingDirection: z.string().min(1),
   motionDirection: z.string().min(1),
   notes: z.string().optional(),
+  negativePrompt: z.string().optional(),
   photoAssets: z
     .array(
       z.object({
@@ -61,6 +63,20 @@ export const AssignScenePhotosSchema = z.object({
 });
 
 export const FillSceneWithAiSchema = z.object({}).strict();
+
+// Preview the composed prompt for a scene. Every field is optional: omitted
+// fields fall back to the persisted scene/storyboard values, so the preview can
+// reflect the user's current unsaved editor/modal state. Side-effect free.
+export const PreviewScenePromptSchema = z.object({
+  imagePrompt: z.string().optional(),
+  emotion: z.string().optional(),
+  cameraDirection: z.string().optional(),
+  lightingDirection: z.string().optional(),
+  motionDirection: z.string().optional(),
+  sceneNegativePrompt: z.string().optional(),
+  projectNegativePrompt: z.string().optional(),
+  commonPrompt: z.string().optional(),
+});
 
 export const AnalyzeProjectPhotosSchema = z.object({}).strict();
 

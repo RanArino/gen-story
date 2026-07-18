@@ -5,7 +5,7 @@ import type {
 
 import { createAiInputImage } from "./image-metadata";
 import { buildPhotoAiInputStorageKey } from "../storage/storage-keys";
-import { composeImagePrompt } from "../generation/prompt-composer";
+import { composeScenePrompt } from "../generation/compose-scene-prompt";
 
 export type NormalizedInputImage = {
   photoAssetId: string;
@@ -38,11 +38,14 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
     inputJson: Record<string, unknown>;
     commonPromptOverride?: string;
   }): Promise<Record<string, unknown>> {
-    const scene = await this.deps.scenes.findById(input.sceneId);
-
-    if (scene == null) {
-      throw new Error("Scene not found for image preprocessing.");
-    }
+    const {
+      scene,
+      prompt: composedPrompt,
+      negativePrompt,
+    } = await composeScenePrompt(this.deps, {
+      sceneId: input.sceneId,
+      overrides: { commonPrompt: input.commonPromptOverride },
+    });
 
     if (
       scene.projectId !== input.projectId ||
@@ -50,26 +53,6 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
     ) {
       throw new Error("Scene does not match preprocessing target.");
     }
-
-    const storyboard = await this.deps.storyboards.findById(input.storyboardId);
-    if (storyboard == null) {
-      throw new Error("Storyboard not found for image preprocessing.");
-    }
-
-    const stylePreset = storyboard.stylePresetId
-      ? await this.deps.stylePresets.findById(storyboard.stylePresetId)
-      : null;
-
-    const composedPrompt = composeImagePrompt({
-      imagePrompt: scene.imagePrompt ?? "",
-      emotion: scene.emotion ?? "",
-      cameraDirection: scene.cameraDirection ?? "",
-      lightingDirection: scene.lightingDirection ?? "",
-      motionDirection: scene.motionDirection ?? "",
-      tone: storyboard.tone ?? "",
-      stylePresetPrompt: stylePreset?.prompt ?? null,
-      commonPrompt: input.commonPromptOverride ?? storyboard.commonPrompt ?? "",
-    });
 
     const normalizedInputImages: NormalizedInputImage[] = [];
 
@@ -123,6 +106,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       ...input.inputJson,
       normalizedInputImages,
       prompt: composedPrompt,
+      negativePrompt,
     };
   }
 }

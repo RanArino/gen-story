@@ -219,6 +219,7 @@ export async function upsertStoryboard(
     stylePresetId?: string | null;
     status?: string;
     commonPrompt?: string;
+    negativePrompt?: string;
   },
 ): Promise<StoryboardDto> {
   return request<StoryboardDto>(
@@ -249,7 +250,38 @@ export type UpsertSceneInput = {
   lightingDirection: string;
   motionDirection: string;
   notes?: string;
+  negativePrompt?: string;
 };
+
+export type PreviewScenePromptOverrides = {
+  imagePrompt?: string;
+  emotion?: string;
+  cameraDirection?: string;
+  lightingDirection?: string;
+  motionDirection?: string;
+  sceneNegativePrompt?: string;
+  projectNegativePrompt?: string;
+  commonPrompt?: string;
+};
+
+export type ComposedPromptPreview = {
+  prompt: string;
+  negativePrompt: string;
+};
+
+// Read-only, side-effect-free, no image call. Returns the exact positive and
+// negative prompt the next generation would use given the current (possibly
+// unsaved) form values.
+export async function previewScenePrompt(
+  sceneId: string,
+  overrides: PreviewScenePromptOverrides = {},
+): Promise<ComposedPromptPreview> {
+  return request<ComposedPromptPreview>(
+    "POST",
+    `/api/scenes/${sceneId}/preview-prompt`,
+    overrides,
+  );
+}
 
 export async function upsertScenes(
   storyboardId: string,
