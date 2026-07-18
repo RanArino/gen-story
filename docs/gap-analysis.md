@@ -203,7 +203,7 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Default model: OpenAI `gpt-image-2` | ✅ | Hard-coded in OpenAI adapter |
 | Text-to-image generation | ✅ | `images.generate()` |
 | Image-to-image with source photo | ✅ | `images.edit()` with primary photo |
-| Multiple reference images for consistency | ❌ | Only single input photo per request |
+| Multiple reference images for consistency | ❌ | Only single input photo per request. Accepted as proposal B1 (2026-06-02); see §18 |
 | Cinematic prompt composition (60-30-10 color, shot type, depth layering, vanishing point) | ✅ | `apps/api/src/generation/prompt-composer.ts`; composes scene emotion, camera, lighting, tone, and style preset into a rich cinematic prompt before each generation request |
 | Size / quality / format configuration | ⚠️ | Defaults set; no user-facing preset picker |
 | Asynchronous job queue (queued → running → succeeded/failed) | ✅ | Local worker + `generation_requests` state machine |
@@ -270,6 +270,58 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 
 ---
 
+## 18. Accepted UX Enhancement Proposals (A–D)
+
+Accepted on 2026-06-02 from `docs/ux-enhancement-proposals.md` (sections A–D). These are committed for Phase 1 but **not yet implemented** (no ExecPlan drafted yet); each row links back to its proposal ID. Items overlapping an existing requirement row above are cross-referenced rather than duplicated.
+
+### A. Generation feedback & flow
+
+| Proposal | Status | Notes |
+|---|---|---|
+| A1. Live generation panel with thumbnails & ETA | ❌ | Proposal A1; replaces the flat status list on `GeneratePage` |
+| A2. Background generation + global progress chip | ❌ | Proposal A2; polling hook hoisted into `AppShell` |
+| A3. Variants per scene (N candidates per request) | ❌ | Proposal A3; `inputJson.variants`; extends §11 "One generated image per scene" |
+| A4. Composed-prompt preview before submit | ❌ | Proposal A4; new `POST /api/scenes/:id/preview-prompt` |
+| A5. Negative prompt field (scene + project) | ❌ | Proposal A5 + H7; add `negativePrompt` to `scenes` and `storyboards`, designed as a "deviation fence" |
+| A6. Adjustment chips on test generation | 🟡 | Already tracked in §6; see `docs/plans/20260526-test-generation-adjustment-chips.md` |
+| A7. Estimated cost / coin preview | ❌ | Proposal A7; static per-model price table in `packages/shared` |
+| A8. Failure clustering & recovery hints | ❌ | Proposal A8; error-class → hint banner on `GeneratePage` |
+
+### B. Scene composition & prompt quality
+
+| Proposal | Status | Notes |
+|---|---|---|
+| B1. Reference image set (multi-input) per scene | ❌ | Proposal B1; same gap as §13 "Multiple reference images for consistency"; add `reference_*` roles |
+| B2. Character anchors (project-level subject consistency) | ❌ | Proposal B2; new `characters` table + `scenes.characterIds` |
+| B3. Seed / determinism control | ❌ | Proposal B3; optional `seed` carried in `inputJson` |
+| B4. Aspect ratio per scene | ❌ | Proposal B4; `scenes.aspectRatio` (P2 blocker) |
+| B5. Style strength slider | ❌ | Proposal B5; `scenes.stylePresetStrength` 0–100 |
+| B6. "Anime Layout Master" composition assistant | ❌ | Proposal B6; `scenes.compositionJson` |
+| B7. Shot-variation generator (Seedance-style) | ❌ | Proposal B7; N composition variants → sibling scene |
+
+### C. Review and adoption
+
+| Proposal | Status | Notes |
+|---|---|---|
+| C1. Compare slider (source ↔ generated) | ❌ | Proposal C1; drag-to-reveal overlay on `ReviewPage` |
+| C2. Variant tray inside scene card | ❌ | Proposal C2; up to 4 recent succeeded thumbnails |
+| C3. Star / favorite generations across history | ❌ | Proposal C3; `generated_images.isFavorite` |
+| C4. Bulk operations on Review | ❌ | Proposal C4; multi-select + floating action bar |
+| C5. Inpainting / region regen | ❌ | Proposal C5; mask-based partial regen (future) |
+| C6. Outpainting to target aspect | ❌ | Proposal C6; P2 prep |
+| C7. Continuity check between adjacent scenes | ❌ | Proposal C7; server-side palette / face-size comparison |
+
+### D. Prompt transparency & lineage
+
+| Proposal | Status | Notes |
+|---|---|---|
+| D1. Prompt diff on retry | ❌ | Proposal D1; diff previous `inputJson` vs. new form values |
+| D2. Lineage view per scene | ❌ | Proposal D2; `generation_requests.parentRequestId` + tree view |
+
+> Section **H** (generation-consistency proposals H1–H9) in `docs/ux-enhancement-proposals.md` has been authored but is **not** promoted here yet, pending review.
+
+---
+
 ## Phase 2 — Video Generation (Future)
 
 All Phase 2 items are **🔮 not started** and explicitly out of scope for the initial release.
@@ -326,6 +378,12 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | File lifecycle & cleanup | 5 | 1 | 0 | 0 |
 | Local release readiness | 11 | 0 | 0 | 0 |
 | Technical debt & infrastructure | 2 | 0 | 0 | 0 |
+| Accepted UX proposals — A (feedback/flow) | 0 | 0 | 1 | 7 |
+| Accepted UX proposals — B (composition) | 0 | 0 | 0 | 7 |
+| Accepted UX proposals — C (review/adoption) | 0 | 0 | 0 | 7 |
+| Accepted UX proposals — D (transparency/lineage) | 0 | 0 | 0 | 2 |
+
+The accepted-proposal counts (§18) are tracked separately from the REQUIREMENTS_INIT requirement areas above; A6 is also counted under "Test generation workflow", and B1 under "Image generation infra" (§13), so those two overlap intentionally.
 
 ---
 
@@ -385,3 +443,7 @@ The items below are the highest-value gaps to close before Phase 1 is fully real
 
 15. **Cascade physical file deletion on project/photo delete**
     Soft delete works; file cleanup on hard-delete path needs to be wired up.
+
+### Accepted UX Enhancement Proposals (A–D)
+
+See **§18** for the full list of proposals accepted on 2026-06-02 from `docs/ux-enhancement-proposals.md`. None have ExecPlans yet; the recommended sequencing is in that doc's "Recommended top picks" (chain reference H1, Base Negative A5/H7, invariant re-injection H4, and text-free plate H2 are the highest-leverage for series consistency).
