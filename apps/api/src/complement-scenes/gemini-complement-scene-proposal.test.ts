@@ -81,6 +81,7 @@ function input() {
       }),
     ],
     siblingScenes: [fromScene, toScene],
+    language: "en" as const,
   };
 }
 

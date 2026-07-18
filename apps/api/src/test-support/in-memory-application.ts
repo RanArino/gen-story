@@ -24,6 +24,8 @@ import type {
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
   TestGenerationBatchRepositoryPort,
+  UserPreference,
+  UserPreferenceRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
 import type {
@@ -447,6 +449,20 @@ class InMemoryPhotoAnalysisGeneration implements PhotoAnalysisGenerationPort {
   }
 }
 
+class InMemoryUserPreferenceRepository
+  implements UserPreferenceRepositoryPort
+{
+  private readonly items = new Map<string, UserPreference>();
+
+  async findByUserId(userId: string): Promise<UserPreference | null> {
+    return this.items.get(userId) ?? null;
+  }
+
+  async upsert(preference: UserPreference): Promise<void> {
+    this.items.set(preference.userId, preference);
+  }
+}
+
 class InMemoryJobQueue implements JobQueuePort {
   async enqueue(): Promise<{ jobId: string }> {
     return { jobId: "job_1" };
@@ -522,6 +538,7 @@ export function createInMemoryApplicationDependencies(
     testGenerationBatches: new InMemoryTestGenerationBatchRepository(
       stores.testGenerationBatches,
     ),
+    userPreferences: new InMemoryUserPreferenceRepository(),
     objectStorage: new InMemoryObjectStorage(),
     imagePreprocessing: new InMemoryImagePreprocessing(),
     imageGeneration: new InMemoryImageGeneration(),

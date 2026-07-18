@@ -42,6 +42,7 @@ describe("LocalPhotoAnalysisGenerationAdapter", () => {
           updatedAt: "2026-05-02T00:00:00.000Z",
         }),
       ],
+      language: "en",
     });
 
     expect(result.model).toBe("local-deterministic");

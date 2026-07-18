@@ -26,8 +26,22 @@ import type {
 import type {
   AuthPrincipal,
   ComplementSceneProposal,
+  UserPreference,
 } from "@gen-story/application";
-import type { ComplementSceneProposalDto } from "@gen-story/shared";
+import type {
+  ComplementSceneProposalDto,
+  UserPreferenceDto,
+} from "@gen-story/shared";
+
+export function toUserPreferenceDto(
+  preference: UserPreference,
+): UserPreferenceDto {
+  return {
+    userId: preference.userId,
+    language: preference.language,
+    updatedAt: preference.updatedAt,
+  };
+}
 
 export function toComplementSceneProposalDto(
   proposal: ComplementSceneProposal,

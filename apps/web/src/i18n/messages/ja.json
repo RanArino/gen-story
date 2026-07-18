@@ -1,0 +1,466 @@
+{
+  "common": {
+    "loading": "読み込み中…",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "edit": "編集",
+    "delete": "削除",
+    "restore": "復元",
+    "back": "戻る",
+    "next": "次へ",
+    "close": "閉じる",
+    "retry": "再試行",
+    "appName": "Gen Story",
+    "appTitle": "ストーリービルダー"
+  },
+  "nav": {
+    "projects": "プロジェクト",
+    "settings": "設定",
+    "stepPhotos": "1 · 写真",
+    "stepStoryboard": "2 · 絵コンテ",
+    "stepGenerate": "3 · 生成",
+    "stepReview": "4 · 確認"
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "subtitle": "あなたのストーリープロジェクト",
+    "newProject": "+ 新しいプロジェクト",
+    "deleteTitle": "プロジェクトを削除",
+    "delete": "削除",
+    "restore": "復元",
+    "emptyTitle": "プロジェクトがまだありません。最初のプロジェクトを作成して始めましょう。",
+    "deletedSectionTitle": "最近削除したもの",
+    "deletedSectionHint": "削除されたプロジェクトは7日間保存されます。",
+    "updated": "更新 {date}",
+    "deletedAt": "削除 {date}",
+    "deleteFailed": "削除に失敗しました",
+    "restoreFailed": "復元に失敗しました",
+    "createTitle": "新しいプロジェクトを作成",
+    "createSubtitle": "プロジェクトに名前を付けて始めましょう。",
+    "nameLabel": "プロジェクト名",
+    "namePlaceholder": "北海道家族旅行",
+    "createButton": "プロジェクトを作成",
+    "creating": "作成中…",
+    "createFailed": "プロジェクトの作成に失敗しました",
+    "occasionLabel": "イベント(任意)",
+    "occasions": {
+      "general": "なし / 一般",
+      "anniversary": "記念日",
+      "graduation": "卒業",
+      "birthday": "誕生日",
+      "travel": "旅行",
+      "wedding": "結婚式",
+      "other": "その他"
+    }
+  },
+  "photos": {
+    "title": "写真",
+    "subtitle": "このプロジェクトで使う写真をアップロード・管理します",
+    "uploadButton": "写真をアップロード",
+    "addMore": "+ 写真を追加",
+    "continueToStoryboard": "絵コンテへ進む →",
+    "tabs": {
+      "upload": "アップロード",
+      "manage": "管理({count})"
+    },
+    "dropzone": {
+      "primary": "ここに写真をドロップ、または <strong>クリックして選択</strong>",
+      "hint": "JPG・PNG・HEIC・WebP · 最大 {max} 枚まで"
+    },
+    "primaryBadge": "メイン",
+    "selectAll": "すべて選択",
+    "deselectAll": "選択を解除",
+    "selectPhotoTitle": "写真を選択",
+    "viewSize": {
+      "small": "小サイズのサムネイル",
+      "medium": "中サイズのサムネイル",
+      "large": "大サイズのサムネイル"
+    },
+    "bulk": {
+      "selectedCount": "{count} 件を選択中",
+      "setCandidate": "候補に設定",
+      "setReference": "参考に設定",
+      "setExcluded": "除外に設定",
+      "deleteSelected": "選択を削除"
+    },
+    "uploading": "アップロード中…",
+    "deletedSectionTitle": "最近削除したもの",
+    "deletedSectionHint": "削除された写真は7日間保存されます。",
+    "deletedAt": "削除 {date}",
+    "deleteTitle": "写真を削除",
+    "delete": "削除",
+    "restore": "復元",
+    "dragHint": "ドラッグして並び替え(現在位置 {index})",
+    "usage": {
+      "candidate": "候補",
+      "reference": "参考",
+      "excluded": "除外"
+    },
+    "errors": {
+      "uploadFailed": "アップロードに失敗しました",
+      "updateFailed": "更新に失敗しました",
+      "deleteFailed": "削除に失敗しました",
+      "restoreFailed": "復元に失敗しました",
+      "reorderFailed": "並び替えに失敗しました",
+      "maxPhotos": "1プロジェクトあたり最大 {max} 枚までです。",
+      "slotsLeft": "あと {slots} 枚しか追加できません(最大 {max} 枚)。"
+    }
+  },
+  "storyboard": {
+    "title": "絵コンテ",
+    "subtitle": "感情とスタイルを選んで、シーンを編集してください。",
+    "noStoryboard": "まだ絵コンテがありません — シーン作成を始めるには初期化してください。",
+    "initialize": "絵コンテを初期化",
+    "fields": {
+      "title": "タイトル",
+      "description": "説明",
+      "imagePrompt": "画像プロンプト",
+      "notes": "メモ",
+      "emotion": "感情",
+      "camera": "カメラ",
+      "lighting": "ライティング",
+      "motion": "モーション",
+      "tone": "トーン",
+      "primaryPhoto": "メイン写真"
+    },
+    "selectOption": "選択…",
+    "save": "シーンを保存",
+    "saveScenes": "シーンを保存",
+    "saving": "保存中…",
+    "saved": "保存しました",
+    "aiFill": "AIで埋める",
+    "aiFilling": "生成中...",
+    "aiFillTitle": "空欄をAIで埋める",
+    "aiFillSaved": "AI入力を保存しました",
+    "export": "絵コンテJSONをエクスポート",
+    "ai": {
+      "title": "AI写真分析",
+      "subtitle": "候補写真をもとに <strong>感情 / トーン</strong> を提案します。提案をクリックすると下のトーン設定に適用されます。スタイルプリセット、共通プロンプト、シーンは自動で埋められません。",
+      "analyze": "写真を分析",
+      "reanalyze": "再分析",
+      "analyzing": "分析中…",
+      "completeMsg": "写真分析が完了しました!",
+      "emptyNoPhotos": "分析を有効にするには、写真ページで少なくとも1枚を「候補」または「参考」に設定してください。",
+      "emptyClickToStart": "<strong>写真を分析</strong> をクリックして、選択した写真からトーンの候補を生成してください。"
+    },
+    "tones": {
+      "warm": { "label": "温かい", "desc": "心温まる懐かしさ" },
+      "cinematic": { "label": "映画的", "desc": "ドラマチックで壮大" },
+      "playful": { "label": "陽気", "desc": "楽しく活発" },
+      "quiet": { "label": "静か", "desc": "穏やかで内省的" }
+    },
+    "sections": {
+      "tone": "感情 / トーン",
+      "style": "スタイルプリセット",
+      "commonPrompt": "共通プロンプト",
+      "createScenes": "写真からシーンを作成",
+      "scenes": "シーン({count})"
+    },
+    "style": {
+      "aiRecommend": "AIにおまかせ",
+      "systemStyles": "システムスタイル",
+      "customStyles": "カスタムスタイル",
+      "createCustom": "カスタムスタイルを作成",
+      "name": "スタイル名",
+      "namePlaceholder": "ビンテージファミリーフィルム",
+      "description": "説明",
+      "descriptionPlaceholder": "温かい粒子感、柔らかいハイライト、淡い色味。",
+      "prompt": "スタイルプロンプト",
+      "promptPlaceholder": "画像生成時に適用する視覚処理を記述してください。",
+      "creating": "作成中...",
+      "createStyle": "スタイルを作成",
+      "createdMsg": "カスタムスタイルを作成しました!",
+      "failed": "カスタムスタイルの作成に失敗しました"
+    },
+    "commonPrompt": {
+      "notSet": "未設定",
+      "regenerate": "トーンとスタイルから再生成",
+      "intro": "すべてのシーンの画像生成に適用されます。絵コンテのトーンとスタイルから自動生成されており、全シーンを一貫させるために編集できます。",
+      "placeholder": "すべてのシーンに適用される共通プロンプト",
+      "save": "共通プロンプトを保存",
+      "saving": "保存中…",
+      "savedMsg": "共通プロンプトを保存しました!",
+      "failed": "共通プロンプトの保存に失敗しました"
+    },
+    "createScenes": {
+      "selectPhotosCta": "シーンを作成する写真を選択",
+      "addAsScene": "{count} 枚をシーンとして追加",
+      "addAsScenes": "{count} 枚をシーンとして追加",
+      "creating": "作成中…",
+      "createdMsg": "{count} 件のシーンを作成しました!下にスクロールして編集してください。",
+      "createdMsgPlural": "{count} 件のシーンを作成しました!下にスクロールして編集してください。",
+      "thumbsTitle": "{size} サムネイル",
+      "selectAll": "すべて選択",
+      "deselectAll": "選択を解除",
+      "hint": "💡 候補写真を1枚以上選び、ボタンを押すと下書きシーンが作成されます",
+      "failed": "テンプレートシーンの作成に失敗しました"
+    },
+    "scenes": {
+      "addScene": "+ シーンを追加",
+      "empty": "シーンがまだありません。「シーンを追加」をクリックして始めてください。",
+      "sceneLabel": "シーン {index}",
+      "sceneAnonymous": "シーン",
+      "sceneWithTitle": "シーン {index} · {title}",
+      "complementLabel": "補完シーン {index}",
+      "defaultTitle": "新しいシーン",
+      "defaultDescription": "このシーンで何が起きるかを書いてください。",
+      "defaultImagePrompt": "シーンの本質を捉えた映画的な一場面。",
+      "dragTitle": "ドラッグでシーンを並び替え",
+      "moveUp": "上へ",
+      "moveDown": "下へ",
+      "deleteTitle": "このシーンを削除",
+      "primaryClickReassign": "別の写真をクリックして、メイン写真を変更できます。",
+      "primaryClickAssign": "写真をクリックして、このシーンのメイン写真に設定してください。",
+      "bridgingScene": "AIによる橋渡しシーン · {label}",
+      "failedSave": "シーンの保存に失敗しました",
+      "failedFill": "シーンの自動入力に失敗しました",
+      "failedReorder": "シーンの並び替えに失敗しました",
+      "failedTone": "トーンの保存に失敗しました",
+      "failedStyle": "スタイルの保存に失敗しました",
+      "failedAnalyze": "写真の分析に失敗しました",
+      "failedInit": "絵コンテの作成に失敗しました"
+    },
+    "complement": {
+      "insertBlank": "+ 補完シーン",
+      "insertBlankTitle": "ここに空の補完シーンを挿入",
+      "aiPropose": "✨ AIに提案させる",
+      "aiProposeTitle": "AIに橋渡しシーンを提案してもらう",
+      "modalTitle": "AI補完シーンの提案",
+      "modalHint": "挿入する橋渡しシーンを選んでください。保存前に編集できます。",
+      "noProposals": "提案はありませんでした。",
+      "applying": "適用中…",
+      "useScene": "このシーンを使う",
+      "inserted": "補完シーンを挿入しました",
+      "appliedReview": "提案を適用しました — 確認して「シーンを保存」してください",
+      "failedInsert": "補完シーンの挿入に失敗しました",
+      "failedPropose": "補完シーンの提案に失敗しました",
+      "failedApply": "提案の適用に失敗しました"
+    },
+    "footer": {
+      "continueToGenerate": "生成へ進む →",
+      "testInProgress": "テスト中…",
+      "viewTestGeneration": "テスト生成を表示",
+      "startTestGeneration": "テスト生成 →"
+    }
+  },
+  "testGeneration": {
+    "title": "テスト生成 — 3スタイルをプレビュー",
+    "intro": "本生成の前に、スタイル選択を確認するため3枚のサンプル画像を生成します。気に入った1枚を確定して進めてください。",
+    "startCta": "テストサンプルを3枚生成",
+    "starting": "開始中…",
+    "confirmedNotice": "✓ テストを確定しました。本生成に進めます。",
+    "progress": "進捗: {total} 中 {done} 件完了",
+    "variantHeader": "バリアント {index} — {status}",
+    "variantAlt": "テストバリアント {index}",
+    "stateFailed": "失敗",
+    "stateGenerating": "生成中…",
+    "confirmStyle": "このスタイルを確定",
+    "confirming": "確定中…",
+    "confirmedBadge": "✓ 確定済み",
+    "regenerate": "新しいテストを生成",
+    "errors": {
+      "start": "テスト生成の開始に失敗しました。",
+      "confirm": "確定に失敗しました。",
+      "reset": "リセットに失敗しました。"
+    }
+  },
+  "generate": {
+    "title": "生成",
+    "subtitle": "絵コンテの各シーンに対してAI画像を生成します。",
+    "noScenes": "シーンが見つかりません。先に絵コンテのステップでシーンを追加してください。",
+    "goToStoryboard": "絵コンテへ移動 →",
+    "progress": {
+      "completed": "{total} 中 {done} 件完了",
+      "failed": "{count} 件失敗",
+      "generating": "生成中…"
+    },
+    "actions": {
+      "starting": "開始中…",
+      "start": "生成を開始",
+      "retryFailed": "失敗したシーンを再試行",
+      "reviewImages": "画像を確認 →"
+    },
+    "row": {
+      "retry": "再試行",
+      "cancel": "キャンセル"
+    },
+    "status": {
+      "none": "未開始",
+      "queued": "待機中",
+      "running": "生成中…",
+      "succeeded": "完了",
+      "failed": "失敗",
+      "canceled": "キャンセル"
+    },
+    "errors": {
+      "start": "生成の開始に失敗しました",
+      "retry": "再試行に失敗しました",
+      "cancel": "キャンセルに失敗しました"
+    }
+  },
+  "review": {
+    "title": "確認",
+    "subtitle": "生成された画像と元の写真を比較して、採用するものを選んでください。",
+    "noScenes": "シーンが見つかりません。",
+    "backToGenerate": "← 生成に戻る",
+    "generationHistory": "生成履歴",
+    "exportJson": "絵コンテJSONをエクスポート",
+    "controls": {
+      "view": "表示",
+      "show": "表示対象",
+      "views": {
+        "card": "カード",
+        "timeline": "タイムライン",
+        "table": "テーブル"
+      },
+      "filters": {
+        "all": "すべて",
+        "original": "元写真のみ",
+        "generated": "生成画像のみ"
+      }
+    },
+    "card": {
+      "adoptedBadge": "✓ 採用済み",
+      "failedBadge": "生成に失敗",
+      "regenerate": "再生成",
+      "sourcePhoto": "元写真",
+      "generatedImage": "生成画像",
+      "noPhotoAssigned": "写真未割当",
+      "generationFailed": "生成に失敗しました",
+      "generatingState": "生成中…",
+      "notGeneratedYet": "未生成",
+      "noImageAdopted": "まだ採用された画像はありません",
+      "retryGeneration": "生成を再試行",
+      "goToGenerate": "生成へ移動 →",
+      "historyHeader": "生成履歴({count})",
+      "adopt": "採用",
+      "adopted": "採用済み"
+    },
+    "regenModal": {
+      "title": "再生成 — {sceneTitle}",
+      "untitledScene": "無題のシーン",
+      "subtitle": "設定を調整してから確定すると、新しい生成がキューに入ります。変更はシーンに保存されます。",
+      "imagePrompt": "画像プロンプト",
+      "emotion": "感情",
+      "camera": "カメラ",
+      "lighting": "ライティング",
+      "motion": "モーション",
+      "cancel": "キャンセル",
+      "queue": "生成をキューに追加",
+      "queuing": "キュー追加中…"
+    },
+    "timeline": {
+      "untitled": "無題",
+      "complementScene": "補完シーン",
+      "noPhoto": "写真なし",
+      "notGenerated": "未生成"
+    },
+    "table": {
+      "hash": "#",
+      "title": "タイトル",
+      "emotion": "感情",
+      "camera": "カメラ",
+      "sourcePhoto": "元写真",
+      "generatedImage": "生成画像",
+      "untitled": "無題"
+    },
+    "time": {
+      "justNow": "たった今",
+      "minutesAgo": "{count} 分前",
+      "hoursAgo": "{count} 時間前",
+      "daysAgo": "{count} 日前"
+    },
+    "errors": {
+      "adopt": "画像の採用に失敗しました",
+      "retry": "再試行に失敗しました",
+      "regen": "再生成のキューイングに失敗しました"
+    }
+  },
+  "generationHistory": {
+    "title": "生成履歴",
+    "subtitle": "このプロジェクトのすべての生成リクエストをシーン別に表示します。",
+    "backToReview": "← 確認に戻る",
+    "totalRequest": "{count} 件のリクエスト",
+    "totalRequests": "{count} 件のリクエスト",
+    "noRequests": "生成リクエストはまだありません。",
+    "goToGenerate": "生成へ移動 →",
+    "editStoryboard": "絵コンテを編集",
+    "generateCta": "生成 →",
+    "untitledScene": "無題のシーン",
+    "tableHeaders": {
+      "status": "ステータス",
+      "created": "作成",
+      "completed": "完了",
+      "error": "エラー"
+    }
+  },
+  "settings": {
+    "title": "設定",
+    "subtitle": "アプリの設定",
+    "languageLabel": "言語",
+    "languageHelp": "インターフェース、AIによって生成されるテキスト、エクスポートされる絵コンテにこの言語が使われます。",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "保存しました",
+    "saveFailed": "設定の保存に失敗しました",
+    "language": {
+      "en": "English",
+      "ja": "日本語"
+    }
+  },
+  "errors": {
+    "validation_error": "入力された情報が正しくありません。",
+    "not_found": "対象が見つかりませんでした。",
+    "conflict": "現在の状態と競合しています。",
+    "invalid_state": "この操作は現在許可されていません。",
+    "unknown": "問題が発生しました。もう一度お試しください。"
+  },
+  "selections": {
+    "camera": {
+      "Wide": "ワイド",
+      "Extreme Wide": "超ワイド",
+      "Medium": "ミディアム",
+      "Close-up": "アップ",
+      "Extreme Close-up": "超クローズアップ",
+      "Aerial": "空撮",
+      "Overhead": "真上",
+      "POV": "POV(主観)",
+      "Low Angle": "ローアングル",
+      "Telephoto": "望遠",
+      "Voyeur": "群衆越し"
+    },
+    "lighting": {
+      "Golden hour": "ゴールデンアワー",
+      "Natural": "自然光",
+      "Dramatic": "ドラマチック",
+      "Night": "夜景",
+      "Soft": "ソフト",
+      "Backlit": "逆光",
+      "Silhouette": "シルエット",
+      "Volumetric": "ボリューム光"
+    },
+    "motion": {
+      "Slow pan": "ゆっくりパン",
+      "Static": "静止",
+      "Zoom in": "ズームイン",
+      "Zoom out": "ズームアウト",
+      "Tracking": "追従"
+    },
+    "emotion": {
+      "Joy": "喜び",
+      "Nostalgia": "懐かしさ",
+      "Love": "愛情",
+      "Pride": "誇り",
+      "Wonder": "驚き",
+      "Calm": "穏やか",
+      "Excitement": "高揚",
+      "Gratitude": "感謝"
+    },
+    "tone": {
+      "warm": "温かい",
+      "cinematic": "映画的",
+      "playful": "陽気",
+      "quiet": "静か"
+    }
+  }
+}

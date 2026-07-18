@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import type { ProjectDto } from "@gen-story/shared";
 import {
@@ -13,6 +14,8 @@ import { ErrorAlert } from "../ErrorAlert";
 import styles from "./ProjectListPage.module.css";
 
 export function ProjectListPage() {
+  const t = useTranslations("projects");
+  const tCommon = useTranslations("common");
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +38,7 @@ export function ProjectListPage() {
       await deleteProject(projectId);
       load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Delete failed");
+      setError(e instanceof Error ? e.message : t("deleteFailed"));
     }
   }
 
@@ -44,7 +47,7 @@ export function ProjectListPage() {
       await restoreProject(projectId);
       load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Restore failed");
+      setError(e instanceof Error ? e.message : t("restoreFailed"));
     }
   }
 
@@ -54,26 +57,26 @@ export function ProjectListPage() {
   return (
     <AppShell>
       <div className="screen-header">
-        <h2>Projects</h2>
-        <p>Your story projects</p>
+        <h2>{t("title")}</h2>
+        <p>{t("subtitle")}</p>
       </div>
 
       <div className={styles.toolbar}>
         <Link href="/projects/new" className="btn btn-primary">
-          + New project
+          {t("newProject")}
         </Link>
       </div>
 
-      {loading && <p className={styles.hint}>Loading…</p>}
+      {loading && <p className={styles.hint}>{tCommon("loading")}</p>}
       {error && <ErrorAlert message={error} onRetry={load} />}
 
       {!loading &&
         activeProjects.length === 0 &&
         deletedProjects.length === 0 && (
           <div className={`card ${styles.empty}`}>
-            <p>No projects yet. Create your first project to get started.</p>
+            <p>{t("emptyTitle")}</p>
             <Link href="/projects/new" className="btn btn-primary">
-              + New project
+              {t("newProject")}
             </Link>
           </div>
         )}
@@ -91,15 +94,17 @@ export function ProjectListPage() {
                 </span>
               </div>
               <p className={styles.meta}>
-                Updated {new Date(p.updatedAt).toLocaleDateString()}
+                {t("updated", {
+                  date: new Date(p.updatedAt).toLocaleDateString(),
+                })}
               </p>
             </Link>
             <button
               className={styles.deleteBtn}
               onClick={() => handleDelete(p.id)}
-              title="Delete project"
+              title={t("deleteTitle")}
             >
-              Delete
+              {t("delete")}
             </button>
           </div>
         ))}
@@ -107,10 +112,8 @@ export function ProjectListPage() {
 
       {deletedProjects.length > 0 && (
         <section className={styles.deletedSection}>
-          <h3 className={styles.deletedTitle}>Recently deleted</h3>
-          <p className={styles.deletedHint}>
-            Deleted projects are kept for 7 days.
-          </p>
+          <h3 className={styles.deletedTitle}>{t("deletedSectionTitle")}</h3>
+          <p className={styles.deletedHint}>{t("deletedSectionHint")}</p>
           <div className={styles.grid}>
             {deletedProjects.map((p) => (
               <div
@@ -121,14 +124,16 @@ export function ProjectListPage() {
                   <h3>{p.name}</h3>
                 </div>
                 <p className={styles.meta}>
-                  Deleted {new Date(p.deletedAt!).toLocaleDateString()}
+                  {t("deletedAt", {
+                    date: new Date(p.deletedAt!).toLocaleDateString(),
+                  })}
                 </p>
                 <button
                   className="btn btn-secondary"
                   style={{ fontSize: 12, padding: "4px 10px", marginTop: 4 }}
                   onClick={() => handleRestore(p.id)}
                 >
-                  Restore
+                  {t("restore")}
                 </button>
               </div>
             ))}

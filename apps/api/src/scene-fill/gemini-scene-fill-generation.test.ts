@@ -74,6 +74,7 @@ function input() {
     stylePreset: null,
     projectPhotos: [primaryPhoto],
     siblingScenes: [],
+    language: "en" as const,
   };
 }
 
@@ -139,5 +140,56 @@ describe("GeminiSceneFillGenerationAdapter", () => {
     );
 
     await expect(adapter.generateSceneFill(input())).rejects.toThrow();
+  });
+
+  it("injects a Japanese language directive when language=ja", async () => {
+    let capturedPrompt = "";
+    const client = {
+      models: {
+        async generateContent(req: {
+          contents: Array<{ parts: Array<{ text?: string }> }>;
+        }) {
+          const text = req.contents[0]?.parts[0]?.text;
+          capturedPrompt = typeof text === "string" ? text : "";
+          return validResponse;
+        },
+      },
+    };
+    const adapter = new GeminiSceneFillGenerationAdapter(
+      new MemoryObjectStorage(onePixelPng),
+      "test-key",
+      "gemini-test",
+      client,
+    );
+
+    await adapter.generateSceneFill({ ...input(), language: "ja" });
+
+    expect(capturedPrompt).toMatch(/Respond in Japanese/);
+    expect(capturedPrompt).toMatch(/remain in English/);
+  });
+
+  it("injects an English language directive when language=en", async () => {
+    let capturedPrompt = "";
+    const client = {
+      models: {
+        async generateContent(req: {
+          contents: Array<{ parts: Array<{ text?: string }> }>;
+        }) {
+          const text = req.contents[0]?.parts[0]?.text;
+          capturedPrompt = typeof text === "string" ? text : "";
+          return validResponse;
+        },
+      },
+    };
+    const adapter = new GeminiSceneFillGenerationAdapter(
+      new MemoryObjectStorage(onePixelPng),
+      "test-key",
+      "gemini-test",
+      client,
+    );
+
+    await adapter.generateSceneFill(input());
+
+    expect(capturedPrompt).toMatch(/Respond in English/);
   });
 });

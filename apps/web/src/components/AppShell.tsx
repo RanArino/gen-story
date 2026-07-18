@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import styles from "./AppShell.module.css";
 
@@ -12,6 +13,8 @@ type Props = {
 
 export function AppShell({ children, projectId }: Props) {
   const pathname = usePathname();
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(href + "/");
@@ -21,15 +24,15 @@ export function AppShell({ children, projectId }: Props) {
     <div className={styles.shell}>
       <nav className={styles.sidebar}>
         <div>
-          <p className={styles.eyebrow}>Gen Story</p>
-          <span className={styles.appTitle}>Story Builder</span>
+          <p className={styles.eyebrow}>{tCommon("appName")}</p>
+          <span className={styles.appTitle}>{tCommon("appTitle")}</span>
         </div>
         <div className={styles.stepList}>
           <Link
             href="/projects"
             className={`${styles.stepButton} ${isActive("/projects") && !projectId ? styles.stepButtonActive : ""}`}
           >
-            Projects
+            {tNav("projects")}
           </Link>
           {projectId && (
             <>
@@ -37,28 +40,36 @@ export function AppShell({ children, projectId }: Props) {
                 href={`/projects/${projectId}/photos`}
                 className={`${styles.stepButton} ${isActive(`/projects/${projectId}/photos`) ? styles.stepButtonActive : ""}`}
               >
-                1 · Photos
+                {tNav("stepPhotos")}
               </Link>
               <Link
                 href={`/projects/${projectId}/storyboard`}
                 className={`${styles.stepButton} ${isActive(`/projects/${projectId}/storyboard`) ? styles.stepButtonActive : ""}`}
               >
-                2 · Storyboard
+                {tNav("stepStoryboard")}
               </Link>
               <Link
                 href={`/projects/${projectId}/generate`}
                 className={`${styles.stepButton} ${isActive(`/projects/${projectId}/generate`) ? styles.stepButtonActive : ""}`}
               >
-                3 · Generate
+                {tNav("stepGenerate")}
               </Link>
               <Link
                 href={`/projects/${projectId}/review`}
                 className={`${styles.stepButton} ${isActive(`/projects/${projectId}/review`) ? styles.stepButtonActive : ""}`}
               >
-                4 · Review
+                {tNav("stepReview")}
               </Link>
             </>
           )}
+        </div>
+        <div className={styles.sidebarFooter}>
+          <Link
+            href="/settings"
+            className={`${styles.stepButton} ${isActive("/settings") ? styles.stepButtonActive : ""}`}
+          >
+            {tNav("settings")}
+          </Link>
         </div>
       </nav>
       <main className={styles.content}>{children}</main>

@@ -52,6 +52,8 @@ import type {
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
   TestGenerationBatchRepositoryPort,
+  UserPreference,
+  UserPreferenceRepositoryPort,
   UserRepositoryPort,
 } from "./ports";
 import {
@@ -62,6 +64,7 @@ import {
   createProjectUseCase,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
+  getUserPreference,
   insertComplementScene,
   markGeneratedImageAdopted,
   proposeComplementScenes,
@@ -69,6 +72,7 @@ import {
   reorderPhotos,
   reorderScenes,
   retryFailedGenerationRequest,
+  setUserPreference,
   updatePhotoCuration,
   upsertScenes,
   upsertStoryboard,
@@ -327,6 +331,20 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
 
   async save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void> {
     await this.store.save(projectPhotoAnalysis);
+  }
+}
+
+class InMemoryUserPreferenceRepository
+  implements UserPreferenceRepositoryPort
+{
+  private readonly items = new Map<string, UserPreference>();
+
+  async findByUserId(userId: string): Promise<UserPreference | null> {
+    return this.items.get(userId) ?? null;
+  }
+
+  async upsert(preference: UserPreference): Promise<void> {
+    this.items.set(preference.userId, preference);
   }
 }
 
@@ -620,6 +638,7 @@ function createDependencies(initial?: {
     testGenerationBatches: new InMemoryTestGenerationBatchRepository(
       stores.testGenerationBatches,
     ),
+    userPreferences: new InMemoryUserPreferenceRepository(),
     objectStorage,
     imagePreprocessing,
     imageGeneration,
@@ -638,6 +657,48 @@ function createDependencies(initial?: {
 }
 
 describe("application use cases", () => {
+  it("returns the default language for a brand-new user", async () => {
+    const deps = createDependencies();
+
+    const result = await getUserPreference(deps, "user_new");
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.userId).toBe("user_new");
+      expect(result.value.language).toBe("en");
+    }
+  });
+
+  it("round-trips a user language preference", async () => {
+    const deps = createDependencies();
+
+    const setResult = await setUserPreference(deps, {
+      userId: "user_1",
+      language: "ja",
+    });
+    expect(setResult.ok).toBe(true);
+
+    const getResult = await getUserPreference(deps, "user_1");
+    expect(getResult.ok).toBe(true);
+    if (getResult.ok) {
+      expect(getResult.value.language).toBe("ja");
+    }
+  });
+
+  it("rejects an invalid language", async () => {
+    const deps = createDependencies();
+
+    const result = await setUserPreference(deps, {
+      userId: "user_1",
+      // @ts-expect-error intentional bad value
+      language: "fr",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("validation_error");
+    }
+  });
+
   it("creates a user-scoped custom style preset", async () => {
     const deps = createDependencies();
 

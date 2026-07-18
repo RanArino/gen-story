@@ -92,3 +92,7 @@ export const CreateCustomStyleSchema = z.object({
   prompt: z.string().min(1),
   referenceImageStorageKey: z.string().min(1).optional(),
 });
+
+export const SetUserPreferenceSchema = z.object({
+  language: z.enum(["en", "ja"]),
+});

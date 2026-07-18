@@ -18,6 +18,28 @@ export type AuthPrincipal = {
   organization: Organization;
 };
 
+export type Language = "en" | "ja";
+export const SUPPORTED_LANGUAGES: Language[] = ["en", "ja"];
+export const DEFAULT_LANGUAGE: Language = "en";
+
+export function isLanguage(value: unknown): value is Language {
+  return (
+    typeof value === "string" &&
+    (SUPPORTED_LANGUAGES as string[]).includes(value)
+  );
+}
+
+export type UserPreference = {
+  userId: string;
+  language: Language;
+  updatedAt: string;
+};
+
+export interface UserPreferenceRepositoryPort {
+  findByUserId(userId: string): Promise<UserPreference | null>;
+  upsert(preference: UserPreference): Promise<void>;
+}
+
 export interface UserRepositoryPort {
   findById(userId: string): Promise<User | null>;
   save(user: User): Promise<void>;
@@ -157,6 +179,7 @@ export type SceneFillGenerationInput = {
   stylePreset: StylePreset | null;
   projectPhotos: PhotoAsset[];
   siblingScenes: Scene[];
+  language: Language;
 };
 
 export interface SceneFillGenerationPort {
@@ -183,6 +206,7 @@ export type ComplementSceneProposalInput = {
   stylePreset: StylePreset | null;
   projectPhotos: PhotoAsset[];
   siblingScenes: Scene[];
+  language: Language;
 };
 
 export interface ComplementSceneProposalPort {
@@ -195,6 +219,7 @@ export type PhotoAnalysisGenerationInput = {
   project: Project;
   storyboard: Storyboard | null;
   photos: PhotoAsset[];
+  language: Language;
 };
 
 export type PhotoAnalysisGenerationResult = {
@@ -242,6 +267,7 @@ export interface ApplicationDependencies {
   generatedImages: GeneratedImageRepositoryPort;
   projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
   testGenerationBatches: TestGenerationBatchRepositoryPort;
+  userPreferences: UserPreferenceRepositoryPort;
   objectStorage: ObjectStoragePort;
   imagePreprocessing: ImagePreprocessingPort;
   imageGeneration: ImageGenerationPort;

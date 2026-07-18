@@ -16,6 +16,7 @@ import {
   exportStoryboardAsJson,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
+  getUserPreference,
   insertComplementScene,
   markGeneratedImageAdopted,
   proposeComplementScenes,
@@ -26,12 +27,15 @@ import {
   restorePhotoAsset,
   restoreProject,
   retryFailedGenerationRequest,
+  setUserPreference,
   updatePhotoCuration,
   upsertScenes,
   upsertStoryboard,
   type ApplicationDependencies,
   type AuthPrincipal,
 } from "@gen-story/application";
+import { isLanguage as isLanguageValue } from "@gen-story/application";
+import { getLocalizedLabels } from "@gen-story/shared";
 
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
@@ -47,6 +51,7 @@ import {
   toStoryboardDto,
   toStylePresetDto,
   toTestGenerationBatchDto,
+  toUserPreferenceDto,
 } from "./dto-mappers";
 import {
   badRequestBody,
@@ -72,6 +77,7 @@ import {
   CreateTemplateScenesSchema,
   FillSceneWithAiSchema,
   PatchPhotoAssetSchema,
+  SetUserPreferenceSchema,
   UploadPhotoAssetSchema,
   UpsertScenesSchema,
   UpsertStoryboardSchema,
@@ -1695,12 +1701,19 @@ export function buildRouter(deps: ApplicationDependencies): Router {
   router.add(
     "GET",
     "/api/storyboards/:storyboardId/export.json",
-    async (_req, res, params) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
       const storyboardId = getParam(params, "storyboardId");
-      const result = await exportStoryboardAsJson(deps, { storyboardId });
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const langParam = url.searchParams.get("lang");
+      const language = isLanguageValue(langParam) ? langParam : undefined;
+
+      const result = await exportStoryboardAsJson(deps, {
+        storyboardId,
+        language,
+      });
 
       if (!result.ok) {
         sendJson(
@@ -1711,14 +1724,78 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
+      const envelope = {
+        language: result.value.language,
+        localizedLabels: getLocalizedLabels(result.value.language),
+        storyboard: result.value,
+      };
+
       const filename = `storyboard-${storyboardId}-${Date.now()}.json`;
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="${filename}"`,
       });
-      res.end(JSON.stringify(result.value, null, 2));
+      res.end(JSON.stringify(envelope, null, 2));
     },
   );
+
+  // GET /api/user/preferences
+  router.add("GET", "/api/user/preferences", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    const result = await getUserPreference(deps, principal.user.id);
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
+
+    sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
+  });
+
+  // PUT /api/user/preferences
+  router.add("PUT", "/api/user/preferences", async (req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    let rawBody: unknown;
+    try {
+      rawBody = await readJsonBody(req);
+    } catch (err) {
+      sendJson(
+        res,
+        400,
+        badRequestBody(err instanceof Error ? err.message : "Bad request."),
+      );
+      return;
+    }
+
+    const parsed = SetUserPreferenceSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+      return;
+    }
+
+    const result = await setUserPreference(deps, {
+      userId: principal.user.id,
+      language: parsed.data.language,
+    });
+
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
+
+    sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
+  });
 
   router.add("GET", "/files/*", async (_req, res, params) => {
     const tail = getParam(params, "*");

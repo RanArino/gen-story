@@ -31,6 +31,14 @@ export const users = sqliteTable(
   (table) => [index("users_organization_id_idx").on(table.organizationId)],
 );
 
+export const userPreferences = sqliteTable("user_preferences", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  language: text("language").notNull().default("en"),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const projects = sqliteTable(
   "projects",
   {
