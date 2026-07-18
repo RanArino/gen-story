@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  appendAdjustmentsToCommonPrompt,
+  assertAdjustmentsValid,
   assertComplementSceneBridge,
   canStartTestGeneration,
   completeTestGenerationBatch,
@@ -33,6 +35,7 @@ import {
   type Storyboard,
   type StoryboardStatus,
   type StylePreset,
+  type TestAdjustmentId,
   type TestGenerationBatch,
 } from "@gen-story/domain";
 
@@ -1686,9 +1689,97 @@ export async function requestTestGeneration(
   }
 }
 
+export type ApplyAdjustmentToTestVariantInput = {
+  storyboardId: string;
+  variantId: string;
+  adjustmentIds: TestAdjustmentId[];
+  adjustmentSuffixes: Record<TestAdjustmentId, string>;
+};
+
+export async function applyAdjustmentToTestVariant(
+  deps: ApplicationDependencies,
+  input: ApplyAdjustmentToTestVariantInput,
+): Promise<UseCaseResult<GenerationRequest>> {
+  try {
+    assertAdjustmentsValid(input.adjustmentIds);
+
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const variant = await deps.generationRequests.findById(input.variantId);
+    if (!variant || variant.storyboardId !== input.storyboardId) {
+      return failure(
+        "not_found",
+        "Generation request not found in this storyboard.",
+      );
+    }
+
+    const inputJson = variant.inputJson as Record<string, unknown>;
+    const testBatchId = inputJson?.testBatchId;
+    if (typeof testBatchId !== "string") {
+      return failure(
+        "invalid_state",
+        "Generation request is not a test variant.",
+      );
+    }
+
+    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(
+      input.storyboardId,
+    );
+    if (!batch || batch.id !== testBatchId) {
+      return failure(
+        "invalid_state",
+        "Test variant does not belong to the current batch.",
+      );
+    }
+    if (batch.status === "completed") {
+      return failure(
+        "invalid_state",
+        "Cannot adjust a variant after the batch is confirmed.",
+      );
+    }
+
+    const effectiveCommonPrompt = appendAdjustmentsToCommonPrompt(
+      storyboard.commonPrompt ?? "",
+      input.adjustmentIds,
+      input.adjustmentSuffixes,
+    );
+
+    const preprocessed = await deps.imagePreprocessing.preprocess({
+      projectId: variant.projectId,
+      storyboardId: input.storyboardId,
+      sceneId: variant.sceneId,
+      inputJson: { testBatchId, testVariant: inputJson.testVariant },
+      commonPromptOverride: effectiveCommonPrompt,
+    });
+
+    const ts = now();
+
+    await deps.generationRequests.softDelete(variant.id, ts);
+
+    const newRequest = createGenerationRequest({
+      id: randomUUID(),
+      projectId: variant.projectId,
+      storyboardId: input.storyboardId,
+      sceneId: variant.sceneId,
+      inputJson: preprocessed,
+      appliedAdjustments: input.adjustmentIds,
+      sourceGenerationRequestId: variant.id,
+      createdAt: ts,
+      updatedAt: ts,
+    });
+    await deps.generationRequests.save(newRequest);
+
+    return success(newRequest);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
 export type ConfirmTestGenerationInput = {
   storyboardId: string;
   confirmedGenerationRequestId: string;
+  adjustmentSuffixes?: Record<TestAdjustmentId, string>;
 };
 
 export async function confirmTestGeneration(
@@ -1732,6 +1823,22 @@ export async function confirmTestGeneration(
       ts,
     );
     await deps.testGenerationBatches.save(confirmed);
+
+    const appliedAdjustments = req.appliedAdjustments ?? [];
+    if (appliedAdjustments.length > 0 && input.adjustmentSuffixes) {
+      const nextCommonPrompt = appendAdjustmentsToCommonPrompt(
+        storyboard.commonPrompt ?? "",
+        appliedAdjustments,
+        input.adjustmentSuffixes,
+      );
+      if (nextCommonPrompt !== storyboard.commonPrompt) {
+        await deps.storyboards.save({
+          ...storyboard,
+          commonPrompt: nextCommonPrompt,
+          updatedAt: ts,
+        });
+      }
+    }
 
     return success(confirmed);
   } catch (error) {
@@ -1914,10 +2021,7 @@ export async function setUserPreference(
     }
 
     if (!isLanguage(input.language)) {
-      return failure(
-        "validation_error",
-        `language must be one of: en, ja`,
-      );
+      return failure("validation_error", `language must be one of: en, ja`);
     }
 
     const preference: UserPreference = {

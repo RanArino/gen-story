@@ -106,6 +106,7 @@ export interface GenerationRequestRepositoryPort {
   findRecent(limit: number): Promise<GenerationRequest[]>;
   findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]>;
   save(generationRequest: GenerationRequest): Promise<void>;
+  softDelete(generationRequestId: string, deletedAt: string): Promise<void>;
 }
 
 export interface GeneratedImageRepositoryPort {
@@ -144,6 +145,7 @@ export interface ImagePreprocessingPort {
     storyboardId: string;
     sceneId: string;
     inputJson: Record<string, unknown>;
+    commonPromptOverride?: string;
   }): Promise<Record<string, unknown>>;
 }
 

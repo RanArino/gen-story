@@ -96,8 +96,8 @@ Phase 1 goal: produce a storyboard and adopted generated-image set that can be h
 | Requirement | Status | Notes |
 |---|---|---|
 | Test-generate 3 pattern images before bulk generation | ✅ | `TestGenerationBatch` domain entity + DB migration + 4 API endpoints; `TestGenerationModal` generates 3 variants with polling |
-| Adjustment sliders / buttons (warmer, more cinematic, etc.) | ❌ | Not implemented; deferred — test generation provides initial validation |
-| Adjustments update common project prompt internally | ❌ | No common prompt; depends on test workflow completion |
+| Adjustment sliders / buttons (warmer, more cinematic, etc.) | 🟡 | In progress — see `docs/plans/20260526-test-generation-adjustment-chips.md` |
+| Adjustments update common project prompt internally | 🟡 | In progress — see `docs/plans/20260526-test-generation-adjustment-chips.md` |
 | User selects one test image to confirm style | ✅ | `TestGenerationModal` confirm action calls `POST /api/storyboards/:id/test-generation/confirm` |
 | "Generate more tests" option | ✅ | "Generate new tests" button resets batch via `POST /api/storyboards/:id/test-generation/reset` |
 | Bulk generation starts only after test confirmation | ✅ | StoryboardPage footer shows test modal until batch confirmed; only then shows "Continue to Generate" link |
@@ -314,7 +314,7 @@ Travel planning, Google Calendar, Google Maps, coin/payment system, SNS auto-pub
 | Emotion / AI photo analysis | 7 | 0 | 0 | 0 |
 | Image style selection | 6 | 0 | 1 | 1 |
 | Common project prompt | 4 | 0 | 0 | 0 |
-| Test generation workflow | 4 | 0 | 0 | 2 |
+| Test generation workflow | 4 | 0 | 2 | 0 |
 | Storyboard composition | 5 | 0 | 0 | 3 |
 | Scene content | 17 | 0 | 0 | 0 |
 | Scene editing UX | 4 | 1 | 1 | 0 |

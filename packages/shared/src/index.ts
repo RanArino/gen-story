@@ -25,6 +25,16 @@ export {
 } from "./i18n-labels";
 export type { LocalizedLabels } from "./i18n-labels";
 
+export {
+  TEST_ADJUSTMENTS,
+  TEST_ADJUSTMENT_IDS,
+  MAX_ADJUSTMENTS_PER_VARIANT,
+  isTestAdjustmentId,
+} from "./adjustments";
+export type { TestAdjustmentId, TestAdjustment } from "./adjustments";
+
+import type { TestAdjustmentId } from "./adjustments";
+
 export type ApiHealthDto = {
   status: "ok";
   service: string;
@@ -148,6 +158,7 @@ export type GenerationRequestDto = {
   inputJson: Record<string, unknown>;
   errorMessage: string | null;
   sourceGenerationRequestId: string | null;
+  appliedAdjustments: TestAdjustmentId[];
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;

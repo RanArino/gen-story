@@ -11,6 +11,7 @@ import type {
   SceneDto,
   StylePresetDto,
   StoryboardDto,
+  TestAdjustmentId,
   TestGenerationBatchDto,
   UserPreferenceDto,
 } from "@gen-story/shared";
@@ -465,6 +466,19 @@ export async function resetTestGenerationBatch(
     `/api/storyboards/${storyboardId}/test-generation/reset`,
   );
   return data.batch;
+}
+
+export async function applyTestVariantAdjustments(
+  storyboardId: string,
+  variantId: string,
+  adjustmentIds: TestAdjustmentId[],
+): Promise<GenerationRequestDto> {
+  const data = await request<{ generationRequest: GenerationRequestDto }>(
+    "POST",
+    `/api/storyboards/${storyboardId}/test-generation/variants/${variantId}/adjustments`,
+    { adjustmentIds },
+  );
+  return data.generationRequest;
 }
 
 export function exportStoryboardUrl(

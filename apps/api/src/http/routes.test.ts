@@ -1139,3 +1139,138 @@ describe("auth scoping — 401 without principal", () => {
     }
   });
 });
+
+describe("POST /api/storyboards/:id/test-generation/variants/:vid/adjustments", () => {
+  async function seedVariant() {
+    const {
+      createProject,
+      createStoryboard,
+      createScene,
+      createGenerationRequest,
+      createTestGenerationBatch,
+    } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+
+    await deps.projects.save(
+      createProject({
+        id: "adj-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Adjustment Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "adj-sb",
+        projectId: "adj-proj",
+        tone: "cinematic",
+        commonPrompt: "Base common prompt.",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createScene({
+        id: "adj-scene",
+        projectId: "adj-proj",
+        storyboardId: "adj-sb",
+        orderIndex: 0,
+        title: "T",
+        description: "D",
+        imagePrompt: "P",
+        emotion: "calm",
+        cameraDirection: "wide",
+        lightingDirection: "natural",
+        motionDirection: "slow pan",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const batch = createTestGenerationBatch({
+      id: "adj-batch",
+      storyboardId: "adj-sb",
+      status: "pending",
+      createdAt: now,
+    });
+    await deps.testGenerationBatches.save(batch);
+    const variant = createGenerationRequest({
+      id: "adj-variant",
+      projectId: "adj-proj",
+      storyboardId: "adj-sb",
+      sceneId: "adj-scene",
+      inputJson: { testBatchId: batch.id, testVariant: 0 },
+      createdAt: now,
+      updatedAt: now,
+    });
+    await deps.generationRequests.save(variant);
+  }
+
+  it("happy path: applies one adjustment and returns 200", async () => {
+    await seedVariant();
+    const { status, body } = await req(
+      base,
+      "POST",
+      "/api/storyboards/adj-sb/test-generation/variants/adj-variant/adjustments",
+      { adjustmentIds: ["warmer"] },
+    );
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      generationRequest: {
+        status: "queued",
+        appliedAdjustments: ["warmer"],
+        sourceGenerationRequestId: "adj-variant",
+      },
+    });
+  });
+
+  it("returns 422 when more than 3 adjustments are given", async () => {
+    await seedVariant();
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/storyboards/adj-sb/test-generation/variants/adj-variant/adjustments",
+      {
+        adjustmentIds: ["warmer", "cooler", "darker", "brighter"],
+      },
+    );
+    expect(status).toBe(422);
+  });
+
+  it("returns 422 for unknown adjustment id", async () => {
+    await seedVariant();
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/storyboards/adj-sb/test-generation/variants/adj-variant/adjustments",
+      { adjustmentIds: ["not_real"] },
+    );
+    expect(status).toBe(422);
+  });
+
+  it("returns 404 when variant is missing", async () => {
+    await seedVariant();
+    const { status } = await req(
+      base,
+      "POST",
+      "/api/storyboards/adj-sb/test-generation/variants/missing/adjustments",
+      { adjustmentIds: ["warmer"] },
+    );
+    expect(status).toBe(404);
+  });
+
+  it("accepts an empty array (no-op restoring base commonPrompt)", async () => {
+    await seedVariant();
+    const { status, body } = await req(
+      base,
+      "POST",
+      "/api/storyboards/adj-sb/test-generation/variants/adj-variant/adjustments",
+      { adjustmentIds: [] },
+    );
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      generationRequest: { appliedAdjustments: [] },
+    });
+  });
+});

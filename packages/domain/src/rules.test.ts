@@ -9,6 +9,8 @@ import {
   createStoryboard,
 } from "./index";
 import {
+  appendAdjustmentsToCommonPrompt,
+  assertAdjustmentsValid,
   composeCommonPrompt,
   replaceScenePhotoAssets,
   retryGenerationRequest,
@@ -18,6 +20,16 @@ import {
   updatePhotoUsage,
   updateStylePreset,
 } from "./index";
+import type { TestAdjustmentId } from "./index";
+
+const FAKE_SUFFIXES: Record<TestAdjustmentId, string> = {
+  warmer: "warmer color temperature, amber tones",
+  cooler: "cooler color temperature, blue tones",
+  more_cinematic: "stronger cinematic grade",
+  darker: "lower-key lighting",
+  brighter: "higher-key lighting",
+  more_candid: "candid documentary feel",
+};
 
 describe("domain rules", () => {
   it("sorts scenes by order index with a deterministic tiebreaker", () => {
@@ -348,5 +360,85 @@ describe("domain rules", () => {
     };
 
     expect(composeCommonPrompt(input)).toBe(composeCommonPrompt(input));
+  });
+});
+
+describe("assertAdjustmentsValid", () => {
+  it("accepts an empty list", () => {
+    expect(() => assertAdjustmentsValid([])).not.toThrow();
+  });
+
+  it("accepts up to 3 unique adjustments", () => {
+    expect(() =>
+      assertAdjustmentsValid(["warmer", "more_cinematic", "darker"]),
+    ).not.toThrow();
+  });
+
+  it("rejects more than 3 adjustments", () => {
+    expect(() =>
+      assertAdjustmentsValid(["warmer", "cooler", "more_cinematic", "darker"]),
+    ).toThrow(/At most 3 adjustments/);
+  });
+
+  it("rejects duplicate adjustments", () => {
+    expect(() => assertAdjustmentsValid(["warmer", "warmer"])).toThrow(
+      /Duplicate adjustment/,
+    );
+  });
+
+  it("rejects unknown ids", () => {
+    expect(() =>
+      assertAdjustmentsValid(["not_a_real_id" as TestAdjustmentId]),
+    ).toThrow(/Unknown adjustment/);
+  });
+});
+
+describe("appendAdjustmentsToCommonPrompt", () => {
+  it("returns the original prompt when no adjustments are given", () => {
+    expect(
+      appendAdjustmentsToCommonPrompt("base prompt", [], FAKE_SUFFIXES),
+    ).toBe("base prompt");
+  });
+
+  it("appends a suffix to the common prompt", () => {
+    expect(
+      appendAdjustmentsToCommonPrompt(
+        "base prompt.",
+        ["warmer"],
+        FAKE_SUFFIXES,
+      ),
+    ).toBe("base prompt. warmer color temperature, amber tones");
+  });
+
+  it("appends multiple suffixes in order", () => {
+    expect(
+      appendAdjustmentsToCommonPrompt(
+        "base.",
+        ["warmer", "more_cinematic"],
+        FAKE_SUFFIXES,
+      ),
+    ).toBe(
+      "base. warmer color temperature, amber tones stronger cinematic grade",
+    );
+  });
+
+  it("de-duplicates suffixes already present in the prompt", () => {
+    const once = appendAdjustmentsToCommonPrompt(
+      "base.",
+      ["warmer"],
+      FAKE_SUFFIXES,
+    );
+    const twice = appendAdjustmentsToCommonPrompt(
+      once,
+      ["warmer"],
+      FAKE_SUFFIXES,
+    );
+    expect(twice).toBe(once);
+  });
+
+  it("handles an empty base common prompt", () => {
+    expect(appendAdjustmentsToCommonPrompt("", ["cooler"], FAKE_SUFFIXES)).toBe(
+      "cooler color temperature, blue tones",
+    );
   });
 });

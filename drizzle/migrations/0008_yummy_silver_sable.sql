@@ -1,0 +1,1 @@
+ALTER TABLE `generation_requests` ADD `applied_adjustments_json` text DEFAULT '[]' NOT NULL;

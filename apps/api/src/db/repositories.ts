@@ -1,4 +1,14 @@
-import { and, asc, desc, eq, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import {
   createGeneratedImage,
@@ -12,6 +22,7 @@ import {
   createStylePreset,
   createTestGenerationBatch,
   createUser,
+  isTestAdjustmentId,
   sortScenesByOrderIndex,
   type GeneratedImage,
   type GenerationRequest,
@@ -31,6 +42,7 @@ import {
   type StoryboardStatus,
   type StylePreset,
   type StylePresetScope,
+  type TestAdjustmentId,
   type TestGenerationBatch,
   type TestGenerationBatchStatus,
   type User,
@@ -238,11 +250,24 @@ function mapGenerationRequest(row: GenerationRequestRow): GenerationRequest {
     inputJson: parseInputJson(row.inputJson),
     errorMessage: row.errorMessage,
     sourceGenerationRequestId: row.sourceGenerationRequestId,
+    appliedAdjustments: parseAppliedAdjustments(row.appliedAdjustmentsJson),
     startedAt: row.startedAt ?? null,
     completedAt: row.completedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
+}
+
+function parseAppliedAdjustments(value: string | null): TestAdjustmentId[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isTestAdjustmentId);
+  } catch {
+    return [];
+  }
 }
 
 function mapGeneratedImage(row: GeneratedImageRow): GeneratedImage {
@@ -1057,9 +1082,7 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
     return rows.map(mapGenerationRequest);
   }
 
-  async findByStoryboardId(
-    storyboardId: string,
-  ): Promise<GenerationRequest[]> {
+  async findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]> {
     const rows = await this.db
       .select()
       .from(generationRequests)
@@ -1069,15 +1092,16 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
           isNull(generationRequests.deletedAt),
         ),
       )
-      .orderBy(
-        desc(generationRequests.createdAt),
-        desc(generationRequests.id),
-      );
+      .orderBy(desc(generationRequests.createdAt), desc(generationRequests.id));
 
     return rows.map(mapGenerationRequest);
   }
 
   async save(generationRequest: GenerationRequest): Promise<void> {
+    const appliedAdjustmentsJson = JSON.stringify(
+      generationRequest.appliedAdjustments,
+    );
+
     await this.db
       .insert(generationRequests)
       .values({
@@ -1089,6 +1113,7 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
         inputJson: JSON.stringify(generationRequest.inputJson),
         errorMessage: generationRequest.errorMessage,
         sourceGenerationRequestId: generationRequest.sourceGenerationRequestId,
+        appliedAdjustmentsJson,
         startedAt: generationRequest.startedAt,
         completedAt: generationRequest.completedAt,
         createdAt: generationRequest.createdAt,
@@ -1105,6 +1130,7 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
           errorMessage: generationRequest.errorMessage,
           sourceGenerationRequestId:
             generationRequest.sourceGenerationRequestId,
+          appliedAdjustmentsJson,
           startedAt: generationRequest.startedAt,
           completedAt: generationRequest.completedAt,
           updatedAt: generationRequest.updatedAt,
@@ -1424,9 +1450,7 @@ function mapUserPreference(row: UserPreferenceRow): UserPreference {
   };
 }
 
-export class SqliteUserPreferenceRepository
-  implements UserPreferenceRepositoryPort
-{
+export class SqliteUserPreferenceRepository implements UserPreferenceRepositoryPort {
   constructor(private readonly db: GenStoryDatabase) {}
 
   async findByUserId(userId: string): Promise<UserPreference | null> {
