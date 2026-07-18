@@ -23,6 +23,7 @@ export const UpsertStoryboardSchema = z.object({
   status: z.enum(["draft", "editing", "ready", "completed"]).optional(),
   stylePresetId: z.string().nullable().optional(),
   commonPrompt: z.string().optional(),
+  story: z.string().optional(),
   negativePrompt: z.string().optional(),
 });
 
@@ -76,6 +77,7 @@ export const PreviewScenePromptSchema = z.object({
   sceneNegativePrompt: z.string().optional(),
   projectNegativePrompt: z.string().optional(),
   commonPrompt: z.string().optional(),
+  story: z.string().optional(),
 });
 
 export const AnalyzeProjectPhotosSchema = z.object({}).strict();

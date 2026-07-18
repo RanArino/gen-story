@@ -83,6 +83,7 @@ describe("domain factories", () => {
       tone: "Tender and reflective",
       stylePresetId: "style_1",
       commonPrompt: "",
+      story: "",
       negativePrompt: "",
       sceneIds: ["scene_2", "scene_1"],
       createdAt: "2026-05-02T00:00:00.000Z",
@@ -101,6 +102,21 @@ describe("domain factories", () => {
     });
 
     expect(storyboard.commonPrompt).toBe("Warm nostalgic family film.");
+  });
+
+  it("trims and preserves a supplied storyboard story", () => {
+    const storyboard = createStoryboard({
+      id: "storyboard_1",
+      projectId: "project_1",
+      tone: "Tender and reflective",
+      story: "  A family returns to the seaside town where everything began.  ",
+      createdAt: "2026-05-02T00:00:00.000Z",
+      updatedAt: "2026-05-02T00:00:00.000Z",
+    });
+
+    expect(storyboard.story).toBe(
+      "A family returns to the seaside town where everything began.",
+    );
   });
 
   it("creates a photo asset with candidate usage by default", () => {

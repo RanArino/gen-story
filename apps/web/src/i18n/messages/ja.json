@@ -173,6 +173,8 @@
       "tone": "感情 / トーン",
       "style": "スタイルプリセット",
       "commonPrompt": "共通プロンプト",
+      "story": "ストーリー / 世界観",
+      "projectSettings": "プロジェクト設定",
       "createScenes": "写真からシーンを作成",
       "scenes": "シーン({count})",
       "negativePrompt": "ネガティブプロンプト（逸脱フェンス）"
@@ -202,6 +204,38 @@
       "saving": "保存中…",
       "savedMsg": "共通プロンプトを保存しました!",
       "failed": "共通プロンプトの保存に失敗しました"
+    },
+    "story": {
+      "notSet": "未設定",
+      "intro": "全シーンに共通する物語と世界観を定義します。写真分析から初期化され、各画像プロンプトに合成されます。",
+      "placeholder": "全シーンで共有するストーリーと世界観",
+      "save": "ストーリーを保存",
+      "saving": "保存中…",
+      "savedMsg": "ストーリーを保存しました!",
+      "failed": "ストーリーの保存に失敗しました",
+      "regenerate": "分析から再生成"
+    },
+    "view": {
+      "label": "絵コンテ表示",
+      "split": "分割",
+      "gallery": "ギャラリー",
+      "showDetails": "説明とプロンプトを表示",
+      "hideDetails": "説明とプロンプトを隠す",
+      "galleryEditor": "ギャラリーシーンを編集"
+    },
+    "nav": {
+      "label": "シーン写真ナビゲーション",
+      "untitled": "無題"
+    },
+    "addScenes": {
+      "open": "シーンを追加",
+      "title": "未使用写真からシーンを追加",
+      "hint": "候補写真のうち、まだシーンのメイン写真に使われていないものだけを表示します。",
+      "empty": "すべての候補写真はすでにシーンに割り当てられています。"
+    },
+    "changePhoto": {
+      "open": "写真を変更",
+      "noPhoto": "写真なし"
     },
     "createScenes": {
       "selectPhotosCta": "シーンを作成する写真を選択",

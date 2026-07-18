@@ -19,6 +19,7 @@ export type ComposeScenePromptOverrides = {
   lightingDirection?: string;
   motionDirection?: string;
   commonPrompt?: string;
+  story?: string;
   sceneNegativePrompt?: string;
   projectNegativePrompt?: string;
 };
@@ -71,6 +72,7 @@ export async function composeScenePrompt(
     tone: storyboard.tone ?? "",
     stylePresetPrompt: stylePreset?.prompt ?? null,
     commonPrompt: overrides.commonPrompt ?? storyboard.commonPrompt ?? "",
+    story: overrides.story ?? storyboard.story ?? "",
     negativePrompt,
   });
 

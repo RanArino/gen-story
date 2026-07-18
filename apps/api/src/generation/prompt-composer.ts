@@ -89,6 +89,7 @@ export function composeImagePrompt(input: {
   tone: string;
   stylePresetPrompt: string | null;
   commonPrompt: string;
+  story: string;
   // Already-merged negative phrases. `gpt-image` has no native negative-prompt
   // field, so when non-empty this is folded into the single returned prompt as
   // a trailing `avoid: …` clause.
@@ -103,6 +104,7 @@ export function composeImagePrompt(input: {
     tone,
     stylePresetPrompt,
     commonPrompt,
+    story,
     negativePrompt,
   } = input;
 
@@ -110,6 +112,7 @@ export function composeImagePrompt(input: {
 
   if (stylePresetPrompt) segments.push(stylePresetPrompt);
   if (commonPrompt.trim()) segments.push(commonPrompt.trim());
+  if (story.trim()) segments.push(story.trim());
   segments.push(CAMERA_DESCRIPTORS[cameraDirection] ?? "cinematic framing");
   if (imagePrompt) segments.push(imagePrompt);
   segments.push(
