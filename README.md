@@ -1,6 +1,13 @@
 # Gen Story
 
-A local personal-use app for generating AI-powered photo story videos. Upload photos, build a storyboard, generate AI images per scene, and review the results.
+A locally-run demo app for turning your photos into AI-powered story visuals.
+Upload photos, build a storyboard, generate an AI image per scene, and review
+the results.
+
+This repository is published as a **public demo**: it runs entirely on your own
+machine (local SQLite + local file storage) and needs no cloud setup. See
+[docs/known-limitations.md](docs/known-limitations.md) for what is intentionally
+out of scope in this version.
 
 ## Prerequisites
 
@@ -175,3 +182,7 @@ data/            Local SQLite DB and uploaded files (gitignored)
 ```
 
 See [docs/known-limitations.md](docs/known-limitations.md) for features intentionally excluded from this local version.
+
+## License
+
+Released under the [MIT License](LICENSE).
