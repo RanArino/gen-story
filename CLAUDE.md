@@ -68,7 +68,7 @@ data/            Local SQLite DB and uploaded files (gitignored)
 - Write all code, comments, task names, PR text, and docs in **English**.
 - `pnpm typecheck` after every code change.
 - Update `docs/` when commands, env vars, APIs, or user-visible behavior changes.
-- Update `docs/gap-analysis.md` whenever work starts, is planned with an ExecPlan, or is completed for any requirement tracked there. If an ExecPlan targets a `❌ Not yet implemented` requirement, change that requirement to `🟡 In progress` in the same change as the plan.
+- Update `internal/gap-analysis.md` whenever work starts, is planned with an ExecPlan, or is completed for any requirement tracked there. If an ExecPlan targets a `❌ Not yet implemented` requirement, change that requirement to `🟡 In progress` in the same change as the plan. (`internal/` is gitignored and excluded from the public release.)
 - Use `.env.example` to document new env vars; never commit `.env` or secrets.
 - Never edit generated files: `node_modules`, `.next`, `dist`, `*.tsbuildinfo`.
 - Never add production cloud deployment, external queues, paid billing, WorkOS production auth, SNS, video generation, or BGM generation unless explicitly requested.
@@ -79,4 +79,4 @@ data/            Local SQLite DB and uploaded files (gitignored)
 - Prefer existing local patterns over new abstractions or dependencies.
 - Run narrowest check first (`pnpm typecheck`), then broader checks (`pnpm lint`, `pnpm test`, `pnpm build`).
 - Use an ExecPlan (see `/Users/ran/my-app/PLANS.md`) for multi-step, architectural, or migration work.
-- When creating or updating an ExecPlan from `docs/gap-analysis.md`, keep `docs/gap-analysis.md` synchronized before finishing the turn, including status icons, notes, and summary counts.
+- When creating or updating an ExecPlan from `internal/gap-analysis.md`, keep `internal/gap-analysis.md` synchronized before finishing the turn, including status icons, notes, and summary counts. ExecPlans live in `internal/plans/`.
