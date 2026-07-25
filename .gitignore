@@ -19,3 +19,6 @@ scripts/poc/output/
 ToDo
 PR*.md
 apps/api/data/uploads/
+
+# Internal strategy, requirements, and planning docs (not for public release)
+internal/
