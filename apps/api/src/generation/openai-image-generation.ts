@@ -33,7 +33,7 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
       prompt = "A cinematic still image.",
       model = "gpt-image-2",
       size = "1024x1024",
-      quality = "standard",
+      quality = "auto",
       projectId = "unknown-project",
       sceneId = "unknown-scene",
       inputPhotoStorageKeys,
@@ -70,7 +70,6 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
         image: imageFiles[0]!,
         prompt: String(prompt),
         size: size as Parameters<typeof this.client.images.edit>[0]["size"],
-        response_format: "b64_json",
       });
 
       b64 = response.data?.[0]?.b64_json ?? "";
@@ -84,7 +83,6 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
         quality: quality as Parameters<
           typeof this.client.images.generate
         >[0]["quality"],
-        response_format: "b64_json",
         n: 1,
       });
 
