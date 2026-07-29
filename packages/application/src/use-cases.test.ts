@@ -2749,4 +2749,94 @@ describe("application use cases", () => {
       imagePrompt: "AI image prompt",
     });
   });
+
+  it("passes the stored photo analysis to the scene fill port", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_ai",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_ai",
+          projectId: "project_ai",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_ai",
+          projectId: "project_ai",
+          name: "birthday.jpg",
+          storageKey: "photos/birthday.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "photo_ai_checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      scenes: [
+        createTemplateScene({
+          id: "scene_ai",
+          projectId: "project_ai",
+          storyboardId: "storyboard_ai",
+          orderIndex: 0,
+          photoAssetId: "photo_ai",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projectPhotoAnalyses: [
+        createProjectPhotoAnalysis({
+          id: "analysis_1",
+          projectId: "project_ai",
+          emotionCandidates: [
+            {
+              value: "warm_nostalgia",
+              label: "Warm nostalgia",
+              description: "Tender.",
+              reason: "Because.",
+            },
+          ],
+          photoInsights: [
+            {
+              photoAssetId: "photo_ai",
+              summary: "A birthday table.",
+              people: "Two adults.",
+              setting: "Indoors.",
+              event: "Birthday.",
+              atmosphere: "Warm.",
+            },
+          ],
+          storySummary: "A warm family birthday.",
+          model: "test-model",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    await runSceneAiFillJob(deps, job!);
+
+    expect(deps.sceneFillGeneration.calls).toHaveLength(1);
+    expect(deps.sceneFillGeneration.calls[0]!.photoAnalysis).toMatchObject({
+      id: "analysis_1",
+      storySummary: "A warm family birthday.",
+    });
+  });
 });

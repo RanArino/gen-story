@@ -74,6 +74,7 @@ function input() {
     stylePreset: null,
     projectPhotos: [primaryPhoto],
     siblingScenes: [],
+    photoAnalysis: null,
     language: "en" as const,
   };
 }

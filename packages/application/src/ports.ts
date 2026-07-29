@@ -192,6 +192,10 @@ export type SceneFillGenerationInput = {
   stylePreset: StylePreset | null;
   projectPhotos: PhotoAsset[];
   siblingScenes: Scene[];
+  // The project's stored photo analysis, when one exists. Grounds the scene in
+  // what the vision pass already established about these photos and the story
+  // as a whole, instead of re-deriving it per scene.
+  photoAnalysis: ProjectPhotoAnalysis | null;
   language: Language;
 };
 

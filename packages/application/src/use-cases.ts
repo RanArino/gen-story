@@ -939,6 +939,7 @@ type SceneFillContext = {
         stylePreset: StylePreset | null;
         projectPhotos: PhotoAsset[];
         siblingScenes: Scene[];
+        photoAnalysis: ProjectPhotoAnalysis | null;
         language: Language;
       }
   >;
@@ -1010,6 +1011,9 @@ async function collectSceneFillContext(
         }
       }
 
+      const photoAnalysis =
+        await deps.projectPhotoAnalyses.findLatestByProjectId(project.id);
+
       return {
         project,
         storyboard,
@@ -1018,6 +1022,7 @@ async function collectSceneFillContext(
         stylePreset,
         projectPhotos,
         siblingScenes,
+        photoAnalysis,
         language,
       };
     },
