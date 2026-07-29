@@ -256,7 +256,10 @@
       "selectAll": "すべて選択",
       "deselectAll": "選択を解除",
       "hint": "💡 候補写真を1枚以上選び、ボタンを押すと下書きシーンが作成されます",
-      "failed": "テンプレートシーンの作成に失敗しました"
+      "failed": "テンプレートシーンの作成に失敗しました",
+      "autoFill": "タイトルとプロンプトもAIで作成する（写真{count}枚 → AI呼び出し{count}回）",
+      "autoFillProgress": "AIがシーンを作成中… {done}/{total}",
+      "autoFillFailed": "{count}件のシーンでAI補完に失敗しました。該当シーンの「AIで埋める」から再試行できます。"
     },
     "scenes": {
       "addScene": "+ シーンを追加",

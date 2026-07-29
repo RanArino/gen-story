@@ -69,6 +69,7 @@ import {
   confirmTestGeneration,
   createGenerationRequestUseCase,
   createCustomStyle,
+  createTemplateScenesFromPhotos,
   createProjectUseCase,
   fillSceneWithAi,
   getProjectPhotoAnalysis,
@@ -2838,5 +2839,79 @@ describe("application use cases", () => {
       id: "analysis_1",
       storySummary: "A warm family birthday.",
     });
+  });
+
+  it("enqueues one AI fill job per created scene only when autoFill is requested", async () => {
+    function seed() {
+      return createDependencies({
+        projects: [
+          createProject({
+            id: "project_t",
+            organizationId: "org_1",
+            ownerUserId: "user_1",
+            name: "Trip",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        storyboards: [
+          createStoryboard({
+            id: "storyboard_t",
+            projectId: "project_t",
+            tone: "Warm",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        photoAssets: ["photo_a", "photo_b"].map((id) =>
+          createPhotoAsset({
+            id,
+            projectId: "project_t",
+            name: `${id}.jpg`,
+            usage: "candidate",
+            storageKey: `photos/${id}.jpg`,
+            mimeType: "image/jpeg",
+            size: 1,
+            checksum: id,
+            sourceKind: "upload",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ),
+      });
+    }
+
+    const withoutFill = seed();
+    const plain = await createTemplateScenesFromPhotos(withoutFill, {
+      storyboardId: "storyboard_t",
+      projectId: "project_t",
+      photoAssetIds: ["photo_a", "photo_b"],
+    });
+    expect(plain.ok).toBe(true);
+    if (plain.ok) {
+      expect(plain.value.scenes).toHaveLength(2);
+      expect(plain.value.aiJobIds).toEqual([]);
+    }
+    expect(withoutFill.stores.aiJobs.values()).toHaveLength(0);
+
+    const withFill = seed();
+    const auto = await createTemplateScenesFromPhotos(withFill, {
+      storyboardId: "storyboard_t",
+      projectId: "project_t",
+      photoAssetIds: ["photo_a", "photo_b"],
+      autoFill: true,
+    });
+    expect(auto.ok).toBe(true);
+    if (auto.ok) {
+      expect(auto.value.aiJobIds).toHaveLength(2);
+    }
+    const jobs = withFill.stores.aiJobs.values();
+    expect(jobs).toHaveLength(2);
+    expect(jobs.every((job) => job.kind === "scene_ai_fill")).toBe(true);
+    expect(jobs.map((job) => job.inputJson.sceneId).sort()).toEqual(
+      auto.ok ? auto.value.scenes.map((s) => s.id).sort() : [],
+    );
+    // Enqueue must not call the model.
+    expect(withFill.sceneFillGeneration.calls).toHaveLength(0);
   });
 });

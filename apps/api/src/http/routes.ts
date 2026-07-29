@@ -717,6 +717,7 @@ export function buildRouter(deps: ApiDependencies): Router {
         storyboardId,
         projectId: storyboard.projectId,
         photoAssetIds: parsed.data.photoAssetIds,
+        autoFill: parsed.data.autoFill,
       });
 
       if (!result.ok) {
@@ -728,7 +729,10 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      sendJson(res, 201, { scenes: result.value.map(toSceneDto) });
+      sendJson(res, 201, {
+        scenes: result.value.scenes.map(toSceneDto),
+        aiJobIds: result.value.aiJobIds,
+      });
     },
   );
 

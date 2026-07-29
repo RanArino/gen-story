@@ -470,13 +470,14 @@ export async function assignPhotosToScene(
 export async function createTemplateScenesFromPhotos(
   storyboardId: string,
   photoAssetIds: string[],
-): Promise<SceneDto[]> {
-  const data = await request<{ scenes: SceneDto[] }>(
+  autoFill = false,
+): Promise<{ scenes: SceneDto[]; aiJobIds: string[] }> {
+  const data = await request<{ scenes: SceneDto[]; aiJobIds: string[] }>(
     "POST",
     `/api/storyboards/${storyboardId}/template-scenes`,
-    { photoAssetIds },
+    { photoAssetIds, autoFill },
   );
-  return data.scenes;
+  return { scenes: data.scenes, aiJobIds: data.aiJobIds ?? [] };
 }
 
 export async function fillSceneWithAi(

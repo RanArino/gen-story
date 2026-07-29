@@ -93,6 +93,7 @@ export type {
   ConfirmTestGenerationInput,
   CreateCustomStyleInput,
   CreateTemplateScenesFromPhotosInput,
+  CreateTemplateScenesFromPhotosResult,
   ExportStoryboardAsJsonInput,
   FillSceneWithAiInput,
   FillSceneWithAiResult,

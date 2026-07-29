@@ -614,12 +614,23 @@ export type CreateTemplateScenesFromPhotosInput = {
   storyboardId: string;
   projectId: string;
   photoAssetIds: string[];
+  // When true, each new scene also gets a background AI fill job, so the
+  // storyboard arrives written rather than as a row of empty forms. Costs one
+  // model call per photo, which is why the caller has to ask for it.
+  autoFill?: boolean;
+  language?: Language;
+};
+
+export type CreateTemplateScenesFromPhotosResult = {
+  scenes: Scene[];
+  // Job ids in the same order as `scenes`; empty when autoFill was not requested.
+  aiJobIds: string[];
 };
 
 export async function createTemplateScenesFromPhotos(
   deps: ApplicationDependencies,
   input: CreateTemplateScenesFromPhotosInput,
-): Promise<UseCaseResult<Scene[]>> {
+): Promise<UseCaseResult<CreateTemplateScenesFromPhotosResult>> {
   try {
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
@@ -677,7 +688,20 @@ export async function createTemplateScenesFromPhotos(
     };
     await deps.storyboards.save(updatedStoryboard);
 
-    return success(createdScenes);
+    const aiJobIds: string[] = [];
+    if (input.autoFill === true) {
+      const language = await resolvePrincipalLanguage(deps, input.language);
+      for (const scene of createdScenes) {
+        const { jobId } = await deps.jobQueue.enqueue({
+          kind: "scene_ai_fill",
+          projectId: input.projectId,
+          payload: { sceneId: scene.id, language },
+        });
+        aiJobIds.push(jobId);
+      }
+    }
+
+    return success({ scenes: createdScenes, aiJobIds });
   } catch (error) {
     return validationFailure(error);
   }

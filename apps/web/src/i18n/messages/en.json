@@ -256,7 +256,10 @@
       "selectAll": "Select all",
       "deselectAll": "Deselect all",
       "hint": "💡 Select one or more candidate photos below, then click the button to create draft scenes",
-      "failed": "Failed to create template scenes"
+      "failed": "Failed to create template scenes",
+      "autoFill": "Also write titles and prompts with AI ({count} photos → {count} AI calls)",
+      "autoFillProgress": "AI writing scenes… {done}/{total}",
+      "autoFillFailed": "AI fill failed for {count} scene(s). Use “Fill with AI” on those scenes to retry."
     },
     "scenes": {
       "addScene": "+ Add scene",

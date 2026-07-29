@@ -88,6 +88,9 @@ export const AnalyzeProjectPhotosSchema = z.object({}).strict();
 
 export const CreateTemplateScenesSchema = z.object({
   photoAssetIds: z.array(z.string().min(1)).min(1).max(20),
+  // Opt-in: enqueues one AI fill job per created scene, so it bills one model
+  // call per photo. Defaults to off.
+  autoFill: z.boolean().optional(),
 });
 
 export const ReorderPhotosSchema = z.object({

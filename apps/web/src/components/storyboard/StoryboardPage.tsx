@@ -25,6 +25,7 @@ import {
   AiJobCanceledError,
   analyzeProjectPhotos,
   assignPhotosToScene,
+  awaitAiJob,
   cancelAiJob,
   createCustomStyle,
   createTemplateScenesFromPhotos,
@@ -203,6 +204,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   >("small");
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
   const [showAddScenesModal, setShowAddScenesModal] = useState(false);
+  // Opt-in: bills one model call per selected photo.
+  const [autoFillNewScenes, setAutoFillNewScenes] = useState(false);
+  const [autoFillProgress, setAutoFillProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [sceneViewMode, setSceneViewMode] = useState<SceneViewMode>("split");
   const [activeSceneAnchor, setActiveSceneAnchor] = useState<string | null>(
     null,
@@ -563,14 +570,50 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     }
   }
 
+  // Wait on every auto-fill job in parallel, refreshing the scene list as each
+  // finishes. Failures are surfaced once, at the end, rather than as one banner
+  // per photo.
+  async function watchAutoFillJobs(storyboardId: string, jobIds: string[]) {
+    setAutoFillProgress({ done: 0, total: jobIds.length });
+    let done = 0;
+    let failed = 0;
+
+    await Promise.all(
+      jobIds.map(async (jobId) => {
+        try {
+          const job = await awaitAiJob(jobId, { projectId });
+          if (job.status !== "succeeded") failed += 1;
+        } catch {
+          failed += 1;
+        } finally {
+          done += 1;
+          setAutoFillProgress({ done, total: jobIds.length });
+          try {
+            const refreshed = await listScenes(storyboardId);
+            setScenes(refreshed.map(sceneDtoToState));
+          } catch {
+            // A failed refresh is recoverable by reloading; not worth a banner.
+          }
+        }
+      }),
+    );
+
+    setAutoFillProgress(null);
+    if (failed > 0) {
+      setError(t("createScenes.autoFillFailed", { count: failed }));
+    }
+  }
+
   async function handleCreateTemplateScenes() {
     if (!sbId || selectedPhotoIds.size === 0) return;
     setCreatingTemplates(true);
     try {
-      const newScenes = await createTemplateScenesFromPhotos(
-        sbId,
-        Array.from(selectedPhotoIds),
-      );
+      const { scenes: newScenes, aiJobIds } =
+        await createTemplateScenesFromPhotos(
+          sbId,
+          Array.from(selectedPhotoIds),
+          autoFillNewScenes,
+        );
       setScenes((prev) => [...prev, ...newScenes.map(sceneDtoToState)]);
       setSelectedPhotoIds(new Set());
       setShowAddScenesModal(false);
@@ -582,6 +625,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           { count: newScenes.length },
         ),
       );
+
+      // The fill jobs run in the background; refresh the scene list as each
+      // one lands so the storyboard fills in progressively.
+      if (aiJobIds.length > 0) {
+        void watchAutoFillJobs(sbId, aiJobIds);
+      }
       setTimeout(() => setSaveMsg(null), 4000);
       // Scroll to scenes section after a short delay
       setTimeout(() => {
@@ -1269,6 +1318,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             {t("sections.scenes", { count: scenes.length })}
           </h3>
           <div className={styles.sceneBoardActions}>
+            {autoFillProgress && (
+              <span className={styles.saveMsg}>
+                {t("createScenes.autoFillProgress", autoFillProgress)}
+              </span>
+            )}
             {saveMsg && <span className={styles.saveMsg}>{saveMsg}</span>}
             <div className={styles.viewSwitcher} aria-label={t("view.label")}>
               {(["split", "gallery"] as const).map((mode) => (
@@ -1505,6 +1559,18 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                     {allUnusedSelected
                       ? t("createScenes.deselectAll")
                       : t("createScenes.selectAll")}
+                  </label>
+                  {/* One model call per selected photo, so this is opt-in and
+                      states the count it will spend. */}
+                  <label className={styles.photoModalSelectAll}>
+                    <input
+                      type="checkbox"
+                      checked={autoFillNewScenes}
+                      onChange={(e) => setAutoFillNewScenes(e.target.checked)}
+                    />
+                    {t("createScenes.autoFill", {
+                      count: selectedPhotoIds.size,
+                    })}
                   </label>
                   <div className={styles.sizeSwitcher}>
                     {(["small", "medium", "large"] as const).map((size) => (
