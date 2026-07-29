@@ -149,7 +149,15 @@
       "localModelBadge": "Local (no AI)",
       "analyzedAt": "Analyzed: {when}",
       "emptyNoPhotos": "Mark at least one photo as candidate or reference on the Photos page to enable analysis.",
-      "emptyClickToStart": "Click <strong>Analyze photos</strong> to generate tone suggestions based on your selected photo set."
+      "emptyClickToStart": "Click <strong>Analyze photos</strong> to generate tone suggestions based on your selected photo set.",
+      "cancelJob": "Cancel",
+      "jobStatus": {
+        "queued": "Queued…",
+        "running": "Working…",
+        "succeeded": "Done",
+        "failed": "Failed",
+        "canceled": "Canceled"
+      }
     },
     "tones": {
       "warm": {

@@ -1,4 +1,5 @@
 import type {
+  AiJobDto,
   ComplementSceneProposalDto,
   GeneratedImageDto,
   GenerationRequestDto,
@@ -65,6 +66,134 @@ async function request<T>(
 
 export async function getMe(): Promise<MeDto> {
   return request<MeDto>("GET", "/api/me");
+}
+
+// ── AI jobs ───────────────────────────────────────────────────────────────────
+
+export type ProjectEvent = {
+  kind: string;
+  entityType: string;
+  entityId: string;
+  payload?: Record<string, unknown>;
+};
+
+const AI_JOB_TERMINAL_STATUSES = ["succeeded", "failed", "canceled"];
+
+export function isAiJobTerminal(job: AiJobDto): boolean {
+  return AI_JOB_TERMINAL_STATUSES.includes(job.status);
+}
+
+export async function getAiJob(jobId: string): Promise<AiJobDto> {
+  return request<AiJobDto>("GET", `/api/ai-jobs/${jobId}`);
+}
+
+export async function cancelAiJob(jobId: string): Promise<AiJobDto> {
+  return request<AiJobDto>("POST", `/api/ai-jobs/${jobId}/cancel`);
+}
+
+// Live project event stream. Returns an unsubscribe function.
+export function subscribeToProjectEvents(
+  projectId: string,
+  handler: (event: ProjectEvent) => void,
+): () => void {
+  const source = new EventSource(
+    `${apiBase()}/api/projects/${projectId}/events`,
+  );
+
+  const onMessage = (message: MessageEvent<string>) => {
+    try {
+      handler(JSON.parse(message.data) as ProjectEvent);
+    } catch {
+      // A malformed frame is not worth breaking the stream over.
+    }
+  };
+
+  // Named SSE events do not fire the default `message` handler, so listen for
+  // each kind the server emits.
+  const kinds = [
+    "ai-job.queued",
+    "ai-job.running",
+    "ai-job.succeeded",
+    "ai-job.failed",
+    "ai-job.canceled",
+    "project_photo_analysis.completed",
+    "scene.ai_filled",
+    "generation-request.created",
+    "generation-request.retried",
+    "generation-request.running",
+    "generation-request.succeeded",
+    "generation-request.failed",
+  ];
+  for (const kind of kinds) source.addEventListener(kind, onMessage);
+  source.addEventListener("message", onMessage);
+
+  return () => {
+    for (const kind of kinds) source.removeEventListener(kind, onMessage);
+    source.removeEventListener("message", onMessage);
+    source.close();
+  };
+}
+
+export type AiJobWatchOptions = {
+  projectId: string;
+  onJobId?: (jobId: string) => void;
+  onStatus?: (status: string) => void;
+};
+
+// Resolve once the job reaches a terminal state. The event stream makes this
+// prompt; the poll makes it correct even if the stream never connects.
+export async function awaitAiJob(
+  jobId: string,
+  options: AiJobWatchOptions,
+): Promise<AiJobDto> {
+  return new Promise<AiJobDto>((resolve, reject) => {
+    let settled = false;
+    let lastStatus: string | null = null;
+
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(timer);
+      unsubscribe();
+      fn();
+    };
+
+    const check = async () => {
+      if (settled) return;
+      try {
+        const job = await getAiJob(jobId);
+        if (job.status !== lastStatus) {
+          lastStatus = job.status;
+          options.onStatus?.(job.status);
+        }
+        if (!isAiJobTerminal(job)) return;
+        finish(() => resolve(job));
+      } catch (err) {
+        finish(() => reject(err));
+      }
+    };
+
+    const unsubscribe = subscribeToProjectEvents(options.projectId, (event) => {
+      if (event.payload?.aiJobId === jobId) void check();
+    });
+    const timer = setInterval(() => void check(), 2000);
+    void check();
+  });
+}
+
+// Cancellation is a user action, not a failure; callers distinguish it so the
+// UI can return to idle instead of showing an error.
+export class AiJobCanceledError extends Error {
+  constructor() {
+    super("AI job was canceled.");
+    this.name = "AiJobCanceledError";
+  }
+}
+
+function aiJobResultOrThrow(job: AiJobDto, fallbackMessage: string): void {
+  if (job.status === "succeeded") return;
+  if (job.status === "canceled") throw new AiJobCanceledError();
+  throw new Error(job.errorMessage ?? fallbackMessage);
 }
 
 // ── Projects ──────────────────────────────────────────────────────────────────
@@ -188,14 +317,35 @@ export async function getProjectPhotoAnalysis(
   return data.photoAnalysis;
 }
 
+// Enqueues a background job unless the stored analysis is still valid, then
+// waits for it and returns the persisted result.
 export async function analyzeProjectPhotos(
   projectId: string,
+  watch?: Omit<AiJobWatchOptions, "projectId">,
 ): Promise<{ photoAnalysis: ProjectPhotoAnalysisDto; cached: boolean }> {
   const data = await request<{
-    photoAnalysis: ProjectPhotoAnalysisDto;
+    photoAnalysis: ProjectPhotoAnalysisDto | null;
     cached: boolean;
+    jobId: string | null;
   }>("POST", `/api/projects/${projectId}/photo-analysis`, {});
-  return { photoAnalysis: data.photoAnalysis, cached: data.cached };
+
+  if (data.cached && data.photoAnalysis != null) {
+    return { photoAnalysis: data.photoAnalysis, cached: true };
+  }
+
+  if (data.jobId == null) {
+    throw new Error("Photo analysis did not start.");
+  }
+  watch?.onJobId?.(data.jobId);
+
+  const job = await awaitAiJob(data.jobId, { projectId, ...watch });
+  aiJobResultOrThrow(job, "Photo analysis failed.");
+
+  const analysis = await getProjectPhotoAnalysis(projectId);
+  if (analysis == null) {
+    throw new Error("Photo analysis produced no result.");
+  }
+  return { photoAnalysis: analysis, cached: false };
 }
 
 // ── Storyboards ───────────────────────────────────────────────────────────────
@@ -329,8 +479,35 @@ export async function createTemplateScenesFromPhotos(
   return data.scenes;
 }
 
-export async function fillSceneWithAi(sceneId: string): Promise<SceneDto> {
-  return request<SceneDto>("POST", `/api/scenes/${sceneId}/ai-fill`, {});
+export async function fillSceneWithAi(
+  sceneId: string,
+  context: {
+    projectId: string;
+    storyboardId: string;
+  } & Omit<AiJobWatchOptions, "projectId">,
+): Promise<SceneDto> {
+  const { projectId, storyboardId, ...watch } = context;
+  const data = await request<{ scene: SceneDto | null; jobId: string | null }>(
+    "POST",
+    `/api/scenes/${sceneId}/ai-fill`,
+    {},
+  );
+
+  // Nothing was blank, so there was no AI call and no job.
+  if (data.jobId == null) {
+    if (data.scene == null) throw new Error("AI fill returned no scene.");
+    return data.scene;
+  }
+  watch.onJobId?.(data.jobId);
+
+  const job = await awaitAiJob(data.jobId, { projectId, ...watch });
+  aiJobResultOrThrow(job, "AI fill failed.");
+
+  const scene = (await listScenes(storyboardId)).find(
+    (candidate) => candidate.id === sceneId,
+  );
+  if (scene == null) throw new Error("AI fill returned no scene.");
+  return scene;
 }
 
 // ── Complement Scenes ─────────────────────────────────────────────────────────
@@ -351,13 +528,22 @@ export async function proposeComplementScenes(
   storyboardId: string,
   fromSceneId: string,
   toSceneId: string,
+  watch: AiJobWatchOptions,
 ): Promise<ComplementSceneProposalDto[]> {
-  const data = await request<{ proposals: ComplementSceneProposalDto[] }>(
+  const data = await request<{ jobId: string }>(
     "POST",
     `/api/storyboards/${storyboardId}/complement-scenes/proposals`,
     { fromSceneId, toSceneId },
   );
-  return data.proposals;
+  watch.onJobId?.(data.jobId);
+
+  const job = await awaitAiJob(data.jobId, watch);
+  aiJobResultOrThrow(job, "Complement scene proposals failed.");
+
+  const proposals = job.resultJson?.proposals;
+  return Array.isArray(proposals)
+    ? (proposals as ComplementSceneProposalDto[])
+    : [];
 }
 
 // ── Style Presets ─────────────────────────────────────────────────────────────

@@ -22,8 +22,10 @@ import type {
 } from "@gen-story/shared";
 import { RECOMMENDED_NEGATIVE_FENCE } from "@gen-story/shared";
 import {
+  AiJobCanceledError,
   analyzeProjectPhotos,
   assignPhotosToScene,
+  cancelAiJob,
   createCustomStyle,
   createTemplateScenesFromPhotos,
   fillSceneWithAi,
@@ -173,6 +175,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [creatingTemplates, setCreatingTemplates] = useState(false);
   const [analyzingPhotos, setAnalyzingPhotos] = useState(false);
   const [aiFillingSceneId, setAiFillingSceneId] = useState<string | null>(null);
+  // The background AI job currently being watched, so it can be cancelled.
+  const [activeAiJob, setActiveAiJob] = useState<{
+    id: string;
+    status: string;
+  } | null>(null);
   const [testBatch, setTestBatch] = useState<TestGenerationBatchDto | null>(
     null,
   );
@@ -405,6 +412,23 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     }
   }
 
+  // Shared watch callbacks: expose the running job so it can be cancelled and
+  // so its status can be shown.
+  const aiJobWatch = {
+    onJobId: (id: string) => setActiveAiJob({ id, status: "queued" }),
+    onStatus: (status: string) =>
+      setActiveAiJob((prev) => (prev == null ? prev : { ...prev, status })),
+  };
+
+  async function handleCancelAiJob() {
+    if (activeAiJob == null) return;
+    try {
+      await cancelAiJob(activeAiJob.id);
+    } catch {
+      // The watcher reports the real outcome; a lost cancel is not fatal.
+    }
+  }
+
   async function handleAnalyzePhotos() {
     // Re-analysis sends every analyzable photo to the AI again, which costs
     // tokens. Confirm before spending on a result the user already has.
@@ -417,15 +441,20 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     setAnalyzingPhotos(true);
     setError(null);
     try {
-      const { photoAnalysis: analysis, cached } =
-        await analyzeProjectPhotos(projectId);
+      const { photoAnalysis: analysis, cached } = await analyzeProjectPhotos(
+        projectId,
+        aiJobWatch,
+      );
       setPhotoAnalysis(analysis);
       setSaveMsg(cached ? t("ai.cachedMsg") : t("ai.completeMsg"));
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("scenes.failedAnalyze"));
+      if (!(e instanceof AiJobCanceledError)) {
+        setError(e instanceof Error ? e.message : t("scenes.failedAnalyze"));
+      }
     } finally {
       setAnalyzingPhotos(false);
+      setActiveAiJob(null);
     }
   }
 
@@ -659,10 +688,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   }
 
   async function handleAiFill(sceneId: string) {
+    if (!sbId) return;
     setAiFillingSceneId(sceneId);
     setError(null);
     try {
-      const filled = await fillSceneWithAi(sceneId);
+      const filled = await fillSceneWithAi(sceneId, {
+        projectId,
+        storyboardId: sbId,
+        ...aiJobWatch,
+      });
       setScenes((prev) =>
         prev.map((scene) =>
           scene.id === sceneId ? sceneDtoToState(filled) : scene,
@@ -671,9 +705,12 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setSaveMsg(t("aiFillSaved"));
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("scenes.failedFill"));
+      if (!(e instanceof AiJobCanceledError)) {
+        setError(e instanceof Error ? e.message : t("scenes.failedFill"));
+      }
     } finally {
       setAiFillingSceneId(null);
+      setActiveAiJob(null);
     }
   }
 
@@ -709,12 +746,18 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         sbId,
         fromSceneId,
         toSceneId,
+        { projectId, ...aiJobWatch },
       );
       setProposalCtx({ fromSceneId, toSceneId, proposals });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("complement.failedPropose"));
+      if (!(e instanceof AiJobCanceledError)) {
+        setError(
+          e instanceof Error ? e.message : t("complement.failedPropose"),
+        );
+      }
     } finally {
       setComplementBusy(false);
+      setActiveAiJob(null);
     }
   }
 
@@ -842,11 +885,27 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                       ? t("ai.reanalyze")
                       : t("ai.upToDate")}
               </button>
-              {photoAnalysis && !analysisStale && !analyzingPhotos && (
-                <small className={styles.aiAssistHint}>
-                  {t("ai.upToDateHint")}
-                </small>
+              {activeAiJob && (
+                <>
+                  <small className={styles.aiAssistHint}>
+                    {t(`ai.jobStatus.${activeAiJob.status}`)}
+                  </small>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleCancelAiJob}
+                  >
+                    {t("ai.cancelJob")}
+                  </button>
+                </>
               )}
+              {photoAnalysis &&
+                !analysisStale &&
+                !analyzingPhotos &&
+                !activeAiJob && (
+                  <small className={styles.aiAssistHint}>
+                    {t("ai.upToDateHint")}
+                  </small>
+                )}
             </div>
           )}
         </div>
