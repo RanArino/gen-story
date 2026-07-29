@@ -1,5 +1,6 @@
 import type {
   AiJob,
+  AiJobKind,
   GeneratedImage,
   GenerationRequest,
   GenerationRequestStatus,
@@ -249,7 +250,8 @@ export interface PhotoAnalysisGenerationPort {
 
 export interface JobQueuePort {
   enqueue(job: {
-    kind: string;
+    kind: AiJobKind;
+    projectId: string;
     payload: Record<string, unknown>;
   }): Promise<{ jobId: string }>;
 }

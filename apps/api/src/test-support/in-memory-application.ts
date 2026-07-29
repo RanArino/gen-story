@@ -30,10 +30,13 @@ import type {
   UserRepositoryPort,
 } from "@gen-story/application";
 import type {
+  AiJobKind,
   GenerationRequestStatus,
   TestGenerationBatch,
 } from "@gen-story/domain";
+import { createAiJob } from "@gen-story/domain";
 import { LocalAuthContext } from "../auth/local-auth";
+import { LocalProgressEvents } from "../jobs/local-progress-events";
 import type {
   AiJob,
   GeneratedImage,
@@ -494,14 +497,47 @@ class InMemoryAiJobRepository implements AiJobRepositoryPort {
   }
 }
 
+// Writes real rows into the AI job store so tests can assert on what was
+// enqueued, and so the worker can be driven end to end in memory.
 class InMemoryJobQueue implements JobQueuePort {
-  async enqueue(): Promise<{ jobId: string }> {
-    return { jobId: "job_1" };
-  }
-}
+  private sequence = 0;
 
-class InMemoryProgressEvents implements ProgressEventPort {
-  async publish(): Promise<void> {}
+  constructor(
+    private readonly store: MemoryStore<AiJob>,
+    private readonly progressEvents: ProgressEventPort,
+  ) {}
+
+  async enqueue(job: {
+    kind: AiJobKind;
+    projectId: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ jobId: string }> {
+    this.sequence += 1;
+    const timestamp = new Date().toISOString();
+    const aiJob = createAiJob({
+      id: `job_${this.sequence}`,
+      projectId: job.projectId,
+      kind: job.kind,
+      inputJson: job.payload,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    await this.store.save(aiJob);
+    await this.progressEvents.publish({
+      kind: "ai-job.queued",
+      entityType: "aiJob",
+      entityId: aiJob.id,
+      payload: {
+        aiJobId: aiJob.id,
+        projectId: aiJob.projectId,
+        jobKind: aiJob.kind,
+        status: aiJob.status,
+      },
+    });
+
+    return { jobId: aiJob.id };
+  }
 }
 
 export function createInMemoryApplicationDependencies(
@@ -519,8 +555,11 @@ export function createInMemoryApplicationDependencies(
     testGenerationBatches?: TestGenerationBatch[];
     aiJobs?: AiJob[];
   },
-  overrides?: Partial<ApplicationDependencies>,
+  overrides?: Partial<Omit<ApplicationDependencies, "progressEvents">> & {
+    progressEvents?: LocalProgressEvents;
+  },
 ): ApplicationDependencies & {
+  progressEvents: LocalProgressEvents;
   stores: {
     users: MemoryStore<User>;
     organizations: MemoryStore<Organization>;
@@ -552,7 +591,10 @@ export function createInMemoryApplicationDependencies(
     ),
     aiJobs: new MemoryStore<AiJob>(initial?.aiJobs ?? []),
   };
-  const dependencies: ApplicationDependencies = {
+  const progressEvents = new LocalProgressEvents();
+  const dependencies: ApplicationDependencies & {
+    progressEvents: LocalProgressEvents;
+  } = {
     users: new InMemoryUserRepository(stores.users),
     organizations: new InMemoryOrganizationRepository(stores.organizations),
     projects: new InMemoryProjectRepository(stores.projects),
@@ -580,8 +622,8 @@ export function createInMemoryApplicationDependencies(
     sceneFillGeneration: new InMemorySceneFillGeneration(),
     complementSceneProposal: new InMemoryComplementSceneProposal(),
     photoAnalysisGeneration: new InMemoryPhotoAnalysisGeneration(),
-    jobQueue: new InMemoryJobQueue(),
-    progressEvents: new InMemoryProgressEvents(),
+    jobQueue: new InMemoryJobQueue(stores.aiJobs, progressEvents),
+    progressEvents,
     authContext: new LocalAuthContext({
       users: new InMemoryUserRepository(stores.users),
       organizations: new InMemoryOrganizationRepository(stores.organizations),

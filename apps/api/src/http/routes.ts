@@ -6,6 +6,7 @@ import {
   assignPhotosToScene,
   analyzeProjectPhotos,
   applyAdjustmentToTestVariant,
+  cancelAiJob,
   cancelGenerationRequest,
   confirmTestGeneration,
   createGenerationRequestUseCase,
@@ -36,6 +37,7 @@ import {
   type AuthPrincipal,
 } from "@gen-story/application";
 import { isLanguage as isLanguageValue } from "@gen-story/application";
+import type { AiJob } from "@gen-story/domain";
 import {
   getLocalizedLabels,
   isTestAdjustmentId,
@@ -43,10 +45,11 @@ import {
   type TestAdjustmentId,
 } from "@gen-story/shared";
 
+import type { ApiDependencies } from "../app/create-api-context";
 import { composeScenePrompt } from "../generation/compose-scene-prompt";
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
-  toComplementSceneProposalDto,
+  toAiJobDto,
   toGeneratedImageDto,
   toGenerationRequestDto,
   toGenerationRequestWithSceneTitleDto,
@@ -107,7 +110,32 @@ async function requirePrincipal(
   return principal;
 }
 
-export function buildRouter(deps: ApplicationDependencies): Router {
+// Resolve an AI job and confirm it belongs to the caller's organization,
+// responding on the failure paths exactly as the other handlers do.
+async function requireOwnedAiJob(
+  deps: ApiDependencies,
+  res: ServerResponse,
+  aiJobId: string,
+): Promise<AiJob | null> {
+  const principal = await requirePrincipal(deps, res);
+  if (principal == null) return null;
+
+  const job = await deps.aiJobs.findById(aiJobId);
+  if (job == null) {
+    sendJson(res, 404, notFoundBody("AI job not found."));
+    return null;
+  }
+
+  const project = await deps.projects.findById(job.projectId);
+  if (project == null || project.organizationId !== principal.organization.id) {
+    sendJson(res, 403, forbiddenBody());
+    return null;
+  }
+
+  return job;
+}
+
+export function buildRouter(deps: ApiDependencies): Router {
   const router = new Router();
 
   // GET /api/me
@@ -309,9 +337,14 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, {
-        photoAnalysis: toProjectPhotoAnalysisDto(result.value.analysis),
+      // A cache hit answers immediately; otherwise the caller follows the job.
+      sendJson(res, result.value.cached ? 200 : 202, {
+        photoAnalysis:
+          result.value.analysis == null
+            ? null
+            : toProjectPhotoAnalysisDto(result.value.analysis),
         cached: result.value.cached,
+        jobId: result.value.jobId,
       });
     },
   );
@@ -811,7 +844,12 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, toSceneDto(result.value));
+      // Nothing to fill answers immediately; otherwise follow the job.
+      sendJson(res, result.value.jobId == null ? 200 : 202, {
+        scene:
+          result.value.scene == null ? null : toSceneDto(result.value.scene),
+        jobId: result.value.jobId,
+      });
     },
   );
 
@@ -987,9 +1025,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, {
-        proposals: result.value.map(toComplementSceneProposalDto),
-      });
+      sendJson(res, 202, { jobId: result.value.jobId });
     },
   );
 
@@ -1333,6 +1369,87 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       sendJson(res, 200, toGenerationRequestDto(result.value));
+    },
+  );
+
+  // GET /api/ai-jobs/:aiJobId
+  router.add("GET", "/api/ai-jobs/:aiJobId", async (_req, res, params) => {
+    const job = await requireOwnedAiJob(deps, res, getParam(params, "aiJobId"));
+    if (job == null) return;
+
+    sendJson(res, 200, toAiJobDto(job));
+  });
+
+  // POST /api/ai-jobs/:aiJobId/cancel
+  router.add(
+    "POST",
+    "/api/ai-jobs/:aiJobId/cancel",
+    async (_req, res, params) => {
+      const aiJobId = getParam(params, "aiJobId");
+      const job = await requireOwnedAiJob(deps, res, aiJobId);
+      if (job == null) return;
+
+      const result = await cancelAiJob(deps, { aiJobId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toAiJobDto(result.value));
+    },
+  );
+
+  // GET /api/projects/:projectId/events
+  // Server-sent events: job lifecycle and mutations for one project. The
+  // stream is an optimization — every event it carries is also reachable by
+  // polling GET /api/ai-jobs/:aiJobId.
+  router.add(
+    "GET",
+    "/api/projects/:projectId/events",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const projectId = getParam(params, "projectId");
+      const project = await deps.projects.findById(projectId);
+      if (project == null) {
+        sendJson(res, 404, notFoundBody("Project not found."));
+        return;
+      }
+
+      if (project.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      res.write(": connected\n\n");
+
+      const unsubscribe = deps.progressEvents.subscribe(projectId, (event) => {
+        res.write(`event: ${event.kind}\n`);
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      });
+
+      // Keep intermediaries from closing an idle connection.
+      const heartbeat = setInterval(() => {
+        res.write(": heartbeat\n\n");
+      }, 25_000);
+
+      const close = () => {
+        clearInterval(heartbeat);
+        unsubscribe();
+        res.end();
+      };
+      req.on("close", close);
+      req.on("error", close);
     },
   );
 

@@ -18,12 +18,14 @@ import {
   createTemplateScene,
   createTestGenerationBatch,
   composeCommonPrompt,
+  createAiJob,
   replaceScenePhotoAssets,
   resetTestGenerationBatch,
   retryGenerationRequest,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
   transitionGenerationRequestStatus,
+  type AiJob,
   type GeneratedImage,
   type GenerationRequest,
   type PhotoAsset,
@@ -41,7 +43,6 @@ import {
 
 import type {
   ApplicationDependencies,
-  ComplementSceneProposal,
   Language,
   UseCaseResult,
   UserPreference,
@@ -700,6 +701,21 @@ async function resolvePrincipalLanguage(
   return DEFAULT_LANGUAGE;
 }
 
+// The language chosen when the job was enqueued, so a queued job is not
+// affected by a later preference change.
+function readLanguagePayload(payload: Record<string, unknown>): Language {
+  const value = payload.language;
+  return isLanguage(value) ? value : DEFAULT_LANGUAGE;
+}
+
+function readStringPayload(
+  payload: Record<string, unknown>,
+  key: string,
+): string | null {
+  const value = payload[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 function isAnalyzablePhoto(photo: PhotoAsset): boolean {
   return (
     photo.deletedAt === null &&
@@ -730,12 +746,18 @@ function computeAnalysisInputsHash(
 }
 
 export type AnalyzeProjectPhotosResult = {
-  analysis: ProjectPhotoAnalysis;
+  // Present only on a cache hit; a fresh analysis arrives via the job.
+  analysis: ProjectPhotoAnalysis | null;
   // True when the stored analysis was reused because inputs were unchanged
-  // (no AI call was made).
+  // (no AI call was made, and no job was enqueued).
   cached: boolean;
+  // Present only when a background job was enqueued.
+  jobId: string | null;
 };
 
+// Enqueue half. The (paid) AI call happens in runPhotoAnalysisJob, driven by
+// the worker. The input-hash cache guard stays here, before any job exists, so
+// an unchanged photo set still costs nothing and still reports `cached: true`.
 export async function analyzeProjectPhotos(
   deps: ApplicationDependencies,
   input: AnalyzeProjectPhotosInput,
@@ -763,8 +785,47 @@ export async function analyzeProjectPhotos(
 
     // Skip the (paid) AI call when nothing relevant changed since last time.
     if (existing && existing.inputsHash === inputsHash) {
-      return success({ analysis: existing, cached: true });
+      return success({ analysis: existing, cached: true, jobId: null });
     }
+
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "photo_analysis",
+      projectId: project.id,
+      payload: { projectId: project.id, language },
+    });
+
+    return success({ analysis: null, cached: false, jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// Run half. Inputs are re-read here rather than carried in the job payload,
+// so a job that waited in the queue analyzes the photo set as it is now.
+export async function runPhotoAnalysisJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const project = await getProjectOrNotFound(deps, job.projectId);
+    if (isFailure(project)) return project;
+
+    const photos = (await deps.photoAssets.findByProjectId(project.id)).filter(
+      isAnalyzablePhoto,
+    );
+
+    if (photos.length === 0) {
+      return failure(
+        "validation_error",
+        "Project must have at least one candidate or reference photo for analysis.",
+      );
+    }
+
+    const language = readLanguagePayload(job.inputJson);
+    const inputsHash = computeAnalysisInputsHash(photos, language);
+    const existing = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
 
     const storyboards = await deps.storyboards.findByProjectId(project.id);
     const storyboard = storyboards[0] ?? null;
@@ -799,7 +860,11 @@ export async function analyzeProjectPhotos(
       },
     });
 
-    return success({ analysis, cached: false });
+    return success({
+      projectPhotoAnalysisId: analysis.id,
+      model: analysis.model,
+      photoCount: photos.length,
+    });
   } catch (error) {
     return validationFailure(error);
   }
@@ -842,94 +907,179 @@ function isBlankSceneField(value: string): boolean {
   return value.trim().length === 0;
 }
 
+type SceneFillContext = {
+  scene: Scene;
+  blankFields: (typeof sceneFillFields)[number][];
+  buildInput: (language: Language) => Promise<
+    | UseCaseResult<never>
+    | {
+        project: Project;
+        storyboard: Storyboard;
+        scene: Scene;
+        primaryPhoto: PhotoAsset;
+        stylePreset: StylePreset | null;
+        projectPhotos: PhotoAsset[];
+        siblingScenes: Scene[];
+        language: Language;
+      }
+  >;
+};
+
+// Everything the AI fill needs, gathered from persistence. Shared by the
+// enqueue half (which only inspects `blankFields`) and the run half.
+async function collectSceneFillContext(
+  deps: ApplicationDependencies,
+  sceneId: string,
+): Promise<UseCaseResult<never> | SceneFillContext> {
+  const scene = await getSceneOrNotFound(deps, sceneId);
+  if (isFailure(scene)) return scene;
+
+  const storyboard = await getStoryboardOrNotFound(deps, scene.storyboardId);
+  if (isFailure(storyboard)) return storyboard;
+
+  if (storyboard.projectId !== scene.projectId) {
+    return failure(
+      "invalid_state",
+      "Scene does not belong to this storyboard.",
+    );
+  }
+
+  const project = await getProjectOrNotFound(deps, scene.projectId);
+  if (isFailure(project)) return project;
+
+  const primaryPhotoAssignment = scene.photoAssets.find(
+    (photoAsset) => photoAsset.role === "primary",
+  );
+  if (primaryPhotoAssignment == null) {
+    return failure(
+      "validation_error",
+      "Scene must have a primary photo for AI fill.",
+    );
+  }
+
+  const primaryPhoto = await getPhotoAssetOrNotFound(
+    deps,
+    primaryPhotoAssignment.photoAssetId,
+  );
+  if (isFailure(primaryPhoto)) return primaryPhoto;
+
+  if (
+    primaryPhoto.projectId !== scene.projectId ||
+    primaryPhoto.deletedAt !== null
+  ) {
+    return failure("validation_error", "Scene primary photo is not available.");
+  }
+
+  const blankFields = sceneFillFields.filter((field) =>
+    isBlankSceneField(scene[field]),
+  );
+
+  return {
+    scene,
+    blankFields,
+    buildInput: async (language: Language) => {
+      const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
+      const siblingScenes = await deps.scenes.findByStoryboardId(storyboard.id);
+      let stylePreset: StylePreset | null = null;
+
+      if (storyboard.stylePresetId != null) {
+        stylePreset = await deps.stylePresets.findById(
+          storyboard.stylePresetId,
+        );
+        if (stylePreset == null) {
+          return failure("not_found", "Style preset not found.");
+        }
+      }
+
+      return {
+        project,
+        storyboard,
+        scene,
+        primaryPhoto,
+        stylePreset,
+        projectPhotos,
+        siblingScenes,
+        language,
+      };
+    },
+  };
+}
+
+export type FillSceneWithAiResult = {
+  // Present when the scene had no blank fields, so no AI call was needed.
+  scene: Scene | null;
+  // Present only when a background job was enqueued.
+  jobId: string | null;
+};
+
+// Enqueue half. The AI call happens in runSceneAiFillJob.
 export async function fillSceneWithAi(
   deps: ApplicationDependencies,
   input: FillSceneWithAiInput,
-): Promise<UseCaseResult<Scene>> {
+): Promise<UseCaseResult<FillSceneWithAiResult>> {
   try {
-    const scene = await getSceneOrNotFound(deps, input.sceneId);
-    if (isFailure(scene)) return scene;
+    const context = await collectSceneFillContext(deps, input.sceneId);
+    if (isFailure(context)) return context;
 
-    const storyboard = await getStoryboardOrNotFound(deps, scene.storyboardId);
-    if (isFailure(storyboard)) return storyboard;
-
-    if (storyboard.projectId !== scene.projectId) {
-      return failure(
-        "invalid_state",
-        "Scene does not belong to this storyboard.",
-      );
-    }
-
-    const project = await getProjectOrNotFound(deps, scene.projectId);
-    if (isFailure(project)) return project;
-
-    const primaryPhotoAssignment = scene.photoAssets.find(
-      (photoAsset) => photoAsset.role === "primary",
-    );
-    if (primaryPhotoAssignment == null) {
-      return failure(
-        "validation_error",
-        "Scene must have a primary photo for AI fill.",
-      );
-    }
-
-    const primaryPhoto = await getPhotoAssetOrNotFound(
-      deps,
-      primaryPhotoAssignment.photoAssetId,
-    );
-    if (isFailure(primaryPhoto)) return primaryPhoto;
-
-    if (
-      primaryPhoto.projectId !== scene.projectId ||
-      primaryPhoto.deletedAt !== null
-    ) {
-      return failure(
-        "validation_error",
-        "Scene primary photo is not available.",
-      );
-    }
-
-    const blankFields = sceneFillFields.filter((field) =>
-      isBlankSceneField(scene[field]),
-    );
-    if (blankFields.length === 0) {
-      return success(scene);
-    }
-
-    const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
-    const siblingScenes = await deps.scenes.findByStoryboardId(storyboard.id);
-    let stylePreset: StylePreset | null = null;
-
-    if (storyboard.stylePresetId != null) {
-      stylePreset = await deps.stylePresets.findById(storyboard.stylePresetId);
-      if (stylePreset == null) {
-        return failure("not_found", "Style preset not found.");
-      }
+    if (context.blankFields.length === 0) {
+      return success({ scene: context.scene, jobId: null });
     }
 
     const language = await resolvePrincipalLanguage(deps, input.language);
-    const suggestion = await deps.sceneFillGeneration.generateSceneFill({
-      project,
-      storyboard,
-      scene,
-      primaryPhoto,
-      stylePreset,
-      projectPhotos,
-      siblingScenes,
-      language,
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "scene_ai_fill",
+      projectId: context.scene.projectId,
+      payload: { sceneId: input.sceneId, language },
     });
 
+    return success({ scene: null, jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function runSceneAiFillJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const sceneId = readStringPayload(job.inputJson, "sceneId");
+    if (sceneId == null) {
+      return failure("validation_error", "AI job is missing a scene ID.");
+    }
+
+    const context = await collectSceneFillContext(deps, sceneId);
+    if (isFailure(context)) return context;
+
+    if (context.blankFields.length === 0) {
+      return success({ sceneId, filledFields: [] });
+    }
+
+    const generationInput = await context.buildInput(
+      readLanguagePayload(job.inputJson),
+    );
+    if (isFailure(generationInput)) return generationInput;
+
+    const suggestion =
+      await deps.sceneFillGeneration.generateSceneFill(generationInput);
+
     const updatedScene = {
-      ...scene,
+      ...context.scene,
       ...Object.fromEntries(
-        blankFields.map((field) => [field, suggestion[field]]),
+        context.blankFields.map((field) => [field, suggestion[field]]),
       ),
       updatedAt: now(),
     };
 
     await deps.scenes.save(updatedScene);
+    await deps.progressEvents.publish({
+      kind: "scene.ai_filled",
+      entityType: "scene",
+      entityId: updatedScene.id,
+      payload: { sceneId: updatedScene.id, projectId: updatedScene.projectId },
+    });
 
-    return success(updatedScene);
+    return success({ sceneId, filledFields: [...context.blankFields] });
   } catch (error) {
     return validationFailure(error);
   }
@@ -1028,22 +1178,73 @@ export type ProposeComplementScenesInput = {
   language?: Language;
 };
 
+export type ProposeComplementScenesResult = {
+  jobId: string;
+};
+
+// Enqueue half. The AI call happens in runComplementSceneProposalsJob.
 export async function proposeComplementScenes(
   deps: ApplicationDependencies,
   input: ProposeComplementScenesInput,
-): Promise<UseCaseResult<ComplementSceneProposal[]>> {
+): Promise<UseCaseResult<ProposeComplementScenesResult>> {
   try {
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const scenes = await deps.scenes.findByStoryboardId(input.storyboardId);
+    const known = new Set(scenes.map((scene) => scene.id));
+    if (!known.has(input.fromSceneId) || !known.has(input.toSceneId)) {
+      return failure(
+        "not_found",
+        "Bridge scenes were not found in this storyboard.",
+      );
+    }
+
+    const language = await resolvePrincipalLanguage(deps, input.language);
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "complement_scene_proposals",
+      projectId: storyboard.projectId,
+      payload: {
+        storyboardId: input.storyboardId,
+        fromSceneId: input.fromSceneId,
+        toSceneId: input.toSceneId,
+        language,
+      },
+    });
+
+    return success({ jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function runComplementSceneProposalsJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const storyboardId = readStringPayload(job.inputJson, "storyboardId");
+    const fromSceneId = readStringPayload(job.inputJson, "fromSceneId");
+    const toSceneId = readStringPayload(job.inputJson, "toSceneId");
+
+    if (storyboardId == null || fromSceneId == null || toSceneId == null) {
+      return failure(
+        "validation_error",
+        "AI job is missing complement scene bridge references.",
+      );
+    }
+
+    const storyboard = await getStoryboardOrNotFound(deps, storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
     const project = await getProjectOrNotFound(deps, storyboard.projectId);
     if (isFailure(project)) return project;
 
     const scenes = sortScenesByOrderIndex(
-      await deps.scenes.findByStoryboardId(input.storyboardId),
+      await deps.scenes.findByStoryboardId(storyboardId),
     );
-    const fromScene = scenes.find((scene) => scene.id === input.fromSceneId);
-    const toScene = scenes.find((scene) => scene.id === input.toSceneId);
+    const fromScene = scenes.find((scene) => scene.id === fromSceneId);
+    const toScene = scenes.find((scene) => scene.id === toSceneId);
 
     if (fromScene == null || toScene == null) {
       return failure(
@@ -1061,7 +1262,6 @@ export async function proposeComplementScenes(
     }
 
     const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
-    const language = await resolvePrincipalLanguage(deps, input.language);
     const proposals =
       await deps.complementSceneProposal.proposeComplementScenes({
         project,
@@ -1071,10 +1271,232 @@ export async function proposeComplementScenes(
         stylePreset,
         projectPhotos,
         siblingScenes: scenes,
-        language,
+        language: readLanguagePayload(job.inputJson),
       });
 
-    return success(proposals.slice(0, 3));
+    return success({
+      storyboardId,
+      fromSceneId,
+      toSceneId,
+      proposals: proposals.slice(0, 3),
+    });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── AI job lifecycle ─────────────────────────────────────────────────────────
+
+async function getAiJobOrNotFound(
+  deps: ApplicationDependencies,
+  aiJobId: string,
+): Promise<AiJob | UseCaseResult<never>> {
+  const aiJob = await deps.aiJobs.findById(aiJobId);
+  if (aiJob == null) return failure("not_found", "AI job not found.");
+  return aiJob;
+}
+
+export type AiJobIdInput = {
+  aiJobId: string;
+};
+
+export async function getAiJob(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput,
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const aiJob = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(aiJob)) return aiJob;
+    return success(aiJob);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+async function saveAiJobTransition(
+  deps: ApplicationDependencies,
+  job: AiJob,
+  changes: Partial<AiJob>,
+  eventKind: string,
+): Promise<AiJob> {
+  const updated = createAiJob({ ...job, ...changes });
+  await deps.aiJobs.save(updated);
+  await deps.progressEvents.publish({
+    kind: eventKind,
+    entityType: "aiJob",
+    entityId: updated.id,
+    payload: {
+      aiJobId: updated.id,
+      projectId: updated.projectId,
+      jobKind: updated.kind,
+      status: updated.status,
+      result: updated.resultJson,
+      errorMessage: updated.errorMessage,
+    },
+  });
+  return updated;
+}
+
+export async function markAiJobRunning(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput & { startedAt: string },
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    if (job.status !== "queued") {
+      return failure(
+        "invalid_state",
+        `Cannot mark AI job as running: current status is "${job.status}".`,
+      );
+    }
+
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "running",
+          startedAt: input.startedAt,
+          updatedAt: input.startedAt,
+        },
+        "ai-job.running",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function markAiJobSucceeded(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput & {
+    resultJson: Record<string, unknown>;
+    completedAt: string;
+  },
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    // A job canceled mid-flight must not have its result written.
+    if (job.status !== "running") {
+      return failure(
+        "invalid_state",
+        `Cannot complete AI job: current status is "${job.status}".`,
+      );
+    }
+
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "succeeded",
+          resultJson: input.resultJson,
+          completedAt: input.completedAt,
+          updatedAt: input.completedAt,
+        },
+        "ai-job.succeeded",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function markAiJobFailed(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput & { errorMessage: string; completedAt: string },
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    if (job.status !== "running" && job.status !== "queued") {
+      return failure(
+        "invalid_state",
+        `Cannot fail AI job: current status is "${job.status}".`,
+      );
+    }
+
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "failed",
+          errorMessage: input.errorMessage,
+          completedAt: input.completedAt,
+          updatedAt: input.completedAt,
+        },
+        "ai-job.failed",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function cancelAiJob(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput,
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    if (job.status !== "queued" && job.status !== "running") {
+      return failure(
+        "invalid_state",
+        `Cannot cancel AI job: current status is "${job.status}".`,
+      );
+    }
+
+    const timestamp = now();
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "canceled",
+          completedAt: timestamp,
+          updatedAt: timestamp,
+        },
+        "ai-job.canceled",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// Restart recovery: an API restart leaves `running` rows behind whose worker is
+// gone. Fail them so the UI shows an honest terminal state instead of a spinner
+// that never resolves.
+export async function failInterruptedAiJobs(
+  deps: ApplicationDependencies,
+): Promise<UseCaseResult<number>> {
+  try {
+    const running = await deps.aiJobs.findRunning();
+    const timestamp = now();
+
+    for (const job of running) {
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "failed",
+          errorMessage: "interrupted by restart",
+          completedAt: timestamp,
+          updatedAt: timestamp,
+        },
+        "ai-job.failed",
+      );
+    }
+
+    return success(running.length);
   } catch (error) {
     return validationFailure(error);
   }
@@ -1291,22 +1713,14 @@ export async function createGenerationRequestUseCase(
 
     await deps.generationRequests.save(generationRequest);
 
-    const queueResult = await deps.jobQueue.enqueue({
-      kind: "generation-request",
-      payload: {
-        generationRequestId: generationRequest.id,
-        projectId: project.id,
-        storyboardId: storyboard.id,
-        sceneId: scene.id,
-      },
-    });
-
+    // The queued generation_requests row is itself the image work queue —
+    // LocalJobWorker polls it directly, so there is no jobQueue enqueue here.
     await deps.progressEvents.publish({
       kind: "generation-request.created",
       entityType: "generationRequest",
       entityId: generationRequest.id,
       payload: {
-        jobId: queueResult.jobId,
+        projectId: generationRequest.projectId,
       },
     });
 
@@ -1413,23 +1827,12 @@ export async function retryFailedGenerationRequest(
 
     await deps.generationRequests.save(retryRequest);
 
-    const queueResult = await deps.jobQueue.enqueue({
-      kind: "generation-request",
-      payload: {
-        generationRequestId: retryRequest.id,
-        sourceGenerationRequestId: generationRequest.id,
-        projectId: retryRequest.projectId,
-        storyboardId: retryRequest.storyboardId,
-        sceneId: retryRequest.sceneId,
-      },
-    });
-
     await deps.progressEvents.publish({
       kind: "generation-request.retried",
       entityType: "generationRequest",
       entityId: retryRequest.id,
       payload: {
-        jobId: queueResult.jobId,
+        projectId: retryRequest.projectId,
         sourceGenerationRequestId: generationRequest.id,
       },
     });
@@ -1543,6 +1946,7 @@ export async function markGenerationRequestRunning(
       kind: "generation-request.running",
       entityType: "generationRequest",
       entityId: updated.id,
+      payload: { projectId: updated.projectId },
     });
 
     return success(updated);
@@ -1621,7 +2025,10 @@ export async function markGenerationRequestCompleted(
       kind: "generation-request.succeeded",
       entityType: "generationRequest",
       entityId: updatedRequest.id,
-      payload: { generatedImageId: generatedImage.id },
+      payload: {
+        projectId: updatedRequest.projectId,
+        generatedImageId: generatedImage.id,
+      },
     });
 
     return success({ generationRequest: updatedRequest, generatedImage });
@@ -1676,7 +2083,7 @@ export async function markGenerationRequestFailed(
       kind: "generation-request.failed",
       entityType: "generationRequest",
       entityId: updated.id,
-      payload: { errorMessage: truncated },
+      payload: { projectId: updated.projectId, errorMessage: truncated },
     });
 
     return success(updated);

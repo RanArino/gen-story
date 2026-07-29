@@ -7,6 +7,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { failInterruptedAiJobs } from "@gen-story/application";
+
 import { createApiContext } from "./app/create-api-context";
 import { seedLocalPrincipal } from "./auth/local-auth";
 import { openDatabase, migrateDatabase } from "./db";
@@ -125,6 +127,13 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
 
   const deps = createApiContext(client);
   await seedLocalPrincipal(deps);
+
+  // Jobs left `running` by a previous process have no worker; fail them so the
+  // UI shows a terminal state instead of a spinner that never resolves.
+  const interrupted = await failInterruptedAiJobs(deps);
+  if (interrupted.ok && interrupted.value > 0) {
+    console.log(`[startup] failed ${interrupted.value} interrupted AI job(s)`);
+  }
 
   const worker = new LocalJobWorker(deps);
   worker.start();

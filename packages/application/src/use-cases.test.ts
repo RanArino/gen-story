@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createAiJob,
   createGeneratedImage,
   createGenerationRequest,
   createOrganization,
@@ -15,6 +16,7 @@ import {
   createUser,
   type TestAdjustmentId,
   type AiJob,
+  type AiJobKind,
   type GeneratedImage,
   type GenerationRequest,
   type GenerationRequestStatus,
@@ -78,6 +80,9 @@ import {
   reorderPhotos,
   reorderScenes,
   retryFailedGenerationRequest,
+  runComplementSceneProposalsJob,
+  runPhotoAnalysisJob,
+  runSceneAiFillJob,
   setUserPreference,
   updatePhotoCuration,
   upsertScenes,
@@ -555,16 +560,30 @@ class InMemoryAiJobRepository implements AiJobRepositoryPort {
 
 class InMemoryJobQueuePort implements JobQueuePort {
   public readonly jobs: Array<{
-    kind: string;
+    kind: AiJobKind;
+    projectId: string;
     payload: Record<string, unknown>;
   }> = [];
 
+  constructor(private readonly store: MemoryStore<AiJob>) {}
+
   async enqueue(job: {
-    kind: string;
+    kind: AiJobKind;
+    projectId: string;
     payload: Record<string, unknown>;
   }): Promise<{ jobId: string }> {
     this.jobs.push(job);
-    return { jobId: `job_${this.jobs.length}` };
+    const timestamp = new Date().toISOString();
+    const aiJob = createAiJob({
+      id: `job_${this.jobs.length}`,
+      projectId: job.projectId,
+      kind: job.kind,
+      inputJson: job.payload,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    await this.store.save(aiJob);
+    return { jobId: aiJob.id };
   }
 }
 
@@ -647,7 +666,7 @@ function createDependencies(initial?: {
     aiJobs: new MemoryStore<AiJob>(initial?.aiJobs ?? []),
   };
 
-  const jobQueue = new InMemoryJobQueuePort();
+  const jobQueue = new InMemoryJobQueuePort(stores.aiJobs);
   const imagePreprocessing = new InMemoryImagePreprocessingPort();
   const progressEvents = new InMemoryProgressEventPort();
   const objectStorage = new InMemoryObjectStoragePort();
@@ -1560,7 +1579,10 @@ describe("application use cases", () => {
 
     expect(result.ok).toBe(true);
     expect(deps.imagePreprocessing.calls).toHaveLength(1);
-    expect(deps.jobQueue.jobs).toHaveLength(1);
+    // Image work is queued by the generation_requests row itself, not the AI
+    // job queue.
+    expect(await deps.generationRequests.findQueued()).toHaveLength(1);
+    expect(deps.jobQueue.jobs).toHaveLength(0);
     expect(deps.progressEvents.events[0]?.kind).toBe(
       "generation-request.created",
     );
@@ -1758,7 +1780,8 @@ describe("application use cases", () => {
       expect(result.value.status).toBe("queued");
       expect(result.value.sourceGenerationRequestId).toBe("request_1");
     }
-    expect(deps.jobQueue.jobs).toHaveLength(1);
+    expect(await deps.generationRequests.findQueued()).toHaveLength(1);
+    expect(deps.jobQueue.jobs).toHaveLength(0);
   });
 
   it("fills blank scene fields with AI suggestions and preserves edited fields", async () => {
@@ -1813,23 +1836,37 @@ describe("application use cases", () => {
       ],
     });
 
-    const result = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+
+    expect(enqueued.ok).toBe(true);
+    // The enqueue half must not touch the AI port or the scene.
+    expect(deps.sceneFillGeneration.calls).toHaveLength(0);
+    expect(deps.scenes.saveCalls).toBe(0);
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("scene_ai_fill");
+    expect(job?.status).toBe("queued");
+
+    const result = await runSceneAiFillJob(deps, job!);
 
     expect(result.ok).toBe(true);
     expect(deps.sceneFillGeneration.calls).toHaveLength(1);
     expect(deps.scenes.saveCalls).toBe(1);
-    if (result.ok) {
-      expect(result.value).toMatchObject({
-        title: "Edited title",
-        description: "AI description",
-        imagePrompt: "AI image prompt",
-        emotion: "Wonder",
-        cameraDirection: "Medium",
-        lightingDirection: "Natural",
-        motionDirection: "Slow pan",
-      });
-      expect(result.value.updatedAt).not.toBe("2026-05-02T00:00:00.000Z");
-    }
+
+    const scene = await deps.scenes.findById("scene_ai");
+    expect(scene).toMatchObject({
+      title: "Edited title",
+      description: "AI description",
+      imagePrompt: "AI image prompt",
+      emotion: "Wonder",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "Slow pan",
+    });
+    expect(scene?.updatedAt).not.toBe("2026-05-02T00:00:00.000Z");
   });
 
   it("rejects AI fill when the scene has no primary photo", async () => {
@@ -2035,7 +2072,23 @@ describe("application use cases", () => {
       ],
     };
 
-    const result = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+    const enqueued = await analyzeProjectPhotos(deps, {
+      projectId: "project_1",
+    });
+
+    expect(enqueued.ok).toBe(true);
+    // The enqueue half must not spend anything.
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(0);
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    expect(enqueued.value.cached).toBe(false);
+    expect(enqueued.value.analysis).toBeNull();
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("photo_analysis");
+
+    const result = await runPhotoAnalysisJob(deps, job!);
 
     expect(result.ok).toBe(true);
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
@@ -2046,10 +2099,9 @@ describe("application use cases", () => {
       "storyboard_1",
     );
     expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(1);
-    if (result.ok) {
-      expect(result.value.cached).toBe(false);
-      expect(result.value.analysis.model).toBe("test-model");
-    }
+    expect(deps.stores.projectPhotoAnalyses.values()[0]!.model).toBe(
+      "test-model",
+    );
   });
 
   it("reuses the stored analysis when inputs are unchanged", async () => {
@@ -2083,16 +2135,26 @@ describe("application use cases", () => {
 
     const first = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(first.ok).toBe(true);
+    if (!first.ok || first.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    const firstJob = await deps.aiJobs.findById(first.value.jobId);
+    const ran = await runPhotoAnalysisJob(deps, firstJob!);
+    expect(ran.ok).toBe(true);
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
 
     const second = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(second.ok).toBe(true);
-    // No second AI call: the cached analysis is reused.
+    // No second AI call and no second job: the cached analysis is reused.
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
+    expect(deps.stores.aiJobs.values()).toHaveLength(1);
     expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(1);
-    if (first.ok && second.ok) {
+    if (second.ok) {
       expect(second.value.cached).toBe(true);
-      expect(second.value.analysis.id).toBe(first.value.analysis.id);
+      expect(second.value.jobId).toBeNull();
+      expect(second.value.analysis?.id).toBe(
+        deps.stores.projectPhotoAnalyses.values()[0]!.id,
+      );
     }
   });
 
@@ -2127,6 +2189,13 @@ describe("application use cases", () => {
 
     const first = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(first.ok).toBe(true);
+    if (!first.ok || first.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    await runPhotoAnalysisJob(
+      deps,
+      (await deps.aiJobs.findById(first.value.jobId))!,
+    );
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
 
     // A new candidate photo changes the analyzable set.
@@ -2148,10 +2217,16 @@ describe("application use cases", () => {
 
     const second = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(second.ok).toBe(true);
-    expect(deps.photoAnalysisGeneration.calls).toHaveLength(2);
-    if (second.ok) {
-      expect(second.value.cached).toBe(false);
+    if (!second.ok || second.value.jobId == null) {
+      throw new Error("expected a second job to be enqueued");
     }
+    expect(second.value.cached).toBe(false);
+
+    await runPhotoAnalysisJob(
+      deps,
+      (await deps.aiJobs.findById(second.value.jobId))!,
+    );
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(2);
   });
 
   it("rejects project photo analysis without included photos", async () => {
@@ -2347,16 +2422,26 @@ describe("application use cases", () => {
   it("returns AI complement-scene proposals for a bridge", async () => {
     const deps = seedComplementSceneDeps();
 
-    const result = await proposeComplementScenes(deps, {
+    const enqueued = await proposeComplementScenes(deps, {
       storyboardId: "storyboard_1",
       fromSceneId: "scene_1",
       toSceneId: "scene_2",
     });
 
+    expect(enqueued.ok).toBe(true);
+    expect(deps.complementSceneProposal.calls).toHaveLength(0);
+    if (!enqueued.ok) throw new Error("expected a job to be enqueued");
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("complement_scene_proposals");
+
+    const result = await runComplementSceneProposalsJob(deps, job!);
+
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.length).toBeGreaterThan(0);
-      expect(result.value.length).toBeLessThanOrEqual(3);
+      const proposals = result.value.proposals as unknown[];
+      expect(proposals.length).toBeGreaterThan(0);
+      expect(proposals.length).toBeLessThanOrEqual(3);
     }
     expect(deps.complementSceneProposal.calls).toHaveLength(1);
   });

@@ -13,10 +13,18 @@ any cloud setup. The following features are deliberately excluded from this vers
 
 ## Generation & jobs
 
-- The job queue and progress-event ports are `NoOp` stubs
-  (`apps/api/src/app/create-api-context.ts`). Image generation runs
-  synchronously within the request rather than through a real async queue, and
-  there is no live progress stream.
+- Background work runs in-process. Image generation uses the `generation_requests`
+  table and text/vision AI work (photo analysis, scene AI fill, complement scene
+  proposals) uses the `ai_jobs` table; both are polled by `LocalJobWorker` inside
+  the API process. There is no external queue, no multi-process worker, and no
+  retry-with-backoff.
+- Progress is delivered by server-sent events on
+  `GET /api/projects/:projectId/events`, fanned out in memory to subscribers of
+  the same API process. Events are not persisted or replayed: a client that
+  connects late misses earlier events and must read job state from
+  `GET /api/ai-jobs/:aiJobId` instead.
+- Jobs left `running` by a killed API process are marked `failed` with
+  `interrupted by restart` on the next startup; they are not resumed.
 - Image generation defaults to a **mock adapter** that returns placeholder
   images. Real generation requires an `OPENAI_API_KEY` and
   `IMAGE_GENERATION_ADAPTER=openai`.

@@ -1,12 +1,10 @@
-import type {
-  ApplicationDependencies,
-  JobQueuePort,
-  ProgressEventPort,
-} from "@gen-story/application";
+import type { ApplicationDependencies } from "@gen-story/application";
 
 import { LocalAuthContext } from "../auth/local-auth";
 import type { GenStorySqliteClient } from "../db/client";
 import { createSqliteRepositories } from "../db/repositories";
+import { LocalProgressEvents } from "../jobs/local-progress-events";
+import { SqliteJobQueue } from "../jobs/sqlite-job-queue";
 import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
 import { OpenAiImageGenerationAdapter } from "../generation/openai-image-generation";
 import { LocalImagePreprocessingAdapter } from "../images/local-image-preprocessing";
@@ -25,19 +23,15 @@ import {
 } from "../scene-fill/gemini-scene-fill-generation";
 import { LocalObjectStorage } from "../storage/local-object-storage";
 
-class NoOpJobQueue implements JobQueuePort {
-  async enqueue(): Promise<{ jobId: string }> {
-    return { jobId: crypto.randomUUID() };
-  }
-}
-
-class NoOpProgressEvents implements ProgressEventPort {
-  async publish(): Promise<void> {}
-}
+// The router needs the concrete emitter, not just the port, because the SSE
+// route subscribes to it.
+export type ApiDependencies = ApplicationDependencies & {
+  progressEvents: LocalProgressEvents;
+};
 
 export function createApiContext(
   client: GenStorySqliteClient,
-): ApplicationDependencies {
+): ApiDependencies {
   const repos = createSqliteRepositories(client.db);
   const objectStorage = new LocalObjectStorage();
   const imagePreprocessing = new LocalImagePreprocessingAdapter({
@@ -75,6 +69,8 @@ export function createApiContext(
       )
     : new LocalPhotoAnalysisGenerationAdapter();
 
+  const progressEvents = new LocalProgressEvents();
+
   return {
     ...repos,
     objectStorage,
@@ -83,8 +79,8 @@ export function createApiContext(
     sceneFillGeneration,
     complementSceneProposal,
     photoAnalysisGeneration,
-    jobQueue: new NoOpJobQueue(),
-    progressEvents: new NoOpProgressEvents(),
+    jobQueue: new SqliteJobQueue(repos.aiJobs, progressEvents),
+    progressEvents,
     authContext: new LocalAuthContext(repos),
   };
 }

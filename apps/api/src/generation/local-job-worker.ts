@@ -1,10 +1,34 @@
 import {
   checkConcurrencyAllowed,
+  markAiJobFailed,
+  markAiJobRunning,
+  markAiJobSucceeded,
   markGenerationRequestCompleted,
   markGenerationRequestFailed,
   markGenerationRequestRunning,
+  runComplementSceneProposalsJob,
+  runPhotoAnalysisJob,
+  runSceneAiFillJob,
 } from "@gen-story/application";
-import type { ApplicationDependencies } from "@gen-story/application";
+import type {
+  ApplicationDependencies,
+  UseCaseResult,
+} from "@gen-story/application";
+import type { AiJob } from "@gen-story/domain";
+
+const AI_JOB_RUNNERS: Record<
+  AiJob["kind"],
+  (
+    deps: ApplicationDependencies,
+    job: AiJob,
+  ) => Promise<UseCaseResult<Record<string, unknown>>>
+> = {
+  photo_analysis: runPhotoAnalysisJob,
+  scene_ai_fill: runSceneAiFillJob,
+  complement_scene_proposals: runComplementSceneProposalsJob,
+};
+
+const MAX_DISPATCH_PER_TICK = 5;
 
 function now(): string {
   return new Date().toISOString();
@@ -43,6 +67,7 @@ export class LocalJobWorker {
     this.running = true;
     try {
       await this.processQueued();
+      await this.processQueuedAiJobs();
     } finally {
       this.running = false;
     }
@@ -64,10 +89,87 @@ export class LocalJobWorker {
       dispatched.push(this.executeJob(request.id, request.inputJson));
 
       // Stop dispatching once we have reached the global cap for this tick
-      if (dispatched.length >= 5) break;
+      if (dispatched.length >= MAX_DISPATCH_PER_TICK) break;
     }
 
     await Promise.allSettled(dispatched);
+  }
+
+  private async processQueuedAiJobs(): Promise<void> {
+    const queued = await this.deps.aiJobs.findQueued();
+    if (queued.length === 0) return;
+
+    const dispatched: Promise<void>[] = [];
+
+    for (const job of queued) {
+      const allowed = await checkConcurrencyAllowed(this.deps, job.projectId);
+      if (!allowed) continue;
+
+      dispatched.push(this.executeAiJob(job));
+
+      if (dispatched.length >= MAX_DISPATCH_PER_TICK) break;
+    }
+
+    await Promise.allSettled(dispatched);
+  }
+
+  private async executeAiJob(job: AiJob): Promise<void> {
+    const startedAt = now();
+
+    const runningResult = await markAiJobRunning(this.deps, {
+      aiJobId: job.id,
+      startedAt,
+    });
+
+    if (!runningResult.ok) {
+      // Already transitioned by another worker tick, or canceled — skip.
+      return;
+    }
+
+    console.log(`[Worker] starting AI job ${job.id} (${job.kind})`);
+
+    try {
+      const result = await AI_JOB_RUNNERS[job.kind](
+        this.deps,
+        runningResult.value,
+      );
+
+      if (!result.ok) {
+        await markAiJobFailed(this.deps, {
+          aiJobId: job.id,
+          errorMessage: result.error.message.slice(0, 500),
+          completedAt: now(),
+        });
+        console.log(
+          `[Worker] failed AI job ${job.id}: ${result.error.message}`,
+        );
+        return;
+      }
+
+      const succeeded = await markAiJobSucceeded(this.deps, {
+        aiJobId: job.id,
+        resultJson: result.value,
+        completedAt: now(),
+      });
+
+      if (!succeeded.ok) {
+        console.log(
+          `[Worker] AI job ${job.id} already canceled; discarding result`,
+        );
+        return;
+      }
+
+      const durationMs = Date.now() - new Date(startedAt).getTime();
+      console.log(`[Worker] succeeded AI job ${job.id} in ${durationMs}ms`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await markAiJobFailed(this.deps, {
+        aiJobId: job.id,
+        errorMessage: message.slice(0, 500),
+        completedAt: now(),
+      });
+      console.log(`[Worker] failed AI job ${job.id}: ${message}`);
+    }
   }
 
   private async executeJob(

@@ -507,9 +507,20 @@ describe("POST /api/storyboards/:storyboardId/complement-scenes", () => {
       "/api/storyboards/sb-comp/complement-scenes/proposals",
       { fromSceneId: "scene-a", toSceneId: "scene-b" },
     );
-    expect(result.status).toBe(200);
-    const body = result.body as { proposals: unknown[] };
-    expect(body.proposals.length).toBeGreaterThan(0);
+    expect(result.status).toBe(202);
+    const { jobId } = result.body as { jobId: string };
+    expect(jobId).toBeTruthy();
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("complement_scene_proposals");
+
+    const { runComplementSceneProposalsJob } =
+      await import("@gen-story/application");
+    const run = await runComplementSceneProposalsJob(deps, job!);
+    expect(run.ok).toBe(true);
+    if (run.ok) {
+      expect((run.value.proposals as unknown[]).length).toBeGreaterThan(0);
+    }
   });
 
   it("reorders scenes via PUT /scene-order", async () => {
@@ -592,8 +603,21 @@ describe("POST /api/scenes/:sceneId/ai-fill", () => {
       {},
     );
 
-    expect(status).toBe(200);
-    expect(body).toMatchObject({
+    // The AI call now runs in the background; the route returns a job handle.
+    expect(status).toBe(202);
+    const { jobId } = body as { jobId: string; scene: null };
+    expect(jobId).toBeTruthy();
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("scene_ai_fill");
+    expect(job?.status).toBe("queued");
+
+    const { runSceneAiFillJob } = await import("@gen-story/application");
+    const run = await runSceneAiFillJob(deps, job!);
+    expect(run.ok).toBe(true);
+
+    const scene = await deps.scenes.findById("ai-scene");
+    expect(scene).toMatchObject({
       id: "ai-scene",
       title: "AI family.jpg",
       description: "AI description for family.jpg",
@@ -1178,13 +1202,19 @@ describe("project photo analysis routes", () => {
       {},
     );
 
-    expect(created.status).toBe(200);
-    expect(created.body).toMatchObject({
-      photoAnalysis: {
-        projectId: "analysis-proj",
-        model: "in-memory",
-      },
-    });
+    expect(created.status).toBe(202);
+    const { jobId, cached } = created.body as {
+      jobId: string;
+      cached: boolean;
+    };
+    expect(cached).toBe(false);
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("photo_analysis");
+
+    const { runPhotoAnalysisJob } = await import("@gen-story/application");
+    const run = await runPhotoAnalysisJob(deps, job!);
+    expect(run.ok).toBe(true);
 
     const fetched = await req(
       base,
@@ -1412,5 +1442,89 @@ describe("POST /api/storyboards/:id/test-generation/variants/:vid/adjustments", 
     expect(body).toMatchObject({
       generationRequest: { appliedAdjustments: [] },
     });
+  });
+});
+
+describe("AI job routes", () => {
+  async function seedJob() {
+    const { createProject } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    await deps.projects.save(
+      createProject({
+        id: "job-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Job Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "photo_analysis",
+      projectId: "job-proj",
+      payload: { projectId: "job-proj" },
+    });
+    return jobId;
+  }
+
+  it("returns an AI job by id", async () => {
+    const jobId = await seedJob();
+
+    const { status, body } = await req(base, "GET", `/api/ai-jobs/${jobId}`);
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      id: jobId,
+      projectId: "job-proj",
+      kind: "photo_analysis",
+      status: "queued",
+    });
+  });
+
+  it("returns 404 for an unknown AI job", async () => {
+    const { status } = await req(base, "GET", "/api/ai-jobs/missing");
+    expect(status).toBe(404);
+  });
+
+  it("cancels a queued AI job", async () => {
+    const jobId = await seedJob();
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/ai-jobs/${jobId}/cancel`,
+    );
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ id: jobId, status: "canceled" });
+    expect(await deps.aiJobs.findQueued()).toHaveLength(0);
+  });
+
+  it("streams project events as server-sent events", async () => {
+    const jobId = await seedJob();
+
+    const controller = new AbortController();
+    const res = await fetch(`${base}/api/projects/job-proj/events`, {
+      signal: controller.signal,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/event-stream");
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+
+    // The stream opens with a comment frame before any event.
+    const first = await reader.read();
+    expect(decoder.decode(first.value)).toContain(": connected");
+
+    await req(base, "POST", `/api/ai-jobs/${jobId}/cancel`);
+
+    const next = await reader.read();
+    const frame = decoder.decode(next.value);
+    expect(frame).toContain("event: ai-job.canceled");
+    expect(frame).toContain(jobId);
+
+    controller.abort();
   });
 });

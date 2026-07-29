@@ -174,6 +174,20 @@ export type GenerationRequestDto = {
   updatedAt: string;
 };
 
+export type AiJobDto = {
+  id: string;
+  projectId: string;
+  kind: string;
+  status: string;
+  inputJson: Record<string, unknown>;
+  resultJson: Record<string, unknown> | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type GenerationRequestWithSceneTitleDto = GenerationRequestDto & {
   sceneTitle: string | null;
 };

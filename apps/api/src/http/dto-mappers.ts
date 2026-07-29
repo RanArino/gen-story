@@ -1,4 +1,5 @@
 import type {
+  AiJob,
   GeneratedImage,
   GenerationRequest,
   PhotoAsset,
@@ -10,6 +11,7 @@ import type {
   TestGenerationBatch,
 } from "@gen-story/domain";
 import type {
+  AiJobDto,
   GeneratedImageDto,
   GenerationRequestDto,
   MeDto,
@@ -219,6 +221,22 @@ export function toGenerationRequestDto(
     completedAt: req.completedAt,
     createdAt: req.createdAt,
     updatedAt: req.updatedAt,
+  };
+}
+
+export function toAiJobDto(job: AiJob): AiJobDto {
+  return {
+    id: job.id,
+    projectId: job.projectId,
+    kind: job.kind,
+    status: job.status,
+    inputJson: job.inputJson,
+    resultJson: job.resultJson,
+    errorMessage: job.errorMessage,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
   };
 }
 
