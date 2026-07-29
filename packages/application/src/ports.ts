@@ -1,4 +1,5 @@
 import type {
+  AiJob,
   GeneratedImage,
   GenerationRequest,
   GenerationRequestStatus,
@@ -107,6 +108,15 @@ export interface GenerationRequestRepositoryPort {
   findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]>;
   save(generationRequest: GenerationRequest): Promise<void>;
   softDelete(generationRequestId: string, deletedAt: string): Promise<void>;
+}
+
+export interface AiJobRepositoryPort {
+  findById(aiJobId: string): Promise<AiJob | null>;
+  findQueued(): Promise<AiJob[]>;
+  findByProjectId(projectId: string): Promise<AiJob[]>;
+  findRunning(): Promise<AiJob[]>;
+  findRunningCountByProjectId(projectId: string): Promise<number>;
+  save(aiJob: AiJob): Promise<void>;
 }
 
 export interface GeneratedImageRepositoryPort {
@@ -267,6 +277,7 @@ export interface ApplicationDependencies {
   stylePresets: StylePresetRepositoryPort;
   generationRequests: GenerationRequestRepositoryPort;
   generatedImages: GeneratedImageRepositoryPort;
+  aiJobs: AiJobRepositoryPort;
   projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
   testGenerationBatches: TestGenerationBatchRepositoryPort;
   userPreferences: UserPreferenceRepositoryPort;

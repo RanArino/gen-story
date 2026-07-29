@@ -289,6 +289,32 @@ export const projectPhotoAnalyses = sqliteTable(
   ],
 );
 
+// Background jobs for the text/vision AI operations (photo analysis, scene AI
+// fill, complement scene proposals). Image generation keeps its own
+// image-specific `generation_requests` table.
+export const aiJobs = sqliteTable(
+  "ai_jobs",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    kind: text("kind").notNull(),
+    status: text("status").notNull(),
+    inputJson: text("input_json").notNull(),
+    resultJson: text("result_json"),
+    errorMessage: text("error_message"),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("ai_jobs_project_id_idx").on(table.projectId),
+    index("ai_jobs_status_idx").on(table.status),
+  ],
+);
+
 export const testGenerationBatches = sqliteTable(
   "test_generation_batches",
   {

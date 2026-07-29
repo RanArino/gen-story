@@ -3,6 +3,7 @@ export {
   MAX_CONCURRENT_PER_PROJECT,
 } from "./concurrency-policy";
 export type {
+  AiJobRepositoryPort,
   ApplicationDependencies,
   AuthContextPort,
   AuthPrincipal,

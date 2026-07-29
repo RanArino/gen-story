@@ -85,6 +85,13 @@
       "when": 1781707812140,
       "tag": "0011_futuristic_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1785288575839,
+      "tag": "0012_yielding_wendigo",
+      "breakpoints": true
     }
   ]
 }

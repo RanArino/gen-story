@@ -11,6 +11,7 @@ export type GenerationRequestId = string;
 export type GeneratedImageId = string;
 export type ProjectPhotoAnalysisId = string;
 export type TestGenerationBatchId = string;
+export type AiJobId = string;
 
 export type ProjectStatus = "draft" | "active" | "completed" | "archived";
 export type TestGenerationBatchStatus = "pending" | "completed";
@@ -25,6 +26,32 @@ export type GenerationRequestStatus =
   | "succeeded"
   | "failed"
   | "canceled";
+
+// Background text/vision AI work. Image generation is not an AI job; it keeps
+// its own GenerationRequest lifecycle.
+export type AiJobKind =
+  | "photo_analysis"
+  | "scene_ai_fill"
+  | "complement_scene_proposals";
+
+export type AiJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "canceled";
+
+export const AI_JOB_KINDS: AiJobKind[] = [
+  "photo_analysis",
+  "scene_ai_fill",
+  "complement_scene_proposals",
+];
+
+export function isAiJobKind(value: unknown): value is AiJobKind {
+  return (
+    typeof value === "string" && (AI_JOB_KINDS as string[]).includes(value)
+  );
+}
 
 export type TestAdjustmentId =
   | "warmer"
@@ -165,6 +192,20 @@ export type GenerationRequest = {
   errorMessage: string | null;
   sourceGenerationRequestId: GenerationRequestId | null;
   appliedAdjustments: TestAdjustmentId[];
+  startedAt: Timestamp | null;
+  completedAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export type AiJob = {
+  id: AiJobId;
+  projectId: ProjectId;
+  kind: AiJobKind;
+  status: AiJobStatus;
+  inputJson: Record<string, unknown>;
+  resultJson: Record<string, unknown> | null;
+  errorMessage: string | null;
   startedAt: Timestamp | null;
   completedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -331,6 +372,20 @@ export type CreateGenerationRequestInput = {
   errorMessage?: string | null;
   sourceGenerationRequestId?: GenerationRequestId | null;
   appliedAdjustments?: TestAdjustmentId[];
+  startedAt?: Timestamp | null;
+  completedAt?: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export type CreateAiJobInput = {
+  id: AiJobId;
+  projectId: ProjectId;
+  kind: AiJobKind;
+  inputJson: Record<string, unknown>;
+  status?: AiJobStatus;
+  resultJson?: Record<string, unknown> | null;
+  errorMessage?: string | null;
   startedAt?: Timestamp | null;
   completedAt?: Timestamp | null;
   createdAt: Timestamp;
@@ -599,6 +654,22 @@ export function createGenerationRequest(
     errorMessage: trimOptionalText(input.errorMessage) || null,
     sourceGenerationRequestId: input.sourceGenerationRequestId ?? null,
     appliedAdjustments: [...(input.appliedAdjustments ?? [])],
+    startedAt: input.startedAt ?? null,
+    completedAt: input.completedAt ?? null,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+  };
+}
+
+export function createAiJob(input: CreateAiJobInput): AiJob {
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    kind: input.kind,
+    status: input.status ?? "queued",
+    inputJson: { ...input.inputJson },
+    resultJson: input.resultJson ?? null,
+    errorMessage: trimOptionalText(input.errorMessage) || null,
     startedAt: input.startedAt ?? null,
     completedAt: input.completedAt ?? null,
     createdAt: input.createdAt,

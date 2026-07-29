@@ -1,4 +1,5 @@
 import type {
+  AiJobRepositoryPort,
   ApplicationDependencies,
   ComplementSceneProposal,
   ComplementSceneProposalInput,
@@ -34,6 +35,7 @@ import type {
 } from "@gen-story/domain";
 import { LocalAuthContext } from "../auth/local-auth";
 import type {
+  AiJob,
   GeneratedImage,
   GenerationRequest,
   Organization,
@@ -461,6 +463,37 @@ class InMemoryUserPreferenceRepository implements UserPreferenceRepositoryPort {
   }
 }
 
+class InMemoryAiJobRepository implements AiJobRepositoryPort {
+  constructor(private readonly store: MemoryStore<AiJob>) {}
+
+  async findById(aiJobId: string): Promise<AiJob | null> {
+    return this.store.findById(aiJobId);
+  }
+
+  async findQueued(): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.status === "queued");
+  }
+
+  async findRunning(): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.status === "running");
+  }
+
+  async findRunningCountByProjectId(projectId: string): Promise<number> {
+    return this.store
+      .values()
+      .filter((job) => job.projectId === projectId && job.status === "running")
+      .length;
+  }
+
+  async findByProjectId(projectId: string): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.projectId === projectId);
+  }
+
+  async save(aiJob: AiJob): Promise<void> {
+    await this.store.save(aiJob);
+  }
+}
+
 class InMemoryJobQueue implements JobQueuePort {
   async enqueue(): Promise<{ jobId: string }> {
     return { jobId: "job_1" };
@@ -484,6 +517,7 @@ export function createInMemoryApplicationDependencies(
     generatedImages?: GeneratedImage[];
     projectPhotoAnalyses?: ProjectPhotoAnalysis[];
     testGenerationBatches?: TestGenerationBatch[];
+    aiJobs?: AiJob[];
   },
   overrides?: Partial<ApplicationDependencies>,
 ): ApplicationDependencies & {
@@ -499,6 +533,7 @@ export function createInMemoryApplicationDependencies(
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
     testGenerationBatches: MemoryStore<TestGenerationBatch>;
+    aiJobs: MemoryStore<AiJob>;
   };
 } {
   const stores = {
@@ -515,6 +550,7 @@ export function createInMemoryApplicationDependencies(
     testGenerationBatches: new MemoryStore<TestGenerationBatch>(
       initial?.testGenerationBatches ?? [],
     ),
+    aiJobs: new MemoryStore<AiJob>(initial?.aiJobs ?? []),
   };
   const dependencies: ApplicationDependencies = {
     users: new InMemoryUserRepository(stores.users),
@@ -530,6 +566,7 @@ export function createInMemoryApplicationDependencies(
     generatedImages: new InMemoryGeneratedImageRepository(
       stores.generatedImages,
     ),
+    aiJobs: new InMemoryAiJobRepository(stores.aiJobs),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
     ),

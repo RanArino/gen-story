@@ -1,4 +1,9 @@
 export type {
+  AiJob,
+  AiJobId,
+  AiJobKind,
+  AiJobStatus,
+  CreateAiJobInput,
   CreateGeneratedImageInput,
   CreateGenerationRequestInput,
   CreateOrganizationInput,
@@ -51,6 +56,8 @@ export type {
   UserId,
 } from "./model";
 export {
+  AI_JOB_KINDS,
+  createAiJob,
   createGeneratedImage,
   createComplementScene,
   createGenerationRequest,
@@ -64,6 +71,7 @@ export {
   createStylePreset,
   createTestGenerationBatch,
   createUser,
+  isAiJobKind,
   isTestAdjustmentId,
   TEST_ADJUSTMENT_IDS,
 } from "./model";
