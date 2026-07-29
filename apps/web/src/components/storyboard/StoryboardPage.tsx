@@ -666,13 +666,16 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         scenes.map((s) => ({
           sceneId: s.id,
           orderIndex: s.orderIndex,
-          title: s.title || "Untitled",
-          description: s.description || "-",
-          imagePrompt: s.imagePrompt || "-",
-          emotion: s.emotion || "Joy",
-          cameraDirection: s.cameraDirection || "Wide",
-          lightingDirection: s.lightingDirection || "Natural",
-          motionDirection: s.motionDirection || "Slow pan",
+          // Save blanks as blanks. Substituting placeholder text here used to
+          // make every scene look already-filled, which silently disabled AI
+          // fill for the rest of the scene's life.
+          title: s.title,
+          description: s.description,
+          imagePrompt: s.imagePrompt,
+          emotion: s.emotion,
+          cameraDirection: s.cameraDirection,
+          lightingDirection: s.lightingDirection,
+          motionDirection: s.motionDirection,
           notes: s.notes,
           negativePrompt: s.negativePrompt,
         })),

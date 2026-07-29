@@ -27,17 +27,21 @@ export const UpsertStoryboardSchema = z.object({
   negativePrompt: z.string().optional(),
 });
 
+// The AI-fillable fields accept the empty string on purpose: blank means "not
+// written yet", which is what makes a scene eligible for AI fill. Requiring a
+// non-empty value here forced the web layer to invent placeholder text, which
+// then made every scene look already-filled and silently disabled AI fill.
 export const SceneInputSchema = z.object({
   sceneId: z.string().optional(),
   orderIndex: z.number().int().min(0),
   status: z.enum(["draft", "ready", "completed"]).optional(),
-  title: z.string().min(1),
-  description: z.string().min(1),
-  imagePrompt: z.string().min(1),
-  emotion: z.string().min(1),
-  cameraDirection: z.string().min(1),
-  lightingDirection: z.string().min(1),
-  motionDirection: z.string().min(1),
+  title: z.string(),
+  description: z.string(),
+  imagePrompt: z.string(),
+  emotion: z.string(),
+  cameraDirection: z.string(),
+  lightingDirection: z.string(),
+  motionDirection: z.string(),
   notes: z.string().optional(),
   negativePrompt: z.string().optional(),
   photoAssets: z

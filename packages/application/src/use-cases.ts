@@ -903,8 +903,27 @@ const sceneFillFields = [
   "motionDirection",
 ] as const satisfies ReadonlyArray<keyof Scene>;
 
+// Placeholder text the web layer used to write into blank scene fields so they
+// would pass a since-relaxed non-empty validation. Scenes saved before that fix
+// still carry these values, and treating them as real content would leave those
+// scenes permanently ineligible for AI fill. They are recognized as blank so
+// existing storyboards recover on the next fill; anything the user actually
+// typed is left alone.
+const LEGACY_SCENE_FIELD_PLACEHOLDERS = new Set([
+  "-",
+  "untitled",
+  "joy",
+  "wide",
+  "natural",
+  "slow pan",
+]);
+
 function isBlankSceneField(value: string): boolean {
-  return value.trim().length === 0;
+  const trimmed = value.trim();
+  return (
+    trimmed.length === 0 ||
+    LEGACY_SCENE_FIELD_PLACEHOLDERS.has(trimmed.toLowerCase())
+  );
 }
 
 type SceneFillContext = {

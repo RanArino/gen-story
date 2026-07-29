@@ -2674,4 +2674,79 @@ describe("application use cases", () => {
       expect(after).toBe(before);
     });
   });
+
+  it("treats legacy placeholder scene fields as blank so AI fill still applies", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_ai",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_ai",
+          projectId: "project_ai",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_ai",
+          projectId: "project_ai",
+          name: "birthday.jpg",
+          storageKey: "photos/birthday.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "photo_ai_checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      scenes: [
+        {
+          ...createTemplateScene({
+            id: "scene_ai",
+            projectId: "project_ai",
+            storyboardId: "storyboard_ai",
+            orderIndex: 0,
+            photoAssetId: "photo_ai",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+          // Exactly what the web layer used to persist for a blank scene.
+          title: "Untitled",
+          description: "-",
+          imagePrompt: "-",
+          emotion: "Joy",
+          cameraDirection: "Wide",
+          lightingDirection: "Natural",
+          motionDirection: "Slow pan",
+        },
+      ],
+    });
+
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("placeholder-filled scene should still enqueue a job");
+    }
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    await runSceneAiFillJob(deps, job!);
+
+    const scene = await deps.scenes.findById("scene_ai");
+    expect(scene).toMatchObject({
+      title: "AI title",
+      description: "AI description",
+      imagePrompt: "AI image prompt",
+    });
+  });
 });
