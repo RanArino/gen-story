@@ -97,7 +97,7 @@ pnpm tsx scripts/generate-style-previews.ts --fresh-base
 
 This writes JPEG files to `apps/web/public/style-previews/`. The base image is
 cached at `data/style-preview-base.png` so re-runs do not regenerate it. The
-script requires `OPENAI_API_KEY` (it is also read from `.env` / `.env.local`);
+script requires `OPENAI_API_KEY` (read from `apps/api/.env`);
 without it the gallery simply shows no preview thumbnails.
 
 ## Running Tests
@@ -158,7 +158,7 @@ API terminal logs each request in structured format:
 
 **Port already in use** — Another process is using port 3000 or 4000. Stop it or change `API_PORT` / the Next.js port.
 
-**`apps/api/.env` not found** — Copy `.env.example` as described above. The app will start but generation will use the mock adapter.
+**`apps/api/.env` not found** — Copy `apps/api/.env.example` as described above. The app will start but generation will use the mock adapter.
 
 **SQLite locked** — Only one process should write to the database at a time. Stop any other running API instances.
 

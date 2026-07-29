@@ -54,7 +54,7 @@ data/            Local SQLite DB and uploaded files (gitignored)
 
 **Storage layout:** `data/uploads/originals/projects/{projectId}/{photoAssetId}.ext`
 
-**Environment variables** are documented in `.env.example`. Default: `API_PORT=4000`, `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000`, `GEN_STORY_SQLITE_PATH=data/gen-story.sqlite`.
+**Environment variables** live in a single file, `apps/api/.env`, documented by `apps/api/.env.example`. Default: `API_PORT=4000`, `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000`, `GEN_STORY_SQLITE_PATH=data/gen-story.sqlite`.
 
 ## Layer Isolation Rules (strictly enforced)
 
@@ -69,7 +69,7 @@ data/            Local SQLite DB and uploaded files (gitignored)
 - `pnpm typecheck` after every code change.
 - Update `docs/` when commands, env vars, APIs, or user-visible behavior changes.
 - Update `internal/gap-analysis.md` whenever work starts, is planned with an ExecPlan, or is completed for any requirement tracked there. If an ExecPlan targets a `❌ Not yet implemented` requirement, change that requirement to `🟡 In progress` in the same change as the plan. (`internal/` is gitignored and excluded from the public release.)
-- Use `.env.example` to document new env vars; never commit `.env` or secrets.
+- Use `apps/api/.env.example` to document new env vars; never commit `apps/api/.env` or secrets.
 - Never edit generated files: `node_modules`, `.next`, `dist`, `*.tsbuildinfo`.
 - Never add production cloud deployment, external queues, paid billing, WorkOS production auth, SNS, video generation, or BGM generation unless explicitly requested.
 
