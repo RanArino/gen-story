@@ -20,11 +20,11 @@ import {
   composeCommonPrompt,
   createAiJob,
   replaceScenePhotoAssets,
-  resetTestGenerationBatch,
   retryGenerationRequest,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
   transitionGenerationRequestStatus,
+  unconfirmTestGenerationBatch,
   type AiJob,
   type GeneratedImage,
   type GenerationRequest,
@@ -2170,14 +2170,26 @@ export async function requestTestGeneration(
       );
     }
 
-    const existingBatch =
+    const latestBatch =
       await deps.testGenerationBatches.findLatestByStoryboardId(
         input.storyboardId,
       );
-    if (!canStartTestGeneration(existingBatch)) {
+    // Only variants still in flight block another batch. A batch left pending
+    // because its variants failed must not trap the operator: there is no
+    // longer a reset to escape with.
+    const latestVariants =
+      latestBatch == null
+        ? []
+        : await deps.generationRequests.findByTestBatchId(latestBatch.id);
+    if (
+      !canStartTestGeneration(
+        latestBatch,
+        latestVariants.map((variant) => variant.status),
+      )
+    ) {
       return failure(
         "invalid_state",
-        "A pending test generation batch already exists. Confirm or reset it first.",
+        "A test generation batch for this storyboard is still running.",
       );
     }
 
@@ -2205,6 +2217,7 @@ export async function requestTestGeneration(
         storyboardId: input.storyboardId,
         sceneId: input.sceneId,
         inputJson: { ...preprocessed, testBatchId: batch.id, testVariant: i },
+        testGenerationBatchId: batch.id,
         createdAt: ts,
         updatedAt: ts,
       });
@@ -2294,6 +2307,7 @@ export async function applyAdjustmentToTestVariant(
       inputJson: preprocessed,
       appliedAdjustments: input.adjustmentIds,
       sourceGenerationRequestId: variant.id,
+      testGenerationBatchId: testBatchId,
       createdAt: ts,
       updatedAt: ts,
     });
@@ -2319,22 +2333,6 @@ export async function confirmTestGeneration(
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
-    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(
-      input.storyboardId,
-    );
-    if (!batch) {
-      return failure(
-        "not_found",
-        "No test generation batch found for this storyboard.",
-      );
-    }
-    if (batch.status === "completed") {
-      return failure(
-        "invalid_state",
-        "Test generation batch is already confirmed.",
-      );
-    }
-
     const req = await deps.generationRequests.findById(
       input.confirmedGenerationRequestId,
     );
@@ -2344,8 +2342,40 @@ export async function confirmTestGeneration(
         "Generation request not found in this storyboard.",
       );
     }
+    if (req.status !== "succeeded") {
+      return failure(
+        "invalid_state",
+        "Only a succeeded sample can be confirmed.",
+      );
+    }
+
+    // The batch comes from the sample, not from "the latest batch": the
+    // operator may confirm a sample from any batch they have generated.
+    const batches = await deps.testGenerationBatches.listByStoryboardId(
+      input.storyboardId,
+    );
+    const batch = batches.find(
+      (candidate) => candidate.id === req.testGenerationBatchId,
+    );
+    if (!batch) {
+      return failure(
+        "invalid_state",
+        "Generation request is not a test generation sample.",
+      );
+    }
 
     const ts = now();
+    // A storyboard holds exactly one confirmation, so moving it means taking it
+    // off whichever other batch currently has it. `createdAt` is preserved, so
+    // the batch keeps its place in the history ordering.
+    for (const other of batches) {
+      if (other.id === batch.id) continue;
+      if (other.status !== "completed") continue;
+      await deps.testGenerationBatches.save(
+        unconfirmTestGenerationBatch(other),
+      );
+    }
+
     const confirmed = completeTestGenerationBatch(
       batch,
       input.confirmedGenerationRequestId,
@@ -2375,36 +2405,63 @@ export async function confirmTestGeneration(
   }
 }
 
-export type ResetTestGenerationInput = {
-  storyboardId: string;
+export type TestGenerationBatchVariant = {
+  request: GenerationRequest;
+  generatedImage: GeneratedImage | null;
 };
 
-export async function resetTestGeneration(
+export type TestGenerationBatchWithVariants = {
+  batch: TestGenerationBatch;
+  variants: TestGenerationBatchVariant[];
+};
+
+// The storyboard's whole sample history, newest batch first. Assembled here so
+// the modal and the history screen read one shape instead of each stitching
+// batches to requests to images for itself.
+export async function listTestGenerationBatches(
   deps: ApplicationDependencies,
-  input: ResetTestGenerationInput,
-): Promise<UseCaseResult<TestGenerationBatch>> {
+  input: { storyboardId: string },
+): Promise<UseCaseResult<TestGenerationBatchWithVariants[]>> {
   try {
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
-    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(
+    const batches = await deps.testGenerationBatches.listByStoryboardId(
       input.storyboardId,
     );
-    if (!batch) {
-      return failure(
-        "not_found",
-        "No test generation batch found for this storyboard.",
+
+    const result: TestGenerationBatchWithVariants[] = [];
+    for (const batch of batches) {
+      const requests = await deps.generationRequests.findByTestBatchId(
+        batch.id,
       );
+      const variants: TestGenerationBatchVariant[] = [];
+      for (const request of requests) {
+        const images = await deps.generatedImages.findBySceneId(
+          request.sceneId,
+        );
+        variants.push({
+          request,
+          generatedImage:
+            images.find((image) => image.generationRequestId === request.id) ??
+            null,
+        });
+      }
+      variants.sort(
+        (a, b) => testVariantIndex(a.request) - testVariantIndex(b.request),
+      );
+      result.push({ batch, variants });
     }
 
-    const ts = now();
-    const reset = resetTestGenerationBatch(batch, ts);
-    await deps.testGenerationBatches.save(reset);
-
-    return success(reset);
+    return success(result);
   } catch (error) {
     return validationFailure(error);
   }
+}
+
+function testVariantIndex(request: GenerationRequest): number {
+  const value = (request.inputJson as Record<string, unknown>).testVariant;
+  return typeof value === "number" ? value : 0;
 }
 
 // ── Storyboard JSON Export ───────────────────────────────────────────────────

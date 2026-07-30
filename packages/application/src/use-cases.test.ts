@@ -75,6 +75,7 @@ import {
   getProjectPhotoAnalysis,
   getUserPreference,
   insertComplementScene,
+  listTestGenerationBatches,
   markGeneratedImageAdopted,
   proposeComplementScenes,
   registerPhotoAsset,
@@ -304,6 +305,13 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.testGenerationBatchId === testBatchId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.store.save(generationRequest);
   }
@@ -370,6 +378,18 @@ class InMemoryTestGenerationBatchRepository implements TestGenerationBatchReposi
         .filter((b) => b.storyboardId === storyboardId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
     );
+  }
+
+  async listByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch[]> {
+    return this.store
+      .values()
+      .filter((b) => b.storyboardId === storyboardId)
+      .sort(
+        (a, b) =>
+          b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+      );
   }
 
   async save(batch: TestGenerationBatch): Promise<void> {
@@ -2596,6 +2616,10 @@ describe("application use cases", () => {
           sceneId: "s1",
           inputJson: { testBatchId: "batch_1", testVariant: 0 },
           appliedAdjustments: opts?.adjustments ?? [],
+          // A sample is only confirmable once its image exists, and the batch
+          // link is now a field rather than something read back out of inputJson.
+          status: "succeeded",
+          testGenerationBatchId: "batch_1",
           createdAt: ts,
           updatedAt: ts,
         }),
@@ -2652,12 +2676,20 @@ describe("application use cases", () => {
         "Base prompt. warmer color temperature stronger cinematic grade",
       );
 
+      // Re-confirming the same sample is allowed now that a confirmation can be
+      // moved between batches, and it must be idempotent: the suffixes are
+      // already in the common prompt and must not be appended a second time.
       const reconfirm = await confirmTestGeneration(deps, {
         storyboardId: "sb1",
         confirmedGenerationRequestId: "variant_1",
         adjustmentSuffixes: SUFFIXES,
       });
-      expect(reconfirm.ok).toBe(false);
+      expect(reconfirm.ok).toBe(true);
+
+      const afterReconfirm = await deps.storyboards.findById("sb1");
+      expect(afterReconfirm?.commonPrompt).toBe(
+        "Base prompt. warmer color temperature stronger cinematic grade",
+      );
     });
 
     it("confirmTestGeneration with no adjustments leaves commonPrompt unchanged", async () => {
@@ -2673,6 +2705,188 @@ describe("application use cases", () => {
 
       const after = (await deps.storyboards.findById("sb1"))?.commonPrompt;
       expect(after).toBe(before);
+    });
+  });
+
+  describe("test-generation sample history", () => {
+    // Two batches, older first, each with one succeeded sample carrying an image.
+    async function seedTwoBatches() {
+      const deps = createDependencies();
+      await deps.projects.save(
+        createProject({
+          id: "p1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Trip",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      );
+      await deps.storyboards.save(
+        createStoryboard({
+          id: "sb1",
+          projectId: "p1",
+          tone: "warm",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      );
+      await deps.scenes.save(
+        createScene({
+          id: "s1",
+          projectId: "p1",
+          storyboardId: "sb1",
+          orderIndex: 0,
+          title: "T",
+          description: "D",
+          imagePrompt: "P",
+          emotion: "",
+          cameraDirection: "",
+          lightingDirection: "",
+          motionDirection: "",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      );
+
+      const batches = [
+        { id: "batch_old", at: "2026-07-01T00:00:00.000Z" },
+        { id: "batch_new", at: "2026-07-02T00:00:00.000Z" },
+      ];
+      for (const { id, at } of batches) {
+        await deps.testGenerationBatches.save(
+          createTestGenerationBatch({
+            id,
+            storyboardId: "sb1",
+            status: "pending",
+            createdAt: at,
+          }),
+        );
+        // Saved out of variant order so the ordering assertion is meaningful.
+        for (const variantIndex of [1, 0]) {
+          const requestId = `${id}_v${variantIndex}`;
+          await deps.generationRequests.save(
+            createGenerationRequest({
+              id: requestId,
+              projectId: "p1",
+              storyboardId: "sb1",
+              sceneId: "s1",
+              status: "succeeded",
+              inputJson: { testBatchId: id, testVariant: variantIndex },
+              testGenerationBatchId: id,
+              createdAt: at,
+              updatedAt: at,
+            }),
+          );
+          await deps.generatedImages.save(
+            createGeneratedImage({
+              id: `img_${requestId}`,
+              projectId: "p1",
+              storyboardId: "sb1",
+              sceneId: "s1",
+              generationRequestId: requestId,
+              storageKey: `data/uploads/generated/${requestId}.jpg`,
+              mimeType: "image/jpeg",
+              size: 1,
+              checksum: requestId,
+              createdAt: at,
+              updatedAt: at,
+            }),
+          );
+        }
+      }
+
+      return deps;
+    }
+
+    it("lists every batch newest first with its samples in variant order", async () => {
+      const deps = await seedTwoBatches();
+
+      const result = await listTestGenerationBatches(deps, {
+        storyboardId: "sb1",
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.map((entry) => entry.batch.id)).toEqual([
+        "batch_new",
+        "batch_old",
+      ]);
+      expect(
+        result.value[0]!.variants.map((variant) => variant.request.id),
+      ).toEqual(["batch_new_v0", "batch_new_v1"]);
+      expect(result.value[1]!.variants[0]!.generatedImage?.id).toBe(
+        "img_batch_old_v0",
+      );
+    });
+
+    it("keeps each batch's samples to itself", async () => {
+      const deps = await seedTwoBatches();
+
+      const oldVariants =
+        await deps.generationRequests.findByTestBatchId("batch_old");
+
+      expect(oldVariants.map((variant) => variant.id).sort()).toEqual([
+        "batch_old_v0",
+        "batch_old_v1",
+      ]);
+    });
+
+    // The point of the feature: run the real generation from a different sample
+    // without losing the batch it came from.
+    it("moves the single confirmation when a sample from an older batch is confirmed", async () => {
+      const deps = await seedTwoBatches();
+
+      const first = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "batch_new_v0",
+      });
+      expect(first.ok).toBe(true);
+
+      const second = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "batch_old_v1",
+      });
+      expect(second.ok).toBe(true);
+
+      const listed = await listTestGenerationBatches(deps, {
+        storyboardId: "sb1",
+      });
+      expect(listed.ok).toBe(true);
+      if (!listed.ok) return;
+
+      const completed = listed.value.filter(
+        (entry) => entry.batch.status === "completed",
+      );
+      expect(completed).toHaveLength(1);
+      expect(completed[0]!.batch.id).toBe("batch_old");
+      expect(completed[0]!.batch.confirmedGenerationRequestId).toBe(
+        "batch_old_v1",
+      );
+
+      // The batch that lost the confirmation stays in place in the history.
+      const newBatch = listed.value.find(
+        (entry) => entry.batch.id === "batch_new",
+      );
+      expect(newBatch?.batch.status).toBe("pending");
+      expect(newBatch?.batch.createdAt).toBe("2026-07-02T00:00:00.000Z");
+      expect(listed.value.map((entry) => entry.batch.id)).toEqual([
+        "batch_new",
+        "batch_old",
+      ]);
+    });
+
+    it("refuses to confirm a sample that has not succeeded", async () => {
+      const deps = await seedTwoBatches();
+      const queued = await deps.generationRequests.findById("batch_new_v0");
+      await deps.generationRequests.save({ ...queued!, status: "queued" });
+
+      const result = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "batch_new_v0",
+      });
+
+      expect(result.ok).toBe(false);
     });
   });
 

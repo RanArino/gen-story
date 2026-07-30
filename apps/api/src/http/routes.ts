@@ -20,12 +20,12 @@ import {
   getProjectPhotoAnalysis,
   getUserPreference,
   insertComplementScene,
+  listTestGenerationBatches,
   markGeneratedImageAdopted,
   proposeComplementScenes,
   reorderPhotos,
   reorderScenes,
   requestTestGeneration,
-  resetTestGeneration,
   restorePhotoAsset,
   restoreProject,
   retryFailedGenerationRequest,
@@ -38,6 +38,7 @@ import {
 } from "@gen-story/application";
 import { isLanguage as isLanguageValue } from "@gen-story/application";
 import type { AiJob } from "@gen-story/domain";
+import { isVisibleInSceneHistory } from "@gen-story/domain";
 import {
   getLocalizedLabels,
   isTestAdjustmentId,
@@ -61,6 +62,7 @@ import {
   toStoryboardDto,
   toStylePresetDto,
   toTestGenerationBatchDto,
+  toTestGenerationBatchWithVariantsDto,
   toUserPreferenceDto,
 } from "./dto-mappers";
 import {
@@ -133,6 +135,26 @@ async function requireOwnedAiJob(
   }
 
   return job;
+}
+
+// The ids of the samples a storyboard's operator picked, one per completed
+// batch. Feeds `isVisibleInSceneHistory` so scene-scoped history keeps the
+// chosen sample and drops the rejected ones.
+async function confirmedTestRequestIds(
+  deps: ApiDependencies,
+  storyboardId: string,
+): Promise<Set<string>> {
+  const batches =
+    await deps.testGenerationBatches.listByStoryboardId(storyboardId);
+  const ids = new Set<string>();
+
+  for (const batch of batches) {
+    if (batch.confirmedGenerationRequestId !== null) {
+      ids.add(batch.confirmedGenerationRequestId);
+    }
+  }
+
+  return ids;
 }
 
 export function buildRouter(deps: ApiDependencies): Router {
@@ -1217,10 +1239,15 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      const generationRequests =
-        await deps.generationRequests.findBySceneId(sceneId);
+      const [generationRequests, confirmedIds] = await Promise.all([
+        deps.generationRequests.findBySceneId(sceneId),
+        confirmedTestRequestIds(deps, scene.storyboardId),
+      ]);
+
       sendJson(res, 200, {
-        generationRequests: generationRequests.map(toGenerationRequestDto),
+        generationRequests: generationRequests
+          .filter((req) => isVisibleInSceneHistory(req, confirmedIds))
+          .map(toGenerationRequestDto),
       });
     },
   );
@@ -1481,9 +1508,25 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      const generatedImages = await deps.generatedImages.findBySceneId(sceneId);
+      // The images of rejected samples must go too, or the scene's "generated
+      // image" panel and its review thumbnails can show a sample that was
+      // turned down.
+      const [generatedImages, sceneRequests, confirmedIds] = await Promise.all([
+        deps.generatedImages.findBySceneId(sceneId),
+        deps.generationRequests.findBySceneId(sceneId),
+        confirmedTestRequestIds(deps, scene.storyboardId),
+      ]);
+
+      const hiddenRequestIds = new Set(
+        sceneRequests
+          .filter((req) => !isVisibleInSceneHistory(req, confirmedIds))
+          .map((req) => req.id),
+      );
+
       sendJson(res, 200, {
-        generatedImages: generatedImages.map(toGeneratedImageDto),
+        generatedImages: generatedImages
+          .filter((image) => !hiddenRequestIds.has(image.generationRequestId))
+          .map(toGeneratedImageDto),
       });
     },
   );
@@ -1824,16 +1867,16 @@ export function buildRouter(deps: ApiDependencies): Router {
     },
   );
 
-  // POST /api/storyboards/:storyboardId/test-generation/reset
+  // GET /api/storyboards/:storyboardId/test-generation/batches
   router.add(
-    "POST",
-    "/api/storyboards/:storyboardId/test-generation/reset",
+    "GET",
+    "/api/storyboards/:storyboardId/test-generation/batches",
     async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
       const storyboardId = getParam(params, "storyboardId");
-      const result = await resetTestGeneration(deps, { storyboardId });
+      const result = await listTestGenerationBatches(deps, { storyboardId });
 
       if (!result.ok) {
         sendJson(
@@ -1844,7 +1887,9 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, { batch: toTestGenerationBatchDto(result.value) });
+      sendJson(res, 200, {
+        batches: result.value.map(toTestGenerationBatchWithVariantsDto),
+      });
     },
   );
 
@@ -1936,22 +1981,28 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      const [requests, scenes] = await Promise.all([
+      const [requests, scenes, confirmedIds] = await Promise.all([
         deps.generationRequests.findByStoryboardId(storyboardId),
         deps.scenes.findByStoryboardId(storyboardId),
+        confirmedTestRequestIds(deps, storyboardId),
       ]);
 
       const sceneTitleById = new Map(
         scenes.map((s) => [s.id, s.title ?? null]),
       );
 
+      // The rejected samples are listed by the test-generation section of this
+      // same screen; repeating them under the first scene would double-count
+      // them.
       sendJson(res, 200, {
-        generationRequests: requests.map((r) =>
-          toGenerationRequestWithSceneTitleDto(
-            r,
-            sceneTitleById.get(r.sceneId) ?? null,
+        generationRequests: requests
+          .filter((r) => isVisibleInSceneHistory(r, confirmedIds))
+          .map((r) =>
+            toGenerationRequestWithSceneTitleDto(
+              r,
+              sceneTitleById.get(r.sceneId) ?? null,
+            ),
           ),
-        ),
       });
     },
   );

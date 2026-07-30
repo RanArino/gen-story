@@ -107,6 +107,8 @@ export interface GenerationRequestRepositoryPort {
   findQueued(): Promise<GenerationRequest[]>;
   findRecent(limit: number): Promise<GenerationRequest[]>;
   findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]>;
+  // The variants of one test-generation batch, oldest first.
+  findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]>;
   save(generationRequest: GenerationRequest): Promise<void>;
   softDelete(generationRequestId: string, deletedAt: string): Promise<void>;
 }
@@ -137,6 +139,8 @@ export interface TestGenerationBatchRepositoryPort {
   findLatestByStoryboardId(
     storyboardId: string,
   ): Promise<TestGenerationBatch | null>;
+  // Every batch of a storyboard, newest first.
+  listByStoryboardId(storyboardId: string): Promise<TestGenerationBatch[]>;
   save(batch: TestGenerationBatch): Promise<void>;
 }
 

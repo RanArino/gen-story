@@ -167,6 +167,10 @@ export type GenerationRequestDto = {
   inputJson: Record<string, unknown>;
   errorMessage: string | null;
   sourceGenerationRequestId: string | null;
+  // Non-null on a test-generation sample. Scene-scoped history lists only ever
+  // carry the confirmed sample, so a non-null value there marks that entry as
+  // "the sample this scene's look was chosen from".
+  testGenerationBatchId: string | null;
   appliedAdjustments: TestAdjustmentId[];
   startedAt: string | null;
   completedAt: string | null;
@@ -216,6 +220,18 @@ export type TestGenerationBatchDto = {
   confirmedGenerationRequestId: string | null;
   createdAt: string;
   completedAt: string | null;
+};
+
+export type TestGenerationBatchVariantDto = {
+  request: GenerationRequestDto;
+  generatedImage: GeneratedImageDto | null;
+};
+
+// One entry of a storyboard's sample history: the batch plus its samples in
+// variant order, each with its image when the generation succeeded.
+export type TestGenerationBatchWithVariantsDto = {
+  batch: TestGenerationBatchDto;
+  variants: TestGenerationBatchVariantDto[];
 };
 
 export type EmotionCandidateDto = {

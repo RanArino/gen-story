@@ -221,12 +221,32 @@ export function retryGenerationRequest(
   };
 }
 
+// A storyboard may hold any number of batches. Only work that is still in
+// flight blocks a new one: a batch whose variants all failed used to need an
+// explicit reset to get past, which is what reset was really being used for.
 export function canStartTestGeneration(
-  existingBatch: TestGenerationBatch | null,
+  latestBatch: TestGenerationBatch | null,
+  latestBatchVariantStatuses: GenerationRequestStatus[] = [],
 ): boolean {
-  if (existingBatch === null) return true;
-  if (existingBatch.status === "completed") return true;
-  return false;
+  if (latestBatch === null) return true;
+  if (latestBatch.status === "completed") return true;
+  return !latestBatchVariantStatuses.some(
+    (status) => status === "queued" || status === "running",
+  );
+}
+
+// A batch's samples are generated from the storyboard's first scene, so they
+// land in that scene's request history next to its real generations. Only the
+// confirmed sample belongs there: the rejected ones are alternatives internal to
+// the batch, and every batch is readable in the test-generation dialog. Without
+// this the first scene gains three entries per batch and its real generations
+// get buried.
+export function isVisibleInSceneHistory(
+  request: Pick<GenerationRequest, "id" | "testGenerationBatchId">,
+  confirmedTestRequestIds: ReadonlySet<string>,
+): boolean {
+  if (request.testGenerationBatchId === null) return true;
+  return confirmedTestRequestIds.has(request.id);
 }
 
 export function completeTestGenerationBatch(
@@ -242,16 +262,18 @@ export function completeTestGenerationBatch(
   };
 }
 
-export function resetTestGenerationBatch(
+// Moves the storyboard's single confirmation off this batch. `createdAt` is
+// deliberately untouched: the batch keeps its place in the history ordering.
+// The removed `resetTestGenerationBatch` overwrote it, which is what made an
+// older batch look newer than the samples that replaced it.
+export function unconfirmTestGenerationBatch(
   batch: TestGenerationBatch,
-  createdAt: Timestamp,
 ): TestGenerationBatch {
   return {
     ...batch,
     status: "pending",
     confirmedGenerationRequestId: null,
     completedAt: null,
-    createdAt,
   };
 }
 

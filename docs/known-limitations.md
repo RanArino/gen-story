@@ -26,8 +26,27 @@ any cloud setup. The following features are deliberately excluded from this vers
 - Jobs left `running` by a killed API process are marked `failed` with
   `interrupted by restart` on the next startup; they are not resumed.
 - Image generation defaults to a **mock adapter** that returns placeholder
-  images. Real generation requires an `OPENAI_API_KEY` and
-  `IMAGE_GENERATION_ADAPTER=openai`.
+  images. Real generation requires an `OPENAI_API_KEY`; its presence alone
+  selects the OpenAI adapter.
+- Confirming a test-generation sample only records the choice. It does not start
+  the real generation — that is a separate action on the Generate screen.
+- A storyboard may hold any number of test-generation batches. Exactly one of
+  them is confirmed at a time, and confirming a sample from an older batch moves
+  the confirmation rather than copying it. Per-variant adjustments apply to the
+  newest batch only; older batches stay readable and confirmable. Every batch is
+  listed in the storyboard's test-generation dialog and on the generation-history
+  screen.
+- Samples are generated from a real scene, so they produce ordinary
+  `generation_requests` rows for it. Scene-scoped views — the review screen's
+  per-scene history and the per-scene groups of the generation-history screen —
+  list only the **confirmed** sample and hide the rejected ones, which are read
+  in the test-generation dialog instead. The confirmed sample is tagged as a
+  sample and can be chosen as the scene's image like any other generation.
+- A new batch is refused only while a sample of the newest batch is still queued
+  or running. There is no "reset": generating another batch is the way to
+  replace samples, and each one costs three image generations.
+- Samples are always generated from the storyboard's **first** scene, so they
+  represent that scene's prompt rather than the storyboard as a whole.
 - Photo analysis for emotion candidates falls back to deterministic local
   suggestions unless a `GEMINI_API_KEY` is provided.
 

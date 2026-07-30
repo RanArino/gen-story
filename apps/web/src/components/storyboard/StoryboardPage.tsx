@@ -1709,13 +1709,30 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       <div className={styles.footer}>
         {testBatch?.status === "completed" ? (
-          <Link
-            href={`/projects/${projectId}/generate`}
-            className="btn btn-primary"
-            style={{ marginLeft: "auto" }}
+          // Both affordances, not just the exit: a confirmed storyboard must
+          // still be able to reach the samples it already generated and pick
+          // a different one.
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+            }}
           >
-            {t("footer.continueToGenerate")}
-          </Link>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowTestModal(true)}
+            >
+              {t("footer.reviewTestGeneration")}
+            </button>
+            <Link
+              href={`/projects/${projectId}/generate`}
+              className="btn btn-primary"
+            >
+              {t("footer.continueToGenerate")}
+            </Link>
+          </div>
         ) : (
           <div
             style={{
@@ -1747,7 +1764,6 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         <TestGenerationModal
           storyboardId={storyboard.id}
           sceneId={scenes[0].id ?? ""}
-          existingBatch={testBatch}
           onConfirmed={() => {
             setShowTestModal(false);
             load().catch(() => undefined);

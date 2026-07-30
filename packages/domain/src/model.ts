@@ -192,6 +192,9 @@ export type GenerationRequest = {
   errorMessage: string | null;
   sourceGenerationRequestId: GenerationRequestId | null;
   appliedAdjustments: TestAdjustmentId[];
+  // Set only on the variants of a test-generation batch. It is what makes "the
+  // samples of batch X" a query rather than a scan of inputJson.
+  testGenerationBatchId: TestGenerationBatchId | null;
   startedAt: Timestamp | null;
   completedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -372,6 +375,7 @@ export type CreateGenerationRequestInput = {
   errorMessage?: string | null;
   sourceGenerationRequestId?: GenerationRequestId | null;
   appliedAdjustments?: TestAdjustmentId[];
+  testGenerationBatchId?: TestGenerationBatchId | null;
   startedAt?: Timestamp | null;
   completedAt?: Timestamp | null;
   createdAt: Timestamp;
@@ -654,6 +658,7 @@ export function createGenerationRequest(
     errorMessage: trimOptionalText(input.errorMessage) || null,
     sourceGenerationRequestId: input.sourceGenerationRequestId ?? null,
     appliedAdjustments: [...(input.appliedAdjustments ?? [])],
+    testGenerationBatchId: input.testGenerationBatchId ?? null,
     startedAt: input.startedAt ?? null,
     completedAt: input.completedAt ?? null,
     createdAt: input.createdAt,

@@ -3,8 +3,16 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
-import type { GenerationRequestWithSceneTitleDto } from "@gen-story/shared";
-import { listStoryboardGenerationRequests, listStoryboards } from "../../lib/api-client";
+import type {
+  GenerationRequestWithSceneTitleDto,
+  TestGenerationBatchWithVariantsDto,
+} from "@gen-story/shared";
+import {
+  listStoryboardGenerationRequests,
+  listStoryboards,
+  listTestGenerationBatches,
+} from "../../lib/api-client";
+import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./GenerationHistoryPage.module.css";
@@ -22,6 +30,9 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [storyboardId, setStoryboardId] = useState<string | null>(null);
+  const [testBatches, setTestBatches] = useState<
+    TestGenerationBatchWithVariantsDto[]
+  >([]);
 
   const load = useCallback(async () => {
     const storyboards = await listStoryboards(projectId);
@@ -29,13 +40,21 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
     const sb = storyboards[0]!;
     setStoryboardId(sb.id);
 
-    const requests = await listStoryboardGenerationRequests(sb.id);
+    const [requests, batches] = await Promise.all([
+      listStoryboardGenerationRequests(sb.id),
+      listTestGenerationBatches(sb.id),
+    ]);
+    setTestBatches(batches);
 
     const groupMap = new Map<string, SceneGroup>();
     for (const req of requests) {
       let group = groupMap.get(req.sceneId);
       if (!group) {
-        group = { sceneId: req.sceneId, sceneTitle: req.sceneTitle, requests: [] };
+        group = {
+          sceneId: req.sceneId,
+          sceneTitle: req.sceneTitle,
+          requests: [],
+        };
         groupMap.set(req.sceneId, group);
       }
       group.requests.push(req);
@@ -81,6 +100,97 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
         </span>
       </div>
 
+      {testBatches.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 className={styles.sceneTitle}>
+            {t("testGeneration.heading", { count: testBatches.length })}
+          </h3>
+          <div style={{ display: "grid", gap: 16 }}>
+            {testBatches.map((entry, index) => (
+              <div key={entry.batch.id}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "baseline",
+                    marginBottom: 8,
+                    fontSize: 13,
+                    color: "#8898aa",
+                  }}
+                >
+                  <strong style={{ color: "inherit" }}>
+                    {t("testGeneration.runLabel", {
+                      number: testBatches.length - index,
+                    })}
+                  </strong>
+                  <span>{formatTimestamp(entry.batch.createdAt)}</span>
+                  <span>
+                    {entry.batch.status === "completed"
+                      ? t("testGeneration.confirmed")
+                      : t("testGeneration.notConfirmed")}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {entry.variants.map((variant) => {
+                    const isConfirmed =
+                      entry.batch.confirmedGenerationRequestId ===
+                      variant.request.id;
+                    return (
+                      <div
+                        key={variant.request.id}
+                        style={{
+                          width: 96,
+                          height: 96,
+                          borderRadius: 6,
+                          overflow: "hidden",
+                          border: isConfirmed
+                            ? "2px solid #4caf50"
+                            : "1px solid #d8dee9",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "#f5f6f8",
+                          fontSize: 12,
+                          color: "#8898aa",
+                        }}
+                        title={
+                          isConfirmed
+                            ? t("testGeneration.confirmed")
+                            : variant.request.status
+                        }
+                      >
+                        {variant.generatedImage ? (
+                          <img
+                            src={storageKeyToUrl(
+                              variant.generatedImage.storageKey,
+                            )}
+                            alt={t("testGeneration.sampleAlt")}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          variant.request.status
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <Link
+            href={`/projects/${projectId}/storyboard`}
+            className="btn btn-secondary"
+            style={{ marginTop: 12 }}
+          >
+            {t("testGeneration.openStoryboard")}
+          </Link>
+        </div>
+      )}
+
       {groups.length === 0 && (
         <div className="card">
           <p>{t("noRequests")}</p>
@@ -114,6 +224,20 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
                   <tr key={req.id}>
                     <td>
                       <StatusChip status={req.status} />
+                      {/* Only a confirmed sample survives the API's scene
+                          filter, so say why this row is not a plain
+                          generation. */}
+                      {req.testGenerationBatchId !== null && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            fontSize: 11,
+                            color: "#3730a3",
+                          }}
+                        >
+                          {t("testGeneration.sampleRow")}
+                        </span>
+                      )}
                     </td>
                     <td className={styles.timestamp}>
                       {formatTimestamp(req.createdAt)}
@@ -168,7 +292,13 @@ function StatusChip({ status }: { status: string }) {
     queued: "#fef9c3",
     canceled: "#f3f4f6",
   };
-  const labelKey = ["succeeded", "failed", "running", "queued", "canceled"].includes(status)
+  const labelKey = [
+    "succeeded",
+    "failed",
+    "running",
+    "queued",
+    "canceled",
+  ].includes(status)
     ? status
     : null;
   return (

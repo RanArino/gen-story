@@ -14,6 +14,7 @@ import type {
   StoryboardDto,
   TestAdjustmentId,
   TestGenerationBatchDto,
+  TestGenerationBatchWithVariantsDto,
   UserPreferenceDto,
 } from "@gen-story/shared";
 
@@ -690,14 +691,15 @@ export async function confirmTestGenerationBatch(
   return data.batch;
 }
 
-export async function resetTestGenerationBatch(
+// The storyboard's whole sample history, newest batch first, with each sample's
+// image already attached.
+export async function listTestGenerationBatches(
   storyboardId: string,
-): Promise<TestGenerationBatchDto> {
-  const data = await request<{ batch: TestGenerationBatchDto }>(
-    "POST",
-    `/api/storyboards/${storyboardId}/test-generation/reset`,
-  );
-  return data.batch;
+): Promise<TestGenerationBatchWithVariantsDto[]> {
+  const data = await request<{
+    batches: TestGenerationBatchWithVariantsDto[];
+  }>("GET", `/api/storyboards/${storyboardId}/test-generation/batches`);
+  return data.batches;
 }
 
 export async function applyTestVariantAdjustments(

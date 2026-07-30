@@ -213,6 +213,7 @@ export const generationRequests = sqliteTable(
     appliedAdjustmentsJson: text("applied_adjustments_json")
       .notNull()
       .default("[]"),
+    testGenerationBatchId: text("test_generation_batch_id"),
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
     createdAt: text("created_at").notNull(),
@@ -224,6 +225,9 @@ export const generationRequests = sqliteTable(
     index("generation_requests_storyboard_id_idx").on(table.storyboardId),
     index("generation_requests_scene_id_idx").on(table.sceneId),
     index("generation_requests_status_idx").on(table.status),
+    index("generation_requests_test_generation_batch_id_idx").on(
+      table.testGenerationBatchId,
+    ),
   ],
 );
 

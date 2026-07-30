@@ -22,12 +22,14 @@ import type {
   StylePresetDto,
   StoryboardDto,
   TestGenerationBatchDto,
+  TestGenerationBatchWithVariantsDto,
   GenerationRequestWithSceneTitleDto,
 } from "@gen-story/shared";
 
 import type {
   AuthPrincipal,
   ComplementSceneProposal,
+  TestGenerationBatchWithVariants,
   UserPreference,
 } from "@gen-story/application";
 import type {
@@ -204,6 +206,21 @@ export function toTestGenerationBatchDto(
   };
 }
 
+export function toTestGenerationBatchWithVariantsDto(
+  entry: TestGenerationBatchWithVariants,
+): TestGenerationBatchWithVariantsDto {
+  return {
+    batch: toTestGenerationBatchDto(entry.batch),
+    variants: entry.variants.map((variant) => ({
+      request: toGenerationRequestDto(variant.request),
+      generatedImage:
+        variant.generatedImage == null
+          ? null
+          : toGeneratedImageDto(variant.generatedImage),
+    })),
+  };
+}
+
 export function toGenerationRequestDto(
   req: GenerationRequest,
 ): GenerationRequestDto {
@@ -216,6 +233,7 @@ export function toGenerationRequestDto(
     inputJson: req.inputJson,
     errorMessage: req.errorMessage,
     sourceGenerationRequestId: req.sourceGenerationRequestId,
+    testGenerationBatchId: req.testGenerationBatchId,
     appliedAdjustments: req.appliedAdjustments ?? [],
     startedAt: req.startedAt,
     completedAt: req.completedAt,

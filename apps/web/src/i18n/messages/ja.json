@@ -306,7 +306,8 @@
       "continueToGenerate": "生成へ進む →",
       "testInProgress": "テスト中…",
       "viewTestGeneration": "テスト生成を表示",
-      "startTestGeneration": "テスト生成 →"
+      "startTestGeneration": "テスト生成 →",
+      "reviewTestGeneration": "サンプルを見る／選び直す"
     },
     "negativePrompt": {
       "notSet": "未設定",
@@ -333,7 +334,6 @@
     "confirmStyle": "このスタイルを確定",
     "confirming": "確定中…",
     "confirmedBadge": "✓ 確定済み",
-    "regenerate": "新しいテストを生成",
     "adjustments": {
       "heading": "このバリアントを調整",
       "saveHint": "このバリアントを確定すると、選択した調整がプロジェクトの共通プロンプトに保存されます。",
@@ -352,9 +352,15 @@
     "errors": {
       "start": "テスト生成の開始に失敗しました。",
       "confirm": "確定に失敗しました。",
-      "reset": "リセットに失敗しました。",
       "apply": "調整の適用に失敗しました。"
-    }
+    },
+    "loadingHistory": "サンプル履歴を読み込み中…",
+    "historyHeading": "サンプル履歴",
+    "batchTab": "第{number}回 · {time}",
+    "batchConfirmedMark": "✓",
+    "newBatchCta": "新しいサンプルを3枚生成（画像3枚分）",
+    "batchInFlight": "生成中のサンプルがあります。完了までお待ちください。",
+    "olderBatchNotice": "過去のサンプルです。調整は最新の回でのみ行えますが、ここから確定して本生成に進めます。"
   },
   "generate": {
     "title": "生成",
@@ -412,7 +418,6 @@
       }
     },
     "card": {
-      "adoptedBadge": "✓ 採用済み",
       "failedBadge": "生成に失敗",
       "regenerate": "再生成",
       "sourcePhoto": "元写真",
@@ -425,8 +430,8 @@
       "retryGeneration": "生成を再試行",
       "goToGenerate": "生成へ移動 →",
       "historyHeader": "生成履歴({count})",
-      "adopt": "採用",
-      "adopted": "採用済み"
+      "useThis": "この画像を使う",
+      "sampleTag": "サンプル"
     },
     "regenModal": {
       "title": "再生成 — {sceneTitle}",
@@ -484,6 +489,15 @@
       "created": "作成",
       "completed": "完了",
       "error": "エラー"
+    },
+    "testGeneration": {
+      "heading": "テスト生成サンプル（{count}回）",
+      "runLabel": "第{number}回",
+      "confirmed": "確定済み",
+      "notConfirmed": "未確定",
+      "sampleAlt": "テストサンプル",
+      "openStoryboard": "絵コンテでサンプルを見る",
+      "sampleRow": "サンプル"
     }
   },
   "settings": {

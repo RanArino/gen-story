@@ -262,6 +262,7 @@ function mapGenerationRequest(row: GenerationRequestRow): GenerationRequest {
     errorMessage: row.errorMessage,
     sourceGenerationRequestId: row.sourceGenerationRequestId,
     appliedAdjustments: parseAppliedAdjustments(row.appliedAdjustmentsJson),
+    testGenerationBatchId: row.testGenerationBatchId ?? null,
     startedAt: row.startedAt ?? null,
     completedAt: row.completedAt ?? null,
     createdAt: row.createdAt,
@@ -1130,6 +1131,21 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
     return rows.map(mapGenerationRequest);
   }
 
+  async findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]> {
+    const rows = await this.db
+      .select()
+      .from(generationRequests)
+      .where(
+        and(
+          eq(generationRequests.testGenerationBatchId, testBatchId),
+          isNull(generationRequests.deletedAt),
+        ),
+      )
+      .orderBy(generationRequests.createdAt, generationRequests.id);
+
+    return rows.map(mapGenerationRequest);
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     const appliedAdjustmentsJson = JSON.stringify(
       generationRequest.appliedAdjustments,
@@ -1147,6 +1163,7 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
         errorMessage: generationRequest.errorMessage,
         sourceGenerationRequestId: generationRequest.sourceGenerationRequestId,
         appliedAdjustmentsJson,
+        testGenerationBatchId: generationRequest.testGenerationBatchId,
         startedAt: generationRequest.startedAt,
         completedAt: generationRequest.completedAt,
         createdAt: generationRequest.createdAt,
@@ -1164,6 +1181,7 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
           sourceGenerationRequestId:
             generationRequest.sourceGenerationRequestId,
           appliedAdjustmentsJson,
+          testGenerationBatchId: generationRequest.testGenerationBatchId,
           startedAt: generationRequest.startedAt,
           completedAt: generationRequest.completedAt,
           updatedAt: generationRequest.updatedAt,
@@ -1537,6 +1555,21 @@ export class SqliteTestGenerationBatchRepository implements TestGenerationBatchR
       .get();
 
     return row == null ? null : mapTestGenerationBatch(row);
+  }
+
+  async listByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch[]> {
+    const rows = await this.db
+      .select()
+      .from(testGenerationBatches)
+      .where(eq(testGenerationBatches.storyboardId, storyboardId))
+      .orderBy(
+        sql`${testGenerationBatches.createdAt} desc`,
+        sql`${testGenerationBatches.id} desc`,
+      );
+
+    return rows.map(mapTestGenerationBatch);
   }
 
   async save(batch: TestGenerationBatch): Promise<void> {

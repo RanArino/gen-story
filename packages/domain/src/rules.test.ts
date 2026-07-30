@@ -11,12 +11,17 @@ import {
 import {
   appendAdjustmentsToCommonPrompt,
   assertAdjustmentsValid,
+  canStartTestGeneration,
+  completeTestGenerationBatch,
   composeCommonPrompt,
+  createTestGenerationBatch,
+  isVisibleInSceneHistory,
   replaceScenePhotoAssets,
   retryGenerationRequest,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
   transitionGenerationRequestStatus,
+  unconfirmTestGenerationBatch,
   updatePhotoUsage,
   updateStylePreset,
 } from "./index";
@@ -440,5 +445,117 @@ describe("appendAdjustmentsToCommonPrompt", () => {
     expect(appendAdjustmentsToCommonPrompt("", ["cooler"], FAKE_SUFFIXES)).toBe(
       "cooler color temperature, blue tones",
     );
+  });
+});
+
+describe("test generation batch rules", () => {
+  const batchAt = (createdAt: string) =>
+    createTestGenerationBatch({
+      id: "batch_1",
+      storyboardId: "sb_1",
+      status: "pending",
+      createdAt,
+    });
+
+  // The removed `resetTestGenerationBatch` overwrote createdAt, which pushed an
+  // older batch to the front of a newest-first history.
+  it("keeps createdAt when a batch loses its confirmation", () => {
+    const confirmed = completeTestGenerationBatch(
+      batchAt("2026-07-01T00:00:00.000Z"),
+      "variant_1",
+      "2026-07-02T00:00:00.000Z",
+    );
+
+    const unconfirmed = unconfirmTestGenerationBatch(confirmed);
+
+    expect(unconfirmed.createdAt).toBe("2026-07-01T00:00:00.000Z");
+    expect(unconfirmed.status).toBe("pending");
+    expect(unconfirmed.confirmedGenerationRequestId).toBeNull();
+    expect(unconfirmed.completedAt).toBeNull();
+  });
+
+  it("allows a first batch and one after a confirmed batch", () => {
+    expect(canStartTestGeneration(null)).toBe(true);
+    expect(
+      canStartTestGeneration(
+        completeTestGenerationBatch(
+          batchAt("2026-07-01T00:00:00.000Z"),
+          "variant_1",
+          "2026-07-02T00:00:00.000Z",
+        ),
+        ["succeeded", "succeeded", "succeeded"],
+      ),
+    ).toBe(true);
+  });
+
+  // Without this, a batch whose samples all failed would need the reset that
+  // this change removes, leaving the operator with no way forward.
+  it("allows a new batch when a pending batch has no work left in flight", () => {
+    expect(
+      canStartTestGeneration(batchAt("2026-07-01T00:00:00.000Z"), [
+        "failed",
+        "failed",
+        "failed",
+      ]),
+    ).toBe(true);
+  });
+
+  it("refuses a new batch while a sample is still queued or running", () => {
+    expect(
+      canStartTestGeneration(batchAt("2026-07-01T00:00:00.000Z"), [
+        "succeeded",
+        "running",
+        "failed",
+      ]),
+    ).toBe(false);
+    expect(
+      canStartTestGeneration(batchAt("2026-07-01T00:00:00.000Z"), [
+        "queued",
+        "queued",
+        "queued",
+      ]),
+    ).toBe(false);
+  });
+
+  // Samples are generated from the storyboard's first scene, so all three of
+  // them used to show up in that scene's history beside its real generations.
+  it("keeps only the confirmed sample in a scene's history", () => {
+    const confirmed = new Set(["variant_2"]);
+
+    expect(
+      isVisibleInSceneHistory(
+        { id: "req_1", testGenerationBatchId: null },
+        confirmed,
+      ),
+    ).toBe(true);
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_2", testGenerationBatchId: "batch_1" },
+        confirmed,
+      ),
+    ).toBe(true);
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_1", testGenerationBatchId: "batch_1" },
+        confirmed,
+      ),
+    ).toBe(false);
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_3", testGenerationBatchId: "batch_1" },
+        confirmed,
+      ),
+    ).toBe(false);
+  });
+
+  // A batch nobody confirmed contributes nothing to the scene: those samples
+  // are only meaningful inside the test-generation dialog.
+  it("hides every sample of a batch that was never confirmed", () => {
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_1", testGenerationBatchId: "batch_1" },
+        new Set<string>(),
+      ),
+    ).toBe(false);
   });
 });

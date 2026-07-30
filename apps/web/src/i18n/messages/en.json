@@ -306,7 +306,8 @@
       "continueToGenerate": "Continue to Generate →",
       "testInProgress": "Test in progress…",
       "viewTestGeneration": "View Test Generation",
-      "startTestGeneration": "Test Generation →"
+      "startTestGeneration": "Test Generation →",
+      "reviewTestGeneration": "Review samples"
     },
     "negativePrompt": {
       "notSet": "Not set",
@@ -333,7 +334,6 @@
     "confirmStyle": "Confirm this style",
     "confirming": "Confirming…",
     "confirmedBadge": "✓ Confirmed",
-    "regenerate": "Generate new tests",
     "adjustments": {
       "heading": "Adjust this variant",
       "saveHint": "These adjustments will be saved to the project prompt when you confirm this variant.",
@@ -352,9 +352,15 @@
     "errors": {
       "start": "Failed to start test generation.",
       "confirm": "Failed to confirm.",
-      "reset": "Failed to reset.",
       "apply": "Failed to apply adjustments."
-    }
+    },
+    "loadingHistory": "Loading sample history…",
+    "historyHeading": "Sample history",
+    "batchTab": "Run {number} · {time}",
+    "batchConfirmedMark": "✓",
+    "newBatchCta": "Generate 3 new samples (3 images)",
+    "batchInFlight": "Samples are still generating. Wait for them to finish.",
+    "olderBatchNotice": "These are earlier samples. Adjustments apply to the newest run only, but you can confirm one of these and continue to generation."
   },
   "generate": {
     "title": "Generate",
@@ -412,7 +418,6 @@
       }
     },
     "card": {
-      "adoptedBadge": "✓ Adopted",
       "failedBadge": "Generation failed",
       "regenerate": "Re-generate",
       "sourcePhoto": "Source photo",
@@ -425,8 +430,8 @@
       "retryGeneration": "Retry generation",
       "goToGenerate": "Go to Generate →",
       "historyHeader": "Generation history ({count})",
-      "adopt": "Adopt",
-      "adopted": "Adopted"
+      "useThis": "Use this image",
+      "sampleTag": "Sample"
     },
     "regenModal": {
       "title": "Re-generate — {sceneTitle}",
@@ -484,6 +489,15 @@
       "created": "Created",
       "completed": "Completed",
       "error": "Error"
+    },
+    "testGeneration": {
+      "heading": "Test generation samples ({count} runs)",
+      "runLabel": "Run {number}",
+      "confirmed": "Confirmed",
+      "notConfirmed": "Not confirmed",
+      "sampleAlt": "Test sample",
+      "openStoryboard": "Open samples in storyboard",
+      "sampleRow": "Sample"
     }
   },
   "settings": {

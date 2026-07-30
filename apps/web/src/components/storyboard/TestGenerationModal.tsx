@@ -3,17 +3,14 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import type {
-  GenerationRequestDto,
   TestAdjustmentId,
-  TestGenerationBatchDto,
+  TestGenerationBatchWithVariantsDto,
 } from "@gen-story/shared";
 import {
   applyTestVariantAdjustments,
   confirmTestGenerationBatch,
-  listGeneratedImages,
-  listGenerationRequests,
+  listTestGenerationBatches,
   requestTestGenerationBatch,
-  resetTestGenerationBatch,
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AdjustmentChips } from "./AdjustmentChips";
@@ -21,31 +18,40 @@ import { AdjustmentChips } from "./AdjustmentChips";
 type Props = {
   storyboardId: string;
   sceneId: string;
-  existingBatch: TestGenerationBatchDto | null;
   onConfirmed: () => void;
   onClose: () => void;
 };
 
-type GeneratedImageEntry = {
-  requestId: string;
-  imageUrl: string | null;
-  status: string;
-};
+const IN_FLIGHT_STATUSES = ["queued", "running"];
+
+function isInFlight(entry: TestGenerationBatchWithVariantsDto): boolean {
+  return entry.variants.some((variant) =>
+    IN_FLIGHT_STATUSES.includes(variant.request.status),
+  );
+}
+
+function formatBatchTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export function TestGenerationModal({
   storyboardId,
   sceneId,
-  existingBatch,
   onConfirmed,
   onClose,
 }: Props) {
   const t = useTranslations("testGeneration");
-  const [batch, setBatch] = useState<TestGenerationBatchDto | null>(
-    existingBatch,
+  const [batches, setBatches] = useState<TestGenerationBatchWithVariantsDto[]>(
+    [],
   );
-  const [requests, setRequests] = useState<GenerationRequestDto[]>([]);
-  const [images, setImages] = useState<GeneratedImageEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingAdjustments, setPendingAdjustments] = useState<
@@ -55,58 +61,50 @@ export function TestGenerationModal({
     null,
   );
 
-  const refreshRequests = useCallback(async () => {
-    if (!sceneId) return;
-    const reqs = await listGenerationRequests(sceneId);
-    const testReqs = batch
-      ? reqs.filter(
-          (r) =>
-            r.inputJson &&
-            typeof r.inputJson === "object" &&
-            "testBatchId" in r.inputJson &&
-            r.inputJson.testBatchId === batch.id,
-        )
-      : [];
-    setRequests(testReqs);
-
-    const imageEntries: GeneratedImageEntry[] = await Promise.all(
-      testReqs.map(async (req) => {
-        if (req.status !== "succeeded") {
-          return { requestId: req.id, imageUrl: null, status: req.status };
-        }
-        const imgs = await listGeneratedImages(sceneId);
-        const img = imgs.find((i) => i.generationRequestId === req.id);
-        return {
-          requestId: req.id,
-          imageUrl: img ? storageKeyToUrl(img.storageKey) : null,
-          status: req.status,
-        };
-      }),
+  // One request returns the whole history with images already attached, so
+  // there is nothing to stitch together here.
+  const refresh = useCallback(async () => {
+    const next = await listTestGenerationBatches(storyboardId);
+    setBatches(next);
+    setSelectedBatchId((current) =>
+      current != null && next.some((entry) => entry.batch.id === current)
+        ? current
+        : (next[0]?.batch.id ?? null),
     );
-    setImages(imageEntries);
-  }, [sceneId, batch]);
+    return next;
+  }, [storyboardId]);
 
   useEffect(() => {
-    if (batch) {
-      refreshRequests();
-      if (batch.status === "pending") {
-        const interval = setInterval(refreshRequests, 2000);
-        return () => clearInterval(interval);
-      }
-    }
-  }, [batch, refreshRequests]);
+    refresh()
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [refresh]);
 
-  async function handleStartTest() {
-    setLoading(true);
+  // Only poll while something is actually generating.
+  const anyInFlight = batches.some(isInFlight);
+  useEffect(() => {
+    if (!anyInFlight) return;
+    const interval = setInterval(() => {
+      refresh().catch(() => undefined);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [anyInFlight, refresh]);
+
+  async function handleStartBatch() {
+    setStarting(true);
     setError(null);
     try {
       const result = await requestTestGenerationBatch(storyboardId, sceneId);
-      setBatch(result.batch);
-      setRequests(result.generationRequests);
+      const next = await refresh();
+      setSelectedBatchId(
+        next.some((entry) => entry.batch.id === result.batch.id)
+          ? result.batch.id
+          : (next[0]?.batch.id ?? null),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : t("errors.start"));
     } finally {
-      setLoading(false);
+      setStarting(false);
     }
   }
 
@@ -138,7 +136,7 @@ export function TestGenerationModal({
         next[newReq.id] = newReq.appliedAdjustments;
         return next;
       });
-      await refreshRequests();
+      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : t("errors.apply"));
     } finally {
@@ -146,22 +144,17 @@ export function TestGenerationModal({
     }
   }
 
-  async function handleReset() {
-    setError(null);
-    try {
-      const reset = await resetTestGenerationBatch(storyboardId);
-      setBatch(reset);
-      setRequests([]);
-      setImages([]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("errors.reset"));
-    }
-  }
-
-  const succeededCount = requests.filter(
-    (r) => r.status === "succeeded",
-  ).length;
-  const totalCount = requests.length;
+  const selected =
+    batches.find((entry) => entry.batch.id === selectedBatchId) ?? null;
+  // Adjustments rewrite the newest batch in place, so the API only allows them
+  // there. Older batches stay readable and confirmable.
+  const isNewestBatch =
+    selected != null && selected.batch.id === batches[0]?.batch.id;
+  const canAdjustBatch =
+    isNewestBatch && selected != null && selected.batch.status !== "completed";
+  const succeededCount =
+    selected?.variants.filter((v) => v.request.status === "succeeded").length ??
+    0;
 
   return (
     <div
@@ -226,57 +219,145 @@ export function TestGenerationModal({
           </div>
         )}
 
-        {!batch && (
+        {loading && <p style={{ color: "#888" }}>{t("loadingHistory")}</p>}
+
+        {!loading && batches.length === 0 && (
           <div style={{ textAlign: "center", padding: 32 }}>
             <button
               className="btn btn-primary"
-              onClick={handleStartTest}
-              disabled={loading}
+              onClick={handleStartBatch}
+              disabled={starting}
               style={{ fontSize: 16, padding: "12px 32px" }}
             >
-              {loading ? t("starting") : t("startCta")}
+              {starting ? t("starting") : t("startCta")}
             </button>
           </div>
         )}
 
-        {batch && batch.status === "completed" && (
-          <div
-            style={{
-              background: "#f0fff4",
-              padding: 12,
-              borderRadius: 6,
-              marginBottom: 16,
-              color: "#2d6a4f",
-            }}
-          >
-            {t("confirmedNotice")}
-          </div>
-        )}
-
-        {batch && requests.length > 0 && (
+        {batches.length > 0 && (
           <>
-            <p style={{ color: "#666", marginBottom: 16 }}>
-              {t("progress", { done: succeededCount, total: totalCount })}
-            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                alignItems: "center",
+                marginBottom: 16,
+                paddingBottom: 16,
+                borderBottom: "1px solid #eee",
+              }}
+              role="tablist"
+              aria-label={t("historyHeading")}
+            >
+              <span style={{ fontSize: 13, color: "#888", marginRight: 4 }}>
+                {t("historyHeading")}
+              </span>
+              {batches.map((entry, index) => {
+                const isSelected = entry.batch.id === selectedBatchId;
+                const isConfirmed = entry.batch.status === "completed";
+                return (
+                  <button
+                    key={entry.batch.id}
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setSelectedBatchId(entry.batch.id)}
+                    style={{
+                      fontSize: 13,
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      cursor: "pointer",
+                      border: isSelected
+                        ? "1px solid #3b5bfd"
+                        : "1px solid #ddd",
+                      background: isSelected ? "#eef1ff" : "#fff",
+                      color: isSelected ? "#3b5bfd" : "#555",
+                      fontWeight: isSelected ? 600 : 400,
+                    }}
+                  >
+                    {t("batchTab", {
+                      number: batches.length - index,
+                      time: formatBatchTime(entry.batch.createdAt),
+                    })}
+                    {isConfirmed ? ` ${t("batchConfirmedMark")}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <span style={{ color: "#666", fontSize: 14 }}>
+                {t("progress", {
+                  done: succeededCount,
+                  total: selected?.variants.length ?? 0,
+                })}
+              </span>
+              <button
+                className="btn btn-secondary"
+                onClick={handleStartBatch}
+                disabled={starting || anyInFlight}
+                style={{ fontSize: 13 }}
+                title={anyInFlight ? t("batchInFlight") : undefined}
+              >
+                {starting ? t("starting") : t("newBatchCta")}
+              </button>
+            </div>
+
+            {selected?.batch.status === "completed" && (
+              <div
+                style={{
+                  background: "#f0fff4",
+                  padding: 12,
+                  borderRadius: 6,
+                  marginBottom: 16,
+                  color: "#2d6a4f",
+                }}
+              >
+                {t("confirmedNotice")}
+              </div>
+            )}
+
+            {selected != null && !canAdjustBatch && !isNewestBatch && (
+              <div
+                style={{
+                  background: "#f7f7f7",
+                  padding: 12,
+                  borderRadius: 6,
+                  marginBottom: 16,
+                  color: "#666",
+                  fontSize: 13,
+                }}
+              >
+                {t("olderBatchNotice")}
+              </div>
+            )}
+
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
                 gap: 16,
-                marginBottom: 24,
               }}
             >
-              {requests.map((req, i) => {
-                const entry = images.find((img) => img.requestId === req.id);
+              {(selected?.variants ?? []).map((variant, i) => {
+                const req = variant.request;
                 const isConfirmed =
-                  batch.confirmedGenerationRequestId === req.id;
+                  selected?.batch.confirmedGenerationRequestId === req.id;
                 const chipSelection =
                   pendingAdjustments[req.id] ?? req.appliedAdjustments;
                 const isApplying = applyingVariantId === req.id;
-                const isInFlight =
-                  req.status === "queued" || req.status === "running";
-                const canAdjust =
-                  batch.status !== "completed" && !isConfirmed && !isApplying;
+                const variantInFlight = IN_FLIGHT_STATUSES.includes(req.status);
+                const canAdjust = canAdjustBatch && !isConfirmed && !isApplying;
+                const imageUrl =
+                  variant.generatedImage != null
+                    ? storageKeyToUrl(variant.generatedImage.storageKey)
+                    : null;
                 return (
                   <div
                     key={req.id}
@@ -297,9 +378,9 @@ export function TestGenerationModal({
                         status: req.status,
                       })}
                     </div>
-                    {entry?.imageUrl ? (
+                    {imageUrl ? (
                       <img
-                        src={entry.imageUrl}
+                        src={imageUrl}
                         alt={t("variantAlt", { index: i + 1 })}
                         style={{
                           width: "100%",
@@ -329,7 +410,7 @@ export function TestGenerationModal({
                           : t("stateGenerating")}
                       </div>
                     )}
-                    {batch.status !== "completed" && (
+                    {canAdjustBatch && (
                       <div style={{ marginTop: 8 }}>
                         <div
                           style={{
@@ -342,7 +423,7 @@ export function TestGenerationModal({
                         </div>
                         <AdjustmentChips
                           selected={chipSelection}
-                          disabled={!canAdjust || isInFlight}
+                          disabled={!canAdjust || variantInFlight}
                           onChange={(next) =>
                             setPendingAdjustments((prev) => ({
                               ...prev,
@@ -360,7 +441,7 @@ export function TestGenerationModal({
                           onClick={() => handleApplyAdjustments(req.id)}
                           disabled={
                             !canAdjust ||
-                            isInFlight ||
+                            variantInFlight ||
                             (pendingAdjustments[req.id] === undefined &&
                               chipSelection.length === 0)
                           }
@@ -380,23 +461,22 @@ export function TestGenerationModal({
                         </div>
                       </div>
                     )}
-                    {batch.status !== "completed" &&
-                      req.status === "succeeded" && (
-                        <button
-                          className="btn btn-primary"
-                          style={{
-                            width: "100%",
-                            fontSize: 13,
-                            marginTop: 8,
-                          }}
-                          onClick={() => handleConfirm(req.id)}
-                          disabled={confirming !== null || isApplying}
-                        >
-                          {confirming === req.id
-                            ? t("confirming")
-                            : t("confirmStyle")}
-                        </button>
-                      )}
+                    {!isConfirmed && req.status === "succeeded" && (
+                      <button
+                        className="btn btn-primary"
+                        style={{
+                          width: "100%",
+                          fontSize: 13,
+                          marginTop: 8,
+                        }}
+                        onClick={() => handleConfirm(req.id)}
+                        disabled={confirming !== null || isApplying}
+                      >
+                        {confirming === req.id
+                          ? t("confirming")
+                          : t("confirmStyle")}
+                      </button>
+                    )}
                     {isConfirmed && (
                       <div style={{ color: "#4caf50", fontWeight: 600 }}>
                         {t("confirmedBadge")}
@@ -406,18 +486,6 @@ export function TestGenerationModal({
                 );
               })}
             </div>
-
-            {batch.status !== "completed" && (
-              <div style={{ textAlign: "right" }}>
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleReset}
-                  style={{ fontSize: 13 }}
-                >
-                  {t("regenerate")}
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>

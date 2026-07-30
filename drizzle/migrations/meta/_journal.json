@@ -92,6 +92,13 @@
       "when": 1785288575839,
       "tag": "0012_yielding_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1785392214598,
+      "tag": "0014_silky_serpent_society",
+      "breakpoints": true
     }
   ]
 }

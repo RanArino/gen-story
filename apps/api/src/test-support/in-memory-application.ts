@@ -264,6 +264,13 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.testGenerationBatchId === testBatchId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.store.save(generationRequest);
   }
@@ -325,6 +332,18 @@ class InMemoryTestGenerationBatchRepository implements TestGenerationBatchReposi
         .filter((b) => b.storyboardId === storyboardId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
     );
+  }
+
+  async listByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch[]> {
+    return this.store
+      .values()
+      .filter((b) => b.storyboardId === storyboardId)
+      .sort(
+        (a, b) =>
+          b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+      );
   }
 
   async save(batch: TestGenerationBatch): Promise<void> {
