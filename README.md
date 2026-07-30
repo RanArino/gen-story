@@ -156,7 +156,7 @@ API terminal logs each request in structured format:
 
 ## Troubleshooting
 
-**Port already in use** — Another process is using port 3000 or 4000. Stop it or change `API_PORT` / the Next.js port.
+**Port already in use** — Another process is using port 3000 or 4000. Stop it or change `API_PORT` / the Next.js port. `pnpm dev` keeps the web server running even when the API fails to bind, so the only browser symptom is "Cannot reach the API server" — check the `apps/api dev:` lines for the startup error.
 
 **`apps/api/.env` not found** — Copy `apps/api/.env.example` as described above. The app will start but generation will use the mock adapter.
 

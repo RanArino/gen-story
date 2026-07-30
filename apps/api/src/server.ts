@@ -148,6 +148,22 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
   const router = buildRouter(deps);
   const server = createServer(makeHandleRequest(router));
 
+  // Without a listener for this, Node rethrows the 'error' event and the API
+  // dies in a wall of stack trace while `pnpm dev` keeps the web server up — so
+  // the only symptom is "Failed to fetch" in the browser.
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `[startup] Port ${port} is already in use, so the API did not start.\n` +
+          `          Find the process with: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
+      );
+    } else {
+      console.error("[startup] The API server failed to start:", err);
+    }
+    worker.stop();
+    process.exit(1);
+  });
+
   server.listen(port, () => {
     console.log(`gen-story-api listening on http://localhost:${port}`);
   });
