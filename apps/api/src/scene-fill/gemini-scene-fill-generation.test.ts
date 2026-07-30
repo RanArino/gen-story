@@ -72,7 +72,7 @@ function input() {
     }),
     primaryPhoto,
     stylePreset: null,
-    projectPhotos: [primaryPhoto],
+    referencePhotos: [],
     siblingScenes: [],
     photoAnalysis: null,
     language: "en" as const,
@@ -192,5 +192,80 @@ describe("GeminiSceneFillGenerationAdapter", () => {
     await adapter.generateSceneFill(input());
 
     expect(capturedPrompt).toMatch(/Respond in English/);
+  });
+
+  // One image per call, not one per project photo: sending the whole project
+  // billed an image for every photo on every scene's call.
+  it("sends only the primary photo and the scene's reference photos", async () => {
+    let imageCount = 0;
+    const client = {
+      models: {
+        async generateContent(req: {
+          contents: Array<{ parts: Array<{ inlineData?: unknown }> }>;
+        }) {
+          imageCount = (req.contents[0]?.parts ?? []).filter(
+            (part) => part.inlineData != null,
+          ).length;
+          return validResponse;
+        },
+      },
+    };
+    const adapter = new GeminiSceneFillGenerationAdapter(
+      new MemoryObjectStorage(onePixelPng),
+      "test-key",
+      "gemini-test",
+      client,
+    );
+
+    await adapter.generateSceneFill(input());
+    expect(imageCount).toBe(1);
+
+    const reference = createPhotoAsset({
+      id: "photo_2",
+      projectId: "project_1",
+      name: "venue.png",
+      storageKey: "venue.png",
+      mimeType: "image/png",
+      size: onePixelPng.byteLength,
+      checksum: "checksum_2",
+      sourceKind: "upload",
+      createdAt: ts,
+      updatedAt: ts,
+    });
+    await adapter.generateSceneFill({
+      ...input(),
+      referencePhotos: [reference],
+    });
+    expect(imageCount).toBe(2);
+  });
+
+  it("does not send the primary photo twice when it is also a reference", async () => {
+    let imageCount = 0;
+    const client = {
+      models: {
+        async generateContent(req: {
+          contents: Array<{ parts: Array<{ inlineData?: unknown }> }>;
+        }) {
+          imageCount = (req.contents[0]?.parts ?? []).filter(
+            (part) => part.inlineData != null,
+          ).length;
+          return validResponse;
+        },
+      },
+    };
+    const adapter = new GeminiSceneFillGenerationAdapter(
+      new MemoryObjectStorage(onePixelPng),
+      "test-key",
+      "gemini-test",
+      client,
+    );
+
+    const base = input();
+    await adapter.generateSceneFill({
+      ...base,
+      referencePhotos: [base.primaryPhoto],
+    });
+
+    expect(imageCount).toBe(1);
   });
 });

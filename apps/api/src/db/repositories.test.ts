@@ -179,6 +179,48 @@ describe("SQLite persistence", () => {
     });
   });
 
+  it("round-trips the storyboard setup completion stamp, including null", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(buildStoryboard());
+
+      // New storyboards start un-stamped: the guided flow is still gating them.
+      await expect(
+        repositories.storyboards.findById("storyboard_1"),
+      ).resolves.toMatchObject({ setupCompletedAt: null });
+
+      const stamped = await repositories.storyboards.findById("storyboard_1");
+      await repositories.storyboards.save({
+        ...stamped!,
+        setupCompletedAt: "2026-07-30T12:00:00.000Z",
+      });
+
+      await expect(
+        repositories.storyboards.findById("storyboard_1"),
+      ).resolves.toMatchObject({
+        setupCompletedAt: "2026-07-30T12:00:00.000Z",
+      });
+    });
+  });
+
+  it("stores a blank storyboard tone as undecided", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(
+        createStoryboard({
+          id: "storyboard_1",
+          projectId: "project_1",
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+
+      await expect(
+        repositories.storyboards.findById("storyboard_1"),
+      ).resolves.toMatchObject({ tone: "" });
+    });
+  });
+
   it("restores scene and scene-photo order from orderIndex", async () => {
     await withDatabase(async ({ repositories }) => {
       await seedBase(repositories);

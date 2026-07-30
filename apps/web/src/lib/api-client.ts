@@ -104,46 +104,75 @@ export async function cancelAiJob(jobId: string): Promise<AiJobDto> {
   return request<AiJobDto>("POST", `/api/ai-jobs/${jobId}/cancel`);
 }
 
-// Live project event stream. Returns an unsubscribe function.
+// Named SSE events do not fire the default `message` handler, so every kind the
+// server emits has to be listened for by name.
+const PROJECT_EVENT_KINDS = [
+  "ai-job.queued",
+  "ai-job.running",
+  "ai-job.succeeded",
+  "ai-job.failed",
+  "ai-job.canceled",
+  "project_photo_analysis.completed",
+  "storyboard.story_setup_completed",
+  "storyboard.setup_completed",
+  "scene.ai_filled",
+  "generation-request.created",
+  "generation-request.retried",
+  "generation-request.running",
+  "generation-request.succeeded",
+  "generation-request.failed",
+];
+
+// One connection per project, shared by every subscriber. Waiting on a batch of
+// jobs used to open an EventSource each, so a five-scene bulk fill held five
+// connections to the same endpoint.
+const projectStreams = new Map<
+  string,
+  { source: EventSource; handlers: Set<(event: ProjectEvent) => void> }
+>();
+
+// Live project event stream. Returns an unsubscribe function; the underlying
+// connection closes when the last subscriber leaves.
 export function subscribeToProjectEvents(
   projectId: string,
   handler: (event: ProjectEvent) => void,
 ): () => void {
-  const source = new EventSource(
-    `${apiBase()}/api/projects/${projectId}/events`,
-  );
+  let stream = projectStreams.get(projectId);
 
-  const onMessage = (message: MessageEvent<string>) => {
-    try {
-      handler(JSON.parse(message.data) as ProjectEvent);
-    } catch {
-      // A malformed frame is not worth breaking the stream over.
+  if (stream == null) {
+    const handlers = new Set<(event: ProjectEvent) => void>();
+    const source = new EventSource(
+      `${apiBase()}/api/projects/${projectId}/events`,
+    );
+    const onMessage = (message: MessageEvent<string>) => {
+      let event: ProjectEvent;
+      try {
+        event = JSON.parse(message.data) as ProjectEvent;
+      } catch {
+        // A malformed frame is not worth breaking the stream over.
+        return;
+      }
+      for (const listener of handlers) listener(event);
+    };
+
+    for (const kind of PROJECT_EVENT_KINDS) {
+      source.addEventListener(kind, onMessage);
     }
-  };
+    source.addEventListener("message", onMessage);
 
-  // Named SSE events do not fire the default `message` handler, so listen for
-  // each kind the server emits.
-  const kinds = [
-    "ai-job.queued",
-    "ai-job.running",
-    "ai-job.succeeded",
-    "ai-job.failed",
-    "ai-job.canceled",
-    "project_photo_analysis.completed",
-    "scene.ai_filled",
-    "generation-request.created",
-    "generation-request.retried",
-    "generation-request.running",
-    "generation-request.succeeded",
-    "generation-request.failed",
-  ];
-  for (const kind of kinds) source.addEventListener(kind, onMessage);
-  source.addEventListener("message", onMessage);
+    stream = { source, handlers };
+    projectStreams.set(projectId, stream);
+  }
+
+  const shared = stream;
+  shared.handlers.add(handler);
 
   return () => {
-    for (const kind of kinds) source.removeEventListener(kind, onMessage);
-    source.removeEventListener("message", onMessage);
-    source.close();
+    shared.handlers.delete(handler);
+    if (shared.handlers.size === 0) {
+      shared.source.close();
+      projectStreams.delete(projectId);
+    }
   };
 }
 
@@ -153,13 +182,45 @@ export type AiJobWatchOptions = {
   onStatus?: (status: string) => void;
 };
 
-// Resolve once the job reaches a terminal state. The event stream makes this
-// prompt; the poll makes it correct even if the stream never connects.
+// What a caller actually needs from a finished job. Narrower than `AiJobDto`
+// on purpose: it is exactly what the event stream already delivers, which is
+// what lets a completion resolve without a follow-up request.
+export type AiJobOutcome = {
+  jobId: string;
+  status: string;
+  errorMessage: string | null;
+  resultJson: Record<string, unknown> | null;
+};
+
+// Safety net only. The stream is what makes completion prompt; this covers the
+// two cases it cannot — a stream that never connects, and a job that finished
+// before we subscribed. Polling per job every couple of seconds used to put a
+// `GET /api/ai-jobs/:id` line in the API log for every watched job every 2s,
+// which on an eight-scene fill buried everything else in the log.
+const AI_JOB_POLL_INTERVAL_MS = 30_000;
+
+function outcomeFromEvent(
+  jobId: string,
+  payload: Record<string, unknown>,
+): AiJobOutcome {
+  return {
+    jobId,
+    status: String(payload.status),
+    errorMessage:
+      typeof payload.errorMessage === "string" ? payload.errorMessage : null,
+    resultJson:
+      payload.result != null
+        ? (payload.result as Record<string, unknown>)
+        : null,
+  };
+}
+
+// Resolve once the job reaches a terminal state.
 export async function awaitAiJob(
   jobId: string,
   options: AiJobWatchOptions,
-): Promise<AiJobDto> {
-  return new Promise<AiJobDto>((resolve, reject) => {
+): Promise<AiJobOutcome> {
+  return new Promise<AiJobOutcome>((resolve, reject) => {
     let settled = false;
     let lastStatus: string | null = null;
 
@@ -171,25 +232,44 @@ export async function awaitAiJob(
       fn();
     };
 
+    const report = (status: string) => {
+      if (status === lastStatus) return;
+      lastStatus = status;
+      options.onStatus?.(status);
+    };
+
+    // The job-transition events already carry the status, the result and the
+    // error message, so a terminal event is the whole answer — no request.
+    const unsubscribe = subscribeToProjectEvents(options.projectId, (event) => {
+      const payload = event.payload;
+      if (payload == null || payload.aiJobId !== jobId) return;
+      if (typeof payload.status !== "string") return;
+
+      report(payload.status);
+      if (!AI_JOB_TERMINAL_STATUSES.includes(payload.status)) return;
+      finish(() => resolve(outcomeFromEvent(jobId, payload)));
+    });
+
     const check = async () => {
       if (settled) return;
       try {
         const job = await getAiJob(jobId);
-        if (job.status !== lastStatus) {
-          lastStatus = job.status;
-          options.onStatus?.(job.status);
-        }
+        report(job.status);
         if (!isAiJobTerminal(job)) return;
-        finish(() => resolve(job));
+        finish(() =>
+          resolve({
+            jobId,
+            status: job.status,
+            errorMessage: job.errorMessage,
+            resultJson: job.resultJson,
+          }),
+        );
       } catch (err) {
         finish(() => reject(err));
       }
     };
 
-    const unsubscribe = subscribeToProjectEvents(options.projectId, (event) => {
-      if (event.payload?.aiJobId === jobId) void check();
-    });
-    const timer = setInterval(() => void check(), 2000);
+    const timer = setInterval(() => void check(), AI_JOB_POLL_INTERVAL_MS);
     void check();
   });
 }
@@ -203,7 +283,7 @@ export class AiJobCanceledError extends Error {
   }
 }
 
-function aiJobResultOrThrow(job: AiJobDto, fallbackMessage: string): void {
+function aiJobResultOrThrow(job: AiJobOutcome, fallbackMessage: string): void {
   if (job.status === "succeeded") return;
   if (job.status === "canceled") throw new AiJobCanceledError();
   throw new Error(job.errorMessage ?? fallbackMessage);
@@ -373,11 +453,13 @@ export async function listStoryboards(
   return data.storyboards;
 }
 
+// Every field except `projectId` is optional and omitting one leaves the stored
+// value alone, so a caller saving the story does not have to resend the tone.
 export async function upsertStoryboard(
   storyboardId: string,
   input: {
     projectId: string;
-    tone: string;
+    tone?: string;
     stylePresetId?: string | null;
     status?: string;
     commonPrompt?: string;
@@ -390,6 +472,46 @@ export async function upsertStoryboard(
     `/api/storyboards/${storyboardId}`,
     input,
   );
+}
+
+// Setup step 4: one AI call producing the story, common prompt, and negative
+// prompt together. Resolves once the job lands and returns the saved storyboard.
+export async function generateStorySetup(
+  storyboardId: string,
+  context: { projectId: string } & Omit<AiJobWatchOptions, "projectId">,
+): Promise<StoryboardDto> {
+  const { projectId, ...watch } = context;
+  const data = await request<{ jobId: string }>(
+    "POST",
+    `/api/storyboards/${storyboardId}/story-setup`,
+    {},
+  );
+  watch.onJobId?.(data.jobId);
+
+  const job = await awaitAiJob(data.jobId, { projectId, ...watch });
+  aiJobResultOrThrow(job, "Story setup failed.");
+
+  const storyboard = (await listStoryboards(projectId)).find(
+    (candidate) => candidate.id === storyboardId,
+  );
+  if (storyboard == null)
+    throw new Error("Story setup returned no storyboard.");
+  return storyboard;
+}
+
+// Setup step 5: enqueues one AI call per scene that still has a blank field.
+// Returns the job ids so the caller can show progress as each one lands.
+export async function fillStoryboardScenesWithAi(
+  storyboardId: string,
+): Promise<{ aiJobIds: string[]; skippedSceneCount: number }> {
+  const data = await request<{
+    aiJobIds: string[];
+    skippedSceneCount: number;
+  }>("POST", `/api/storyboards/${storyboardId}/scenes/ai-fill`, {});
+  return {
+    aiJobIds: data.aiJobIds ?? [],
+    skippedSceneCount: data.skippedSceneCount ?? 0,
+  };
 }
 
 // ── Scenes ────────────────────────────────────────────────────────────────────

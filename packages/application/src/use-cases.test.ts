@@ -55,6 +55,9 @@ import type {
   SceneFillGenerationPort,
   SceneFillSuggestion,
   SceneRepositoryPort,
+  StorySetupGenerationInput,
+  StorySetupGenerationPort,
+  StorySetupSuggestion,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
   TestGenerationBatchRepositoryPort,
@@ -72,6 +75,8 @@ import {
   createTemplateScenesFromPhotos,
   createProjectUseCase,
   fillSceneWithAi,
+  fillStoryboardScenesWithAi,
+  generateStorySetup,
   getProjectPhotoAnalysis,
   getUserPreference,
   insertComplementScene,
@@ -85,6 +90,7 @@ import {
   runComplementSceneProposalsJob,
   runPhotoAnalysisJob,
   runSceneAiFillJob,
+  runStorySetupJob,
   setUserPreference,
   updatePhotoCuration,
   upsertScenes,
@@ -548,6 +554,23 @@ class InMemoryPhotoAnalysisGenerationPort implements PhotoAnalysisGenerationPort
   }
 }
 
+class InMemoryStorySetupGenerationPort implements StorySetupGenerationPort {
+  public readonly calls: StorySetupGenerationInput[] = [];
+  public result: StorySetupSuggestion = {
+    story: "A warm story about this family, told over one long summer.",
+    commonPrompt: "Warm grain, soft highlights, muted color, consistent cast.",
+    negativePrompt: "text, watermark, extra limbs",
+    model: "test-model",
+  };
+
+  async generateStorySetup(
+    input: StorySetupGenerationInput,
+  ): Promise<StorySetupSuggestion> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
 class InMemoryAiJobRepository implements AiJobRepositoryPort {
   constructor(private readonly store: MemoryStore<AiJob>) {}
 
@@ -662,6 +685,7 @@ function createDependencies(initial?: {
   sceneFillGeneration: InMemorySceneFillGenerationPort;
   complementSceneProposal: InMemoryComplementSceneProposalPort;
   photoAnalysisGeneration: InMemoryPhotoAnalysisGenerationPort;
+  storySetupGeneration: InMemoryStorySetupGenerationPort;
   scenes: InMemorySceneRepository;
 } {
   const stores = {
@@ -695,6 +719,7 @@ function createDependencies(initial?: {
   const sceneFillGeneration = new InMemorySceneFillGenerationPort();
   const complementSceneProposal = new InMemoryComplementSceneProposalPort();
   const photoAnalysisGeneration = new InMemoryPhotoAnalysisGenerationPort();
+  const storySetupGeneration = new InMemoryStorySetupGenerationPort();
 
   return {
     users: new InMemoryUserRepository(stores.users),
@@ -724,6 +749,7 @@ function createDependencies(initial?: {
     sceneFillGeneration,
     complementSceneProposal,
     photoAnalysisGeneration,
+    storySetupGeneration,
     jobQueue,
     progressEvents,
     authContext: {
@@ -1284,7 +1310,10 @@ describe("application use cases", () => {
     });
   }
 
-  it("auto-generates a common prompt for a new storyboard when none is provided", async () => {
+  // Setup step 4 gates on the common prompt being written, so a save that does
+  // not mention it must leave it blank. Composing one here would mark step 4
+  // done the moment the user picked a tone.
+  it("leaves the common prompt blank when the caller does not ask for one", async () => {
     const deps = createCommonPromptDeps();
 
     const result = await upsertStoryboard(deps, {
@@ -1296,7 +1325,24 @@ describe("application use cases", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.commonPrompt).not.toBe("");
+      expect(result.value.commonPrompt).toBe("");
+    }
+  });
+
+  it("composes a common prompt from tone and style on an explicit regenerate", async () => {
+    const deps = createCommonPromptDeps();
+
+    // An explicit empty string is the "regenerate from tone & style" action.
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      stylePresetId: "style_1",
+      commonPrompt: "",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
       expect(result.value.commonPrompt).toContain("Reflective");
       expect(result.value.commonPrompt).toContain("Cinematic");
     }
@@ -1369,13 +1415,31 @@ describe("application use cases", () => {
     }
   });
 
-  it("seeds a storyboard story from the latest photo analysis", async () => {
+  // Same rule as the common prompt: seeding only on an explicit request keeps
+  // setup step 4 gateable.
+  it("leaves the story blank when the caller does not ask for one", async () => {
     const deps = createStoryDeps();
 
     const result = await upsertStoryboard(deps, {
       storyboardId: "storyboard_1",
       projectId: "project_1",
       tone: "Reflective",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.story).toBe("");
+    }
+  });
+
+  it("seeds a storyboard story from the latest photo analysis on an explicit regenerate", async () => {
+    const deps = createStoryDeps();
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      story: "",
     });
 
     expect(result.ok).toBe(true);
@@ -1992,6 +2056,258 @@ describe("application use cases", () => {
     expect(result.ok).toBe(true);
     expect(deps.sceneFillGeneration.calls).toHaveLength(0);
     expect(deps.scenes.saveCalls).toBe(0);
+  });
+
+  // ── Guided setup: step 4 (story) ───────────────────────────────────────────
+
+  function createStorySetupDeps(
+    storyboardOverrides: Partial<{
+      tone: string;
+      stylePresetId: string | null;
+    }> = {},
+  ) {
+    return createDependencies({
+      projects: [
+        createProject({
+          id: "project_setup",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      stylePresets: [
+        createStylePreset({
+          id: "style_setup",
+          scope: "system",
+          name: "Cinematic",
+          prompt: "Filmic contrast, shallow depth of field.",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_setup",
+          projectId: "project_setup",
+          tone: "warm_nostalgia",
+          stylePresetId: "style_setup",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+          ...storyboardOverrides,
+        }),
+      ],
+    });
+  }
+
+  it("writes the story, common prompt, and negative prompt from the story setup job", async () => {
+    const deps = createStorySetupDeps();
+
+    const enqueued = await generateStorySetup(deps, {
+      storyboardId: "storyboard_setup",
+    });
+
+    expect(enqueued.ok).toBe(true);
+    // The enqueue half must not touch the AI port.
+    expect(deps.storySetupGeneration.calls).toHaveLength(0);
+    if (!enqueued.ok) throw new Error("expected a job to be enqueued");
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("story_setup");
+
+    const result = await runStorySetupJob(deps, job!);
+
+    expect(result.ok).toBe(true);
+    expect(deps.storySetupGeneration.calls).toHaveLength(1);
+    // The chosen tone and style are what the model is given to write against.
+    expect(deps.storySetupGeneration.calls[0]?.storyboard.tone).toBe(
+      "warm_nostalgia",
+    );
+    expect(deps.storySetupGeneration.calls[0]?.stylePreset?.name).toBe(
+      "Cinematic",
+    );
+
+    const storyboard = await deps.storyboards.findById("storyboard_setup");
+    expect(storyboard).toMatchObject({
+      story: "A warm story about this family, told over one long summer.",
+      commonPrompt:
+        "Warm grain, soft highlights, muted color, consistent cast.",
+      negativePrompt: "text, watermark, extra limbs",
+    });
+  });
+
+  it("refuses to generate the story setup before tone and style are decided", async () => {
+    const noTone = await generateStorySetup(
+      createStorySetupDeps({ tone: "" }),
+      {
+        storyboardId: "storyboard_setup",
+      },
+    );
+    expect(noTone.ok).toBe(false);
+    if (!noTone.ok) expect(noTone.error.code).toBe("invalid_state");
+
+    const noStyle = await generateStorySetup(
+      createStorySetupDeps({ stylePresetId: null }),
+      { storyboardId: "storyboard_setup" },
+    );
+    expect(noStyle.ok).toBe(false);
+    if (!noStyle.ok) expect(noStyle.error.code).toBe("invalid_state");
+  });
+
+  // ── Guided setup: step 5 (scenes) ──────────────────────────────────────────
+
+  function createBulkFillDeps() {
+    const photo = (id: string) =>
+      createPhotoAsset({
+        id,
+        projectId: "project_bulk",
+        name: `${id}.jpg`,
+        storageKey: `photos/${id}.jpg`,
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: `${id}_checksum`,
+        sourceKind: "upload",
+        createdAt: "2026-05-02T00:00:00.000Z",
+        updatedAt: "2026-05-02T00:00:00.000Z",
+      });
+
+    return createDependencies({
+      projects: [
+        createProject({
+          id: "project_bulk",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      stylePresets: [
+        createStylePreset({
+          id: "style_bulk",
+          scope: "system",
+          name: "Cinematic",
+          prompt: "Filmic contrast.",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_bulk",
+          projectId: "project_bulk",
+          tone: "warm_nostalgia",
+          stylePresetId: "style_bulk",
+          commonPrompt: "Warm grain.",
+          story: "A warm family story.",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [photo("photo_blank"), photo("photo_written")],
+      scenes: [
+        createTemplateScene({
+          id: "scene_blank",
+          projectId: "project_bulk",
+          storyboardId: "storyboard_bulk",
+          orderIndex: 0,
+          photoAssetId: "photo_blank",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+        createScene({
+          id: "scene_written",
+          projectId: "project_bulk",
+          storyboardId: "storyboard_bulk",
+          orderIndex: 1,
+          title: "Departure",
+          description: "They drive away at dusk.",
+          imagePrompt: "A car pulling away at dusk.",
+          emotion: "Nostalgia",
+          cameraDirection: "Medium",
+          lightingDirection: "Golden hour",
+          motionDirection: "Tracking",
+          photoAssets: [{ photoAssetId: "photo_written", role: "primary" }],
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+  }
+
+  it("enqueues one bulk fill job per blank scene and skips written ones", async () => {
+    const deps = createBulkFillDeps();
+
+    const result = await fillStoryboardScenesWithAi(deps, {
+      storyboardId: "storyboard_bulk",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.aiJobIds).toHaveLength(1);
+    expect(result.value.skippedSceneCount).toBe(1);
+    expect(deps.jobQueue.jobs).toHaveLength(1);
+    expect(deps.jobQueue.jobs[0]).toMatchObject({
+      kind: "scene_ai_fill",
+      payload: { sceneId: "scene_blank" },
+    });
+    // Enqueueing must not spend an AI call.
+    expect(deps.sceneFillGeneration.calls).toHaveLength(0);
+  });
+
+  it("stamps setup completion once the last blank scene is filled", async () => {
+    const deps = createBulkFillDeps();
+    // The photos have to be analyzable for step 1 to count as done.
+    expect(
+      (await deps.photoAssets.findByProjectId("project_bulk")).every(
+        (candidate) => candidate.usage === "candidate",
+      ),
+    ).toBe(true);
+
+    expect(
+      (await deps.storyboards.findById("storyboard_bulk"))?.setupCompletedAt,
+    ).toBeNull();
+
+    const enqueued = await fillStoryboardScenesWithAi(deps, {
+      storyboardId: "storyboard_bulk",
+    });
+    if (!enqueued.ok) throw new Error("expected jobs to be enqueued");
+
+    for (const jobId of enqueued.value.aiJobIds) {
+      const job = await deps.aiJobs.findById(jobId);
+      await runSceneAiFillJob(deps, job!);
+    }
+
+    const storyboard = await deps.storyboards.findById("storyboard_bulk");
+    expect(storyboard?.setupCompletedAt).not.toBeNull();
+    expect(
+      deps.progressEvents.events.some(
+        (event) => event.kind === "storyboard.setup_completed",
+      ),
+    ).toBe(true);
+  });
+
+  it("leaves setup incomplete while any step is still unsatisfied", async () => {
+    const deps = createBulkFillDeps();
+    // Blank the story so step 4 is open even after every scene is written.
+    const storyboard = await deps.storyboards.findById("storyboard_bulk");
+    await deps.storyboards.save({ ...storyboard!, story: "" });
+
+    const enqueued = await fillStoryboardScenesWithAi(deps, {
+      storyboardId: "storyboard_bulk",
+    });
+    if (!enqueued.ok) throw new Error("expected jobs to be enqueued");
+
+    for (const jobId of enqueued.value.aiJobIds) {
+      const job = await deps.aiJobs.findById(jobId);
+      await runSceneAiFillJob(deps, job!);
+    }
+
+    expect(
+      (await deps.storyboards.findById("storyboard_bulk"))?.setupCompletedAt,
+    ).toBeNull();
   });
 
   it("analyzes only candidate and reference photos", async () => {
@@ -3053,6 +3369,88 @@ describe("application use cases", () => {
       id: "analysis_1",
       storySummary: "A warm family birthday.",
     });
+  });
+
+  // The scene fill used to receive every project photo, so each scene's call
+  // billed one image per photo in the project. Only what the scene actually
+  // references is sent now; the rest of the project arrives as analysis text.
+  it("passes only the scene's reference photos to the scene fill port", async () => {
+    const photo = (id: string) =>
+      createPhotoAsset({
+        id,
+        projectId: "project_ref",
+        name: `${id}.jpg`,
+        storageKey: `photos/${id}.jpg`,
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: `${id}_checksum`,
+        sourceKind: "upload",
+        createdAt: "2026-05-02T00:00:00.000Z",
+        updatedAt: "2026-05-02T00:00:00.000Z",
+      });
+
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_ref",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_ref",
+          projectId: "project_ref",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      // Four photos in the project, but the scene only names two of them.
+      photoAssets: [
+        photo("photo_primary"),
+        photo("photo_reference"),
+        photo("photo_other_1"),
+        photo("photo_other_2"),
+      ],
+      scenes: [
+        createScene({
+          id: "scene_ref",
+          projectId: "project_ref",
+          storyboardId: "storyboard_ref",
+          orderIndex: 0,
+          title: "",
+          description: "",
+          imagePrompt: "",
+          emotion: "",
+          cameraDirection: "",
+          lightingDirection: "",
+          motionDirection: "",
+          photoAssets: [
+            { photoAssetId: "photo_primary", role: "primary" },
+            { photoAssetId: "photo_reference", role: "reference" },
+          ],
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ref" });
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    await runSceneAiFillJob(deps, job!);
+
+    const call = deps.sceneFillGeneration.calls[0]!;
+    expect(call.primaryPhoto.id).toBe("photo_primary");
+    expect(call.referencePhotos.map((candidate) => candidate.id)).toEqual([
+      "photo_reference",
+    ]);
   });
 
   it("enqueues one AI fill job per created scene only when autoFill is requested", async () => {

@@ -95,16 +95,35 @@ export type ScenePhotoAssetDto = {
   role: string;
 };
 
+// The five ordered setup steps, plus "complete" when the data satisfies all of
+// them. Derived server-side from one domain rule so the UI never re-implements
+// the gate.
+export type StoryboardSetupStepDto =
+  | "photos"
+  | "tone"
+  | "style"
+  | "story"
+  | "scenes"
+  | "complete";
+
 export type StoryboardDto = {
   id: string;
   projectId: string;
   status: string;
+  // Empty means the tone has not been decided yet.
   tone: string;
   stylePresetId: string | null;
   commonPrompt: string;
   story: string;
   negativePrompt: string;
   sceneIds: string[];
+  setupStep: StoryboardSetupStepDto;
+  // Set once the storyboard has been through all five steps; from then on the
+  // UI stops gating and every section is editable.
+  setupCompletedAt: string | null;
+  // Scenes still missing AI-fillable text, and therefore the number of AI calls
+  // a bulk fill would spend. Server-derived so the UI can state the cost.
+  pendingSceneFillCount: number;
   createdAt: string;
   updatedAt: string;
 };

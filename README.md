@@ -36,18 +36,18 @@ Copy the example env file and edit as needed:
 cp apps/api/.env.example apps/api/.env
 ```
 
-| Variable                      | Default                 | Description                                                  |
-| ----------------------------- | ----------------------- | ------------------------------------------------------------ |
-| `API_PORT`                    | `4000`                  | Port for the API server                                      |
-| `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000` | API base URL used by the web app                             |
-| `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite` | Path to the SQLite database file                             |
-| `OPENAI_API_KEY`              | _(none)_                | Optional. Required for real image generation                 |
-| `IMAGE_GENERATION_ADAPTER`    | `mock`                  | Set to `openai` to use real generation                       |
-| `GEMINI_API_KEY`              | _(none)_                | Optional. Enables real photo analysis for emotion candidates |
-| `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`      | Gemini model used for project photo analysis                 |
+| Variable                      | Default                 | Description                                                   |
+| ----------------------------- | ----------------------- | ------------------------------------------------------------- |
+| `API_PORT`                    | `4000`                  | Port for the API server                                       |
+| `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000` | API base URL used by the web app                              |
+| `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite` | Path to the SQLite database file                              |
+| `OPENAI_API_KEY`              | _(none)_                | Optional. Set it to use real image generation instead of mock |
+| `GEMINI_API_KEY`              | _(none)_                | Optional. Enables real photo analysis for emotion candidates  |
+| `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`      | Gemini model used for project photo analysis                  |
+| `GEMINI_STORY_SETUP_MODEL`    | `gemini-2.5-flash`      | Gemini model used for storyboard story setup (step 4)         |
 
 The app works without an OpenAI key — it uses a mock adapter that generates placeholder images.
-The app works without a Gemini key; photo analysis uses deterministic local suggestions.
+The app works without a Gemini key; photo analysis and story setup use deterministic local fallbacks.
 
 ## Apply Database Migrations
 
@@ -164,7 +164,7 @@ API terminal logs each request in structured format:
 
 **HEIC conversion fails** — `sharp` requires `libvips`. On macOS: `brew install vips`. On Linux: `apt install libvips-dev`.
 
-**Missing OpenAI key** — Set `OPENAI_API_KEY` in `apps/api/.env` and `IMAGE_GENERATION_ADAPTER=openai`. Without a key the mock adapter produces gray placeholder images.
+**Missing OpenAI key** — Set `OPENAI_API_KEY` in `apps/api/.env`. Its presence alone selects the real adapter. Without a key the mock adapter produces gray placeholder images.
 
 ## Workspace Layout
 

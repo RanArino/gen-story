@@ -102,7 +102,7 @@ function buildPrompt(input: SceneFillGenerationInput): string {
   return [
     "You are drafting one scene of an anniversary-style storyboard.",
     languageDirective(input.language),
-    "The FIRST image is this scene's primary photo; any following images are other project photos for context.",
+    "The FIRST image is this scene's primary photo; any following images are reference photos this scene was given for context.",
     "Generate scene fields grounded in what is actually visible in the primary photo.",
     "Return only JSON matching the provided schema.",
     `Project: ${input.project.name}`,
@@ -156,11 +156,13 @@ export class GeminiSceneFillGenerationAdapter implements SceneFillGenerationPort
     const client = this.getClient();
     const parts: unknown[] = [{ text: buildPrompt(input) }];
 
+    // The primary photo, then whatever this scene named as a reference. The
+    // project's other photos are deliberately not sent: what the vision pass
+    // learned about them already arrives as text in `analysisContext`.
     const photoOrder = [
       input.primaryPhoto,
-      ...input.projectPhotos.filter(
-        (photo) =>
-          photo.id !== input.primaryPhoto.id && photo.deletedAt === null,
+      ...input.referencePhotos.filter(
+        (photo) => photo.id !== input.primaryPhoto.id,
       ),
     ];
 

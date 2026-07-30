@@ -22,6 +22,9 @@ import type {
   SceneFillGenerationPort,
   SceneFillSuggestion,
   SceneRepositoryPort,
+  StorySetupGenerationInput,
+  StorySetupGenerationPort,
+  StorySetupSuggestion,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
   TestGenerationBatchRepositoryPort,
@@ -473,6 +476,19 @@ class InMemoryPhotoAnalysisGeneration implements PhotoAnalysisGenerationPort {
   }
 }
 
+class InMemoryStorySetupGeneration implements StorySetupGenerationPort {
+  async generateStorySetup(
+    input: StorySetupGenerationInput,
+  ): Promise<StorySetupSuggestion> {
+    return {
+      story: `AI story for ${input.project.name} (${input.storyboard.tone})`,
+      commonPrompt: `AI common prompt for ${input.storyboard.tone}`,
+      negativePrompt: "text, watermark",
+      model: "in-memory",
+    };
+  }
+}
+
 class InMemoryUserPreferenceRepository implements UserPreferenceRepositoryPort {
   private readonly items = new Map<string, UserPreference>();
 
@@ -641,6 +657,7 @@ export function createInMemoryApplicationDependencies(
     sceneFillGeneration: new InMemorySceneFillGeneration(),
     complementSceneProposal: new InMemoryComplementSceneProposal(),
     photoAnalysisGeneration: new InMemoryPhotoAnalysisGeneration(),
+    storySetupGeneration: new InMemoryStorySetupGeneration(),
     jobQueue: new InMemoryJobQueue(stores.aiJobs, progressEvents),
     progressEvents,
     authContext: new LocalAuthContext({

@@ -22,6 +22,11 @@ import {
   GeminiSceneFillGenerationAdapter,
 } from "../scene-fill/gemini-scene-fill-generation";
 import { LocalObjectStorage } from "../storage/local-object-storage";
+import {
+  DEFAULT_GEMINI_STORY_SETUP_MODEL,
+  GeminiStorySetupGenerationAdapter,
+} from "../story-setup/gemini-story-setup-generation";
+import { LocalStorySetupGenerationAdapter } from "../story-setup/local-story-setup-generation";
 
 // The router needs the concrete emitter, not just the port, because the SSE
 // route subscribes to it.
@@ -68,6 +73,15 @@ export function createApiContext(
           DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL,
       )
     : new LocalPhotoAnalysisGenerationAdapter();
+  // Step 4 falls back to the deterministic template rather than failing, so a
+  // setup without a Gemini key still walks all five steps.
+  const storySetupGeneration = geminiApiKey
+    ? new GeminiStorySetupGenerationAdapter(
+        geminiApiKey,
+        process.env.GEMINI_STORY_SETUP_MODEL ??
+          DEFAULT_GEMINI_STORY_SETUP_MODEL,
+      )
+    : new LocalStorySetupGenerationAdapter();
 
   const progressEvents = new LocalProgressEvents();
 
@@ -79,6 +93,7 @@ export function createApiContext(
     sceneFillGeneration,
     complementSceneProposal,
     photoAnalysisGeneration,
+    storySetupGeneration,
     jobQueue: new SqliteJobQueue(repos.aiJobs, progressEvents),
     progressEvents,
     authContext: new LocalAuthContext(repos),

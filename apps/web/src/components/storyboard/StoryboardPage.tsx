@@ -30,6 +30,8 @@ import {
   createCustomStyle,
   createTemplateScenesFromPhotos,
   fillSceneWithAi,
+  fillStoryboardScenesWithAi,
+  generateStorySetup,
   getProjectPhotoAnalysis,
   getTestGenerationBatch,
   insertComplementScene,
@@ -49,6 +51,12 @@ import { AppShell } from "../AppShell";
 import { ComposedPromptPreview } from "../common/ComposedPromptPreview";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./StoryboardPage.module.css";
+import {
+  SETUP_STEP_ORDER,
+  StoryboardStepper,
+  stepIndex,
+  type SetupStep,
+} from "./StoryboardStepper";
 
 const TONES = [
   { value: "warm", label: "Warm", desc: "Heartfelt and nostalgic" },
@@ -199,6 +207,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   });
   const [savingCustomStyle, setSavingCustomStyle] = useState(false);
   const [complementBusy, setComplementBusy] = useState(false);
+  const [generatingStorySetup, setGeneratingStorySetup] = useState(false);
+  const [bulkFilling, setBulkFilling] = useState(false);
   const [photoViewSize, setPhotoViewSize] = useState<
     "small" | "medium" | "large"
   >("small");
@@ -392,27 +402,30 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   async function initStoryboard() {
     const id = crypto.randomUUID();
     try {
-      const sb = await upsertStoryboard(id, {
-        projectId,
-        tone: "warm",
-        status: "draft",
-      });
+      // No tone is seeded on purpose: the storyboard starts undecided so setup
+      // step 2 can tell "not chosen yet" from a real choice.
+      const sb = await upsertStoryboard(id, { projectId, status: "draft" });
       setStoryboard(sb);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("scenes.failedInit"));
     }
   }
 
+  // The setup step is derived server-side from photos, storyboard fields and
+  // scenes, so anything that changes those has to re-read the storyboard for
+  // the stepper to move.
+  const refreshStoryboard = useCallback(async () => {
+    const sbs = await listStoryboards(projectId);
+    const refreshed = sbs[0];
+    if (refreshed) setStoryboard(refreshed);
+  }, [projectId]);
+
   async function handleToneChange(tone: string) {
     if (!sbId) return;
     const prev = storyboard!;
     setStoryboard({ ...prev, tone });
     try {
-      const updated = await upsertStoryboard(sbId, {
-        projectId,
-        tone,
-        stylePresetId: prev.stylePresetId,
-      });
+      const updated = await upsertStoryboard(sbId, { projectId, tone });
       setStoryboard(updated);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("scenes.failedTone"));
@@ -453,6 +466,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         aiJobWatch,
       );
       setPhotoAnalysis(analysis);
+      // Analysis can move the flow off step 1, so the stepper needs the fresh
+      // derived step.
+      await refreshStoryboard();
       setSaveMsg(cached ? t("ai.cachedMsg") : t("ai.completeMsg"));
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (e: unknown) {
@@ -472,7 +488,6 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     try {
       const updated = await upsertStoryboard(sbId, {
         projectId,
-        tone: prev.tone,
         stylePresetId,
       });
       setStoryboard(updated);
@@ -500,14 +515,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
   async function saveCommonPrompt(commonPrompt: string) {
     if (!sbId) return;
-    const prev = storyboard!;
     setSavingCommonPrompt(true);
     setError(null);
     try {
       const updated = await upsertStoryboard(sbId, {
         projectId,
-        tone: prev.tone,
-        stylePresetId: prev.stylePresetId,
         commonPrompt,
       });
       setStoryboard(updated);
@@ -525,14 +537,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
   async function saveStory(story: string) {
     if (!sbId) return;
-    const prev = storyboard!;
     setSavingStory(true);
     setError(null);
     try {
       const updated = await upsertStoryboard(sbId, {
         projectId,
-        tone: prev.tone,
-        stylePresetId: prev.stylePresetId,
         story,
       });
       setStoryboard(updated);
@@ -550,14 +559,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
   async function saveNegativePrompt(negativePrompt: string) {
     if (!sbId) return;
-    const prev = storyboard!;
     setSavingNegativePrompt(true);
     setError(null);
     try {
       const updated = await upsertStoryboard(sbId, {
         projectId,
-        tone: prev.tone,
-        stylePresetId: prev.stylePresetId,
         negativePrompt,
       });
       setStoryboard(updated);
@@ -567,6 +573,54 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setError(e instanceof Error ? e.message : t("negativePrompt.failed"));
     } finally {
       setSavingNegativePrompt(false);
+    }
+  }
+
+  // Setup step 4. One AI call producing the story, common prompt and negative
+  // prompt together, so all three stay consistent with the chosen tone and
+  // style instead of being written independently.
+  async function handleGenerateStorySetup() {
+    if (!sbId) return;
+    setGeneratingStorySetup(true);
+    setError(null);
+    try {
+      const updated = await generateStorySetup(sbId, {
+        projectId,
+        ...aiJobWatch,
+      });
+      setStoryboard(updated);
+      setSaveMsg(t("setup.storyGeneratedMsg"));
+      setTimeout(() => setSaveMsg(null), 4000);
+    } catch (e: unknown) {
+      if (!(e instanceof AiJobCanceledError)) {
+        setError(e instanceof Error ? e.message : t("setup.storyFailed"));
+      }
+    } finally {
+      setGeneratingStorySetup(false);
+      setActiveAiJob(null);
+    }
+  }
+
+  // Setup step 5. Bills one AI call per scene that still has a blank field;
+  // scenes already written are skipped by the server, so pressing it again
+  // after a partial failure only pays for what is still missing.
+  async function handleFillAllScenes() {
+    if (!sbId) return;
+    setBulkFilling(true);
+    setError(null);
+    try {
+      const { aiJobIds } = await fillStoryboardScenesWithAi(sbId);
+      if (aiJobIds.length === 0) {
+        setSaveMsg(t("setup.scenesNothingToFill"));
+        setTimeout(() => setSaveMsg(null), 3000);
+        return;
+      }
+      await watchAutoFillJobs(sbId, aiJobIds);
+      await refreshStoryboard();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("setup.scenesFailed"));
+    } finally {
+      setBulkFilling(false);
     }
   }
 
@@ -617,6 +671,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setScenes((prev) => [...prev, ...newScenes.map(sceneDtoToState)]);
       setSelectedPhotoIds(new Set());
       setShowAddScenesModal(false);
+      await refreshStoryboard();
       setSaveMsg(
         t(
           newScenes.length === 1
@@ -730,6 +785,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         })),
       );
       setScenes(saved.map(sceneDtoToState));
+      // Writing the last blank field by hand can finish step 5.
+      await refreshStoryboard();
       setSaveMsg(t("saved"));
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e: unknown) {
@@ -754,6 +811,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           scene.id === sceneId ? sceneDtoToState(filled) : scene,
         ),
       );
+      await refreshStoryboard();
       setSaveMsg(t("aiFillSaved"));
       setTimeout(() => setSaveMsg(null), 2000);
     } catch (e: unknown) {
@@ -895,6 +953,18 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const selectedGalleryScene =
     galleryEditingIndex == null ? null : (scenes[galleryEditingIndex] ?? null);
 
+  // Gating applies only until the storyboard has been through all five steps.
+  // Storyboards that predate this flow were backfilled as complete, so they
+  // keep the full page exactly as before.
+  const setupGated = storyboard.setupCompletedAt == null;
+  const currentStepIndex = stepIndex(storyboard.setupStep);
+  // A section is shown when it is the current step or one already finished.
+  // Locked steps are not rendered at all; the stepper is what explains what
+  // each of them is waiting for.
+  const showStep = (step: SetupStep) =>
+    !setupGated || SETUP_STEP_ORDER.indexOf(step) <= currentStepIndex;
+  const pendingSceneFillCount = storyboard.pendingSceneFillCount;
+
   return (
     <AppShell projectId={projectId}>
       <div className="screen-header">
@@ -903,6 +973,8 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       </div>
 
       {error && <ErrorAlert message={error} />}
+
+      {setupGated && <StoryboardStepper currentStep={storyboard.setupStep} />}
 
       {/* AI assistant card — top-level, scope-explicit. Only affects Tone. */}
       <section className={styles.aiAssistCard}>
@@ -1010,7 +1082,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
       <CollapsibleSection
         title={t("sections.projectSettings")}
-        open={accordionOpen.projectSettings}
+        // While gating, the current step must be on screen, so the accordion
+        // is not collapsible.
+        open={setupGated || accordionOpen.projectSettings}
         onToggle={() =>
           setAccordionOpen((prev) => ({
             ...prev,
@@ -1025,203 +1099,245 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         }
       >
         <div className={styles.projectSettingsGrid}>
-          <section className={styles.projectSettingBlock}>
-            <div className={styles.sectionHeader}>
-              <h4 className={styles.settingTitle}>{t("sections.tone")}</h4>
-              <span className={styles.settingSummary}>{selectedToneLabel}</span>
-            </div>
-            <div className={styles.toneGrid}>
-              {TONES.map((tn) => (
-                <button
-                  key={tn.value}
-                  className={`${styles.toneBtn} ${storyboard.tone === tn.value ? styles.toneBtnActive : ""}`}
-                  onClick={() => handleToneChange(tn.value)}
-                >
-                  <strong>{t(`tones.${tn.value}.label`)}</strong>
-                  <span>{t(`tones.${tn.value}.desc`)}</span>
-                </button>
-              ))}
-              {!fixedToneSelected && selectedAnalysisTone && (
-                <button
-                  className={`${styles.toneBtn} ${styles.toneBtnActive}`}
-                  onClick={() => handleToneChange(selectedAnalysisTone.value)}
-                >
-                  <strong>{selectedAnalysisTone.label}</strong>
-                  <span>{selectedAnalysisTone.description}</span>
-                </button>
-              )}
-            </div>
-          </section>
-
-          <section className={styles.projectSettingBlock}>
-            <div className={styles.sectionHeader}>
-              <h4 className={styles.settingTitle}>{t("sections.style")}</h4>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowCustomStyleModal(true)}
-              >
-                {t("style.createCustom")}
-              </button>
-            </div>
-            <div className={styles.styleGrid}>
-              <button
-                className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
-                onClick={() => handleStyleChange(null)}
-              >
-                {t("style.aiRecommend")}
-              </button>
-              {systemStylePresets.length > 0 && (
-                <span className={styles.styleGroupLabel}>
-                  {t("style.systemStyles")}
+          {showStep("tone") && (
+            <section className={styles.projectSettingBlock}>
+              <div className={styles.sectionHeader}>
+                <h4 className={styles.settingTitle}>{t("sections.tone")}</h4>
+                <span className={styles.settingSummary}>
+                  {selectedToneLabel}
                 </span>
-              )}
-              {systemStylePresets.map((p) => (
+              </div>
+              <div className={styles.toneGrid}>
+                {TONES.map((tn) => (
+                  <button
+                    key={tn.value}
+                    className={`${styles.toneBtn} ${storyboard.tone === tn.value ? styles.toneBtnActive : ""}`}
+                    onClick={() => handleToneChange(tn.value)}
+                  >
+                    <strong>{t(`tones.${tn.value}.label`)}</strong>
+                    <span>{t(`tones.${tn.value}.desc`)}</span>
+                  </button>
+                ))}
+                {!fixedToneSelected && selectedAnalysisTone && (
+                  <button
+                    className={`${styles.toneBtn} ${styles.toneBtnActive}`}
+                    onClick={() => handleToneChange(selectedAnalysisTone.value)}
+                  >
+                    <strong>{selectedAnalysisTone.label}</strong>
+                    <span>{selectedAnalysisTone.description}</span>
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+
+          {showStep("style") && (
+            <section className={styles.projectSettingBlock}>
+              <div className={styles.sectionHeader}>
+                <h4 className={styles.settingTitle}>{t("sections.style")}</h4>
                 <button
-                  key={p.id}
-                  className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
-                  onClick={() => handleStyleChange(p.id)}
-                  title={p.description}
+                  className="btn btn-secondary"
+                  onClick={() => setShowCustomStyleModal(true)}
                 >
-                  {p.previewImageUrl && (
-                    <img src={p.previewImageUrl} alt={p.name} />
+                  {t("style.createCustom")}
+                </button>
+              </div>
+              <div className={styles.styleGrid}>
+                <button
+                  className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
+                  onClick={() => handleStyleChange(null)}
+                >
+                  {t("style.aiRecommend")}
+                </button>
+                {systemStylePresets.length > 0 && (
+                  <span className={styles.styleGroupLabel}>
+                    {t("style.systemStyles")}
+                  </span>
+                )}
+                {systemStylePresets.map((p) => (
+                  <button
+                    key={p.id}
+                    className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
+                    onClick={() => handleStyleChange(p.id)}
+                    title={p.description}
+                  >
+                    {p.previewImageUrl && (
+                      <img src={p.previewImageUrl} alt={p.name} />
+                    )}
+                    <span className={styles.styleBtnCardLabel}>{p.name}</span>
+                  </button>
+                ))}
+                {userStylePresets.length > 0 && (
+                  <span className={styles.styleGroupLabel}>
+                    {t("style.customStyles")}
+                  </span>
+                )}
+                {userStylePresets.map((p) => (
+                  <button
+                    key={p.id}
+                    className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
+                    onClick={() => handleStyleChange(p.id)}
+                    title={p.description}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {showStep("story") && (
+            <section className={styles.projectSettingBlock}>
+              <div className={styles.sectionHeader}>
+                <h4 className={styles.settingTitle}>{t("setup.storyTitle")}</h4>
+                <div className={styles.inlineActions}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleGenerateStorySetup}
+                    disabled={generatingStorySetup}
+                  >
+                    {generatingStorySetup
+                      ? t("setup.storyGenerating")
+                      : t("setup.storyGenerate")}
+                  </button>
+                  {generatingStorySetup && activeAiJob && (
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleCancelAiJob}
+                    >
+                      {t("ai.cancelJob")}
+                    </button>
                   )}
-                  <span className={styles.styleBtnCardLabel}>{p.name}</span>
-                </button>
-              ))}
-              {userStylePresets.length > 0 && (
-                <span className={styles.styleGroupLabel}>
-                  {t("style.customStyles")}
-                </span>
-              )}
-              {userStylePresets.map((p) => (
+                </div>
+              </div>
+              <p className={styles.photoAssignHint}>{t("setup.storyIntro")}</p>
+            </section>
+          )}
+
+          {showStep("story") && (
+            <section className={styles.projectSettingBlock}>
+              <div className={styles.sectionHeader}>
+                <h4 className={styles.settingTitle}>
+                  {t("sections.commonPrompt")}
+                </h4>
                 <button
-                  key={p.id}
-                  className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
-                  onClick={() => handleStyleChange(p.id)}
-                  title={p.description}
+                  className="btn btn-secondary"
+                  onClick={() => saveCommonPrompt("")}
+                  disabled={savingCommonPrompt}
                 >
-                  {p.name}
+                  {t("commonPrompt.regenerate")}
                 </button>
-              ))}
-            </div>
-          </section>
+              </div>
+              <p className={styles.photoAssignHint}>
+                {t("commonPrompt.intro")}
+              </p>
+              <textarea
+                className={styles.fieldInput}
+                rows={6}
+                value={commonPromptDraft}
+                onChange={(e) => setCommonPromptDraft(e.target.value)}
+                placeholder={t("commonPrompt.placeholder")}
+              />
+              <div className={styles.inlineActions}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => saveCommonPrompt(commonPromptDraft)}
+                  disabled={
+                    savingCommonPrompt ||
+                    commonPromptDraft === (storyboard.commonPrompt ?? "")
+                  }
+                >
+                  {savingCommonPrompt
+                    ? t("commonPrompt.saving")
+                    : t("commonPrompt.save")}
+                </button>
+              </div>
+            </section>
+          )}
 
-          <section className={styles.projectSettingBlock}>
-            <div className={styles.sectionHeader}>
-              <h4 className={styles.settingTitle}>
-                {t("sections.commonPrompt")}
-              </h4>
-              <button
-                className="btn btn-secondary"
-                onClick={() => saveCommonPrompt("")}
-                disabled={savingCommonPrompt}
-              >
-                {t("commonPrompt.regenerate")}
-              </button>
-            </div>
-            <p className={styles.photoAssignHint}>{t("commonPrompt.intro")}</p>
-            <textarea
-              className={styles.fieldInput}
-              rows={6}
-              value={commonPromptDraft}
-              onChange={(e) => setCommonPromptDraft(e.target.value)}
-              placeholder={t("commonPrompt.placeholder")}
-            />
-            <div className={styles.inlineActions}>
-              <button
-                className="btn btn-primary"
-                onClick={() => saveCommonPrompt(commonPromptDraft)}
-                disabled={
-                  savingCommonPrompt ||
-                  commonPromptDraft === (storyboard.commonPrompt ?? "")
+          {showStep("story") && (
+            <section className={styles.projectSettingBlock}>
+              <div className={styles.sectionHeader}>
+                <h4 className={styles.settingTitle}>{t("sections.story")}</h4>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => saveStory("")}
+                  disabled={savingStory}
+                >
+                  {t("story.regenerate")}
+                </button>
+              </div>
+              <p className={styles.photoAssignHint}>{t("story.intro")}</p>
+              <textarea
+                className={styles.fieldInput}
+                rows={5}
+                value={storyDraft}
+                onChange={(e) => setStoryDraft(e.target.value)}
+                placeholder={
+                  photoAnalysis?.storySummary || t("story.placeholder")
                 }
-              >
-                {savingCommonPrompt
-                  ? t("commonPrompt.saving")
-                  : t("commonPrompt.save")}
-              </button>
-            </div>
-          </section>
+              />
+              <div className={styles.inlineActions}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => saveStory(storyDraft)}
+                  disabled={
+                    savingStory || storyDraft === (storyboard.story ?? "")
+                  }
+                >
+                  {savingStory ? t("story.saving") : t("story.save")}
+                </button>
+              </div>
+            </section>
+          )}
 
-          <section className={styles.projectSettingBlock}>
-            <div className={styles.sectionHeader}>
-              <h4 className={styles.settingTitle}>{t("sections.story")}</h4>
-              <button
-                className="btn btn-secondary"
-                onClick={() => saveStory("")}
-                disabled={savingStory}
-              >
-                {t("story.regenerate")}
-              </button>
-            </div>
-            <p className={styles.photoAssignHint}>{t("story.intro")}</p>
-            <textarea
-              className={styles.fieldInput}
-              rows={5}
-              value={storyDraft}
-              onChange={(e) => setStoryDraft(e.target.value)}
-              placeholder={
-                photoAnalysis?.storySummary || t("story.placeholder")
-              }
-            />
-            <div className={styles.inlineActions}>
-              <button
-                className="btn btn-primary"
-                onClick={() => saveStory(storyDraft)}
-                disabled={
-                  savingStory || storyDraft === (storyboard.story ?? "")
-                }
-              >
-                {savingStory ? t("story.saving") : t("story.save")}
-              </button>
-            </div>
-          </section>
-
-          <section className={styles.projectSettingBlock}>
-            <div className={styles.sectionHeader}>
-              <h4 className={styles.settingTitle}>
-                {t("sections.negativePrompt")}
-              </h4>
-            </div>
-            <p className={styles.photoAssignHint}>
-              {t("negativePrompt.intro")}
-            </p>
-            <textarea
-              className={styles.fieldInput}
-              rows={4}
-              value={negativePromptDraft}
-              onChange={(e) => setNegativePromptDraft(e.target.value)}
-              placeholder={t("negativePrompt.placeholder")}
-            />
-            <div className={styles.inlineActions}>
-              <button
-                className="btn btn-primary"
-                onClick={() => saveNegativePrompt(negativePromptDraft)}
-                disabled={
-                  savingNegativePrompt ||
-                  negativePromptDraft === (storyboard.negativePrompt ?? "")
-                }
-              >
-                {savingNegativePrompt
-                  ? t("negativePrompt.saving")
-                  : t("negativePrompt.save")}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() =>
-                  setNegativePromptDraft((prev) => {
-                    const trimmed = prev.trim();
-                    return trimmed
-                      ? `${trimmed}, ${RECOMMENDED_NEGATIVE_FENCE}`
-                      : RECOMMENDED_NEGATIVE_FENCE;
-                  })
-                }
-                disabled={savingNegativePrompt}
-              >
-                {t("negativePrompt.insertFence")}
-              </button>
-            </div>
-          </section>
+          {showStep("story") && (
+            <section className={styles.projectSettingBlock}>
+              <div className={styles.sectionHeader}>
+                <h4 className={styles.settingTitle}>
+                  {t("sections.negativePrompt")}
+                </h4>
+              </div>
+              <p className={styles.photoAssignHint}>
+                {t("negativePrompt.intro")}
+              </p>
+              <textarea
+                className={styles.fieldInput}
+                rows={4}
+                value={negativePromptDraft}
+                onChange={(e) => setNegativePromptDraft(e.target.value)}
+                placeholder={t("negativePrompt.placeholder")}
+              />
+              <div className={styles.inlineActions}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => saveNegativePrompt(negativePromptDraft)}
+                  disabled={
+                    savingNegativePrompt ||
+                    negativePromptDraft === (storyboard.negativePrompt ?? "")
+                  }
+                >
+                  {savingNegativePrompt
+                    ? t("negativePrompt.saving")
+                    : t("negativePrompt.save")}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() =>
+                    setNegativePromptDraft((prev) => {
+                      const trimmed = prev.trim();
+                      return trimmed
+                        ? `${trimmed}, ${RECOMMENDED_NEGATIVE_FENCE}`
+                        : RECOMMENDED_NEGATIVE_FENCE;
+                    })
+                  }
+                  disabled={savingNegativePrompt}
+                >
+                  {t("negativePrompt.insertFence")}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
       </CollapsibleSection>
 
@@ -1312,191 +1428,211 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      <section className={styles.section} data-scenes-section>
-        <div className={styles.sceneBoardHeader}>
-          <h3 className={styles.sectionTitle}>
-            {t("sections.scenes", { count: scenes.length })}
-          </h3>
-          <div className={styles.sceneBoardActions}>
-            {autoFillProgress && (
-              <span className={styles.saveMsg}>
-                {t("createScenes.autoFillProgress", autoFillProgress)}
-              </span>
-            )}
-            {saveMsg && <span className={styles.saveMsg}>{saveMsg}</span>}
-            <div className={styles.viewSwitcher} aria-label={t("view.label")}>
-              {(["split", "gallery"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  className={
-                    sceneViewMode === mode
-                      ? styles.viewBtnActive
-                      : styles.viewBtn
-                  }
-                  onClick={() => setSceneViewMode(mode)}
-                >
-                  {t(`view.${mode}`)}
-                </button>
-              ))}
-            </div>
-            <button
-              className="btn btn-secondary"
-              onClick={() => setShowAddScenesModal(true)}
-              disabled={unusedCandidatePhotos.length === 0 || creatingTemplates}
-            >
-              {t("addScenes.open")}
-            </button>
-            <button className="btn btn-secondary" onClick={addScene}>
-              {t("scenes.addScene")}
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={saveScenes}
-              disabled={saving || aiFillingSceneId !== null}
-            >
-              {saving ? t("saving") : t("saveScenes")}
-            </button>
-          </div>
-        </div>
-
-        {scenes.length === 0 && (
-          <div className={`card ${styles.emptyScenes}`}>
-            <p>{t("scenes.empty")}</p>
-          </div>
-        )}
-
-        <div
-          className={`${styles.storyboardLayout} ${
-            sceneViewMode === "split" && scenes.length >= 2
-              ? styles.storyboardLayoutWithRail
-              : ""
-          }`}
-        >
-          <div
-            ref={boardRef}
-            className={
-              sceneViewMode === "gallery"
-                ? styles.galleryGrid
-                : styles.sceneList
-            }
-          >
-            {scenes.map((scene, idx) => {
-              const nextScene = scenes[idx + 1];
-              const anchorId = sceneAnchorId(scene, idx);
-              if (sceneViewMode === "gallery") {
-                const primaryPhoto = primaryPhotoForScene(scene, photos);
-                return (
+      {showStep("scenes") && (
+        <section className={styles.section} data-scenes-section>
+          <div className={styles.sceneBoardHeader}>
+            <h3 className={styles.sectionTitle}>
+              {t("sections.scenes", { count: scenes.length })}
+            </h3>
+            <div className={styles.sceneBoardActions}>
+              {autoFillProgress && (
+                <span className={styles.saveMsg}>
+                  {t("createScenes.autoFillProgress", autoFillProgress)}
+                </span>
+              )}
+              {saveMsg && <span className={styles.saveMsg}>{saveMsg}</span>}
+              <div className={styles.viewSwitcher} aria-label={t("view.label")}>
+                {(["split", "gallery"] as const).map((mode) => (
                   <button
+                    key={mode}
+                    type="button"
+                    className={
+                      sceneViewMode === mode
+                        ? styles.viewBtnActive
+                        : styles.viewBtn
+                    }
+                    onClick={() => setSceneViewMode(mode)}
+                  >
+                    {t(`view.${mode}`)}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowAddScenesModal(true)}
+                disabled={
+                  unusedCandidatePhotos.length === 0 || creatingTemplates
+                }
+              >
+                {t("addScenes.open")}
+              </button>
+              {/* Setup step 5. States the number of AI calls it will spend, and
+                disappears once every scene is written. */}
+              {pendingSceneFillCount > 0 && (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleFillAllScenes}
+                  disabled={bulkFilling || saving || aiFillingSceneId !== null}
+                >
+                  {bulkFilling
+                    ? t("setup.scenesFilling")
+                    : t("setup.scenesFillAll", {
+                        count: pendingSceneFillCount,
+                      })}
+                </button>
+              )}
+              <button className="btn btn-secondary" onClick={addScene}>
+                {t("scenes.addScene")}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={saveScenes}
+                disabled={saving || aiFillingSceneId !== null}
+              >
+                {saving ? t("saving") : t("saveScenes")}
+              </button>
+            </div>
+          </div>
+
+          {scenes.length === 0 && (
+            <div className={`card ${styles.emptyScenes}`}>
+              <p>{t("scenes.empty")}</p>
+            </div>
+          )}
+
+          <div
+            className={`${styles.storyboardLayout} ${
+              sceneViewMode === "split" && scenes.length >= 2
+                ? styles.storyboardLayoutWithRail
+                : ""
+            }`}
+          >
+            <div
+              ref={boardRef}
+              className={
+                sceneViewMode === "gallery"
+                  ? styles.galleryGrid
+                  : styles.sceneList
+              }
+            >
+              {scenes.map((scene, idx) => {
+                const nextScene = scenes[idx + 1];
+                const anchorId = sceneAnchorId(scene, idx);
+                if (sceneViewMode === "gallery") {
+                  const primaryPhoto = primaryPhotoForScene(scene, photos);
+                  return (
+                    <button
+                      key={scene.id ?? idx}
+                      id={anchorId}
+                      type="button"
+                      className={styles.galleryTile}
+                      onClick={() => setGalleryEditingIndex(idx)}
+                    >
+                      {primaryPhoto ? (
+                        <img
+                          src={storageKeyToUrl(primaryPhoto.storageKey)}
+                          alt={primaryPhoto.name}
+                        />
+                      ) : (
+                        <span className={styles.photoPlaceholder}>
+                          {t("changePhoto.noPhoto")}
+                        </span>
+                      )}
+                      <span className={styles.galleryTileMeta}>
+                        <strong>
+                          {t("scenes.sceneLabel", { index: idx + 1 })}
+                        </strong>
+                        <span>{scene.title || t("nav.untitled")}</span>
+                      </span>
+                    </button>
+                  );
+                }
+                return (
+                  <div
                     key={scene.id ?? idx}
                     id={anchorId}
-                    type="button"
-                    className={styles.galleryTile}
-                    onClick={() => setGalleryEditingIndex(idx)}
+                    onDragOver={(e) => {
+                      if (sceneDragIndex !== null) e.preventDefault();
+                    }}
+                    onDrop={() => {
+                      if (sceneDragIndex !== null) {
+                        void handleSceneReorder(sceneDragIndex, idx);
+                      }
+                      setSceneDragIndex(null);
+                    }}
                   >
-                    {primaryPhoto ? (
-                      <img
-                        src={storageKeyToUrl(primaryPhoto.storageKey)}
-                        alt={primaryPhoto.name}
-                      />
-                    ) : (
-                      <span className={styles.photoPlaceholder}>
-                        {t("changePhoto.noPhoto")}
-                      </span>
-                    )}
-                    <span className={styles.galleryTileMeta}>
-                      <strong>
-                        {t("scenes.sceneLabel", { index: idx + 1 })}
-                      </strong>
-                      <span>{scene.title || t("nav.untitled")}</span>
-                    </span>
-                  </button>
-                );
-              }
-              return (
-                <div
-                  key={scene.id ?? idx}
-                  id={anchorId}
-                  onDragOver={(e) => {
-                    if (sceneDragIndex !== null) e.preventDefault();
-                  }}
-                  onDrop={() => {
-                    if (sceneDragIndex !== null) {
-                      void handleSceneReorder(sceneDragIndex, idx);
-                    }
-                    setSceneDragIndex(null);
-                  }}
-                >
-                  <SceneCard
-                    scene={scene}
-                    idx={idx}
-                    total={scenes.length}
-                    scenes={scenes}
-                    photos={photos}
-                    isDragging={sceneDragIndex === idx}
-                    onDragHandleStart={() => setSceneDragIndex(idx)}
-                    onDragHandleEnd={() => setSceneDragIndex(null)}
-                    onUpdate={(patch) => updateScene(idx, patch)}
-                    onMove={(dir) => moveScene(idx, dir)}
-                    onDelete={() => deleteScene(idx)}
-                    onAiFill={handleAiFill}
-                    isAiFilling={aiFillingSceneId === scene.id}
-                    isBusy={saving || aiFillingSceneId !== null}
-                    projectCommonPromptDraft={commonPromptDraft}
-                    projectStoryDraft={storyDraft}
-                    projectNegativePromptDraft={negativePromptDraft}
-                  />
-                  {scene.id && nextScene?.id && (
-                    <ComplementGap
-                      disabled={complementBusy || saving}
-                      onInsertBlank={() =>
-                        handleInsertBlankComplement(scene.id!, nextScene.id!)
-                      }
-                      onPropose={() =>
-                        handleProposeComplement(scene.id!, nextScene.id!)
-                      }
+                    <SceneCard
+                      scene={scene}
+                      idx={idx}
+                      total={scenes.length}
+                      scenes={scenes}
+                      photos={photos}
+                      isDragging={sceneDragIndex === idx}
+                      onDragHandleStart={() => setSceneDragIndex(idx)}
+                      onDragHandleEnd={() => setSceneDragIndex(null)}
+                      onUpdate={(patch) => updateScene(idx, patch)}
+                      onMove={(dir) => moveScene(idx, dir)}
+                      onDelete={() => deleteScene(idx)}
+                      onAiFill={handleAiFill}
+                      isAiFilling={aiFillingSceneId === scene.id}
+                      isBusy={saving || aiFillingSceneId !== null}
+                      projectCommonPromptDraft={commonPromptDraft}
+                      projectStoryDraft={storyDraft}
+                      projectNegativePromptDraft={negativePromptDraft}
                     />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {sceneViewMode === "split" && scenes.length >= 2 && (
-            <nav className={styles.filmstripRail} aria-label={t("nav.label")}>
-              {scenes.map((scene, idx) => {
-                const anchorId = sceneAnchorId(scene, idx);
-                const primaryPhoto = primaryPhotoForScene(scene, photos);
-                return (
-                  <button
-                    key={scene.id ?? idx}
-                    type="button"
-                    className={`${styles.filmstripItem} ${
-                      activeSceneAnchor === anchorId
-                        ? styles.filmstripItemActive
-                        : ""
-                    }`}
-                    style={
-                      primaryPhoto
-                        ? {
-                            backgroundImage: `url(${storageKeyToUrl(primaryPhoto.storageKey)})`,
-                          }
-                        : undefined
-                    }
-                    onClick={() =>
-                      document
-                        .getElementById(anchorId)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                    }
-                  >
-                    <span>{idx + 1}</span>
-                    <strong>{scene.title || t("nav.untitled")}</strong>
-                  </button>
+                    {scene.id && nextScene?.id && (
+                      <ComplementGap
+                        disabled={complementBusy || saving}
+                        onInsertBlank={() =>
+                          handleInsertBlankComplement(scene.id!, nextScene.id!)
+                        }
+                        onPropose={() =>
+                          handleProposeComplement(scene.id!, nextScene.id!)
+                        }
+                      />
+                    )}
+                  </div>
                 );
               })}
-            </nav>
-          )}
-        </div>
-      </section>
+            </div>
+            {sceneViewMode === "split" && scenes.length >= 2 && (
+              <nav className={styles.filmstripRail} aria-label={t("nav.label")}>
+                {scenes.map((scene, idx) => {
+                  const anchorId = sceneAnchorId(scene, idx);
+                  const primaryPhoto = primaryPhotoForScene(scene, photos);
+                  return (
+                    <button
+                      key={scene.id ?? idx}
+                      type="button"
+                      className={`${styles.filmstripItem} ${
+                        activeSceneAnchor === anchorId
+                          ? styles.filmstripItemActive
+                          : ""
+                      }`}
+                      style={
+                        primaryPhoto
+                          ? {
+                              backgroundImage: `url(${storageKeyToUrl(primaryPhoto.storageKey)})`,
+                            }
+                          : undefined
+                      }
+                      onClick={() =>
+                        document.getElementById(anchorId)?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        })
+                      }
+                    >
+                      <span>{idx + 1}</span>
+                      <strong>{scene.title || t("nav.untitled")}</strong>
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
+          </div>
+        </section>
+      )}
 
       {showAddScenesModal && (
         <div
@@ -1707,58 +1843,62 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         />
       )}
 
-      <div className={styles.footer}>
-        {testBatch?.status === "completed" ? (
-          // Both affordances, not just the exit: a confirmed storyboard must
-          // still be able to reach the samples it already generated and pick
-          // a different one.
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-            }}
-          >
-            <button
-              className="btn btn-secondary"
-              onClick={() => setShowTestModal(true)}
+      {/* The generate CTA is the exit from this screen, so it stays out of
+          reach until the storyboard has been through setup. */}
+      {showStep("scenes") && (
+        <div className={styles.footer}>
+          {testBatch?.status === "completed" ? (
+            // Both affordances, not just the exit: a confirmed storyboard must
+            // still be able to reach the samples it already generated and pick
+            // a different one.
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+              }}
             >
-              {t("footer.reviewTestGeneration")}
-            </button>
-            <Link
-              href={`/projects/${projectId}/generate`}
-              className="btn btn-primary"
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowTestModal(true)}
+              >
+                {t("footer.reviewTestGeneration")}
+              </button>
+              <Link
+                href={`/projects/${projectId}/generate`}
+                className="btn btn-primary"
+              >
+                {t("footer.continueToGenerate")}
+              </Link>
+            </div>
+          ) : (
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+              }}
             >
-              {t("footer.continueToGenerate")}
-            </Link>
-          </div>
-        ) : (
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-            }}
-          >
-            {testBatch?.status === "pending" && (
-              <span style={{ fontSize: 13, color: "#888" }}>
-                {t("footer.testInProgress")}
-              </span>
-            )}
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowTestModal(true)}
-              disabled={scenes.length === 0}
-            >
-              {testBatch
-                ? t("footer.viewTestGeneration")
-                : t("footer.startTestGeneration")}
-            </button>
-          </div>
-        )}
-      </div>
+              {testBatch?.status === "pending" && (
+                <span style={{ fontSize: 13, color: "#888" }}>
+                  {t("footer.testInProgress")}
+                </span>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowTestModal(true)}
+                disabled={scenes.length === 0}
+              >
+                {testBatch
+                  ? t("footer.viewTestGeneration")
+                  : t("footer.startTestGeneration")}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {showTestModal && storyboard && scenes[0] && (
         <TestGenerationModal

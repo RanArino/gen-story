@@ -194,7 +194,10 @@ export type SceneFillGenerationInput = {
   scene: Scene;
   primaryPhoto: PhotoAsset;
   stylePreset: StylePreset | null;
-  projectPhotos: PhotoAsset[];
+  // Only the photos this scene assigned as `reference`. Sending every project
+  // photo instead billed one image per photo on every scene's call, and the
+  // cross-photo context it was there for now arrives as text via photoAnalysis.
+  referencePhotos: PhotoAsset[];
   siblingScenes: Scene[];
   // The project's stored photo analysis, when one exists. Grounds the scene in
   // what the vision pass already established about these photos and the story
@@ -234,6 +237,30 @@ export interface ComplementSceneProposalPort {
   proposeComplementScenes(
     input: ComplementSceneProposalInput,
   ): Promise<ComplementSceneProposal[]>;
+}
+
+// Setup step 4: the shared story and world every scene is written against.
+// Text-only — the photos were already read by the project photo analysis, and
+// the summary of that pass is what this step builds on.
+export type StorySetupGenerationInput = {
+  project: Project;
+  storyboard: Storyboard;
+  stylePreset: StylePreset | null;
+  photoAnalysis: ProjectPhotoAnalysis | null;
+  language: Language;
+};
+
+export type StorySetupSuggestion = {
+  story: string;
+  commonPrompt: string;
+  negativePrompt: string;
+  model: string;
+};
+
+export interface StorySetupGenerationPort {
+  generateStorySetup(
+    input: StorySetupGenerationInput,
+  ): Promise<StorySetupSuggestion>;
 }
 
 export type PhotoAnalysisGenerationInput = {
@@ -297,6 +324,7 @@ export interface ApplicationDependencies {
   sceneFillGeneration: SceneFillGenerationPort;
   complementSceneProposal: ComplementSceneProposalPort;
   photoAnalysisGeneration: PhotoAnalysisGenerationPort;
+  storySetupGeneration: StorySetupGenerationPort;
   jobQueue: JobQueuePort;
   progressEvents: ProgressEventPort;
   authContext: AuthContextPort;

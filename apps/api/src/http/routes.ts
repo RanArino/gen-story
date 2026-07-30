@@ -17,7 +17,10 @@ import {
   deleteProject,
   exportStoryboardAsJson,
   fillSceneWithAi,
+  fillStoryboardScenesWithAi,
+  generateStorySetup,
   getProjectPhotoAnalysis,
+  getStoryboardSetup,
   getUserPreference,
   insertComplementScene,
   listTestGenerationBatches,
@@ -88,6 +91,8 @@ import {
   CreateProjectSchema,
   CreateTemplateScenesSchema,
   FillSceneWithAiSchema,
+  FillStoryboardScenesWithAiSchema,
+  GenerateStorySetupSchema,
   PatchPhotoAssetSchema,
   PreviewScenePromptSchema,
   SetUserPreferenceSchema,
@@ -517,7 +522,16 @@ export function buildRouter(deps: ApiDependencies): Router {
       }
 
       const storyboards = await deps.storyboards.findByProjectId(projectId);
-      sendJson(res, 200, { storyboards: storyboards.map(toStoryboardDto) });
+      sendJson(res, 200, {
+        storyboards: await Promise.all(
+          storyboards.map(async (storyboard) =>
+            toStoryboardDto(
+              storyboard,
+              await getStoryboardSetup(deps, storyboard),
+            ),
+          ),
+        ),
+      });
     },
   );
 
@@ -580,7 +594,130 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, toStoryboardDto(result.value));
+      sendJson(
+        res,
+        200,
+        toStoryboardDto(
+          result.value,
+          await getStoryboardSetup(deps, result.value),
+        ),
+      );
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/story-setup
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/story-setup",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = GenerateStorySetupSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await generateStorySetup(deps, { storyboardId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 202, { jobId: result.value.jobId });
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/scenes/ai-fill
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/scenes/ai-fill",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = FillStoryboardScenesWithAiSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await fillStoryboardScenesWithAi(deps, { storyboardId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      // Nothing left to fill answers immediately; otherwise follow the jobs.
+      sendJson(res, result.value.aiJobIds.length === 0 ? 200 : 202, {
+        aiJobIds: result.value.aiJobIds,
+        skippedSceneCount: result.value.skippedSceneCount,
+      });
     },
   );
 

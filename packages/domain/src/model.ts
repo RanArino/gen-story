@@ -31,6 +31,7 @@ export type GenerationRequestStatus =
 // its own GenerationRequest lifecycle.
 export type AiJobKind =
   | "photo_analysis"
+  | "story_setup"
   | "scene_ai_fill"
   | "complement_scene_proposals";
 
@@ -43,6 +44,7 @@ export type AiJobStatus =
 
 export const AI_JOB_KINDS: AiJobKind[] = [
   "photo_analysis",
+  "story_setup",
   "scene_ai_fill",
   "complement_scene_proposals",
 ];
@@ -162,12 +164,18 @@ export type Storyboard = {
   id: StoryboardId;
   projectId: ProjectId;
   status: StoryboardStatus;
+  // Empty means "not decided yet". The guided setup flow needs to tell an
+  // undecided storyboard from one where the user deliberately chose a tone,
+  // which a default value would make impossible.
   tone: string;
   stylePresetId: StylePresetId | null;
   commonPrompt: string;
   story: string;
   negativePrompt: string;
   sceneIds: SceneId[];
+  // When set, the storyboard has been through all five setup steps and is
+  // freely editable. Null means the guided flow is still gating it.
+  setupCompletedAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -322,12 +330,13 @@ export type CreateStoryboardInput = {
   id: StoryboardId;
   projectId: ProjectId;
   status?: StoryboardStatus;
-  tone: string;
+  tone?: string;
   stylePresetId?: StylePresetId | null;
   commonPrompt?: string;
   story?: string;
   negativePrompt?: string;
   sceneIds?: SceneId[];
+  setupCompletedAt?: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -514,12 +523,15 @@ export function createStoryboard(input: CreateStoryboardInput): Storyboard {
     id: input.id,
     projectId: input.projectId,
     status: input.status ?? "draft",
-    tone: trimRequiredText(input.tone, "Storyboard tone"),
+    // Optional on purpose: a blank tone is the "undecided" state the guided
+    // setup flow gates on, not a validation error.
+    tone: trimOptionalText(input.tone),
     stylePresetId: input.stylePresetId ?? null,
     commonPrompt: (input.commonPrompt ?? "").trim(),
     story: (input.story ?? "").trim(),
     negativePrompt: (input.negativePrompt ?? "").trim(),
     sceneIds: [...(input.sceneIds ?? [])],
+    setupCompletedAt: input.setupCompletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };

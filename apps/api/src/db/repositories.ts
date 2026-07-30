@@ -203,6 +203,7 @@ function mapStoryboard(row: StoryboardRow, sceneIds: string[]): Storyboard {
     story: row.story,
     negativePrompt: row.negativePrompt,
     sceneIds,
+    setupCompletedAt: row.setupCompletedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -763,6 +764,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
         commonPrompt: storyboard.commonPrompt,
         story: storyboard.story,
         negativePrompt: storyboard.negativePrompt,
+        setupCompletedAt: storyboard.setupCompletedAt,
         createdAt: storyboard.createdAt,
         updatedAt: storyboard.updatedAt,
       })
@@ -776,6 +778,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
           commonPrompt: storyboard.commonPrompt,
           story: storyboard.story,
           negativePrompt: storyboard.negativePrompt,
+          setupCompletedAt: storyboard.setupCompletedAt,
           updatedAt: storyboard.updatedAt,
           deletedAt: null,
         },

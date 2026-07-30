@@ -350,14 +350,22 @@ describe("PUT /api/storyboards/:storyboardId", () => {
     expect(body).toMatchObject({ id: "sb-1", projectId, tone: "heartwarming" });
   });
 
-  it("returns 422 when tone is missing", async () => {
+  // A storyboard with no tone yet is the normal starting state of the guided
+  // setup flow, not a validation error: step 2 is what fills it in.
+  it("creates a storyboard with an undecided tone when none is sent", async () => {
     const created = await req(base, "POST", "/api/projects", { name: "P2" });
     const projectId = (created.body as Record<string, unknown>).id as string;
 
-    const { status } = await req(base, "PUT", "/api/storyboards/sb-fail", {
+    const { status, body } = await req(base, "PUT", "/api/storyboards/sb-new", {
       projectId,
     });
-    expect(status).toBe(422);
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      tone: "",
+      setupStep: "photos",
+      setupCompletedAt: null,
+    });
   });
 
   it("returns 422 when projectId is missing", async () => {
@@ -725,6 +733,205 @@ describe("POST /api/scenes/:sceneId/ai-fill", () => {
     );
 
     expect(status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guided storyboard setup
+// ---------------------------------------------------------------------------
+
+describe("guided storyboard setup routes", () => {
+  async function seedSetupStoryboard(options?: {
+    idPrefix?: string;
+    organizationId?: string;
+    ownerUserId?: string;
+    tone?: string;
+    stylePresetId?: string | null;
+  }) {
+    const {
+      createPhotoAsset,
+      createProject,
+      createStylePreset,
+      createStoryboard,
+      createTemplateScene,
+    } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    const prefix = options?.idPrefix ?? "setup";
+
+    await deps.stylePresets.save(
+      createStylePreset({
+        id: `${prefix}-style`,
+        scope: "system",
+        name: "Cinematic",
+        prompt: "Filmic contrast.",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.projects.save(
+      createProject({
+        id: `${prefix}-proj`,
+        organizationId: options?.organizationId ?? LOCAL_ORGANIZATION_ID,
+        ownerUserId: options?.ownerUserId ?? LOCAL_USER_ID,
+        name: "Setup Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: `${prefix}-sb`,
+        projectId: `${prefix}-proj`,
+        tone: options?.tone ?? "warm_nostalgia",
+        stylePresetId:
+          options?.stylePresetId === undefined
+            ? `${prefix}-style`
+            : options.stylePresetId,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: `${prefix}-photo`,
+        projectId: `${prefix}-proj`,
+        name: "family.jpg",
+        storageKey: "photos/family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: `${prefix}-photo-checksum`,
+        sourceKind: "upload",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createTemplateScene({
+        id: `${prefix}-scene`,
+        projectId: `${prefix}-proj`,
+        storyboardId: `${prefix}-sb`,
+        orderIndex: 0,
+        photoAssetId: `${prefix}-photo`,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    return prefix;
+  }
+
+  it("returns 202 with a job handle for story setup", async () => {
+    const prefix = await seedSetupStoryboard({ idPrefix: "story-ok" });
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/story-setup`,
+      {},
+    );
+
+    expect(status).toBe(202);
+    const { jobId } = body as { jobId: string };
+    expect(jobId).toBeTruthy();
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("story_setup");
+    expect(job?.status).toBe("queued");
+  });
+
+  it("rejects story setup before a tone is chosen", async () => {
+    const prefix = await seedSetupStoryboard({
+      idPrefix: "story-no-tone",
+      tone: "",
+    });
+
+    const { status } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/story-setup`,
+      {},
+    );
+
+    expect(status).toBe(422);
+  });
+
+  it("returns 403 for story setup on a storyboard in another organization", async () => {
+    const prefix = await seedSetupStoryboard({
+      idPrefix: "story-foreign",
+      organizationId: "other-org",
+      ownerUserId: "other-user",
+    });
+
+    const { status } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/story-setup`,
+      {},
+    );
+
+    expect(status).toBe(403);
+  });
+
+  it("returns 202 with one bulk fill job per blank scene", async () => {
+    const prefix = await seedSetupStoryboard({ idPrefix: "bulk-ok" });
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/scenes/ai-fill`,
+      {},
+    );
+
+    expect(status).toBe(202);
+    const { aiJobIds, skippedSceneCount } = body as {
+      aiJobIds: string[];
+      skippedSceneCount: number;
+    };
+    expect(aiJobIds).toHaveLength(1);
+    expect(skippedSceneCount).toBe(0);
+
+    const job = await deps.aiJobs.findById(aiJobIds[0]!);
+    expect(job?.kind).toBe("scene_ai_fill");
+  });
+
+  it("returns 403 for bulk fill on a storyboard in another organization", async () => {
+    const prefix = await seedSetupStoryboard({
+      idPrefix: "bulk-foreign",
+      organizationId: "other-org",
+      ownerUserId: "other-user",
+    });
+
+    const { status } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/scenes/ai-fill`,
+      {},
+    );
+
+    expect(status).toBe(403);
+  });
+
+  it("reports the derived setup step on the storyboard DTO", async () => {
+    const prefix = await seedSetupStoryboard({ idPrefix: "step-dto" });
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      `/api/projects/${prefix}-proj/storyboards`,
+    );
+
+    expect(status).toBe(200);
+    const { storyboards } = body as {
+      storyboards: Array<{
+        setupStep: string;
+        setupCompletedAt: string | null;
+      }>;
+    };
+    // Photos, tone and style are set; the story has not been written yet.
+    expect(storyboards[0]).toMatchObject({
+      setupStep: "story",
+      setupCompletedAt: null,
+    });
   });
 });
 

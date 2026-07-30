@@ -29,6 +29,7 @@ import type {
 import type {
   AuthPrincipal,
   ComplementSceneProposal,
+  StoryboardSetup,
   TestGenerationBatchWithVariants,
   UserPreference,
 } from "@gen-story/application";
@@ -132,7 +133,13 @@ export function toProjectPhotoAnalysisDto(
   };
 }
 
-export function toStoryboardDto(storyboard: Storyboard): StoryboardDto {
+// The derived setup step is passed in rather than computed here: it needs the
+// project's photos and the storyboard's scenes, which the mapper has no way to
+// read. Callers get it from `getStoryboardSetup`.
+export function toStoryboardDto(
+  storyboard: Storyboard,
+  setup: StoryboardSetup,
+): StoryboardDto {
   return {
     id: storyboard.id,
     projectId: storyboard.projectId,
@@ -143,6 +150,9 @@ export function toStoryboardDto(storyboard: Storyboard): StoryboardDto {
     story: storyboard.story,
     negativePrompt: storyboard.negativePrompt,
     sceneIds: storyboard.sceneIds,
+    setupStep: setup.step,
+    setupCompletedAt: setup.setupCompletedAt,
+    pendingSceneFillCount: setup.pendingSceneFillCount,
     createdAt: storyboard.createdAt,
     updatedAt: storyboard.updatedAt,
   };

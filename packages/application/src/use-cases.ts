@@ -18,9 +18,13 @@ import {
   createTemplateScene,
   createTestGenerationBatch,
   composeCommonPrompt,
+  computeStoryboardSetupStep,
   createAiJob,
+  hasBlankSceneFields,
+  isBlankSceneField,
   replaceScenePhotoAssets,
   retryGenerationRequest,
+  SCENE_FILL_FIELDS,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
   transitionGenerationRequestStatus,
@@ -33,6 +37,8 @@ import {
   type Project,
   type ProjectPhotoAnalysis,
   type Scene,
+  type SceneFillField,
+  type StoryboardSetupStatus,
   type ScenePhotoAsset,
   type Storyboard,
   type StoryboardStatus,
@@ -374,7 +380,10 @@ export type UpsertStoryboardInput = {
   storyboardId: string;
   projectId: string;
   status?: StoryboardStatus;
-  tone: string;
+  // Omitted means "leave the stored tone alone", so a caller saving only the
+  // story does not have to know what the tone is. An explicit empty string is
+  // a deliberate reset back to undecided.
+  tone?: string;
   stylePresetId?: string | null;
   commonPrompt?: string;
   story?: string;
@@ -382,6 +391,11 @@ export type UpsertStoryboardInput = {
   sceneIds?: string[];
 };
 
+// Composition happens only when the caller explicitly sends an empty string —
+// that is the "regenerate from tone & style" action. An omitted field leaves
+// the stored value untouched, including leaving a blank one blank: setup step 4
+// gates on the common prompt being written, so silently composing one here
+// would mark that step done before the user has decided anything.
 async function resolveCommonPrompt(
   deps: ApplicationDependencies,
   args: {
@@ -392,14 +406,12 @@ async function resolveCommonPrompt(
   },
 ): Promise<string> {
   if (args.requestedCommonPrompt === undefined) {
-    if (args.existingCommonPrompt.trim() !== "") {
-      return args.existingCommonPrompt;
-    }
-  } else {
-    const trimmed = args.requestedCommonPrompt.trim();
-    if (trimmed !== "") {
-      return trimmed;
-    }
+    return args.existingCommonPrompt;
+  }
+
+  const trimmed = args.requestedCommonPrompt.trim();
+  if (trimmed !== "") {
+    return trimmed;
   }
 
   let stylePreset: StylePreset | null = null;
@@ -414,6 +426,8 @@ async function resolveCommonPrompt(
   });
 }
 
+// Same rule as the common prompt: an explicit empty string re-seeds from the
+// photo analysis, an omitted field changes nothing.
 async function resolveStory(
   deps: ApplicationDependencies,
   args: {
@@ -423,14 +437,12 @@ async function resolveStory(
   },
 ): Promise<string> {
   if (args.requestedStory === undefined) {
-    if (args.existingStory.trim() !== "") {
-      return args.existingStory;
-    }
-  } else {
-    const trimmed = args.requestedStory.trim();
-    if (trimmed !== "") {
-      return trimmed;
-    }
+    return args.existingStory;
+  }
+
+  const trimmed = args.requestedStory.trim();
+  if (trimmed !== "") {
+    return trimmed;
   }
 
   const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
@@ -463,11 +475,12 @@ export async function upsertStoryboard(
     );
     const effectiveStylePresetId =
       input.stylePresetId ?? existingStoryboard?.stylePresetId ?? null;
+    const tone = input.tone ?? existingStoryboard?.tone ?? "";
 
     const commonPrompt = await resolveCommonPrompt(deps, {
       requestedCommonPrompt: input.commonPrompt,
       existingCommonPrompt: existingStoryboard?.commonPrompt ?? "",
-      tone: input.tone,
+      tone,
       stylePresetId: effectiveStylePresetId,
     });
     const story = await resolveStory(deps, {
@@ -480,13 +493,14 @@ export async function upsertStoryboard(
       id: input.storyboardId,
       projectId: input.projectId,
       status: input.status ?? existingStoryboard?.status,
-      tone: input.tone,
+      tone,
       stylePresetId: effectiveStylePresetId,
       commonPrompt,
       story,
       negativePrompt:
         input.negativePrompt ?? existingStoryboard?.negativePrompt ?? "",
       sceneIds: input.sceneIds ?? existingStoryboard?.sceneIds ?? [],
+      setupCompletedAt: existingStoryboard?.setupCompletedAt ?? null,
       createdAt: existingStoryboard?.createdAt ?? now(),
       updatedAt: now(),
     });
@@ -497,6 +511,73 @@ export async function upsertStoryboard(
   } catch (error) {
     return validationFailure(error);
   }
+}
+
+// ── Storyboard setup flow ────────────────────────────────────────────────────
+
+export type StoryboardSetup = {
+  // The first step that is not yet satisfied by the data, or "complete".
+  step: StoryboardSetupStatus;
+  // Set once the storyboard has been through all five steps. From then on the
+  // UI stops gating, even if a later edit blanks a field again.
+  setupCompletedAt: string | null;
+  // Scenes that still have a blank fillable field, and therefore how many AI
+  // calls a bulk fill would spend. Derived here so the UI can state the cost
+  // without re-implementing the blank-field rule.
+  pendingSceneFillCount: number;
+};
+
+// Derives the step from persisted data using the one domain rule, so the API
+// and the web never disagree about where a storyboard is in the flow.
+export async function getStoryboardSetup(
+  deps: ApplicationDependencies,
+  storyboard: Storyboard,
+): Promise<StoryboardSetup> {
+  const photos = await deps.photoAssets.findByProjectId(storyboard.projectId);
+  const scenes = await deps.scenes.findByStoryboardId(storyboard.id);
+
+  return {
+    step: computeStoryboardSetupStep({
+      analyzablePhotoCount: photos.filter(isAnalyzablePhoto).length,
+      storyboard,
+      scenes,
+    }),
+    setupCompletedAt: storyboard.setupCompletedAt,
+    pendingSceneFillCount: scenes.filter(hasBlankSceneFields).length,
+  };
+}
+
+// Stamps completion the moment the data satisfies all five steps. Called from
+// every path that can finish step 5 — bulk AI fill, single-scene fill, and
+// saving scenes by hand — so completion does not depend on which route the user
+// happened to take. Already-stamped storyboards are left alone: completion is
+// sticky by design, so a later edit that blanks a field does not re-lock the UI.
+async function stampStoryboardSetupCompletion(
+  deps: ApplicationDependencies,
+  storyboardId: string,
+): Promise<void> {
+  const storyboard = await deps.storyboards.findById(storyboardId);
+  if (storyboard == null || storyboard.setupCompletedAt != null) return;
+
+  const setup = await getStoryboardSetup(deps, storyboard);
+  if (setup.step !== "complete") return;
+
+  const timestamp = now();
+  await deps.storyboards.save({
+    ...storyboard,
+    setupCompletedAt: timestamp,
+    updatedAt: timestamp,
+  });
+  await deps.progressEvents.publish({
+    kind: "storyboard.setup_completed",
+    entityType: "storyboard",
+    entityId: storyboard.id,
+    payload: {
+      storyboardId: storyboard.id,
+      projectId: storyboard.projectId,
+      setupCompletedAt: timestamp,
+    },
+  });
 }
 
 export type SceneInput = {
@@ -603,6 +684,9 @@ export async function upsertScenes(
     };
 
     await deps.storyboards.save(updatedStoryboard);
+    // Writing the last blank scene by hand finishes step 5 just as legitimately
+    // as letting the AI write it.
+    await stampStoryboardSetupCompletion(deps, input.storyboardId);
 
     return success(sortScenesByOrderIndex(nextScenes));
   } catch (error) {
@@ -917,42 +1001,9 @@ export type FillSceneWithAiInput = {
   language?: Language;
 };
 
-const sceneFillFields = [
-  "title",
-  "description",
-  "imagePrompt",
-  "emotion",
-  "cameraDirection",
-  "lightingDirection",
-  "motionDirection",
-] as const satisfies ReadonlyArray<keyof Scene>;
-
-// Placeholder text the web layer used to write into blank scene fields so they
-// would pass a since-relaxed non-empty validation. Scenes saved before that fix
-// still carry these values, and treating them as real content would leave those
-// scenes permanently ineligible for AI fill. They are recognized as blank so
-// existing storyboards recover on the next fill; anything the user actually
-// typed is left alone.
-const LEGACY_SCENE_FIELD_PLACEHOLDERS = new Set([
-  "-",
-  "untitled",
-  "joy",
-  "wide",
-  "natural",
-  "slow pan",
-]);
-
-function isBlankSceneField(value: string): boolean {
-  const trimmed = value.trim();
-  return (
-    trimmed.length === 0 ||
-    LEGACY_SCENE_FIELD_PLACEHOLDERS.has(trimmed.toLowerCase())
-  );
-}
-
 type SceneFillContext = {
   scene: Scene;
-  blankFields: (typeof sceneFillFields)[number][];
+  blankFields: SceneFillField[];
   buildInput: (language: Language) => Promise<
     | UseCaseResult<never>
     | {
@@ -961,13 +1012,30 @@ type SceneFillContext = {
         scene: Scene;
         primaryPhoto: PhotoAsset;
         stylePreset: StylePreset | null;
-        projectPhotos: PhotoAsset[];
+        referencePhotos: PhotoAsset[];
         siblingScenes: Scene[];
         photoAnalysis: ProjectPhotoAnalysis | null;
         language: Language;
       }
   >;
 };
+
+// The photos the scene explicitly assigned as `reference`, in assignment order.
+// Deleted ones are dropped so a stale assignment cannot fail the call.
+async function resolveSceneReferencePhotos(
+  deps: ApplicationDependencies,
+  scene: Scene,
+): Promise<PhotoAsset[]> {
+  const photos: PhotoAsset[] = [];
+
+  for (const assignment of scene.photoAssets) {
+    if (assignment.role !== "reference") continue;
+    const photo = await deps.photoAssets.findById(assignment.photoAssetId);
+    if (photo != null && photo.deletedAt === null) photos.push(photo);
+  }
+
+  return photos;
+}
 
 // Everything the AI fill needs, gathered from persistence. Shared by the
 // enqueue half (which only inspects `blankFields`) and the run half.
@@ -1014,15 +1082,15 @@ async function collectSceneFillContext(
     return failure("validation_error", "Scene primary photo is not available.");
   }
 
-  const blankFields = sceneFillFields.filter((field) =>
-    isBlankSceneField(scene[field]),
+  const blankFields = SCENE_FILL_FIELDS.filter((field) =>
+    isBlankSceneField(field, scene[field]),
   );
 
   return {
     scene,
     blankFields,
     buildInput: async (language: Language) => {
-      const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
+      const referencePhotos = await resolveSceneReferencePhotos(deps, scene);
       const siblingScenes = await deps.scenes.findByStoryboardId(storyboard.id);
       let stylePreset: StylePreset | null = null;
 
@@ -1044,7 +1112,7 @@ async function collectSceneFillContext(
         scene,
         primaryPhoto,
         stylePreset,
-        projectPhotos,
+        referencePhotos,
         siblingScenes,
         photoAnalysis,
         language,
@@ -1126,8 +1194,188 @@ export async function runSceneAiFillJob(
       entityId: updatedScene.id,
       payload: { sceneId: updatedScene.id, projectId: updatedScene.projectId },
     });
+    // The last job of a bulk fill is what finishes step 5.
+    await stampStoryboardSetupCompletion(deps, updatedScene.storyboardId);
 
     return success({ sceneId, filledFields: [...context.blankFields] });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type FillStoryboardScenesWithAiInput = {
+  storyboardId: string;
+  language?: Language;
+};
+
+export type FillStoryboardScenesWithAiResult = {
+  // One job per scene that still had a blank field, in scene order.
+  aiJobIds: string[];
+  // Scenes skipped because they were already written, so the caller can say
+  // how many calls it actually spent.
+  skippedSceneCount: number;
+};
+
+// Setup step 5. Enqueues through the same path as the single-scene case rather
+// than adding a second one, so both share the blank-field test, the language
+// resolution, and the per-project concurrency cap.
+export async function fillStoryboardScenesWithAi(
+  deps: ApplicationDependencies,
+  input: FillStoryboardScenesWithAiInput,
+): Promise<UseCaseResult<FillStoryboardScenesWithAiResult>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const scenes = sortScenesByOrderIndex(
+      await deps.scenes.findByStoryboardId(storyboard.id),
+    );
+    const language = await resolvePrincipalLanguage(deps, input.language);
+
+    const aiJobIds: string[] = [];
+    let skippedSceneCount = 0;
+
+    for (const scene of scenes) {
+      if (!hasBlankSceneFields(scene)) {
+        skippedSceneCount += 1;
+        continue;
+      }
+
+      const result = await fillSceneWithAi(deps, {
+        sceneId: scene.id,
+        language,
+      });
+
+      // A scene the single-scene path rejects — most often one with no primary
+      // photo — must not abort the whole batch. Count it as skipped and move on.
+      if (!result.ok || result.value.jobId == null) {
+        skippedSceneCount += 1;
+        continue;
+      }
+
+      aiJobIds.push(result.value.jobId);
+    }
+
+    return success({ aiJobIds, skippedSceneCount });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── Story setup (step 4) ─────────────────────────────────────────────────────
+
+export type GenerateStorySetupInput = {
+  storyboardId: string;
+  language?: Language;
+};
+
+export type GenerateStorySetupResult = {
+  jobId: string;
+};
+
+// Enqueue half. The AI call happens in runStorySetupJob.
+export async function generateStorySetup(
+  deps: ApplicationDependencies,
+  input: GenerateStorySetupInput,
+): Promise<UseCaseResult<GenerateStorySetupResult>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    // Steps 2 and 3 are the inputs to this step; without them the model has
+    // nothing to write the world against, which is the failure this whole flow
+    // exists to prevent.
+    if (storyboard.tone.trim() === "") {
+      return failure(
+        "invalid_state",
+        "Choose a tone before generating the story setup.",
+      );
+    }
+
+    if (storyboard.stylePresetId == null) {
+      return failure(
+        "invalid_state",
+        "Choose a style before generating the story setup.",
+      );
+    }
+
+    const language = await resolvePrincipalLanguage(deps, input.language);
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "story_setup",
+      projectId: storyboard.projectId,
+      payload: { storyboardId: storyboard.id, language },
+    });
+
+    return success({ jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function runStorySetupJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const storyboardId = readStringPayload(job.inputJson, "storyboardId");
+    if (storyboardId == null) {
+      return failure("validation_error", "AI job is missing a storyboard ID.");
+    }
+
+    const storyboard = await getStoryboardOrNotFound(deps, storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const project = await getProjectOrNotFound(deps, storyboard.projectId);
+    if (isFailure(project)) return project;
+
+    let stylePreset: StylePreset | null = null;
+    if (storyboard.stylePresetId != null) {
+      stylePreset = await deps.stylePresets.findById(storyboard.stylePresetId);
+      if (stylePreset == null) {
+        return failure("not_found", "Style preset not found.");
+      }
+    }
+
+    const photoAnalysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
+
+    const suggestion = await deps.storySetupGeneration.generateStorySetup({
+      project,
+      storyboard,
+      stylePreset,
+      photoAnalysis,
+      language: readLanguagePayload(job.inputJson),
+    });
+
+    const timestamp = now();
+    const updated = createStoryboard({
+      ...storyboard,
+      story: suggestion.story,
+      commonPrompt: suggestion.commonPrompt,
+      negativePrompt: suggestion.negativePrompt,
+      updatedAt: timestamp,
+    });
+
+    await deps.storyboards.save(updated);
+    await deps.progressEvents.publish({
+      kind: "storyboard.story_setup_completed",
+      entityType: "storyboard",
+      entityId: updated.id,
+      payload: {
+        storyboardId: updated.id,
+        projectId: updated.projectId,
+        model: suggestion.model,
+      },
+    });
+
+    return success({
+      storyboardId: updated.id,
+      model: suggestion.model,
+      story: updated.story,
+      commonPrompt: updated.commonPrompt,
+      negativePrompt: updated.negativePrompt,
+    });
   } catch (error) {
     return validationFailure(error);
   }

@@ -14,10 +14,10 @@ any cloud setup. The following features are deliberately excluded from this vers
 ## Generation & jobs
 
 - Background work runs in-process. Image generation uses the `generation_requests`
-  table and text/vision AI work (photo analysis, scene AI fill, complement scene
-  proposals) uses the `ai_jobs` table; both are polled by `LocalJobWorker` inside
-  the API process. There is no external queue, no multi-process worker, and no
-  retry-with-backoff.
+  table and text/vision AI work (photo analysis, story setup, scene AI fill,
+  complement scene proposals) uses the `ai_jobs` table; both are polled by
+  `LocalJobWorker` inside the API process. There is no external queue, no
+  multi-process worker, and no retry-with-backoff.
 - Progress is delivered by server-sent events on
   `GET /api/projects/:projectId/events`, fanned out in memory to subscribers of
   the same API process. Events are not persisted or replayed: a client that
@@ -49,6 +49,22 @@ any cloud setup. The following features are deliberately excluded from this vers
   represent that scene's prompt rather than the storyboard as a whole.
 - Photo analysis for emotion candidates falls back to deterministic local
   suggestions unless a `GEMINI_API_KEY` is provided.
+- Story setup (setup step 4) falls back to the deterministic `composeCommonPrompt`
+  template without a `GEMINI_API_KEY`, so the flow still completes but the story
+  is only as good as the stored photo analysis summary.
+
+## Guided storyboard setup
+
+- A new storyboard walks five ordered steps (photos → tone → style → story →
+  scenes) and hides the steps it has not reached yet. Once all five are
+  satisfied the storyboard is stamped complete and the full page unlocks
+  permanently; a later edit that blanks a field does not re-lock it.
+- Storyboards created before this feature were backfilled as complete by the
+  `setup_completed_at` migration, so they keep the previous free-editing
+  behaviour and never see the stepper.
+- Steps 2, 4 and 5 spend AI calls. Each runs from an explicit button that states
+  the number of calls it will make; nothing generates on arrival at a step.
+  Step 5 bills once per scene that still has a blank field.
 
 ## Video & audio
 

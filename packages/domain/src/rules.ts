@@ -7,15 +7,138 @@ import {
   type Scene,
   type SceneBridge,
   type ScenePhotoAsset,
+  type Storyboard,
   type StylePreset,
   type TestAdjustmentId,
   type TestGenerationBatch,
-  type TestGenerationBatchStatus,
   type Timestamp,
   isTestAdjustmentId,
 } from "./model";
 
 export const MAX_ADJUSTMENTS_PER_VARIANT = 3;
+
+// The scene fields the AI writes, and therefore the fields whose blankness
+// decides both whether a scene is eligible for AI fill and whether setup step 5
+// is finished.
+export const SCENE_FILL_FIELDS = [
+  "title",
+  "description",
+  "imagePrompt",
+  "emotion",
+  "cameraDirection",
+  "lightingDirection",
+  "motionDirection",
+] as const satisfies ReadonlyArray<keyof Scene>;
+
+export type SceneFillField = (typeof SCENE_FILL_FIELDS)[number];
+
+// The free-text fields, where the web layer's old placeholder strings are
+// unambiguous filler rather than something a user could have meant.
+const FREE_TEXT_SCENE_FILL_FIELDS = new Set<SceneFillField>([
+  "title",
+  "description",
+  "imagePrompt",
+]);
+
+// Placeholder text the web layer used to write into blank scene fields so they
+// would pass a since-relaxed non-empty validation. Scenes saved before that fix
+// still carry these values, and treating them as real content would leave those
+// scenes permanently ineligible for AI fill, so they are recognized as blank
+// and recover on the next fill.
+//
+// Deliberately limited to the free-text fields. The old placeholders for the
+// four dropdown fields were "Joy", "Wide", "Natural" and "Slow pan" — each the
+// first option of its list and a perfectly legitimate choice. Treating those as
+// blank would mean a scene that really is lit naturally could never finish
+// setup step 5 and would be re-billed for AI fill on every pass.
+const LEGACY_SCENE_TEXT_PLACEHOLDERS = new Set(["-", "untitled"]);
+
+export function isBlankSceneField(
+  field: SceneFillField,
+  value: string,
+): boolean {
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0) {
+    return true;
+  }
+
+  return (
+    FREE_TEXT_SCENE_FILL_FIELDS.has(field) &&
+    LEGACY_SCENE_TEXT_PLACEHOLDERS.has(trimmed.toLowerCase())
+  );
+}
+
+export function hasBlankSceneFields(
+  scene: Pick<Scene, SceneFillField>,
+): boolean {
+  return SCENE_FILL_FIELDS.some((field) =>
+    isBlankSceneField(field, scene[field]),
+  );
+}
+
+// The five ordered setup steps, in the order they must be completed. Each step
+// feeds the next: tone is chosen from what the photos show, the story is
+// written against tone and style, and scene text is written against all of it.
+export const STORYBOARD_SETUP_STEPS = [
+  "photos",
+  "tone",
+  "style",
+  "story",
+  "scenes",
+] as const;
+
+export type StoryboardSetupStep = (typeof STORYBOARD_SETUP_STEPS)[number];
+
+// "complete" means every step is satisfied by the data right now. It is not the
+// same as `Storyboard.setupCompletedAt`, which records that the storyboard has
+// been through the flow once and is permanently unlocked.
+export type StoryboardSetupStatus = StoryboardSetupStep | "complete";
+
+export type ComputeStoryboardSetupStepInput = {
+  // Photos with usage `candidate` or `reference` that are not deleted — the
+  // same set photo analysis runs on.
+  analyzablePhotoCount: number;
+  storyboard: Pick<
+    Storyboard,
+    "tone" | "stylePresetId" | "story" | "commonPrompt"
+  >;
+  scenes: ReadonlyArray<Pick<Scene, SceneFillField>>;
+};
+
+// The single definition of "which step is this storyboard on", derived from
+// persisted data so the API and the web can never disagree. Returns the first
+// step that is not yet satisfied.
+export function computeStoryboardSetupStep(
+  input: ComputeStoryboardSetupStepInput,
+): StoryboardSetupStatus {
+  if (input.analyzablePhotoCount === 0) {
+    return "photos";
+  }
+
+  if (input.storyboard.tone.trim() === "") {
+    return "tone";
+  }
+
+  if (input.storyboard.stylePresetId == null) {
+    return "style";
+  }
+
+  if (
+    input.storyboard.story.trim() === "" ||
+    input.storyboard.commonPrompt.trim() === ""
+  ) {
+    return "story";
+  }
+
+  // A storyboard with no scenes has not finished step 5, even though "no scene
+  // has a blank field" is vacuously true.
+  if (input.scenes.length === 0 || input.scenes.some(hasBlankSceneFields)) {
+    return "scenes";
+  }
+
+  return "complete";
+}
 
 function assertScenePhotoAssets(scenePhotoAssets: ScenePhotoAsset[]): void {
   const primaryCount = scenePhotoAssets.filter(

@@ -159,6 +159,48 @@
         "canceled": "Canceled"
       }
     },
+    "setup": {
+      "title": "Storyboard setup",
+      "progressLabel": "Storyboard setup progress",
+      "progressCount": "{done} of {total} steps done",
+      "steps": {
+        "photos": {
+          "title": "1. Photos",
+          "hint": "Pick the photos this video is built from.",
+          "locked": "Waiting for photos."
+        },
+        "tone": {
+          "title": "2. Tone",
+          "hint": "Analyze the photos, then choose the emotion they suggest.",
+          "locked": "Mark at least one photo as candidate or reference first."
+        },
+        "style": {
+          "title": "3. Style",
+          "hint": "Choose the visual style, or create your own.",
+          "locked": "Choose a tone first."
+        },
+        "story": {
+          "title": "4. Story",
+          "hint": "Write the story, common prompt and negative prompt from your tone and style.",
+          "locked": "Choose a style first."
+        },
+        "scenes": {
+          "title": "5. Scenes",
+          "hint": "Write each scene's title, description and image prompt.",
+          "locked": "Write the story first."
+        }
+      },
+      "storyTitle": "Story setup",
+      "storyIntro": "Writes the story, the common prompt and the negative prompt together, so all three stay consistent with the tone and style you chose. Review and edit them below before continuing.",
+      "storyGenerate": "Generate with AI (1 AI call)",
+      "storyGenerating": "Writing…",
+      "storyGeneratedMsg": "Story, common prompt and negative prompt written — review them below.",
+      "storyFailed": "Failed to generate the story setup",
+      "scenesFillAll": "Write {count} scene(s) with AI ({count} AI calls)",
+      "scenesFilling": "Writing scenes…",
+      "scenesNothingToFill": "Every scene is already written.",
+      "scenesFailed": "Failed to write scenes with AI"
+    },
     "tones": {
       "warm": {
         "label": "Warm",
