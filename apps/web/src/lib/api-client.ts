@@ -37,11 +37,23 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const res = await fetch(`${apiBase()}${path}`, {
-    method,
-    headers: body != null ? { "Content-Type": "application/json" } : undefined,
-    body: body != null ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}${path}`, {
+      method,
+      headers:
+        body != null ? { "Content-Type": "application/json" } : undefined,
+      body: body != null ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    // fetch only rejects before a response exists, so the API was unreachable.
+    // Its own "Failed to fetch" says nothing about which server is down.
+    throw new ApiError(
+      0,
+      "API_UNREACHABLE",
+      `Cannot reach the API server at ${apiBase()}. Make sure it is running (pnpm dev).`,
+    );
+  }
 
   if (!res.ok) {
     let code = "UNKNOWN";
