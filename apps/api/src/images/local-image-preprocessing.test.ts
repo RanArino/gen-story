@@ -154,6 +154,12 @@ describe("LocalImagePreprocessingAdapter", () => {
       expect(JSON.stringify(generationRequest?.inputJson)).not.toContain(
         directory,
       );
+      // The caller sent neither id, and generation adapters build their storage
+      // keys from these. Without them the image lands under "unknown-project".
+      expect(generationRequest?.inputJson).toMatchObject({
+        projectId: "project_1",
+        sceneId: "scene_1",
+      });
 
       const aiInputBody = await storage.getObject(aiInputStorageKey);
 
