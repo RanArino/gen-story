@@ -808,6 +808,7 @@ export function buildRouter(deps: ApiDependencies): Router {
         motionDirection: s.motionDirection,
         notes: s.notes,
         negativePrompt: s.negativePrompt,
+        photoFidelity: s.photoFidelity,
         photoAssets: s.photoAssets,
       }));
 

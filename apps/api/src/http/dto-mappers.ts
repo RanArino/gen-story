@@ -176,6 +176,7 @@ export function toSceneDto(scene: Scene): SceneDto {
     motionDirection: scene.motionDirection,
     notes: scene.notes,
     negativePrompt: scene.negativePrompt,
+    photoFidelity: scene.photoFidelity,
     photoAssets: scene.photoAssets.map((spa) => ({
       photoAssetId: spa.photoAssetId,
       role: spa.role,
