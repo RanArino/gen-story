@@ -123,7 +123,16 @@
       "tone": "Tone",
       "primaryPhoto": "Primary photo",
       "sceneNegativePrompt": "Scene negative prompt",
-      "sceneNegativePromptPlaceholder": "Things to avoid for this scene only (optional)"
+      "sceneNegativePromptPlaceholder": "Things to avoid for this scene only (optional)",
+      "photoFidelity": "Follow source photo"
+    },
+    "photoFidelity": {
+      "off": "Off",
+      "offHint": "Ignore the photo, generate from the prompt alone.",
+      "low": "Low",
+      "lowHint": "Use the photo as reference. Currently identical to High — gpt-image-2 has no lower fidelity setting.",
+      "high": "High",
+      "highHint": "Follow the photo closely, especially faces. This is gpt-image-2's only fidelity level once a photo is attached."
     },
     "selectOption": "Select…",
     "save": "Save scene",
@@ -484,6 +493,15 @@
       "camera": "Camera",
       "lighting": "Lighting",
       "motion": "Motion",
+      "photoFidelityLabel": "Follow source photo",
+      "photoFidelity": {
+        "off": "Off",
+        "offHint": "Ignore the photo, generate from the prompt alone.",
+        "low": "Low",
+        "lowHint": "Use the photo as reference. Currently identical to High — gpt-image-2 has no lower fidelity setting.",
+        "high": "High",
+        "highHint": "Follow the photo closely, especially faces. This is gpt-image-2's only fidelity level once a photo is attached."
+      },
       "cancel": "Cancel",
       "queue": "Queue generation",
       "queuing": "Queuing…"

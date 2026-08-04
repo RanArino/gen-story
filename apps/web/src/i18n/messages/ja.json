@@ -123,7 +123,16 @@
       "tone": "トーン",
       "primaryPhoto": "メイン写真",
       "sceneNegativePrompt": "シーン別ネガティブプロンプト",
-      "sceneNegativePromptPlaceholder": "このシーンだけで避けたい要素（任意）"
+      "sceneNegativePromptPlaceholder": "このシーンだけで避けたい要素（任意）",
+      "photoFidelity": "元写真への忠実度"
+    },
+    "photoFidelity": {
+      "off": "オフ",
+      "offHint": "写真は使わず、プロンプトのみで生成します。",
+      "low": "低",
+      "lowHint": "写真を参考にします。現在は高と同じ結果になります — gpt-image-2にはこれより低い忠実度の設定がありません。",
+      "high": "高",
+      "highHint": "写真に忠実に、特に顔の特徴を再現します。写真を添付した場合、gpt-image-2ではこれが唯一の忠実度レベルです。"
     },
     "selectOption": "選択…",
     "save": "シーンを保存",
@@ -484,6 +493,15 @@
       "camera": "カメラ",
       "lighting": "ライティング",
       "motion": "モーション",
+      "photoFidelityLabel": "元写真への忠実度",
+      "photoFidelity": {
+        "off": "オフ",
+        "offHint": "写真は使わず、プロンプトのみで生成します。",
+        "low": "低",
+        "lowHint": "写真を参考にします。現在は高と同じ結果になります — gpt-image-2にはこれより低い忠実度の設定がありません。",
+        "high": "高",
+        "highHint": "写真に忠実に、特に顔の特徴を再現します。写真を添付した場合、gpt-image-2ではこれが唯一の忠実度レベルです。"
+      },
       "cancel": "キャンセル",
       "queue": "生成をキューに追加",
       "queuing": "キュー追加中…"

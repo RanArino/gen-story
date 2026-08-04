@@ -112,7 +112,22 @@ const DEFAULT_SCENE_FIXED = {
   lightingDirection: "Natural",
   motionDirection: "Slow pan",
   notes: "",
+  photoFidelity: "off",
 } as const;
+
+const PHOTO_FIDELITY_OPTIONS = ["off", "low", "high"] as const;
+
+// AI scene fill is asked to keep emotion/camera/lighting/motion short,
+// English, label-style values, but nothing constrains it to this exact list —
+// a value like "Peace" or "Straight-on" is a legitimate AI choice that just
+// isn't one of the fixed options below. Without this, the <select> silently
+// shows the wrong option selected (the browser falls back to the first one)
+// for a scene whose real value is perfectly valid, and saving without editing
+// that field would then overwrite it with the wrong value.
+function withCurrentOption(options: string[], current: string): string[] {
+  if (!current || options.includes(current)) return options;
+  return [current, ...options];
+}
 
 type SceneState = UpsertSceneInput & {
   id?: string;
@@ -161,6 +176,7 @@ function sceneDtoToState(scene: SceneDto): SceneState {
     motionDirection: scene.motionDirection,
     notes: scene.notes,
     negativePrompt: scene.negativePrompt,
+    photoFidelity: scene.photoFidelity,
     photoAssets: scene.photoAssets,
   };
 }
@@ -782,6 +798,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           motionDirection: s.motionDirection,
           notes: s.notes,
           negativePrompt: s.negativePrompt,
+          photoFidelity: s.photoFidelity,
         })),
       );
       setScenes(saved.map(sceneDtoToState));
@@ -2134,6 +2151,30 @@ function SceneCard({
           </span>
         )}
       </div>
+      {primaryPhoto && (
+        <div className={styles.photoFidelityRow}>
+          <span className={styles.photoFidelityLabel}>
+            {t("fields.photoFidelity")}
+          </span>
+          <div className={styles.photoFidelityOptions}>
+            {PHOTO_FIDELITY_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`${styles.photoFidelityOption} ${
+                  (scene.photoFidelity ?? "off") === option
+                    ? styles.photoFidelityOptionActive
+                    : ""
+                }`}
+                onClick={() => onUpdate({ photoFidelity: option })}
+                title={t(`photoFidelity.${option}Hint`)}
+              >
+                {t(`photoFidelity.${option}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {scene.id && !isComplement && candidatePhotos.length > 0 && (
         <div className={styles.changePhotoWrap}>
           <button
@@ -2231,9 +2272,9 @@ function SceneCard({
             value={scene.emotion}
             onChange={(e) => onUpdate({ emotion: e.target.value })}
           >
-            {EMOTION_OPTIONS.map((o) => (
+            {withCurrentOption(EMOTION_OPTIONS, scene.emotion).map((o) => (
               <option key={o} value={o}>
-                {tSel(`emotion.${o}`)}
+                {EMOTION_OPTIONS.includes(o) ? tSel(`emotion.${o}`) : o}
               </option>
             ))}
           </select>
@@ -2246,11 +2287,13 @@ function SceneCard({
             value={scene.cameraDirection}
             onChange={(e) => onUpdate({ cameraDirection: e.target.value })}
           >
-            {CAMERA_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {tSel(`camera.${o}`)}
-              </option>
-            ))}
+            {withCurrentOption(CAMERA_OPTIONS, scene.cameraDirection).map(
+              (o) => (
+                <option key={o} value={o}>
+                  {CAMERA_OPTIONS.includes(o) ? tSel(`camera.${o}`) : o}
+                </option>
+              ),
+            )}
           </select>
         </SceneField>
 
@@ -2261,11 +2304,13 @@ function SceneCard({
             value={scene.lightingDirection}
             onChange={(e) => onUpdate({ lightingDirection: e.target.value })}
           >
-            {LIGHTING_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {tSel(`lighting.${o}`)}
-              </option>
-            ))}
+            {withCurrentOption(LIGHTING_OPTIONS, scene.lightingDirection).map(
+              (o) => (
+                <option key={o} value={o}>
+                  {LIGHTING_OPTIONS.includes(o) ? tSel(`lighting.${o}`) : o}
+                </option>
+              ),
+            )}
           </select>
         </SceneField>
 
@@ -2276,11 +2321,13 @@ function SceneCard({
             value={scene.motionDirection}
             onChange={(e) => onUpdate({ motionDirection: e.target.value })}
           >
-            {MOTION_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {tSel(`motion.${o}`)}
-              </option>
-            ))}
+            {withCurrentOption(MOTION_OPTIONS, scene.motionDirection).map(
+              (o) => (
+                <option key={o} value={o}>
+                  {MOTION_OPTIONS.includes(o) ? tSel(`motion.${o}`) : o}
+                </option>
+              ),
+            )}
           </select>
         </SceneField>
       </div>
@@ -2306,6 +2353,7 @@ function SceneCard({
             projectNegativePrompt: projectNegativePromptDraft,
             commonPrompt: projectCommonPromptDraft,
             story: projectStoryDraft,
+            photoFidelity: scene.photoFidelity,
           }}
         />
       )}
