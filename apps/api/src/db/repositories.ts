@@ -23,6 +23,7 @@ import {
   createStylePreset,
   createTestGenerationBatch,
   createUser,
+  isPhotoFidelity,
   isTestAdjustmentId,
   sortScenesByOrderIndex,
   type AiJob,
@@ -233,6 +234,9 @@ function mapScene(row: SceneRow, photos: ScenePhotoAsset[]): Scene {
     motionDirection: row.motionDirection,
     notes: row.notes,
     negativePrompt: row.negativePrompt,
+    photoFidelity: isPhotoFidelity(row.photoFidelity)
+      ? row.photoFidelity
+      : "off",
     photoAssets: photos,
     adoptedGeneratedImageId: row.adoptedGeneratedImageId,
     createdAt: row.createdAt,
@@ -874,6 +878,7 @@ export class SqliteSceneRepository implements SceneRepositoryPort {
           motionDirection: scene.motionDirection,
           notes: scene.notes,
           negativePrompt: scene.negativePrompt,
+          photoFidelity: scene.photoFidelity,
           adoptedGeneratedImageId: scene.adoptedGeneratedImageId,
           createdAt: scene.createdAt,
           updatedAt: scene.updatedAt,
@@ -897,6 +902,7 @@ export class SqliteSceneRepository implements SceneRepositoryPort {
             motionDirection: scene.motionDirection,
             notes: scene.notes,
             negativePrompt: scene.negativePrompt,
+            photoFidelity: scene.photoFidelity,
             adoptedGeneratedImageId: scene.adoptedGeneratedImageId,
             updatedAt: scene.updatedAt,
             deletedAt: null,

@@ -1,0 +1,1 @@
+ALTER TABLE `scenes` ADD `photo_fidelity` text DEFAULT 'off' NOT NULL;
