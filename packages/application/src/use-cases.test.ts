@@ -1205,6 +1205,99 @@ describe("application use cases", () => {
     expect(storedStoryboard?.sceneIds).toEqual(["scene_1", "scene_2"]);
   });
 
+  it("persists an explicit photoFidelity and preserves it when omitted on a later save", async () => {
+    const deps = createDependencies({
+      users: [
+        createUser({
+          id: "user_1",
+          organizationId: "org_1",
+          displayName: "Ran",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      organizations: [
+        createOrganization({
+          id: "org_1",
+          name: "Family Studio",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projects: [
+        createProject({
+          id: "project_1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      status: "editing",
+    });
+
+    const created = await upsertScenes(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      scenes: [
+        {
+          sceneId: "scene_1",
+          projectId: "project_1",
+          storyboardId: "storyboard_1",
+          orderIndex: 0,
+          title: "First",
+          description: "desc",
+          imagePrompt: "prompt",
+          emotion: "warm",
+          cameraDirection: "wide",
+          lightingDirection: "soft",
+          motionDirection: "still",
+          photoFidelity: "high",
+        },
+      ],
+    });
+
+    expect(created.ok).toBe(true);
+    if (created.ok) {
+      expect(created.value[0]?.photoFidelity).toBe("high");
+    }
+
+    // Omitting photoFidelity on a later save must not silently reset it to
+    // "off" — that would undo the user's choice every time an unrelated
+    // field, like the title, is edited and saved.
+    const resaved = await upsertScenes(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      scenes: [
+        {
+          sceneId: "scene_1",
+          projectId: "project_1",
+          storyboardId: "storyboard_1",
+          orderIndex: 0,
+          title: "First, retitled",
+          description: "desc",
+          imagePrompt: "prompt",
+          emotion: "warm",
+          cameraDirection: "wide",
+          lightingDirection: "soft",
+          motionDirection: "still",
+        },
+      ],
+    });
+
+    expect(resaved.ok).toBe(true);
+    if (resaved.ok) {
+      expect(resaved.value[0]?.photoFidelity).toBe("high");
+    }
+  });
+
   function createCommonPromptDeps() {
     return createDependencies({
       users: [

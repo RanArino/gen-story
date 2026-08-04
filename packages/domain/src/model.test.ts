@@ -62,7 +62,31 @@ describe("domain factories", () => {
       status: "draft",
       photoAssets: [],
       adoptedGeneratedImageId: null,
+      photoFidelity: "off",
     });
+  });
+
+  it("defaults a scene's photoFidelity to off and accepts an explicit value", () => {
+    const base = {
+      id: "scene_1",
+      projectId: "project_1",
+      storyboardId: "storyboard_1",
+      orderIndex: 0,
+      title: "",
+      description: "",
+      imagePrompt: "",
+      emotion: "",
+      cameraDirection: "",
+      lightingDirection: "",
+      motionDirection: "",
+      createdAt: "2026-05-02T00:00:00.000Z",
+      updatedAt: "2026-05-02T00:00:00.000Z",
+    };
+
+    expect(createScene(base).photoFidelity).toBe("off");
+    expect(createScene({ ...base, photoFidelity: "high" }).photoFidelity).toBe(
+      "high",
+    );
   });
 
   it("creates a storyboard with ordered scene ids", () => {

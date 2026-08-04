@@ -150,6 +150,7 @@ export type SceneDto = {
   motionDirection: string;
   notes: string;
   negativePrompt: string;
+  photoFidelity: "off" | "low" | "high";
   photoAssets: ScenePhotoAssetDto[];
   adoptedGeneratedImageId: string | null;
   createdAt: string;

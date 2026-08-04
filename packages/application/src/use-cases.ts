@@ -595,6 +595,7 @@ export type SceneInput = {
   motionDirection: string;
   notes?: string;
   negativePrompt?: string;
+  photoFidelity?: Scene["photoFidelity"];
   photoAssets?: ScenePhotoAsset[];
   adoptedGeneratedImageId?: string | null;
 };
@@ -623,6 +624,7 @@ function buildScene(existingScene: Scene | null, input: SceneInput): Scene {
     motionDirection: input.motionDirection,
     notes: input.notes ?? existingScene?.notes,
     negativePrompt: input.negativePrompt ?? existingScene?.negativePrompt,
+    photoFidelity: input.photoFidelity ?? existingScene?.photoFidelity,
     photoAssets: input.photoAssets ?? existingScene?.photoAssets,
     adoptedGeneratedImageId:
       input.adoptedGeneratedImageId ??

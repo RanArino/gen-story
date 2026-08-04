@@ -27,6 +27,7 @@ export type {
   OrganizationId,
   PhotoAsset,
   PhotoAssetId,
+  PhotoFidelity,
   PhotoInsight,
   PhotoUsage,
   Project,
@@ -72,6 +73,7 @@ export {
   createTestGenerationBatch,
   createUser,
   isAiJobKind,
+  isPhotoFidelity,
   isTestAdjustmentId,
   TEST_ADJUSTMENT_IDS,
 } from "./model";
