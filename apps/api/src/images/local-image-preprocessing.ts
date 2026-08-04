@@ -111,6 +111,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       projectId: input.projectId,
       sceneId: input.sceneId,
       normalizedInputImages,
+      photoFidelity: scene.photoFidelity,
       prompt: composedPrompt,
       negativePrompt,
     };

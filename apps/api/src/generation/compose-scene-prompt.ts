@@ -22,7 +22,33 @@ export type ComposeScenePromptOverrides = {
   story?: string;
   sceneNegativePrompt?: string;
   projectNegativePrompt?: string;
+  photoFidelity?: Scene["photoFidelity"];
 };
+
+// gpt-image-2 has no adjustable input_fidelity parameter — attaching a photo
+// to an edit call always applies maximum fidelity at the API level (see
+// supportsInputFidelity in apps/api/src/generation/openai-image-generation.ts,
+// added after a live 400 confirmed the parameter is rejected outright). This
+// directive is the one remaining lever for a "low" vs "high" distinction:
+// explicit prompt language, which is OpenAI's own documented technique for
+// steering how strictly a model follows a reference image when no numeric
+// parameter exists. It is not an enforced setting the way input_fidelity was
+// on gpt-image-1 — it is the model's best effort at following an instruction.
+// Only applied when the scene actually has a photo to attach; with none
+// (photoFidelity "off", or no photoAssets) there is nothing for the directive
+// to refer to.
+function photoFidelityDirective(
+  photoFidelity: Scene["photoFidelity"],
+  hasPhotos: boolean,
+): string | null {
+  if (!hasPhotos || photoFidelity === "off") return null;
+
+  if (photoFidelity === "high") {
+    return "Treat the attached reference photo as ground truth: preserve the subject's likeness, pose, framing, and setting precisely rather than reinterpreting them.";
+  }
+
+  return "Use the attached reference photo only as loose inspiration for mood and composition — feel free to reinterpret the subject's pose, framing, and setting rather than replicating the photo.";
+}
 
 export type ComposeScenePromptResult = {
   prompt: string;
@@ -62,7 +88,7 @@ export async function composeScenePrompt(
     overrides.sceneNegativePrompt ?? scene.negativePrompt ?? "",
   );
 
-  const prompt = composeImagePrompt({
+  const basePrompt = composeImagePrompt({
     imagePrompt: overrides.imagePrompt ?? scene.imagePrompt ?? "",
     emotion: overrides.emotion ?? scene.emotion ?? "",
     cameraDirection: overrides.cameraDirection ?? scene.cameraDirection ?? "",
@@ -75,6 +101,14 @@ export async function composeScenePrompt(
     story: overrides.story ?? storyboard.story ?? "",
     negativePrompt,
   });
+
+  const fidelityDirective = photoFidelityDirective(
+    overrides.photoFidelity ?? scene.photoFidelity,
+    scene.photoAssets.length > 0,
+  );
+  const prompt = fidelityDirective
+    ? `${basePrompt}. ${fidelityDirective}`
+    : basePrompt;
 
   return { prompt, negativePrompt, scene, storyboard, stylePreset };
 }
