@@ -10,6 +10,48 @@ import { buildGeneratedImageStorageKey } from "../storage/storage-keys";
 
 type NormalizedInputImageRef = { storageKey: string };
 
+export const DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS = 12_000;
+
+type Delay = (milliseconds: number) => Promise<void>;
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+// The OpenAI image-input quota is shared by the organization, while the local
+// worker may dispatch several scene jobs concurrently. This serializes request
+// starts for this API process without making callers wait for a prior image
+// response to finish.
+export class OpenAiImageGenerationInterval {
+  private nextStartAt = 0;
+  private tail: Promise<void> = Promise.resolve();
+
+  constructor(
+    private readonly intervalMs = DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS,
+    private readonly getTime = Date.now,
+    private readonly wait: Delay = delay,
+  ) {}
+
+  async waitForNextStart(): Promise<void> {
+    const previous = this.tail;
+    let release!: () => void;
+    this.tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await previous;
+    try {
+      const remainingMs = Math.max(0, this.nextStartAt - this.getTime());
+      if (remainingMs > 0) {
+        await this.wait(remainingMs);
+      }
+      this.nextStartAt = this.getTime() + this.intervalMs;
+    } finally {
+      release();
+    }
+  }
+}
+
 export type ImageGenerationMode =
   | { kind: "generate" }
   | {
@@ -65,12 +107,17 @@ export function supportsInputFidelity(model: string): boolean {
 
 export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
   private readonly client: OpenAI;
+  private readonly requestInterval: OpenAiImageGenerationInterval;
 
   constructor(
     private readonly objectStorage: ObjectStoragePort,
     openaiApiKey: string,
+    options?: { requestIntervalMs?: number },
   ) {
     this.client = new OpenAI({ apiKey: openaiApiKey });
+    this.requestInterval = new OpenAiImageGenerationInterval(
+      options?.requestIntervalMs,
+    );
   }
 
   async generate(input: {
@@ -124,6 +171,7 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
         }),
       );
 
+      await this.requestInterval.waitForNextStart();
       const response = await this.client.images.edit({
         model: model as Parameters<typeof this.client.images.edit>[0]["model"],
         image: imageFiles,
@@ -138,6 +186,7 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
 
       b64 = response.data?.[0]?.b64_json ?? "";
     } else {
+      await this.requestInterval.waitForNextStart();
       const response = await this.client.images.generate({
         model: model as Parameters<
           typeof this.client.images.generate

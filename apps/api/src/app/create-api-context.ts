@@ -6,7 +6,10 @@ import { createSqliteRepositories } from "../db/repositories";
 import { LocalProgressEvents } from "../jobs/local-progress-events";
 import { SqliteJobQueue } from "../jobs/sqlite-job-queue";
 import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
-import { OpenAiImageGenerationAdapter } from "../generation/openai-image-generation";
+import {
+  DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS,
+  OpenAiImageGenerationAdapter,
+} from "../generation/openai-image-generation";
 import { LocalImagePreprocessingAdapter } from "../images/local-image-preprocessing";
 import {
   DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL,
@@ -48,8 +51,18 @@ export function createApiContext(
   });
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
+  const configuredImageGenerationIntervalMs = Number(
+    process.env.OPENAI_IMAGE_GENERATION_INTERVAL_MS,
+  );
+  const imageGenerationIntervalMs =
+    Number.isFinite(configuredImageGenerationIntervalMs) &&
+    configuredImageGenerationIntervalMs > 0
+      ? configuredImageGenerationIntervalMs
+      : DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS;
   const imageGeneration = openaiApiKey
-    ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey)
+    ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey, {
+        requestIntervalMs: imageGenerationIntervalMs,
+      })
     : new MockImageGenerationAdapter(objectStorage);
   const geminiApiKey = process.env.GEMINI_API_KEY;
   // Photo-aware AI requires Gemini at runtime; the adapter throws a clear
