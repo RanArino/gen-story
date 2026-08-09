@@ -82,7 +82,7 @@ function buildPrompt(input: StorySetupGenerationInput): string {
     "",
     "story: 3-5 sentences describing the narrative arc and world of this video — who it is about, what it moves through, and how it should feel by the end. Concrete, not generic.",
     "commonPrompt: one paragraph of image-generation direction applied to EVERY scene. Cover the visual treatment, palette, and mood that hold the series together. Do not describe any single scene.",
-    `negativePrompt: comma-separated phrases to keep OUT of every image, chosen for this tone and style. Start from these and add what this specific project needs: ${RECOMMENDED_NEGATIVE_FENCE}`,
+    `negativePrompt: comma-separated phrases to keep OUT of every image, chosen for this tone and style. Do NOT include text, captions, letters, numbers, or any instruction that suppresses visible place names, station names, building names, signs, or other location-identifying text. Start from these and add what this specific project needs: ${RECOMMENDED_NEGATIVE_FENCE}`,
   ]
     .filter((line) => line !== undefined)
     .join("\n");
