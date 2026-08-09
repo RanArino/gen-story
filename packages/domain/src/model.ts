@@ -11,6 +11,7 @@ export type GenerationRequestId = string;
 export type GeneratedImageId = string;
 export type ProjectPhotoAnalysisId = string;
 export type TestGenerationBatchId = string;
+export type AiJobId = string;
 
 export type ProjectStatus = "draft" | "active" | "completed" | "archived";
 export type TestGenerationBatchStatus = "pending" | "completed";
@@ -25,6 +26,34 @@ export type GenerationRequestStatus =
   | "succeeded"
   | "failed"
   | "canceled";
+
+// Background text/vision AI work. Image generation is not an AI job; it keeps
+// its own GenerationRequest lifecycle.
+export type AiJobKind =
+  | "photo_analysis"
+  | "story_setup"
+  | "scene_ai_fill"
+  | "complement_scene_proposals";
+
+export type AiJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "canceled";
+
+export const AI_JOB_KINDS: AiJobKind[] = [
+  "photo_analysis",
+  "story_setup",
+  "scene_ai_fill",
+  "complement_scene_proposals",
+];
+
+export function isAiJobKind(value: unknown): value is AiJobKind {
+  return (
+    typeof value === "string" && (AI_JOB_KINDS as string[]).includes(value)
+  );
+}
 
 export type TestAdjustmentId =
   | "warmer"
@@ -135,12 +164,18 @@ export type Storyboard = {
   id: StoryboardId;
   projectId: ProjectId;
   status: StoryboardStatus;
+  // Empty means "not decided yet". The guided setup flow needs to tell an
+  // undecided storyboard from one where the user deliberately chose a tone,
+  // which a default value would make impossible.
   tone: string;
   stylePresetId: StylePresetId | null;
   commonPrompt: string;
   story: string;
   negativePrompt: string;
   sceneIds: SceneId[];
+  // When set, the storyboard has been through all five setup steps and is
+  // freely editable. Null means the guided flow is still gating it.
+  setupCompletedAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -165,6 +200,23 @@ export type GenerationRequest = {
   errorMessage: string | null;
   sourceGenerationRequestId: GenerationRequestId | null;
   appliedAdjustments: TestAdjustmentId[];
+  // Set only on the variants of a test-generation batch. It is what makes "the
+  // samples of batch X" a query rather than a scan of inputJson.
+  testGenerationBatchId: TestGenerationBatchId | null;
+  startedAt: Timestamp | null;
+  completedAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export type AiJob = {
+  id: AiJobId;
+  projectId: ProjectId;
+  kind: AiJobKind;
+  status: AiJobStatus;
+  inputJson: Record<string, unknown>;
+  resultJson: Record<string, unknown> | null;
+  errorMessage: string | null;
   startedAt: Timestamp | null;
   completedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -278,12 +330,13 @@ export type CreateStoryboardInput = {
   id: StoryboardId;
   projectId: ProjectId;
   status?: StoryboardStatus;
-  tone: string;
+  tone?: string;
   stylePresetId?: StylePresetId | null;
   commonPrompt?: string;
   story?: string;
   negativePrompt?: string;
   sceneIds?: SceneId[];
+  setupCompletedAt?: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -331,6 +384,21 @@ export type CreateGenerationRequestInput = {
   errorMessage?: string | null;
   sourceGenerationRequestId?: GenerationRequestId | null;
   appliedAdjustments?: TestAdjustmentId[];
+  testGenerationBatchId?: TestGenerationBatchId | null;
+  startedAt?: Timestamp | null;
+  completedAt?: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export type CreateAiJobInput = {
+  id: AiJobId;
+  projectId: ProjectId;
+  kind: AiJobKind;
+  inputJson: Record<string, unknown>;
+  status?: AiJobStatus;
+  resultJson?: Record<string, unknown> | null;
+  errorMessage?: string | null;
   startedAt?: Timestamp | null;
   completedAt?: Timestamp | null;
   createdAt: Timestamp;
@@ -455,12 +523,15 @@ export function createStoryboard(input: CreateStoryboardInput): Storyboard {
     id: input.id,
     projectId: input.projectId,
     status: input.status ?? "draft",
-    tone: trimRequiredText(input.tone, "Storyboard tone"),
+    // Optional on purpose: a blank tone is the "undecided" state the guided
+    // setup flow gates on, not a validation error.
+    tone: trimOptionalText(input.tone),
     stylePresetId: input.stylePresetId ?? null,
     commonPrompt: (input.commonPrompt ?? "").trim(),
     story: (input.story ?? "").trim(),
     negativePrompt: (input.negativePrompt ?? "").trim(),
     sceneIds: [...(input.sceneIds ?? [])],
+    setupCompletedAt: input.setupCompletedAt ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
@@ -599,6 +670,23 @@ export function createGenerationRequest(
     errorMessage: trimOptionalText(input.errorMessage) || null,
     sourceGenerationRequestId: input.sourceGenerationRequestId ?? null,
     appliedAdjustments: [...(input.appliedAdjustments ?? [])],
+    testGenerationBatchId: input.testGenerationBatchId ?? null,
+    startedAt: input.startedAt ?? null,
+    completedAt: input.completedAt ?? null,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+  };
+}
+
+export function createAiJob(input: CreateAiJobInput): AiJob {
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    kind: input.kind,
+    status: input.status ?? "queued",
+    inputJson: { ...input.inputJson },
+    resultJson: input.resultJson ?? null,
+    errorMessage: trimOptionalText(input.errorMessage) || null,
     startedAt: input.startedAt ?? null,
     completedAt: input.completedAt ?? null,
     createdAt: input.createdAt,

@@ -86,9 +86,33 @@ describe("domain factories", () => {
       story: "",
       negativePrompt: "",
       sceneIds: ["scene_2", "scene_1"],
+      setupCompletedAt: null,
       createdAt: "2026-05-02T00:00:00.000Z",
       updatedAt: "2026-05-02T00:00:00.000Z",
     });
+  });
+
+  it("treats a missing or blank storyboard tone as undecided", () => {
+    // Blank is the state the guided setup flow gates step 2 on, so it must be
+    // representable rather than rejected the way a required field would be.
+    expect(
+      createStoryboard({
+        id: "storyboard_1",
+        projectId: "project_1",
+        createdAt: "2026-05-02T00:00:00.000Z",
+        updatedAt: "2026-05-02T00:00:00.000Z",
+      }).tone,
+    ).toBe("");
+
+    expect(
+      createStoryboard({
+        id: "storyboard_1",
+        projectId: "project_1",
+        tone: "   ",
+        createdAt: "2026-05-02T00:00:00.000Z",
+        updatedAt: "2026-05-02T00:00:00.000Z",
+      }).tone,
+    ).toBe("");
   });
 
   it("trims and preserves a supplied storyboard common prompt", () => {

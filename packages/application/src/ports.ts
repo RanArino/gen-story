@@ -1,4 +1,6 @@
 import type {
+  AiJob,
+  AiJobKind,
   GeneratedImage,
   GenerationRequest,
   GenerationRequestStatus,
@@ -105,8 +107,19 @@ export interface GenerationRequestRepositoryPort {
   findQueued(): Promise<GenerationRequest[]>;
   findRecent(limit: number): Promise<GenerationRequest[]>;
   findByStoryboardId(storyboardId: string): Promise<GenerationRequest[]>;
+  // The variants of one test-generation batch, oldest first.
+  findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]>;
   save(generationRequest: GenerationRequest): Promise<void>;
   softDelete(generationRequestId: string, deletedAt: string): Promise<void>;
+}
+
+export interface AiJobRepositoryPort {
+  findById(aiJobId: string): Promise<AiJob | null>;
+  findQueued(): Promise<AiJob[]>;
+  findByProjectId(projectId: string): Promise<AiJob[]>;
+  findRunning(): Promise<AiJob[]>;
+  findRunningCountByProjectId(projectId: string): Promise<number>;
+  save(aiJob: AiJob): Promise<void>;
 }
 
 export interface GeneratedImageRepositoryPort {
@@ -126,6 +139,8 @@ export interface TestGenerationBatchRepositoryPort {
   findLatestByStoryboardId(
     storyboardId: string,
   ): Promise<TestGenerationBatch | null>;
+  // Every batch of a storyboard, newest first.
+  listByStoryboardId(storyboardId: string): Promise<TestGenerationBatch[]>;
   save(batch: TestGenerationBatch): Promise<void>;
 }
 
@@ -179,8 +194,15 @@ export type SceneFillGenerationInput = {
   scene: Scene;
   primaryPhoto: PhotoAsset;
   stylePreset: StylePreset | null;
-  projectPhotos: PhotoAsset[];
+  // Only the photos this scene assigned as `reference`. Sending every project
+  // photo instead billed one image per photo on every scene's call, and the
+  // cross-photo context it was there for now arrives as text via photoAnalysis.
+  referencePhotos: PhotoAsset[];
   siblingScenes: Scene[];
+  // The project's stored photo analysis, when one exists. Grounds the scene in
+  // what the vision pass already established about these photos and the story
+  // as a whole, instead of re-deriving it per scene.
+  photoAnalysis: ProjectPhotoAnalysis | null;
   language: Language;
 };
 
@@ -217,6 +239,30 @@ export interface ComplementSceneProposalPort {
   ): Promise<ComplementSceneProposal[]>;
 }
 
+// Setup step 4: the shared story and world every scene is written against.
+// Text-only — the photos were already read by the project photo analysis, and
+// the summary of that pass is what this step builds on.
+export type StorySetupGenerationInput = {
+  project: Project;
+  storyboard: Storyboard;
+  stylePreset: StylePreset | null;
+  photoAnalysis: ProjectPhotoAnalysis | null;
+  language: Language;
+};
+
+export type StorySetupSuggestion = {
+  story: string;
+  commonPrompt: string;
+  negativePrompt: string;
+  model: string;
+};
+
+export interface StorySetupGenerationPort {
+  generateStorySetup(
+    input: StorySetupGenerationInput,
+  ): Promise<StorySetupSuggestion>;
+}
+
 export type PhotoAnalysisGenerationInput = {
   project: Project;
   storyboard: Storyboard | null;
@@ -239,7 +285,8 @@ export interface PhotoAnalysisGenerationPort {
 
 export interface JobQueuePort {
   enqueue(job: {
-    kind: string;
+    kind: AiJobKind;
+    projectId: string;
     payload: Record<string, unknown>;
   }): Promise<{ jobId: string }>;
 }
@@ -267,6 +314,7 @@ export interface ApplicationDependencies {
   stylePresets: StylePresetRepositoryPort;
   generationRequests: GenerationRequestRepositoryPort;
   generatedImages: GeneratedImageRepositoryPort;
+  aiJobs: AiJobRepositoryPort;
   projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
   testGenerationBatches: TestGenerationBatchRepositoryPort;
   userPreferences: UserPreferenceRepositoryPort;
@@ -276,6 +324,7 @@ export interface ApplicationDependencies {
   sceneFillGeneration: SceneFillGenerationPort;
   complementSceneProposal: ComplementSceneProposalPort;
   photoAnalysisGeneration: PhotoAnalysisGenerationPort;
+  storySetupGeneration: StorySetupGenerationPort;
   jobQueue: JobQueuePort;
   progressEvents: ProgressEventPort;
   authContext: AuthContextPort;

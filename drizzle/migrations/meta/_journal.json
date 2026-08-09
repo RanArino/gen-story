@@ -85,6 +85,27 @@
       "when": 1781707812140,
       "tag": "0011_futuristic_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1785288575839,
+      "tag": "0012_yielding_wendigo",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1785340387000,
+      "tag": "0013_blue_revanche",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1785392214598,
+      "tag": "0014_silky_serpent_society",
+      "breakpoints": true
     }
   ]
 }

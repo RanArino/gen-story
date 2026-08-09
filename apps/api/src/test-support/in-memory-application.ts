@@ -1,4 +1,5 @@
 import type {
+  AiJobRepositoryPort,
   ApplicationDependencies,
   ComplementSceneProposal,
   ComplementSceneProposalInput,
@@ -21,6 +22,9 @@ import type {
   SceneFillGenerationPort,
   SceneFillSuggestion,
   SceneRepositoryPort,
+  StorySetupGenerationInput,
+  StorySetupGenerationPort,
+  StorySetupSuggestion,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
   TestGenerationBatchRepositoryPort,
@@ -29,11 +33,15 @@ import type {
   UserRepositoryPort,
 } from "@gen-story/application";
 import type {
+  AiJobKind,
   GenerationRequestStatus,
   TestGenerationBatch,
 } from "@gen-story/domain";
+import { createAiJob } from "@gen-story/domain";
 import { LocalAuthContext } from "../auth/local-auth";
+import { LocalProgressEvents } from "../jobs/local-progress-events";
 import type {
+  AiJob,
   GeneratedImage,
   GenerationRequest,
   Organization,
@@ -259,6 +267,13 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.testGenerationBatchId === testBatchId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.store.save(generationRequest);
   }
@@ -320,6 +335,18 @@ class InMemoryTestGenerationBatchRepository implements TestGenerationBatchReposi
         .filter((b) => b.storyboardId === storyboardId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
     );
+  }
+
+  async listByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch[]> {
+    return this.store
+      .values()
+      .filter((b) => b.storyboardId === storyboardId)
+      .sort(
+        (a, b) =>
+          b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+      );
   }
 
   async save(batch: TestGenerationBatch): Promise<void> {
@@ -449,6 +476,19 @@ class InMemoryPhotoAnalysisGeneration implements PhotoAnalysisGenerationPort {
   }
 }
 
+class InMemoryStorySetupGeneration implements StorySetupGenerationPort {
+  async generateStorySetup(
+    input: StorySetupGenerationInput,
+  ): Promise<StorySetupSuggestion> {
+    return {
+      story: `AI story for ${input.project.name} (${input.storyboard.tone})`,
+      commonPrompt: `AI common prompt for ${input.storyboard.tone}`,
+      negativePrompt: "text, watermark",
+      model: "in-memory",
+    };
+  }
+}
+
 class InMemoryUserPreferenceRepository implements UserPreferenceRepositoryPort {
   private readonly items = new Map<string, UserPreference>();
 
@@ -461,14 +501,78 @@ class InMemoryUserPreferenceRepository implements UserPreferenceRepositoryPort {
   }
 }
 
-class InMemoryJobQueue implements JobQueuePort {
-  async enqueue(): Promise<{ jobId: string }> {
-    return { jobId: "job_1" };
+class InMemoryAiJobRepository implements AiJobRepositoryPort {
+  constructor(private readonly store: MemoryStore<AiJob>) {}
+
+  async findById(aiJobId: string): Promise<AiJob | null> {
+    return this.store.findById(aiJobId);
+  }
+
+  async findQueued(): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.status === "queued");
+  }
+
+  async findRunning(): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.status === "running");
+  }
+
+  async findRunningCountByProjectId(projectId: string): Promise<number> {
+    return this.store
+      .values()
+      .filter((job) => job.projectId === projectId && job.status === "running")
+      .length;
+  }
+
+  async findByProjectId(projectId: string): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.projectId === projectId);
+  }
+
+  async save(aiJob: AiJob): Promise<void> {
+    await this.store.save(aiJob);
   }
 }
 
-class InMemoryProgressEvents implements ProgressEventPort {
-  async publish(): Promise<void> {}
+// Writes real rows into the AI job store so tests can assert on what was
+// enqueued, and so the worker can be driven end to end in memory.
+class InMemoryJobQueue implements JobQueuePort {
+  private sequence = 0;
+
+  constructor(
+    private readonly store: MemoryStore<AiJob>,
+    private readonly progressEvents: ProgressEventPort,
+  ) {}
+
+  async enqueue(job: {
+    kind: AiJobKind;
+    projectId: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ jobId: string }> {
+    this.sequence += 1;
+    const timestamp = new Date().toISOString();
+    const aiJob = createAiJob({
+      id: `job_${this.sequence}`,
+      projectId: job.projectId,
+      kind: job.kind,
+      inputJson: job.payload,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    await this.store.save(aiJob);
+    await this.progressEvents.publish({
+      kind: "ai-job.queued",
+      entityType: "aiJob",
+      entityId: aiJob.id,
+      payload: {
+        aiJobId: aiJob.id,
+        projectId: aiJob.projectId,
+        jobKind: aiJob.kind,
+        status: aiJob.status,
+      },
+    });
+
+    return { jobId: aiJob.id };
+  }
 }
 
 export function createInMemoryApplicationDependencies(
@@ -484,9 +588,13 @@ export function createInMemoryApplicationDependencies(
     generatedImages?: GeneratedImage[];
     projectPhotoAnalyses?: ProjectPhotoAnalysis[];
     testGenerationBatches?: TestGenerationBatch[];
+    aiJobs?: AiJob[];
   },
-  overrides?: Partial<ApplicationDependencies>,
+  overrides?: Partial<Omit<ApplicationDependencies, "progressEvents">> & {
+    progressEvents?: LocalProgressEvents;
+  },
 ): ApplicationDependencies & {
+  progressEvents: LocalProgressEvents;
   stores: {
     users: MemoryStore<User>;
     organizations: MemoryStore<Organization>;
@@ -499,6 +607,7 @@ export function createInMemoryApplicationDependencies(
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
     testGenerationBatches: MemoryStore<TestGenerationBatch>;
+    aiJobs: MemoryStore<AiJob>;
   };
 } {
   const stores = {
@@ -515,8 +624,12 @@ export function createInMemoryApplicationDependencies(
     testGenerationBatches: new MemoryStore<TestGenerationBatch>(
       initial?.testGenerationBatches ?? [],
     ),
+    aiJobs: new MemoryStore<AiJob>(initial?.aiJobs ?? []),
   };
-  const dependencies: ApplicationDependencies = {
+  const progressEvents = new LocalProgressEvents();
+  const dependencies: ApplicationDependencies & {
+    progressEvents: LocalProgressEvents;
+  } = {
     users: new InMemoryUserRepository(stores.users),
     organizations: new InMemoryOrganizationRepository(stores.organizations),
     projects: new InMemoryProjectRepository(stores.projects),
@@ -530,6 +643,7 @@ export function createInMemoryApplicationDependencies(
     generatedImages: new InMemoryGeneratedImageRepository(
       stores.generatedImages,
     ),
+    aiJobs: new InMemoryAiJobRepository(stores.aiJobs),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
     ),
@@ -543,8 +657,9 @@ export function createInMemoryApplicationDependencies(
     sceneFillGeneration: new InMemorySceneFillGeneration(),
     complementSceneProposal: new InMemoryComplementSceneProposal(),
     photoAnalysisGeneration: new InMemoryPhotoAnalysisGeneration(),
-    jobQueue: new InMemoryJobQueue(),
-    progressEvents: new InMemoryProgressEvents(),
+    storySetupGeneration: new InMemoryStorySetupGeneration(),
+    jobQueue: new InMemoryJobQueue(stores.aiJobs, progressEvents),
+    progressEvents,
     authContext: new LocalAuthContext({
       users: new InMemoryUserRepository(stores.users),
       organizations: new InMemoryOrganizationRepository(stores.organizations),

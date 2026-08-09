@@ -104,6 +104,12 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
 
     return {
       ...input.inputJson,
+      // Set after the spread on purpose: these are the validated targets, and
+      // generation adapters build their storage keys from them. Leaving it to
+      // the caller's inputJson meant the test-generation path, which sends only
+      // a batch id, wrote to an "unknown-project" directory.
+      projectId: input.projectId,
+      sceneId: input.sceneId,
       normalizedInputImages,
       prompt: composedPrompt,
       negativePrompt,

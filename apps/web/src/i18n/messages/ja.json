@@ -149,7 +149,57 @@
       "localModelBadge": "ローカル(AI未使用)",
       "analyzedAt": "分析日時: {when}",
       "emptyNoPhotos": "分析を有効にするには、写真ページで少なくとも1枚を「候補」または「参考」に設定してください。",
-      "emptyClickToStart": "<strong>写真を分析</strong> をクリックして、選択した写真からトーンの候補を生成してください。"
+      "emptyClickToStart": "<strong>写真を分析</strong> をクリックして、選択した写真からトーンの候補を生成してください。",
+      "cancelJob": "キャンセル",
+      "jobStatus": {
+        "queued": "待機中…",
+        "running": "処理中…",
+        "succeeded": "完了",
+        "failed": "失敗",
+        "canceled": "キャンセル済み"
+      }
+    },
+    "setup": {
+      "title": "ストーリーボードのセットアップ",
+      "progressLabel": "セットアップの進捗",
+      "progressCount": "{total}ステップ中{done}完了",
+      "steps": {
+        "photos": {
+          "title": "1. 写真",
+          "hint": "この動画のもとになる写真を選びます。",
+          "locked": "写真の選択を待っています。"
+        },
+        "tone": {
+          "title": "2. トーン",
+          "hint": "写真を分析し、そこから提案された感情を選びます。",
+          "locked": "先に写真を候補または参考として指定してください。"
+        },
+        "style": {
+          "title": "3. スタイル",
+          "hint": "ビジュアルスタイルを選ぶか、独自に作成します。",
+          "locked": "先にトーンを選んでください。"
+        },
+        "story": {
+          "title": "4. ストーリー",
+          "hint": "トーンとスタイルから、ストーリー・共通プロンプト・ネガティブプロンプトを作成します。",
+          "locked": "先にスタイルを選んでください。"
+        },
+        "scenes": {
+          "title": "5. シーン",
+          "hint": "各シーンのタイトル・説明・画像プロンプトを作成します。",
+          "locked": "先にストーリーを作成してください。"
+        }
+      },
+      "storyTitle": "ストーリー設定",
+      "storyIntro": "ストーリー・共通プロンプト・ネガティブプロンプトをまとめて作成します。3つとも選んだトーンとスタイルに沿った内容になります。作成後、下の各欄で内容を確認・編集してください。",
+      "storyGenerate": "AIで作成（AI呼び出し1回）",
+      "storyGenerating": "作成中…",
+      "storyGeneratedMsg": "ストーリー・共通プロンプト・ネガティブプロンプトを作成しました。下で内容を確認してください。",
+      "storyFailed": "ストーリー設定の作成に失敗しました",
+      "scenesFillAll": "{count}件のシーンをAIで作成（AI呼び出し{count}回）",
+      "scenesFilling": "シーンを作成中…",
+      "scenesNothingToFill": "すべてのシーンは作成済みです。",
+      "scenesFailed": "シーンのAI作成に失敗しました"
     },
     "tones": {
       "warm": {
@@ -248,7 +298,10 @@
       "selectAll": "すべて選択",
       "deselectAll": "選択を解除",
       "hint": "💡 候補写真を1枚以上選び、ボタンを押すと下書きシーンが作成されます",
-      "failed": "テンプレートシーンの作成に失敗しました"
+      "failed": "テンプレートシーンの作成に失敗しました",
+      "autoFill": "タイトルとプロンプトもAIで作成する（写真{count}枚 → AI呼び出し{count}回）",
+      "autoFillProgress": "AIがシーンを作成中… {done}/{total}",
+      "autoFillFailed": "{count}件のシーンでAI補完に失敗しました。該当シーンの「AIで埋める」から再試行できます。"
     },
     "scenes": {
       "addScene": "+ シーンを追加",
@@ -295,7 +348,8 @@
       "continueToGenerate": "生成へ進む →",
       "testInProgress": "テスト中…",
       "viewTestGeneration": "テスト生成を表示",
-      "startTestGeneration": "テスト生成 →"
+      "startTestGeneration": "テスト生成 →",
+      "reviewTestGeneration": "サンプルを見る／選び直す"
     },
     "negativePrompt": {
       "notSet": "未設定",
@@ -322,7 +376,6 @@
     "confirmStyle": "このスタイルを確定",
     "confirming": "確定中…",
     "confirmedBadge": "✓ 確定済み",
-    "regenerate": "新しいテストを生成",
     "adjustments": {
       "heading": "このバリアントを調整",
       "saveHint": "このバリアントを確定すると、選択した調整がプロジェクトの共通プロンプトに保存されます。",
@@ -341,9 +394,15 @@
     "errors": {
       "start": "テスト生成の開始に失敗しました。",
       "confirm": "確定に失敗しました。",
-      "reset": "リセットに失敗しました。",
       "apply": "調整の適用に失敗しました。"
-    }
+    },
+    "loadingHistory": "サンプル履歴を読み込み中…",
+    "historyHeading": "サンプル履歴",
+    "batchTab": "第{number}回 · {time}",
+    "batchConfirmedMark": "✓",
+    "newBatchCta": "新しいサンプルを3枚生成（画像3枚分）",
+    "batchInFlight": "生成中のサンプルがあります。完了までお待ちください。",
+    "olderBatchNotice": "過去のサンプルです。調整は最新の回でのみ行えますが、ここから確定して本生成に進めます。"
   },
   "generate": {
     "title": "生成",
@@ -401,7 +460,6 @@
       }
     },
     "card": {
-      "adoptedBadge": "✓ 採用済み",
       "failedBadge": "生成に失敗",
       "regenerate": "再生成",
       "sourcePhoto": "元写真",
@@ -414,8 +472,8 @@
       "retryGeneration": "生成を再試行",
       "goToGenerate": "生成へ移動 →",
       "historyHeader": "生成履歴({count})",
-      "adopt": "採用",
-      "adopted": "採用済み"
+      "useThis": "この画像を使う",
+      "sampleTag": "サンプル"
     },
     "regenModal": {
       "title": "再生成 — {sceneTitle}",
@@ -473,6 +531,15 @@
       "created": "作成",
       "completed": "完了",
       "error": "エラー"
+    },
+    "testGeneration": {
+      "heading": "テスト生成サンプル（{count}回）",
+      "runLabel": "第{number}回",
+      "confirmed": "確定済み",
+      "notConfirmed": "未確定",
+      "sampleAlt": "テストサンプル",
+      "openStoryboard": "絵コンテでサンプルを見る",
+      "sampleRow": "サンプル"
     }
   },
   "settings": {

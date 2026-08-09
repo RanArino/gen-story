@@ -6,6 +6,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import {
+  createAiJob,
   createGeneratedImage,
   createGenerationRequest,
   createOrganization,
@@ -175,6 +176,48 @@ describe("SQLite persistence", () => {
         emotionCandidates: projectPhotoAnalysis.emotionCandidates,
         photoInsights: projectPhotoAnalysis.photoInsights,
       });
+    });
+  });
+
+  it("round-trips the storyboard setup completion stamp, including null", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(buildStoryboard());
+
+      // New storyboards start un-stamped: the guided flow is still gating them.
+      await expect(
+        repositories.storyboards.findById("storyboard_1"),
+      ).resolves.toMatchObject({ setupCompletedAt: null });
+
+      const stamped = await repositories.storyboards.findById("storyboard_1");
+      await repositories.storyboards.save({
+        ...stamped!,
+        setupCompletedAt: "2026-07-30T12:00:00.000Z",
+      });
+
+      await expect(
+        repositories.storyboards.findById("storyboard_1"),
+      ).resolves.toMatchObject({
+        setupCompletedAt: "2026-07-30T12:00:00.000Z",
+      });
+    });
+  });
+
+  it("stores a blank storyboard tone as undecided", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(
+        createStoryboard({
+          id: "storyboard_1",
+          projectId: "project_1",
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+
+      await expect(
+        repositories.storyboards.findById("storyboard_1"),
+      ).resolves.toMatchObject({ tone: "" });
     });
   });
 
@@ -424,6 +467,64 @@ describe("SQLite persistence", () => {
       await expect(
         repositories.storyboards.findById("storyboard_1"),
       ).resolves.toMatchObject({ status: "ready" });
+    });
+  });
+
+  it("round-trips AI jobs and finds them by status and project", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+
+      const queued = createAiJob({
+        id: "job_1",
+        projectId: "project_1",
+        kind: "photo_analysis",
+        inputJson: { projectId: "project_1", language: "en" },
+        createdAt: now,
+        updatedAt: now,
+      });
+      await repositories.aiJobs.save(queued);
+
+      await expect(
+        repositories.aiJobs.findById("job_1"),
+      ).resolves.toMatchObject({
+        kind: "photo_analysis",
+        status: "queued",
+        inputJson: { projectId: "project_1", language: "en" },
+        resultJson: null,
+      });
+      await expect(repositories.aiJobs.findQueued()).resolves.toHaveLength(1);
+      await expect(
+        repositories.aiJobs.findRunningCountByProjectId("project_1"),
+      ).resolves.toBe(0);
+
+      await repositories.aiJobs.save({
+        ...queued,
+        status: "running",
+        startedAt: later,
+        updatedAt: later,
+      });
+      await expect(repositories.aiJobs.findQueued()).resolves.toHaveLength(0);
+      await expect(repositories.aiJobs.findRunning()).resolves.toHaveLength(1);
+      await expect(
+        repositories.aiJobs.findRunningCountByProjectId("project_1"),
+      ).resolves.toBe(1);
+
+      await repositories.aiJobs.save({
+        ...queued,
+        status: "succeeded",
+        resultJson: { photoCount: 3 },
+        completedAt: later,
+        updatedAt: later,
+      });
+      await expect(
+        repositories.aiJobs.findById("job_1"),
+      ).resolves.toMatchObject({
+        status: "succeeded",
+        resultJson: { photoCount: 3 },
+      });
+      await expect(
+        repositories.aiJobs.findByProjectId("project_1"),
+      ).resolves.toHaveLength(1);
     });
   });
 });

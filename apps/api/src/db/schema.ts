@@ -113,6 +113,10 @@ export const storyboards = sqliteTable(
     commonPrompt: text("common_prompt").notNull().default(""),
     story: text("story").notNull().default(""),
     negativePrompt: text("negative_prompt").notNull().default(""),
+    // Null while the guided five-step setup is still gating this storyboard.
+    // Stamped once it has been through all five steps, after which every
+    // section is freely editable.
+    setupCompletedAt: text("setup_completed_at"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     deletedAt: text("deleted_at"),
@@ -213,6 +217,7 @@ export const generationRequests = sqliteTable(
     appliedAdjustmentsJson: text("applied_adjustments_json")
       .notNull()
       .default("[]"),
+    testGenerationBatchId: text("test_generation_batch_id"),
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
     createdAt: text("created_at").notNull(),
@@ -224,6 +229,9 @@ export const generationRequests = sqliteTable(
     index("generation_requests_storyboard_id_idx").on(table.storyboardId),
     index("generation_requests_scene_id_idx").on(table.sceneId),
     index("generation_requests_status_idx").on(table.status),
+    index("generation_requests_test_generation_batch_id_idx").on(
+      table.testGenerationBatchId,
+    ),
   ],
 );
 
@@ -286,6 +294,32 @@ export const projectPhotoAnalyses = sqliteTable(
   (table) => [
     uniqueIndex("project_photo_analyses_project_id_unique").on(table.projectId),
     index("project_photo_analyses_project_id_idx").on(table.projectId),
+  ],
+);
+
+// Background jobs for the text/vision AI operations (photo analysis, scene AI
+// fill, complement scene proposals). Image generation keeps its own
+// image-specific `generation_requests` table.
+export const aiJobs = sqliteTable(
+  "ai_jobs",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    kind: text("kind").notNull(),
+    status: text("status").notNull(),
+    inputJson: text("input_json").notNull(),
+    resultJson: text("result_json"),
+    errorMessage: text("error_message"),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("ai_jobs_project_id_idx").on(table.projectId),
+    index("ai_jobs_status_idx").on(table.status),
   ],
 );
 

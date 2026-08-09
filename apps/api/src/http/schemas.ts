@@ -19,7 +19,10 @@ export const PatchPhotoAssetSchema = z.object({
 
 export const UpsertStoryboardSchema = z.object({
   projectId: z.string().min(1),
-  tone: z.string().min(1),
+  // Optional, and the empty string is allowed: blank means "tone not decided
+  // yet", which is exactly what the guided setup flow gates step 2 on. Omitting
+  // it leaves the stored tone alone.
+  tone: z.string().optional(),
   status: z.enum(["draft", "editing", "ready", "completed"]).optional(),
   stylePresetId: z.string().nullable().optional(),
   commonPrompt: z.string().optional(),
@@ -27,17 +30,21 @@ export const UpsertStoryboardSchema = z.object({
   negativePrompt: z.string().optional(),
 });
 
+// The AI-fillable fields accept the empty string on purpose: blank means "not
+// written yet", which is what makes a scene eligible for AI fill. Requiring a
+// non-empty value here forced the web layer to invent placeholder text, which
+// then made every scene look already-filled and silently disabled AI fill.
 export const SceneInputSchema = z.object({
   sceneId: z.string().optional(),
   orderIndex: z.number().int().min(0),
   status: z.enum(["draft", "ready", "completed"]).optional(),
-  title: z.string().min(1),
-  description: z.string().min(1),
-  imagePrompt: z.string().min(1),
-  emotion: z.string().min(1),
-  cameraDirection: z.string().min(1),
-  lightingDirection: z.string().min(1),
-  motionDirection: z.string().min(1),
+  title: z.string(),
+  description: z.string(),
+  imagePrompt: z.string(),
+  emotion: z.string(),
+  cameraDirection: z.string(),
+  lightingDirection: z.string(),
+  motionDirection: z.string(),
   notes: z.string().optional(),
   negativePrompt: z.string().optional(),
   photoAssets: z
@@ -65,6 +72,14 @@ export const AssignScenePhotosSchema = z.object({
 
 export const FillSceneWithAiSchema = z.object({}).strict();
 
+// Setup step 5: one AI call per scene that still has a blank field. The count
+// is not a parameter — the server decides it from the scenes — so the body is
+// empty and the caller reads the spend back from the returned job list.
+export const FillStoryboardScenesWithAiSchema = z.object({}).strict();
+
+// Setup step 4. One AI call; tone and style must already be decided.
+export const GenerateStorySetupSchema = z.object({}).strict();
+
 // Preview the composed prompt for a scene. Every field is optional: omitted
 // fields fall back to the persisted scene/storyboard values, so the preview can
 // reflect the user's current unsaved editor/modal state. Side-effect free.
@@ -84,6 +99,9 @@ export const AnalyzeProjectPhotosSchema = z.object({}).strict();
 
 export const CreateTemplateScenesSchema = z.object({
   photoAssetIds: z.array(z.string().min(1)).min(1).max(20),
+  // Opt-in: enqueues one AI fill job per created scene, so it bills one model
+  // call per photo. Defaults to off.
+  autoFill: z.boolean().optional(),
 });
 
 export const ReorderPhotosSchema = z.object({

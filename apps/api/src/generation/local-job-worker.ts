@@ -1,10 +1,38 @@
 import {
-  checkConcurrencyAllowed,
+  MAX_CONCURRENT_PER_PROJECT,
+  markAiJobFailed,
+  markAiJobRunning,
+  markAiJobSucceeded,
   markGenerationRequestCompleted,
   markGenerationRequestFailed,
   markGenerationRequestRunning,
+  runComplementSceneProposalsJob,
+  runPhotoAnalysisJob,
+  runSceneAiFillJob,
+  runStorySetupJob,
 } from "@gen-story/application";
-import type { ApplicationDependencies } from "@gen-story/application";
+import type {
+  ApplicationDependencies,
+  UseCaseResult,
+} from "@gen-story/application";
+import type { AiJob } from "@gen-story/domain";
+
+const AI_JOB_RUNNERS: Record<
+  AiJob["kind"],
+  (
+    deps: ApplicationDependencies,
+    job: AiJob,
+  ) => Promise<UseCaseResult<Record<string, unknown>>>
+> = {
+  photo_analysis: runPhotoAnalysisJob,
+  story_setup: runStorySetupJob,
+  scene_ai_fill: runSceneAiFillJob,
+  complement_scene_proposals: runComplementSceneProposalsJob,
+};
+
+// Caps how many new items one scan may start, so a backlog spread over many
+// projects ramps up instead of launching everything at once.
+const MAX_DISPATCH_PER_TICK = 5;
 
 function now(): string {
   return new Date().toISOString();
@@ -13,7 +41,12 @@ function now(): string {
 export class LocalJobWorker {
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly pollIntervalMs: number;
-  private running = false;
+  private scanning = false;
+  // Everything this worker currently has in flight, as id -> projectId. The
+  // worker is the only thing that starts work in this process, so this is an
+  // exact per-project count: no database read, and no race against a `running`
+  // status write that has not landed yet.
+  private readonly inFlight = new Map<string, string>();
 
   constructor(
     private readonly deps: ApplicationDependencies,
@@ -38,36 +71,120 @@ export class LocalJobWorker {
     }
   }
 
+  // Only the scan is serialized. It deliberately does not wait for the work it
+  // starts: waiting meant a slot freed by an early finisher stayed idle until
+  // the slowest job in the batch completed, which on an eight-scene fill left
+  // three of five slots unused for six seconds.
   private async tick(): Promise<void> {
-    if (this.running) return;
-    this.running = true;
+    if (this.scanning) return;
+    this.scanning = true;
     try {
-      await this.processQueued();
+      const [requests, jobs] = await Promise.all([
+        this.deps.generationRequests.findQueued(),
+        this.deps.aiJobs.findQueued(),
+      ]);
+
+      let started = 0;
+      for (const request of requests) {
+        if (started >= MAX_DISPATCH_PER_TICK) break;
+        if (!this.claimSlot(request.id, request.projectId)) continue;
+        this.track(request.id, this.executeJob(request.id, request.inputJson));
+        started += 1;
+      }
+      for (const job of jobs) {
+        if (started >= MAX_DISPATCH_PER_TICK) break;
+        if (!this.claimSlot(job.id, job.projectId)) continue;
+        this.track(job.id, this.executeAiJob(job));
+        started += 1;
+      }
     } finally {
-      this.running = false;
+      this.scanning = false;
     }
   }
 
-  private async processQueued(): Promise<void> {
-    const queued = await this.deps.generationRequests.findQueued();
-    if (queued.length === 0) return;
+  // Reserves a slot for this item, or reports that it cannot run yet. Reserving
+  // up front is what keeps the cap exact once dispatch stopped being awaited.
+  private claimSlot(id: string, projectId: string): boolean {
+    if (this.inFlight.has(id)) return false;
 
-    const dispatched: Promise<void>[] = [];
+    let used = 0;
+    for (const owner of this.inFlight.values()) {
+      if (owner === projectId) used += 1;
+    }
+    if (used >= MAX_CONCURRENT_PER_PROJECT) return false;
 
-    for (const request of queued) {
-      const allowed = await checkConcurrencyAllowed(
-        this.deps,
-        request.projectId,
-      );
-      if (!allowed) continue;
+    this.inFlight.set(id, projectId);
+    return true;
+  }
 
-      dispatched.push(this.executeJob(request.id, request.inputJson));
+  // The slot must be released on failure too, and the rejection must stop here:
+  // nothing awaits this promise any more, and an unhandled rejection takes the
+  // whole API process down.
+  private track(id: string, work: Promise<void>): void {
+    void work
+      .catch((err) => {
+        console.error(`[LocalJobWorker] Unhandled error for ${id}:`, err);
+      })
+      .finally(() => this.inFlight.delete(id));
+  }
 
-      // Stop dispatching once we have reached the global cap for this tick
-      if (dispatched.length >= 5) break;
+  private async executeAiJob(job: AiJob): Promise<void> {
+    const startedAt = now();
+
+    const runningResult = await markAiJobRunning(this.deps, {
+      aiJobId: job.id,
+      startedAt,
+    });
+
+    if (!runningResult.ok) {
+      // Already transitioned by another worker tick, or canceled — skip.
+      return;
     }
 
-    await Promise.allSettled(dispatched);
+    console.log(`[Worker] starting AI job ${job.id} (${job.kind})`);
+
+    try {
+      const result = await AI_JOB_RUNNERS[job.kind](
+        this.deps,
+        runningResult.value,
+      );
+
+      if (!result.ok) {
+        await markAiJobFailed(this.deps, {
+          aiJobId: job.id,
+          errorMessage: result.error.message.slice(0, 500),
+          completedAt: now(),
+        });
+        console.log(
+          `[Worker] failed AI job ${job.id}: ${result.error.message}`,
+        );
+        return;
+      }
+
+      const succeeded = await markAiJobSucceeded(this.deps, {
+        aiJobId: job.id,
+        resultJson: result.value,
+        completedAt: now(),
+      });
+
+      if (!succeeded.ok) {
+        console.log(
+          `[Worker] AI job ${job.id} already canceled; discarding result`,
+        );
+        return;
+      }
+
+      const durationMs = Date.now() - new Date(startedAt).getTime();
+      console.log(`[Worker] succeeded AI job ${job.id} in ${durationMs}ms`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await markAiJobFailed(this.deps, {
+        aiJobId: job.id,
+        errorMessage: message.slice(0, 500),
+        completedAt: now(),
+      });
+      console.log(`[Worker] failed AI job ${job.id}: ${message}`);
+    }
   }
 
   private async executeJob(

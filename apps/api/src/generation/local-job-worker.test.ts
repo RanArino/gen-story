@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  analyzeProjectPhotos,
+  cancelAiJob,
   createGenerationRequestUseCase,
   markGenerationRequestFailed,
 } from "@gen-story/application";
 import {
   createOrganization,
+  createPhotoAsset,
   createProject,
   createScene,
   createStoryboard,
@@ -243,5 +246,274 @@ describe("LocalJobWorker", () => {
 
     const retry = await deps.generationRequests.findById("req-retry");
     expect(retry?.status).toBe("succeeded");
+  });
+
+  it("runs a queued AI job through to succeeded with a stored result", async () => {
+    const { deps, project } = makeDeps();
+
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: "photo-1",
+        projectId: project.id,
+        name: "family.jpg",
+        usage: "candidate",
+        storageKey: "photos/family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: "family",
+        sourceKind: "upload",
+        createdAt: now(),
+        updatedAt: now(),
+      }),
+    );
+
+    const enqueued = await analyzeProjectPhotos(deps, {
+      projectId: project.id,
+    });
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+
+    const worker = new LocalJobWorker(deps, { pollIntervalMs: 10 });
+    worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    worker.stop();
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.status).toBe("succeeded");
+    expect(job?.startedAt).not.toBeNull();
+    expect(job?.completedAt).not.toBeNull();
+    expect(job?.resultJson?.photoCount).toBe(1);
+
+    const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
+    expect(analysis).not.toBeNull();
+  });
+
+  it("discards the result of an AI job canceled mid-flight", async () => {
+    const { deps, project } = makeDeps();
+
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: "photo-1",
+        projectId: project.id,
+        name: "family.jpg",
+        usage: "candidate",
+        storageKey: "photos/family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: "family",
+        sourceKind: "upload",
+        createdAt: now(),
+        updatedAt: now(),
+      }),
+    );
+
+    const enqueued = await analyzeProjectPhotos(deps, {
+      projectId: project.id,
+    });
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    const jobId = enqueued.value.jobId;
+
+    // Cancel while the model call is in flight.
+    const slowDeps = {
+      ...deps,
+      photoAnalysisGeneration: {
+        analyzeProjectPhotos: vi.fn(async () => {
+          await cancelAiJob(deps, { aiJobId: jobId });
+          return {
+            emotionCandidates: [
+              {
+                value: "calm",
+                label: "Calm",
+                description: "Calm.",
+                reason: "Because.",
+              },
+            ],
+            photoInsights: [
+              {
+                photoAssetId: "photo-1",
+                summary: "s",
+                people: "p",
+                setting: "s",
+                event: "e",
+                atmosphere: "a",
+              },
+            ],
+            storySummary: "A story.",
+            model: "test",
+          };
+        }),
+      },
+    };
+
+    const worker = new LocalJobWorker(slowDeps, { pollIntervalMs: 10 });
+    worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    worker.stop();
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.status).toBe("canceled");
+    expect(job?.resultJson).toBeNull();
+  });
+
+  it("leaves AI jobs beyond the per-project cap queued", async () => {
+    const { deps, project } = makeDeps();
+
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: "photo-1",
+        projectId: project.id,
+        name: "family.jpg",
+        usage: "candidate",
+        storageKey: "photos/family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: "family",
+        sourceKind: "upload",
+        createdAt: now(),
+        updatedAt: now(),
+      }),
+    );
+
+    for (let i = 1; i <= 7; i += 1) {
+      await deps.jobQueue.enqueue({
+        kind: "photo_analysis",
+        projectId: project.id,
+        payload: { projectId: project.id },
+      });
+    }
+
+    let running = 0;
+    let maxSeen = 0;
+    const slowDeps = {
+      ...deps,
+      photoAnalysisGeneration: {
+        analyzeProjectPhotos: vi.fn(async () => {
+          running += 1;
+          maxSeen = Math.max(maxSeen, running);
+          await new Promise((r) => setTimeout(r, 200));
+          running -= 1;
+          return {
+            emotionCandidates: [
+              {
+                value: "calm",
+                label: "Calm",
+                description: "Calm.",
+                reason: "Because.",
+              },
+            ],
+            photoInsights: [
+              {
+                photoAssetId: "photo-1",
+                summary: "s",
+                people: "p",
+                setting: "s",
+                event: "e",
+                atmosphere: "a",
+              },
+            ],
+            storySummary: "A story.",
+            model: "test",
+          };
+        }),
+      },
+    };
+
+    const worker = new LocalJobWorker(slowDeps, { pollIntervalMs: 10 });
+    worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    worker.stop();
+
+    expect(maxSeen).toBeLessThanOrEqual(5);
+    expect((await deps.aiJobs.findQueued()).length).toBeGreaterThan(0);
+  });
+
+  // A scan must not wait for the work it starts. When it did, a slot freed by a
+  // fast job stayed idle until the slowest job in the batch finished, so an
+  // eight-scene fill ran as two rigid batches with three slots idle in between.
+  it("refills a freed slot without waiting for the rest of the batch", async () => {
+    const { deps, project } = makeDeps();
+
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: "photo-1",
+        projectId: project.id,
+        name: "family.jpg",
+        usage: "candidate",
+        storageKey: "photos/family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: "family",
+        sourceKind: "upload",
+        createdAt: now(),
+        updatedAt: now(),
+      }),
+    );
+
+    for (let i = 1; i <= 8; i += 1) {
+      await deps.jobQueue.enqueue({
+        kind: "photo_analysis",
+        projectId: project.id,
+        payload: { projectId: project.id },
+      });
+    }
+
+    let startedCount = 0;
+    let running = 0;
+    let maxSeen = 0;
+    const slowDeps = {
+      ...deps,
+      photoAnalysisGeneration: {
+        analyzeProjectPhotos: vi.fn(async () => {
+          startedCount += 1;
+          running += 1;
+          maxSeen = Math.max(maxSeen, running);
+          // The first job of the batch is the slow one; the other four in the
+          // opening batch finish quickly and should free their slots.
+          await new Promise((r) =>
+            setTimeout(r, startedCount === 1 ? 400 : 20),
+          );
+          running -= 1;
+          return {
+            emotionCandidates: [
+              {
+                value: "calm",
+                label: "Calm",
+                description: "Calm.",
+                reason: "Because.",
+              },
+            ],
+            photoInsights: [
+              {
+                photoAssetId: "photo-1",
+                summary: "s",
+                people: "p",
+                setting: "s",
+                event: "e",
+                atmosphere: "a",
+              },
+            ],
+            storySummary: "A story.",
+            model: "test",
+          };
+        }),
+      },
+    };
+
+    const worker = new LocalJobWorker(slowDeps, { pollIntervalMs: 10 });
+    worker.start();
+    // Long enough for the fast jobs to cycle several times, still well inside
+    // the 400ms job that used to hold the whole batch hostage.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    worker.stop();
+
+    // More than one batch worth of jobs has started while the slow one runs.
+    expect(startedCount).toBeGreaterThan(5);
+    // And the per-project cap was still respected throughout.
+    expect(maxSeen).toBeLessThanOrEqual(5);
   });
 });

@@ -7,6 +7,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { failInterruptedAiJobs } from "@gen-story/application";
+
 import { createApiContext } from "./app/create-api-context";
 import { seedLocalPrincipal } from "./auth/local-auth";
 import { openDatabase, migrateDatabase } from "./db";
@@ -126,6 +128,13 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
   const deps = createApiContext(client);
   await seedLocalPrincipal(deps);
 
+  // Jobs left `running` by a previous process have no worker; fail them so the
+  // UI shows a terminal state instead of a spinner that never resolves.
+  const interrupted = await failInterruptedAiJobs(deps);
+  if (interrupted.ok && interrupted.value > 0) {
+    console.log(`[startup] failed ${interrupted.value} interrupted AI job(s)`);
+  }
+
   const worker = new LocalJobWorker(deps);
   worker.start();
 
@@ -138,6 +147,22 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
 
   const router = buildRouter(deps);
   const server = createServer(makeHandleRequest(router));
+
+  // Without a listener for this, Node rethrows the 'error' event and the API
+  // dies in a wall of stack trace while `pnpm dev` keeps the web server up — so
+  // the only symptom is "Failed to fetch" in the browser.
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `[startup] Port ${port} is already in use, so the API did not start.\n` +
+          `          Find the process with: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
+      );
+    } else {
+      console.error("[startup] The API server failed to start:", err);
+    }
+    worker.stop();
+    process.exit(1);
+  });
 
   server.listen(port, () => {
     console.log(`gen-story-api listening on http://localhost:${port}`);

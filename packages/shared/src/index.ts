@@ -95,16 +95,35 @@ export type ScenePhotoAssetDto = {
   role: string;
 };
 
+// The five ordered setup steps, plus "complete" when the data satisfies all of
+// them. Derived server-side from one domain rule so the UI never re-implements
+// the gate.
+export type StoryboardSetupStepDto =
+  | "photos"
+  | "tone"
+  | "style"
+  | "story"
+  | "scenes"
+  | "complete";
+
 export type StoryboardDto = {
   id: string;
   projectId: string;
   status: string;
+  // Empty means the tone has not been decided yet.
   tone: string;
   stylePresetId: string | null;
   commonPrompt: string;
   story: string;
   negativePrompt: string;
   sceneIds: string[];
+  setupStep: StoryboardSetupStepDto;
+  // Set once the storyboard has been through all five steps; from then on the
+  // UI stops gating and every section is editable.
+  setupCompletedAt: string | null;
+  // Scenes still missing AI-fillable text, and therefore the number of AI calls
+  // a bulk fill would spend. Server-derived so the UI can state the cost.
+  pendingSceneFillCount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -167,7 +186,25 @@ export type GenerationRequestDto = {
   inputJson: Record<string, unknown>;
   errorMessage: string | null;
   sourceGenerationRequestId: string | null;
+  // Non-null on a test-generation sample. Scene-scoped history lists only ever
+  // carry the confirmed sample, so a non-null value there marks that entry as
+  // "the sample this scene's look was chosen from".
+  testGenerationBatchId: string | null;
   appliedAdjustments: TestAdjustmentId[];
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiJobDto = {
+  id: string;
+  projectId: string;
+  kind: string;
+  status: string;
+  inputJson: Record<string, unknown>;
+  resultJson: Record<string, unknown> | null;
+  errorMessage: string | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -202,6 +239,18 @@ export type TestGenerationBatchDto = {
   confirmedGenerationRequestId: string | null;
   createdAt: string;
   completedAt: string | null;
+};
+
+export type TestGenerationBatchVariantDto = {
+  request: GenerationRequestDto;
+  generatedImage: GeneratedImageDto | null;
+};
+
+// One entry of a storyboard's sample history: the batch plus its samples in
+// variant order, each with its image when the generation succeeded.
+export type TestGenerationBatchWithVariantsDto = {
+  batch: TestGenerationBatchDto;
+  variants: TestGenerationBatchVariantDto[];
 };
 
 export type EmotionCandidateDto = {

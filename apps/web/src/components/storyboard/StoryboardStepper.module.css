@@ -1,0 +1,132 @@
+.stepper {
+  background: #fff;
+  border: 1px solid #e3e8ef;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #152033;
+}
+
+.count {
+  font-size: 13px;
+  color: #667085;
+  white-space: nowrap;
+}
+
+.track {
+  height: 6px;
+  border-radius: 999px;
+  background: #eef1f5;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6d5efc 0%, #1a56db 100%);
+  transition: width 0.25s ease;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Below the breakpoint the five columns cannot hold their labels without
+   wrapping into each other, so the strip becomes a vertical list. */
+@media (max-width: 900px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+
+.marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stepText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stepTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.stepHint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #8898aa;
+  overflow-wrap: anywhere;
+}
+
+.done .marker {
+  background: #1a56db;
+  color: #fff;
+}
+
+.done .stepTitle {
+  color: #152033;
+}
+
+.current .marker {
+  background: #6d5efc;
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(109, 94, 252, 0.16);
+}
+
+.current .stepTitle {
+  color: #152033;
+}
+
+.current .stepHint {
+  color: #5b4bd6;
+}
+
+.locked .marker {
+  background: #eef1f5;
+  color: #98a2b3;
+}
+
+.locked .stepTitle {
+  color: #98a2b3;
+}

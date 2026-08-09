@@ -18,12 +18,18 @@ import {
   createTemplateScene,
   createTestGenerationBatch,
   composeCommonPrompt,
+  computeStoryboardSetupStep,
+  createAiJob,
+  hasBlankSceneFields,
+  isBlankSceneField,
   replaceScenePhotoAssets,
-  resetTestGenerationBatch,
   retryGenerationRequest,
+  SCENE_FILL_FIELDS,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
   transitionGenerationRequestStatus,
+  unconfirmTestGenerationBatch,
+  type AiJob,
   type GeneratedImage,
   type GenerationRequest,
   type PhotoAsset,
@@ -31,6 +37,8 @@ import {
   type Project,
   type ProjectPhotoAnalysis,
   type Scene,
+  type SceneFillField,
+  type StoryboardSetupStatus,
   type ScenePhotoAsset,
   type Storyboard,
   type StoryboardStatus,
@@ -41,7 +49,6 @@ import {
 
 import type {
   ApplicationDependencies,
-  ComplementSceneProposal,
   Language,
   UseCaseResult,
   UserPreference,
@@ -373,7 +380,10 @@ export type UpsertStoryboardInput = {
   storyboardId: string;
   projectId: string;
   status?: StoryboardStatus;
-  tone: string;
+  // Omitted means "leave the stored tone alone", so a caller saving only the
+  // story does not have to know what the tone is. An explicit empty string is
+  // a deliberate reset back to undecided.
+  tone?: string;
   stylePresetId?: string | null;
   commonPrompt?: string;
   story?: string;
@@ -381,6 +391,11 @@ export type UpsertStoryboardInput = {
   sceneIds?: string[];
 };
 
+// Composition happens only when the caller explicitly sends an empty string —
+// that is the "regenerate from tone & style" action. An omitted field leaves
+// the stored value untouched, including leaving a blank one blank: setup step 4
+// gates on the common prompt being written, so silently composing one here
+// would mark that step done before the user has decided anything.
 async function resolveCommonPrompt(
   deps: ApplicationDependencies,
   args: {
@@ -391,14 +406,12 @@ async function resolveCommonPrompt(
   },
 ): Promise<string> {
   if (args.requestedCommonPrompt === undefined) {
-    if (args.existingCommonPrompt.trim() !== "") {
-      return args.existingCommonPrompt;
-    }
-  } else {
-    const trimmed = args.requestedCommonPrompt.trim();
-    if (trimmed !== "") {
-      return trimmed;
-    }
+    return args.existingCommonPrompt;
+  }
+
+  const trimmed = args.requestedCommonPrompt.trim();
+  if (trimmed !== "") {
+    return trimmed;
   }
 
   let stylePreset: StylePreset | null = null;
@@ -413,6 +426,8 @@ async function resolveCommonPrompt(
   });
 }
 
+// Same rule as the common prompt: an explicit empty string re-seeds from the
+// photo analysis, an omitted field changes nothing.
 async function resolveStory(
   deps: ApplicationDependencies,
   args: {
@@ -422,14 +437,12 @@ async function resolveStory(
   },
 ): Promise<string> {
   if (args.requestedStory === undefined) {
-    if (args.existingStory.trim() !== "") {
-      return args.existingStory;
-    }
-  } else {
-    const trimmed = args.requestedStory.trim();
-    if (trimmed !== "") {
-      return trimmed;
-    }
+    return args.existingStory;
+  }
+
+  const trimmed = args.requestedStory.trim();
+  if (trimmed !== "") {
+    return trimmed;
   }
 
   const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
@@ -462,11 +475,12 @@ export async function upsertStoryboard(
     );
     const effectiveStylePresetId =
       input.stylePresetId ?? existingStoryboard?.stylePresetId ?? null;
+    const tone = input.tone ?? existingStoryboard?.tone ?? "";
 
     const commonPrompt = await resolveCommonPrompt(deps, {
       requestedCommonPrompt: input.commonPrompt,
       existingCommonPrompt: existingStoryboard?.commonPrompt ?? "",
-      tone: input.tone,
+      tone,
       stylePresetId: effectiveStylePresetId,
     });
     const story = await resolveStory(deps, {
@@ -479,13 +493,14 @@ export async function upsertStoryboard(
       id: input.storyboardId,
       projectId: input.projectId,
       status: input.status ?? existingStoryboard?.status,
-      tone: input.tone,
+      tone,
       stylePresetId: effectiveStylePresetId,
       commonPrompt,
       story,
       negativePrompt:
         input.negativePrompt ?? existingStoryboard?.negativePrompt ?? "",
       sceneIds: input.sceneIds ?? existingStoryboard?.sceneIds ?? [],
+      setupCompletedAt: existingStoryboard?.setupCompletedAt ?? null,
       createdAt: existingStoryboard?.createdAt ?? now(),
       updatedAt: now(),
     });
@@ -496,6 +511,73 @@ export async function upsertStoryboard(
   } catch (error) {
     return validationFailure(error);
   }
+}
+
+// ── Storyboard setup flow ────────────────────────────────────────────────────
+
+export type StoryboardSetup = {
+  // The first step that is not yet satisfied by the data, or "complete".
+  step: StoryboardSetupStatus;
+  // Set once the storyboard has been through all five steps. From then on the
+  // UI stops gating, even if a later edit blanks a field again.
+  setupCompletedAt: string | null;
+  // Scenes that still have a blank fillable field, and therefore how many AI
+  // calls a bulk fill would spend. Derived here so the UI can state the cost
+  // without re-implementing the blank-field rule.
+  pendingSceneFillCount: number;
+};
+
+// Derives the step from persisted data using the one domain rule, so the API
+// and the web never disagree about where a storyboard is in the flow.
+export async function getStoryboardSetup(
+  deps: ApplicationDependencies,
+  storyboard: Storyboard,
+): Promise<StoryboardSetup> {
+  const photos = await deps.photoAssets.findByProjectId(storyboard.projectId);
+  const scenes = await deps.scenes.findByStoryboardId(storyboard.id);
+
+  return {
+    step: computeStoryboardSetupStep({
+      analyzablePhotoCount: photos.filter(isAnalyzablePhoto).length,
+      storyboard,
+      scenes,
+    }),
+    setupCompletedAt: storyboard.setupCompletedAt,
+    pendingSceneFillCount: scenes.filter(hasBlankSceneFields).length,
+  };
+}
+
+// Stamps completion the moment the data satisfies all five steps. Called from
+// every path that can finish step 5 — bulk AI fill, single-scene fill, and
+// saving scenes by hand — so completion does not depend on which route the user
+// happened to take. Already-stamped storyboards are left alone: completion is
+// sticky by design, so a later edit that blanks a field does not re-lock the UI.
+async function stampStoryboardSetupCompletion(
+  deps: ApplicationDependencies,
+  storyboardId: string,
+): Promise<void> {
+  const storyboard = await deps.storyboards.findById(storyboardId);
+  if (storyboard == null || storyboard.setupCompletedAt != null) return;
+
+  const setup = await getStoryboardSetup(deps, storyboard);
+  if (setup.step !== "complete") return;
+
+  const timestamp = now();
+  await deps.storyboards.save({
+    ...storyboard,
+    setupCompletedAt: timestamp,
+    updatedAt: timestamp,
+  });
+  await deps.progressEvents.publish({
+    kind: "storyboard.setup_completed",
+    entityType: "storyboard",
+    entityId: storyboard.id,
+    payload: {
+      storyboardId: storyboard.id,
+      projectId: storyboard.projectId,
+      setupCompletedAt: timestamp,
+    },
+  });
 }
 
 export type SceneInput = {
@@ -602,6 +684,9 @@ export async function upsertScenes(
     };
 
     await deps.storyboards.save(updatedStoryboard);
+    // Writing the last blank scene by hand finishes step 5 just as legitimately
+    // as letting the AI write it.
+    await stampStoryboardSetupCompletion(deps, input.storyboardId);
 
     return success(sortScenesByOrderIndex(nextScenes));
   } catch (error) {
@@ -613,12 +698,23 @@ export type CreateTemplateScenesFromPhotosInput = {
   storyboardId: string;
   projectId: string;
   photoAssetIds: string[];
+  // When true, each new scene also gets a background AI fill job, so the
+  // storyboard arrives written rather than as a row of empty forms. Costs one
+  // model call per photo, which is why the caller has to ask for it.
+  autoFill?: boolean;
+  language?: Language;
+};
+
+export type CreateTemplateScenesFromPhotosResult = {
+  scenes: Scene[];
+  // Job ids in the same order as `scenes`; empty when autoFill was not requested.
+  aiJobIds: string[];
 };
 
 export async function createTemplateScenesFromPhotos(
   deps: ApplicationDependencies,
   input: CreateTemplateScenesFromPhotosInput,
-): Promise<UseCaseResult<Scene[]>> {
+): Promise<UseCaseResult<CreateTemplateScenesFromPhotosResult>> {
   try {
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
@@ -676,7 +772,20 @@ export async function createTemplateScenesFromPhotos(
     };
     await deps.storyboards.save(updatedStoryboard);
 
-    return success(createdScenes);
+    const aiJobIds: string[] = [];
+    if (input.autoFill === true) {
+      const language = await resolvePrincipalLanguage(deps, input.language);
+      for (const scene of createdScenes) {
+        const { jobId } = await deps.jobQueue.enqueue({
+          kind: "scene_ai_fill",
+          projectId: input.projectId,
+          payload: { sceneId: scene.id, language },
+        });
+        aiJobIds.push(jobId);
+      }
+    }
+
+    return success({ scenes: createdScenes, aiJobIds });
   } catch (error) {
     return validationFailure(error);
   }
@@ -698,6 +807,21 @@ async function resolvePrincipalLanguage(
     if (pref) return pref.language;
   }
   return DEFAULT_LANGUAGE;
+}
+
+// The language chosen when the job was enqueued, so a queued job is not
+// affected by a later preference change.
+function readLanguagePayload(payload: Record<string, unknown>): Language {
+  const value = payload.language;
+  return isLanguage(value) ? value : DEFAULT_LANGUAGE;
+}
+
+function readStringPayload(
+  payload: Record<string, unknown>,
+  key: string,
+): string | null {
+  const value = payload[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function isAnalyzablePhoto(photo: PhotoAsset): boolean {
@@ -730,12 +854,18 @@ function computeAnalysisInputsHash(
 }
 
 export type AnalyzeProjectPhotosResult = {
-  analysis: ProjectPhotoAnalysis;
+  // Present only on a cache hit; a fresh analysis arrives via the job.
+  analysis: ProjectPhotoAnalysis | null;
   // True when the stored analysis was reused because inputs were unchanged
-  // (no AI call was made).
+  // (no AI call was made, and no job was enqueued).
   cached: boolean;
+  // Present only when a background job was enqueued.
+  jobId: string | null;
 };
 
+// Enqueue half. The (paid) AI call happens in runPhotoAnalysisJob, driven by
+// the worker. The input-hash cache guard stays here, before any job exists, so
+// an unchanged photo set still costs nothing and still reports `cached: true`.
 export async function analyzeProjectPhotos(
   deps: ApplicationDependencies,
   input: AnalyzeProjectPhotosInput,
@@ -763,8 +893,47 @@ export async function analyzeProjectPhotos(
 
     // Skip the (paid) AI call when nothing relevant changed since last time.
     if (existing && existing.inputsHash === inputsHash) {
-      return success({ analysis: existing, cached: true });
+      return success({ analysis: existing, cached: true, jobId: null });
     }
+
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "photo_analysis",
+      projectId: project.id,
+      payload: { projectId: project.id, language },
+    });
+
+    return success({ analysis: null, cached: false, jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// Run half. Inputs are re-read here rather than carried in the job payload,
+// so a job that waited in the queue analyzes the photo set as it is now.
+export async function runPhotoAnalysisJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const project = await getProjectOrNotFound(deps, job.projectId);
+    if (isFailure(project)) return project;
+
+    const photos = (await deps.photoAssets.findByProjectId(project.id)).filter(
+      isAnalyzablePhoto,
+    );
+
+    if (photos.length === 0) {
+      return failure(
+        "validation_error",
+        "Project must have at least one candidate or reference photo for analysis.",
+      );
+    }
+
+    const language = readLanguagePayload(job.inputJson);
+    const inputsHash = computeAnalysisInputsHash(photos, language);
+    const existing = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
 
     const storyboards = await deps.storyboards.findByProjectId(project.id);
     const storyboard = storyboards[0] ?? null;
@@ -799,7 +968,11 @@ export async function analyzeProjectPhotos(
       },
     });
 
-    return success({ analysis, cached: false });
+    return success({
+      projectPhotoAnalysisId: analysis.id,
+      model: analysis.model,
+      photoCount: photos.length,
+    });
   } catch (error) {
     return validationFailure(error);
   }
@@ -828,78 +1001,334 @@ export type FillSceneWithAiInput = {
   language?: Language;
 };
 
-const sceneFillFields = [
-  "title",
-  "description",
-  "imagePrompt",
-  "emotion",
-  "cameraDirection",
-  "lightingDirection",
-  "motionDirection",
-] as const satisfies ReadonlyArray<keyof Scene>;
+type SceneFillContext = {
+  scene: Scene;
+  blankFields: SceneFillField[];
+  buildInput: (language: Language) => Promise<
+    | UseCaseResult<never>
+    | {
+        project: Project;
+        storyboard: Storyboard;
+        scene: Scene;
+        primaryPhoto: PhotoAsset;
+        stylePreset: StylePreset | null;
+        referencePhotos: PhotoAsset[];
+        siblingScenes: Scene[];
+        photoAnalysis: ProjectPhotoAnalysis | null;
+        language: Language;
+      }
+  >;
+};
 
-function isBlankSceneField(value: string): boolean {
-  return value.trim().length === 0;
+// The photos the scene explicitly assigned as `reference`, in assignment order.
+// Deleted ones are dropped so a stale assignment cannot fail the call.
+async function resolveSceneReferencePhotos(
+  deps: ApplicationDependencies,
+  scene: Scene,
+): Promise<PhotoAsset[]> {
+  const photos: PhotoAsset[] = [];
+
+  for (const assignment of scene.photoAssets) {
+    if (assignment.role !== "reference") continue;
+    const photo = await deps.photoAssets.findById(assignment.photoAssetId);
+    if (photo != null && photo.deletedAt === null) photos.push(photo);
+  }
+
+  return photos;
 }
 
+// Everything the AI fill needs, gathered from persistence. Shared by the
+// enqueue half (which only inspects `blankFields`) and the run half.
+async function collectSceneFillContext(
+  deps: ApplicationDependencies,
+  sceneId: string,
+): Promise<UseCaseResult<never> | SceneFillContext> {
+  const scene = await getSceneOrNotFound(deps, sceneId);
+  if (isFailure(scene)) return scene;
+
+  const storyboard = await getStoryboardOrNotFound(deps, scene.storyboardId);
+  if (isFailure(storyboard)) return storyboard;
+
+  if (storyboard.projectId !== scene.projectId) {
+    return failure(
+      "invalid_state",
+      "Scene does not belong to this storyboard.",
+    );
+  }
+
+  const project = await getProjectOrNotFound(deps, scene.projectId);
+  if (isFailure(project)) return project;
+
+  const primaryPhotoAssignment = scene.photoAssets.find(
+    (photoAsset) => photoAsset.role === "primary",
+  );
+  if (primaryPhotoAssignment == null) {
+    return failure(
+      "validation_error",
+      "Scene must have a primary photo for AI fill.",
+    );
+  }
+
+  const primaryPhoto = await getPhotoAssetOrNotFound(
+    deps,
+    primaryPhotoAssignment.photoAssetId,
+  );
+  if (isFailure(primaryPhoto)) return primaryPhoto;
+
+  if (
+    primaryPhoto.projectId !== scene.projectId ||
+    primaryPhoto.deletedAt !== null
+  ) {
+    return failure("validation_error", "Scene primary photo is not available.");
+  }
+
+  const blankFields = SCENE_FILL_FIELDS.filter((field) =>
+    isBlankSceneField(field, scene[field]),
+  );
+
+  return {
+    scene,
+    blankFields,
+    buildInput: async (language: Language) => {
+      const referencePhotos = await resolveSceneReferencePhotos(deps, scene);
+      const siblingScenes = await deps.scenes.findByStoryboardId(storyboard.id);
+      let stylePreset: StylePreset | null = null;
+
+      if (storyboard.stylePresetId != null) {
+        stylePreset = await deps.stylePresets.findById(
+          storyboard.stylePresetId,
+        );
+        if (stylePreset == null) {
+          return failure("not_found", "Style preset not found.");
+        }
+      }
+
+      const photoAnalysis =
+        await deps.projectPhotoAnalyses.findLatestByProjectId(project.id);
+
+      return {
+        project,
+        storyboard,
+        scene,
+        primaryPhoto,
+        stylePreset,
+        referencePhotos,
+        siblingScenes,
+        photoAnalysis,
+        language,
+      };
+    },
+  };
+}
+
+export type FillSceneWithAiResult = {
+  // Present when the scene had no blank fields, so no AI call was needed.
+  scene: Scene | null;
+  // Present only when a background job was enqueued.
+  jobId: string | null;
+};
+
+// Enqueue half. The AI call happens in runSceneAiFillJob.
 export async function fillSceneWithAi(
   deps: ApplicationDependencies,
   input: FillSceneWithAiInput,
-): Promise<UseCaseResult<Scene>> {
+): Promise<UseCaseResult<FillSceneWithAiResult>> {
   try {
-    const scene = await getSceneOrNotFound(deps, input.sceneId);
-    if (isFailure(scene)) return scene;
+    const context = await collectSceneFillContext(deps, input.sceneId);
+    if (isFailure(context)) return context;
 
-    const storyboard = await getStoryboardOrNotFound(deps, scene.storyboardId);
+    if (context.blankFields.length === 0) {
+      return success({ scene: context.scene, jobId: null });
+    }
+
+    const language = await resolvePrincipalLanguage(deps, input.language);
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "scene_ai_fill",
+      projectId: context.scene.projectId,
+      payload: { sceneId: input.sceneId, language },
+    });
+
+    return success({ scene: null, jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function runSceneAiFillJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const sceneId = readStringPayload(job.inputJson, "sceneId");
+    if (sceneId == null) {
+      return failure("validation_error", "AI job is missing a scene ID.");
+    }
+
+    const context = await collectSceneFillContext(deps, sceneId);
+    if (isFailure(context)) return context;
+
+    if (context.blankFields.length === 0) {
+      return success({ sceneId, filledFields: [] });
+    }
+
+    const generationInput = await context.buildInput(
+      readLanguagePayload(job.inputJson),
+    );
+    if (isFailure(generationInput)) return generationInput;
+
+    const suggestion =
+      await deps.sceneFillGeneration.generateSceneFill(generationInput);
+
+    const updatedScene = {
+      ...context.scene,
+      ...Object.fromEntries(
+        context.blankFields.map((field) => [field, suggestion[field]]),
+      ),
+      updatedAt: now(),
+    };
+
+    await deps.scenes.save(updatedScene);
+    await deps.progressEvents.publish({
+      kind: "scene.ai_filled",
+      entityType: "scene",
+      entityId: updatedScene.id,
+      payload: { sceneId: updatedScene.id, projectId: updatedScene.projectId },
+    });
+    // The last job of a bulk fill is what finishes step 5.
+    await stampStoryboardSetupCompletion(deps, updatedScene.storyboardId);
+
+    return success({ sceneId, filledFields: [...context.blankFields] });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type FillStoryboardScenesWithAiInput = {
+  storyboardId: string;
+  language?: Language;
+};
+
+export type FillStoryboardScenesWithAiResult = {
+  // One job per scene that still had a blank field, in scene order.
+  aiJobIds: string[];
+  // Scenes skipped because they were already written, so the caller can say
+  // how many calls it actually spent.
+  skippedSceneCount: number;
+};
+
+// Setup step 5. Enqueues through the same path as the single-scene case rather
+// than adding a second one, so both share the blank-field test, the language
+// resolution, and the per-project concurrency cap.
+export async function fillStoryboardScenesWithAi(
+  deps: ApplicationDependencies,
+  input: FillStoryboardScenesWithAiInput,
+): Promise<UseCaseResult<FillStoryboardScenesWithAiResult>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
-    if (storyboard.projectId !== scene.projectId) {
+    const scenes = sortScenesByOrderIndex(
+      await deps.scenes.findByStoryboardId(storyboard.id),
+    );
+    const language = await resolvePrincipalLanguage(deps, input.language);
+
+    const aiJobIds: string[] = [];
+    let skippedSceneCount = 0;
+
+    for (const scene of scenes) {
+      if (!hasBlankSceneFields(scene)) {
+        skippedSceneCount += 1;
+        continue;
+      }
+
+      const result = await fillSceneWithAi(deps, {
+        sceneId: scene.id,
+        language,
+      });
+
+      // A scene the single-scene path rejects — most often one with no primary
+      // photo — must not abort the whole batch. Count it as skipped and move on.
+      if (!result.ok || result.value.jobId == null) {
+        skippedSceneCount += 1;
+        continue;
+      }
+
+      aiJobIds.push(result.value.jobId);
+    }
+
+    return success({ aiJobIds, skippedSceneCount });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── Story setup (step 4) ─────────────────────────────────────────────────────
+
+export type GenerateStorySetupInput = {
+  storyboardId: string;
+  language?: Language;
+};
+
+export type GenerateStorySetupResult = {
+  jobId: string;
+};
+
+// Enqueue half. The AI call happens in runStorySetupJob.
+export async function generateStorySetup(
+  deps: ApplicationDependencies,
+  input: GenerateStorySetupInput,
+): Promise<UseCaseResult<GenerateStorySetupResult>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    // Steps 2 and 3 are the inputs to this step; without them the model has
+    // nothing to write the world against, which is the failure this whole flow
+    // exists to prevent.
+    if (storyboard.tone.trim() === "") {
       return failure(
         "invalid_state",
-        "Scene does not belong to this storyboard.",
+        "Choose a tone before generating the story setup.",
       );
     }
 
-    const project = await getProjectOrNotFound(deps, scene.projectId);
+    if (storyboard.stylePresetId == null) {
+      return failure(
+        "invalid_state",
+        "Choose a style before generating the story setup.",
+      );
+    }
+
+    const language = await resolvePrincipalLanguage(deps, input.language);
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "story_setup",
+      projectId: storyboard.projectId,
+      payload: { storyboardId: storyboard.id, language },
+    });
+
+    return success({ jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function runStorySetupJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const storyboardId = readStringPayload(job.inputJson, "storyboardId");
+    if (storyboardId == null) {
+      return failure("validation_error", "AI job is missing a storyboard ID.");
+    }
+
+    const storyboard = await getStoryboardOrNotFound(deps, storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const project = await getProjectOrNotFound(deps, storyboard.projectId);
     if (isFailure(project)) return project;
 
-    const primaryPhotoAssignment = scene.photoAssets.find(
-      (photoAsset) => photoAsset.role === "primary",
-    );
-    if (primaryPhotoAssignment == null) {
-      return failure(
-        "validation_error",
-        "Scene must have a primary photo for AI fill.",
-      );
-    }
-
-    const primaryPhoto = await getPhotoAssetOrNotFound(
-      deps,
-      primaryPhotoAssignment.photoAssetId,
-    );
-    if (isFailure(primaryPhoto)) return primaryPhoto;
-
-    if (
-      primaryPhoto.projectId !== scene.projectId ||
-      primaryPhoto.deletedAt !== null
-    ) {
-      return failure(
-        "validation_error",
-        "Scene primary photo is not available.",
-      );
-    }
-
-    const blankFields = sceneFillFields.filter((field) =>
-      isBlankSceneField(scene[field]),
-    );
-    if (blankFields.length === 0) {
-      return success(scene);
-    }
-
-    const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
-    const siblingScenes = await deps.scenes.findByStoryboardId(storyboard.id);
     let stylePreset: StylePreset | null = null;
-
     if (storyboard.stylePresetId != null) {
       stylePreset = await deps.stylePresets.findById(storyboard.stylePresetId);
       if (stylePreset == null) {
@@ -907,29 +1336,46 @@ export async function fillSceneWithAi(
       }
     }
 
-    const language = await resolvePrincipalLanguage(deps, input.language);
-    const suggestion = await deps.sceneFillGeneration.generateSceneFill({
+    const photoAnalysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
+
+    const suggestion = await deps.storySetupGeneration.generateStorySetup({
       project,
       storyboard,
-      scene,
-      primaryPhoto,
       stylePreset,
-      projectPhotos,
-      siblingScenes,
-      language,
+      photoAnalysis,
+      language: readLanguagePayload(job.inputJson),
     });
 
-    const updatedScene = {
-      ...scene,
-      ...Object.fromEntries(
-        blankFields.map((field) => [field, suggestion[field]]),
-      ),
-      updatedAt: now(),
-    };
+    const timestamp = now();
+    const updated = createStoryboard({
+      ...storyboard,
+      story: suggestion.story,
+      commonPrompt: suggestion.commonPrompt,
+      negativePrompt: suggestion.negativePrompt,
+      updatedAt: timestamp,
+    });
 
-    await deps.scenes.save(updatedScene);
+    await deps.storyboards.save(updated);
+    await deps.progressEvents.publish({
+      kind: "storyboard.story_setup_completed",
+      entityType: "storyboard",
+      entityId: updated.id,
+      payload: {
+        storyboardId: updated.id,
+        projectId: updated.projectId,
+        model: suggestion.model,
+      },
+    });
 
-    return success(updatedScene);
+    return success({
+      storyboardId: updated.id,
+      model: suggestion.model,
+      story: updated.story,
+      commonPrompt: updated.commonPrompt,
+      negativePrompt: updated.negativePrompt,
+    });
   } catch (error) {
     return validationFailure(error);
   }
@@ -1028,22 +1474,73 @@ export type ProposeComplementScenesInput = {
   language?: Language;
 };
 
+export type ProposeComplementScenesResult = {
+  jobId: string;
+};
+
+// Enqueue half. The AI call happens in runComplementSceneProposalsJob.
 export async function proposeComplementScenes(
   deps: ApplicationDependencies,
   input: ProposeComplementScenesInput,
-): Promise<UseCaseResult<ComplementSceneProposal[]>> {
+): Promise<UseCaseResult<ProposeComplementScenesResult>> {
   try {
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const scenes = await deps.scenes.findByStoryboardId(input.storyboardId);
+    const known = new Set(scenes.map((scene) => scene.id));
+    if (!known.has(input.fromSceneId) || !known.has(input.toSceneId)) {
+      return failure(
+        "not_found",
+        "Bridge scenes were not found in this storyboard.",
+      );
+    }
+
+    const language = await resolvePrincipalLanguage(deps, input.language);
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "complement_scene_proposals",
+      projectId: storyboard.projectId,
+      payload: {
+        storyboardId: input.storyboardId,
+        fromSceneId: input.fromSceneId,
+        toSceneId: input.toSceneId,
+        language,
+      },
+    });
+
+    return success({ jobId });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function runComplementSceneProposalsJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const storyboardId = readStringPayload(job.inputJson, "storyboardId");
+    const fromSceneId = readStringPayload(job.inputJson, "fromSceneId");
+    const toSceneId = readStringPayload(job.inputJson, "toSceneId");
+
+    if (storyboardId == null || fromSceneId == null || toSceneId == null) {
+      return failure(
+        "validation_error",
+        "AI job is missing complement scene bridge references.",
+      );
+    }
+
+    const storyboard = await getStoryboardOrNotFound(deps, storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
     const project = await getProjectOrNotFound(deps, storyboard.projectId);
     if (isFailure(project)) return project;
 
     const scenes = sortScenesByOrderIndex(
-      await deps.scenes.findByStoryboardId(input.storyboardId),
+      await deps.scenes.findByStoryboardId(storyboardId),
     );
-    const fromScene = scenes.find((scene) => scene.id === input.fromSceneId);
-    const toScene = scenes.find((scene) => scene.id === input.toSceneId);
+    const fromScene = scenes.find((scene) => scene.id === fromSceneId);
+    const toScene = scenes.find((scene) => scene.id === toSceneId);
 
     if (fromScene == null || toScene == null) {
       return failure(
@@ -1061,7 +1558,6 @@ export async function proposeComplementScenes(
     }
 
     const projectPhotos = await deps.photoAssets.findByProjectId(project.id);
-    const language = await resolvePrincipalLanguage(deps, input.language);
     const proposals =
       await deps.complementSceneProposal.proposeComplementScenes({
         project,
@@ -1071,10 +1567,232 @@ export async function proposeComplementScenes(
         stylePreset,
         projectPhotos,
         siblingScenes: scenes,
-        language,
+        language: readLanguagePayload(job.inputJson),
       });
 
-    return success(proposals.slice(0, 3));
+    return success({
+      storyboardId,
+      fromSceneId,
+      toSceneId,
+      proposals: proposals.slice(0, 3),
+    });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── AI job lifecycle ─────────────────────────────────────────────────────────
+
+async function getAiJobOrNotFound(
+  deps: ApplicationDependencies,
+  aiJobId: string,
+): Promise<AiJob | UseCaseResult<never>> {
+  const aiJob = await deps.aiJobs.findById(aiJobId);
+  if (aiJob == null) return failure("not_found", "AI job not found.");
+  return aiJob;
+}
+
+export type AiJobIdInput = {
+  aiJobId: string;
+};
+
+export async function getAiJob(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput,
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const aiJob = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(aiJob)) return aiJob;
+    return success(aiJob);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+async function saveAiJobTransition(
+  deps: ApplicationDependencies,
+  job: AiJob,
+  changes: Partial<AiJob>,
+  eventKind: string,
+): Promise<AiJob> {
+  const updated = createAiJob({ ...job, ...changes });
+  await deps.aiJobs.save(updated);
+  await deps.progressEvents.publish({
+    kind: eventKind,
+    entityType: "aiJob",
+    entityId: updated.id,
+    payload: {
+      aiJobId: updated.id,
+      projectId: updated.projectId,
+      jobKind: updated.kind,
+      status: updated.status,
+      result: updated.resultJson,
+      errorMessage: updated.errorMessage,
+    },
+  });
+  return updated;
+}
+
+export async function markAiJobRunning(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput & { startedAt: string },
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    if (job.status !== "queued") {
+      return failure(
+        "invalid_state",
+        `Cannot mark AI job as running: current status is "${job.status}".`,
+      );
+    }
+
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "running",
+          startedAt: input.startedAt,
+          updatedAt: input.startedAt,
+        },
+        "ai-job.running",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function markAiJobSucceeded(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput & {
+    resultJson: Record<string, unknown>;
+    completedAt: string;
+  },
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    // A job canceled mid-flight must not have its result written.
+    if (job.status !== "running") {
+      return failure(
+        "invalid_state",
+        `Cannot complete AI job: current status is "${job.status}".`,
+      );
+    }
+
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "succeeded",
+          resultJson: input.resultJson,
+          completedAt: input.completedAt,
+          updatedAt: input.completedAt,
+        },
+        "ai-job.succeeded",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function markAiJobFailed(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput & { errorMessage: string; completedAt: string },
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    if (job.status !== "running" && job.status !== "queued") {
+      return failure(
+        "invalid_state",
+        `Cannot fail AI job: current status is "${job.status}".`,
+      );
+    }
+
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "failed",
+          errorMessage: input.errorMessage,
+          completedAt: input.completedAt,
+          updatedAt: input.completedAt,
+        },
+        "ai-job.failed",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function cancelAiJob(
+  deps: ApplicationDependencies,
+  input: AiJobIdInput,
+): Promise<UseCaseResult<AiJob>> {
+  try {
+    const job = await getAiJobOrNotFound(deps, input.aiJobId);
+    if (isFailure(job)) return job;
+
+    if (job.status !== "queued" && job.status !== "running") {
+      return failure(
+        "invalid_state",
+        `Cannot cancel AI job: current status is "${job.status}".`,
+      );
+    }
+
+    const timestamp = now();
+    return success(
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "canceled",
+          completedAt: timestamp,
+          updatedAt: timestamp,
+        },
+        "ai-job.canceled",
+      ),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// Restart recovery: an API restart leaves `running` rows behind whose worker is
+// gone. Fail them so the UI shows an honest terminal state instead of a spinner
+// that never resolves.
+export async function failInterruptedAiJobs(
+  deps: ApplicationDependencies,
+): Promise<UseCaseResult<number>> {
+  try {
+    const running = await deps.aiJobs.findRunning();
+    const timestamp = now();
+
+    for (const job of running) {
+      await saveAiJobTransition(
+        deps,
+        job,
+        {
+          status: "failed",
+          errorMessage: "interrupted by restart",
+          completedAt: timestamp,
+          updatedAt: timestamp,
+        },
+        "ai-job.failed",
+      );
+    }
+
+    return success(running.length);
   } catch (error) {
     return validationFailure(error);
   }
@@ -1291,22 +2009,14 @@ export async function createGenerationRequestUseCase(
 
     await deps.generationRequests.save(generationRequest);
 
-    const queueResult = await deps.jobQueue.enqueue({
-      kind: "generation-request",
-      payload: {
-        generationRequestId: generationRequest.id,
-        projectId: project.id,
-        storyboardId: storyboard.id,
-        sceneId: scene.id,
-      },
-    });
-
+    // The queued generation_requests row is itself the image work queue —
+    // LocalJobWorker polls it directly, so there is no jobQueue enqueue here.
     await deps.progressEvents.publish({
       kind: "generation-request.created",
       entityType: "generationRequest",
       entityId: generationRequest.id,
       payload: {
-        jobId: queueResult.jobId,
+        projectId: generationRequest.projectId,
       },
     });
 
@@ -1413,23 +2123,12 @@ export async function retryFailedGenerationRequest(
 
     await deps.generationRequests.save(retryRequest);
 
-    const queueResult = await deps.jobQueue.enqueue({
-      kind: "generation-request",
-      payload: {
-        generationRequestId: retryRequest.id,
-        sourceGenerationRequestId: generationRequest.id,
-        projectId: retryRequest.projectId,
-        storyboardId: retryRequest.storyboardId,
-        sceneId: retryRequest.sceneId,
-      },
-    });
-
     await deps.progressEvents.publish({
       kind: "generation-request.retried",
       entityType: "generationRequest",
       entityId: retryRequest.id,
       payload: {
-        jobId: queueResult.jobId,
+        projectId: retryRequest.projectId,
         sourceGenerationRequestId: generationRequest.id,
       },
     });
@@ -1543,6 +2242,7 @@ export async function markGenerationRequestRunning(
       kind: "generation-request.running",
       entityType: "generationRequest",
       entityId: updated.id,
+      payload: { projectId: updated.projectId },
     });
 
     return success(updated);
@@ -1621,7 +2321,10 @@ export async function markGenerationRequestCompleted(
       kind: "generation-request.succeeded",
       entityType: "generationRequest",
       entityId: updatedRequest.id,
-      payload: { generatedImageId: generatedImage.id },
+      payload: {
+        projectId: updatedRequest.projectId,
+        generatedImageId: generatedImage.id,
+      },
     });
 
     return success({ generationRequest: updatedRequest, generatedImage });
@@ -1676,7 +2379,7 @@ export async function markGenerationRequestFailed(
       kind: "generation-request.failed",
       entityType: "generationRequest",
       entityId: updated.id,
-      payload: { errorMessage: truncated },
+      payload: { projectId: updated.projectId, errorMessage: truncated },
     });
 
     return success(updated);
@@ -1715,14 +2418,26 @@ export async function requestTestGeneration(
       );
     }
 
-    const existingBatch =
+    const latestBatch =
       await deps.testGenerationBatches.findLatestByStoryboardId(
         input.storyboardId,
       );
-    if (!canStartTestGeneration(existingBatch)) {
+    // Only variants still in flight block another batch. A batch left pending
+    // because its variants failed must not trap the operator: there is no
+    // longer a reset to escape with.
+    const latestVariants =
+      latestBatch == null
+        ? []
+        : await deps.generationRequests.findByTestBatchId(latestBatch.id);
+    if (
+      !canStartTestGeneration(
+        latestBatch,
+        latestVariants.map((variant) => variant.status),
+      )
+    ) {
       return failure(
         "invalid_state",
-        "A pending test generation batch already exists. Confirm or reset it first.",
+        "A test generation batch for this storyboard is still running.",
       );
     }
 
@@ -1750,6 +2465,7 @@ export async function requestTestGeneration(
         storyboardId: input.storyboardId,
         sceneId: input.sceneId,
         inputJson: { ...preprocessed, testBatchId: batch.id, testVariant: i },
+        testGenerationBatchId: batch.id,
         createdAt: ts,
         updatedAt: ts,
       });
@@ -1839,6 +2555,7 @@ export async function applyAdjustmentToTestVariant(
       inputJson: preprocessed,
       appliedAdjustments: input.adjustmentIds,
       sourceGenerationRequestId: variant.id,
+      testGenerationBatchId: testBatchId,
       createdAt: ts,
       updatedAt: ts,
     });
@@ -1864,22 +2581,6 @@ export async function confirmTestGeneration(
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
-    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(
-      input.storyboardId,
-    );
-    if (!batch) {
-      return failure(
-        "not_found",
-        "No test generation batch found for this storyboard.",
-      );
-    }
-    if (batch.status === "completed") {
-      return failure(
-        "invalid_state",
-        "Test generation batch is already confirmed.",
-      );
-    }
-
     const req = await deps.generationRequests.findById(
       input.confirmedGenerationRequestId,
     );
@@ -1889,8 +2590,40 @@ export async function confirmTestGeneration(
         "Generation request not found in this storyboard.",
       );
     }
+    if (req.status !== "succeeded") {
+      return failure(
+        "invalid_state",
+        "Only a succeeded sample can be confirmed.",
+      );
+    }
+
+    // The batch comes from the sample, not from "the latest batch": the
+    // operator may confirm a sample from any batch they have generated.
+    const batches = await deps.testGenerationBatches.listByStoryboardId(
+      input.storyboardId,
+    );
+    const batch = batches.find(
+      (candidate) => candidate.id === req.testGenerationBatchId,
+    );
+    if (!batch) {
+      return failure(
+        "invalid_state",
+        "Generation request is not a test generation sample.",
+      );
+    }
 
     const ts = now();
+    // A storyboard holds exactly one confirmation, so moving it means taking it
+    // off whichever other batch currently has it. `createdAt` is preserved, so
+    // the batch keeps its place in the history ordering.
+    for (const other of batches) {
+      if (other.id === batch.id) continue;
+      if (other.status !== "completed") continue;
+      await deps.testGenerationBatches.save(
+        unconfirmTestGenerationBatch(other),
+      );
+    }
+
     const confirmed = completeTestGenerationBatch(
       batch,
       input.confirmedGenerationRequestId,
@@ -1920,36 +2653,63 @@ export async function confirmTestGeneration(
   }
 }
 
-export type ResetTestGenerationInput = {
-  storyboardId: string;
+export type TestGenerationBatchVariant = {
+  request: GenerationRequest;
+  generatedImage: GeneratedImage | null;
 };
 
-export async function resetTestGeneration(
+export type TestGenerationBatchWithVariants = {
+  batch: TestGenerationBatch;
+  variants: TestGenerationBatchVariant[];
+};
+
+// The storyboard's whole sample history, newest batch first. Assembled here so
+// the modal and the history screen read one shape instead of each stitching
+// batches to requests to images for itself.
+export async function listTestGenerationBatches(
   deps: ApplicationDependencies,
-  input: ResetTestGenerationInput,
-): Promise<UseCaseResult<TestGenerationBatch>> {
+  input: { storyboardId: string },
+): Promise<UseCaseResult<TestGenerationBatchWithVariants[]>> {
   try {
     const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
     if (isFailure(storyboard)) return storyboard;
 
-    const batch = await deps.testGenerationBatches.findLatestByStoryboardId(
+    const batches = await deps.testGenerationBatches.listByStoryboardId(
       input.storyboardId,
     );
-    if (!batch) {
-      return failure(
-        "not_found",
-        "No test generation batch found for this storyboard.",
+
+    const result: TestGenerationBatchWithVariants[] = [];
+    for (const batch of batches) {
+      const requests = await deps.generationRequests.findByTestBatchId(
+        batch.id,
       );
+      const variants: TestGenerationBatchVariant[] = [];
+      for (const request of requests) {
+        const images = await deps.generatedImages.findBySceneId(
+          request.sceneId,
+        );
+        variants.push({
+          request,
+          generatedImage:
+            images.find((image) => image.generationRequestId === request.id) ??
+            null,
+        });
+      }
+      variants.sort(
+        (a, b) => testVariantIndex(a.request) - testVariantIndex(b.request),
+      );
+      result.push({ batch, variants });
     }
 
-    const ts = now();
-    const reset = resetTestGenerationBatch(batch, ts);
-    await deps.testGenerationBatches.save(reset);
-
-    return success(reset);
+    return success(result);
   } catch (error) {
     return validationFailure(error);
   }
+}
+
+function testVariantIndex(request: GenerationRequest): number {
+  const value = (request.inputJson as Record<string, unknown>).testVariant;
+  return typeof value === "number" ? value : 0;
 }
 
 // ── Storyboard JSON Export ───────────────────────────────────────────────────

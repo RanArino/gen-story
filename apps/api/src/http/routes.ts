@@ -6,6 +6,7 @@ import {
   assignPhotosToScene,
   analyzeProjectPhotos,
   applyAdjustmentToTestVariant,
+  cancelAiJob,
   cancelGenerationRequest,
   confirmTestGeneration,
   createGenerationRequestUseCase,
@@ -16,15 +17,18 @@ import {
   deleteProject,
   exportStoryboardAsJson,
   fillSceneWithAi,
+  fillStoryboardScenesWithAi,
+  generateStorySetup,
   getProjectPhotoAnalysis,
+  getStoryboardSetup,
   getUserPreference,
   insertComplementScene,
+  listTestGenerationBatches,
   markGeneratedImageAdopted,
   proposeComplementScenes,
   reorderPhotos,
   reorderScenes,
   requestTestGeneration,
-  resetTestGeneration,
   restorePhotoAsset,
   restoreProject,
   retryFailedGenerationRequest,
@@ -36,6 +40,8 @@ import {
   type AuthPrincipal,
 } from "@gen-story/application";
 import { isLanguage as isLanguageValue } from "@gen-story/application";
+import type { AiJob } from "@gen-story/domain";
+import { isVisibleInSceneHistory } from "@gen-story/domain";
 import {
   getLocalizedLabels,
   isTestAdjustmentId,
@@ -43,10 +49,11 @@ import {
   type TestAdjustmentId,
 } from "@gen-story/shared";
 
+import type { ApiDependencies } from "../app/create-api-context";
 import { composeScenePrompt } from "../generation/compose-scene-prompt";
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
-  toComplementSceneProposalDto,
+  toAiJobDto,
   toGeneratedImageDto,
   toGenerationRequestDto,
   toGenerationRequestWithSceneTitleDto,
@@ -58,6 +65,7 @@ import {
   toStoryboardDto,
   toStylePresetDto,
   toTestGenerationBatchDto,
+  toTestGenerationBatchWithVariantsDto,
   toUserPreferenceDto,
 } from "./dto-mappers";
 import {
@@ -83,6 +91,8 @@ import {
   CreateProjectSchema,
   CreateTemplateScenesSchema,
   FillSceneWithAiSchema,
+  FillStoryboardScenesWithAiSchema,
+  GenerateStorySetupSchema,
   PatchPhotoAssetSchema,
   PreviewScenePromptSchema,
   SetUserPreferenceSchema,
@@ -107,7 +117,52 @@ async function requirePrincipal(
   return principal;
 }
 
-export function buildRouter(deps: ApplicationDependencies): Router {
+// Resolve an AI job and confirm it belongs to the caller's organization,
+// responding on the failure paths exactly as the other handlers do.
+async function requireOwnedAiJob(
+  deps: ApiDependencies,
+  res: ServerResponse,
+  aiJobId: string,
+): Promise<AiJob | null> {
+  const principal = await requirePrincipal(deps, res);
+  if (principal == null) return null;
+
+  const job = await deps.aiJobs.findById(aiJobId);
+  if (job == null) {
+    sendJson(res, 404, notFoundBody("AI job not found."));
+    return null;
+  }
+
+  const project = await deps.projects.findById(job.projectId);
+  if (project == null || project.organizationId !== principal.organization.id) {
+    sendJson(res, 403, forbiddenBody());
+    return null;
+  }
+
+  return job;
+}
+
+// The ids of the samples a storyboard's operator picked, one per completed
+// batch. Feeds `isVisibleInSceneHistory` so scene-scoped history keeps the
+// chosen sample and drops the rejected ones.
+async function confirmedTestRequestIds(
+  deps: ApiDependencies,
+  storyboardId: string,
+): Promise<Set<string>> {
+  const batches =
+    await deps.testGenerationBatches.listByStoryboardId(storyboardId);
+  const ids = new Set<string>();
+
+  for (const batch of batches) {
+    if (batch.confirmedGenerationRequestId !== null) {
+      ids.add(batch.confirmedGenerationRequestId);
+    }
+  }
+
+  return ids;
+}
+
+export function buildRouter(deps: ApiDependencies): Router {
   const router = new Router();
 
   // GET /api/me
@@ -309,9 +364,14 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, {
-        photoAnalysis: toProjectPhotoAnalysisDto(result.value.analysis),
+      // A cache hit answers immediately; otherwise the caller follows the job.
+      sendJson(res, result.value.cached ? 200 : 202, {
+        photoAnalysis:
+          result.value.analysis == null
+            ? null
+            : toProjectPhotoAnalysisDto(result.value.analysis),
         cached: result.value.cached,
+        jobId: result.value.jobId,
       });
     },
   );
@@ -462,7 +522,16 @@ export function buildRouter(deps: ApplicationDependencies): Router {
       }
 
       const storyboards = await deps.storyboards.findByProjectId(projectId);
-      sendJson(res, 200, { storyboards: storyboards.map(toStoryboardDto) });
+      sendJson(res, 200, {
+        storyboards: await Promise.all(
+          storyboards.map(async (storyboard) =>
+            toStoryboardDto(
+              storyboard,
+              await getStoryboardSetup(deps, storyboard),
+            ),
+          ),
+        ),
+      });
     },
   );
 
@@ -525,7 +594,130 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, toStoryboardDto(result.value));
+      sendJson(
+        res,
+        200,
+        toStoryboardDto(
+          result.value,
+          await getStoryboardSetup(deps, result.value),
+        ),
+      );
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/story-setup
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/story-setup",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = GenerateStorySetupSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await generateStorySetup(deps, { storyboardId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 202, { jobId: result.value.jobId });
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/scenes/ai-fill
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/scenes/ai-fill",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+
+      const parsed = FillStoryboardScenesWithAiSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await fillStoryboardScenesWithAi(deps, { storyboardId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      // Nothing left to fill answers immediately; otherwise follow the jobs.
+      sendJson(res, result.value.aiJobIds.length === 0 ? 200 : 202, {
+        aiJobIds: result.value.aiJobIds,
+        skippedSceneCount: result.value.skippedSceneCount,
+      });
     },
   );
 
@@ -684,6 +876,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         storyboardId,
         projectId: storyboard.projectId,
         photoAssetIds: parsed.data.photoAssetIds,
+        autoFill: parsed.data.autoFill,
       });
 
       if (!result.ok) {
@@ -695,7 +888,10 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 201, { scenes: result.value.map(toSceneDto) });
+      sendJson(res, 201, {
+        scenes: result.value.scenes.map(toSceneDto),
+        aiJobIds: result.value.aiJobIds,
+      });
     },
   );
 
@@ -811,7 +1007,12 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, toSceneDto(result.value));
+      // Nothing to fill answers immediately; otherwise follow the job.
+      sendJson(res, result.value.jobId == null ? 200 : 202, {
+        scene:
+          result.value.scene == null ? null : toSceneDto(result.value.scene),
+        jobId: result.value.jobId,
+      });
     },
   );
 
@@ -987,9 +1188,7 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, {
-        proposals: result.value.map(toComplementSceneProposalDto),
-      });
+      sendJson(res, 202, { jobId: result.value.jobId });
     },
   );
 
@@ -1177,10 +1376,15 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      const generationRequests =
-        await deps.generationRequests.findBySceneId(sceneId);
+      const [generationRequests, confirmedIds] = await Promise.all([
+        deps.generationRequests.findBySceneId(sceneId),
+        confirmedTestRequestIds(deps, scene.storyboardId),
+      ]);
+
       sendJson(res, 200, {
-        generationRequests: generationRequests.map(toGenerationRequestDto),
+        generationRequests: generationRequests
+          .filter((req) => isVisibleInSceneHistory(req, confirmedIds))
+          .map(toGenerationRequestDto),
       });
     },
   );
@@ -1336,6 +1540,87 @@ export function buildRouter(deps: ApplicationDependencies): Router {
     },
   );
 
+  // GET /api/ai-jobs/:aiJobId
+  router.add("GET", "/api/ai-jobs/:aiJobId", async (_req, res, params) => {
+    const job = await requireOwnedAiJob(deps, res, getParam(params, "aiJobId"));
+    if (job == null) return;
+
+    sendJson(res, 200, toAiJobDto(job));
+  });
+
+  // POST /api/ai-jobs/:aiJobId/cancel
+  router.add(
+    "POST",
+    "/api/ai-jobs/:aiJobId/cancel",
+    async (_req, res, params) => {
+      const aiJobId = getParam(params, "aiJobId");
+      const job = await requireOwnedAiJob(deps, res, aiJobId);
+      if (job == null) return;
+
+      const result = await cancelAiJob(deps, { aiJobId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toAiJobDto(result.value));
+    },
+  );
+
+  // GET /api/projects/:projectId/events
+  // Server-sent events: job lifecycle and mutations for one project. The
+  // stream is an optimization — every event it carries is also reachable by
+  // polling GET /api/ai-jobs/:aiJobId.
+  router.add(
+    "GET",
+    "/api/projects/:projectId/events",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const projectId = getParam(params, "projectId");
+      const project = await deps.projects.findById(projectId);
+      if (project == null) {
+        sendJson(res, 404, notFoundBody("Project not found."));
+        return;
+      }
+
+      if (project.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      res.write(": connected\n\n");
+
+      const unsubscribe = deps.progressEvents.subscribe(projectId, (event) => {
+        res.write(`event: ${event.kind}\n`);
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      });
+
+      // Keep intermediaries from closing an idle connection.
+      const heartbeat = setInterval(() => {
+        res.write(": heartbeat\n\n");
+      }, 25_000);
+
+      const close = () => {
+        clearInterval(heartbeat);
+        unsubscribe();
+        res.end();
+      };
+      req.on("close", close);
+      req.on("error", close);
+    },
+  );
+
   // GET /api/scenes/:sceneId/generated-images
   router.add(
     "GET",
@@ -1360,9 +1645,25 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      const generatedImages = await deps.generatedImages.findBySceneId(sceneId);
+      // The images of rejected samples must go too, or the scene's "generated
+      // image" panel and its review thumbnails can show a sample that was
+      // turned down.
+      const [generatedImages, sceneRequests, confirmedIds] = await Promise.all([
+        deps.generatedImages.findBySceneId(sceneId),
+        deps.generationRequests.findBySceneId(sceneId),
+        confirmedTestRequestIds(deps, scene.storyboardId),
+      ]);
+
+      const hiddenRequestIds = new Set(
+        sceneRequests
+          .filter((req) => !isVisibleInSceneHistory(req, confirmedIds))
+          .map((req) => req.id),
+      );
+
       sendJson(res, 200, {
-        generatedImages: generatedImages.map(toGeneratedImageDto),
+        generatedImages: generatedImages
+          .filter((image) => !hiddenRequestIds.has(image.generationRequestId))
+          .map(toGeneratedImageDto),
       });
     },
   );
@@ -1703,16 +2004,16 @@ export function buildRouter(deps: ApplicationDependencies): Router {
     },
   );
 
-  // POST /api/storyboards/:storyboardId/test-generation/reset
+  // GET /api/storyboards/:storyboardId/test-generation/batches
   router.add(
-    "POST",
-    "/api/storyboards/:storyboardId/test-generation/reset",
+    "GET",
+    "/api/storyboards/:storyboardId/test-generation/batches",
     async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
       const storyboardId = getParam(params, "storyboardId");
-      const result = await resetTestGeneration(deps, { storyboardId });
+      const result = await listTestGenerationBatches(deps, { storyboardId });
 
       if (!result.ok) {
         sendJson(
@@ -1723,7 +2024,9 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      sendJson(res, 200, { batch: toTestGenerationBatchDto(result.value) });
+      sendJson(res, 200, {
+        batches: result.value.map(toTestGenerationBatchWithVariantsDto),
+      });
     },
   );
 
@@ -1815,22 +2118,28 @@ export function buildRouter(deps: ApplicationDependencies): Router {
         return;
       }
 
-      const [requests, scenes] = await Promise.all([
+      const [requests, scenes, confirmedIds] = await Promise.all([
         deps.generationRequests.findByStoryboardId(storyboardId),
         deps.scenes.findByStoryboardId(storyboardId),
+        confirmedTestRequestIds(deps, storyboardId),
       ]);
 
       const sceneTitleById = new Map(
         scenes.map((s) => [s.id, s.title ?? null]),
       );
 
+      // The rejected samples are listed by the test-generation section of this
+      // same screen; repeating them under the first scene would double-count
+      // them.
       sendJson(res, 200, {
-        generationRequests: requests.map((r) =>
-          toGenerationRequestWithSceneTitleDto(
-            r,
-            sceneTitleById.get(r.sceneId) ?? null,
+        generationRequests: requests
+          .filter((r) => isVisibleInSceneHistory(r, confirmedIds))
+          .map((r) =>
+            toGenerationRequestWithSceneTitleDto(
+              r,
+              sceneTitleById.get(r.sceneId) ?? null,
+            ),
           ),
-        ),
       });
     },
   );

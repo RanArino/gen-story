@@ -35,9 +35,7 @@ export class LocalSceneFillGenerationAdapter implements SceneFillGenerationPort 
     const stylePrompt = normalize(input.stylePreset?.prompt ?? "", styleName);
     const projectContext = normalize(input.project.name, "the story");
     const sceneNumber = input.scene.orderIndex + 1;
-    const photoCount = input.projectPhotos.filter(
-      (photo) => photo.deletedAt === null,
-    ).length;
+    const photoCount = 1 + input.referencePhotos.length;
     const siblingCount = input.siblingScenes.filter(
       (scene) => scene.id !== input.scene.id,
     ).length;

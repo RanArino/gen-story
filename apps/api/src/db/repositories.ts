@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 
 import {
+  createAiJob,
   createGeneratedImage,
   createGenerationRequest,
   createOrganization,
@@ -24,6 +25,9 @@ import {
   createUser,
   isTestAdjustmentId,
   sortScenesByOrderIndex,
+  type AiJob,
+  type AiJobKind,
+  type AiJobStatus,
   type GeneratedImage,
   type GenerationRequest,
   type GenerationRequestStatus,
@@ -48,6 +52,7 @@ import {
   type User,
 } from "@gen-story/domain";
 import type {
+  AiJobRepositoryPort,
   GeneratedImageRepositoryPort,
   GenerationRequestRepositoryPort,
   Language,
@@ -67,6 +72,7 @@ import { isLanguage } from "@gen-story/application";
 
 import type { GenStoryDatabase } from "./client";
 import {
+  aiJobs,
   generatedImages,
   generationRequests,
   organizations,
@@ -92,6 +98,7 @@ type SceneRow = typeof scenes.$inferSelect;
 type StylePresetRow = typeof stylePresets.$inferSelect;
 type GenerationRequestRow = typeof generationRequests.$inferSelect;
 type GeneratedImageRow = typeof generatedImages.$inferSelect;
+type AiJobRow = typeof aiJobs.$inferSelect;
 
 export type PhotoAssetClassification = {
   used: string[];
@@ -196,6 +203,7 @@ function mapStoryboard(row: StoryboardRow, sceneIds: string[]): Storyboard {
     story: row.story,
     negativePrompt: row.negativePrompt,
     sceneIds,
+    setupCompletedAt: row.setupCompletedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -255,6 +263,7 @@ function mapGenerationRequest(row: GenerationRequestRow): GenerationRequest {
     errorMessage: row.errorMessage,
     sourceGenerationRequestId: row.sourceGenerationRequestId,
     appliedAdjustments: parseAppliedAdjustments(row.appliedAdjustmentsJson),
+    testGenerationBatchId: row.testGenerationBatchId ?? null,
     startedAt: row.startedAt ?? null,
     completedAt: row.completedAt ?? null,
     createdAt: row.createdAt,
@@ -288,6 +297,22 @@ function mapGeneratedImage(row: GeneratedImageRow): GeneratedImage {
     height: row.height,
     checksum: row.checksum,
     adoptedAt: row.adoptedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
+function mapAiJob(row: AiJobRow): AiJob {
+  return createAiJob({
+    id: row.id,
+    projectId: row.projectId,
+    kind: row.kind as AiJobKind,
+    status: row.status as AiJobStatus,
+    inputJson: parseInputJson(row.inputJson),
+    resultJson: row.resultJson == null ? null : parseInputJson(row.resultJson),
+    errorMessage: row.errorMessage,
+    startedAt: row.startedAt ?? null,
+    completedAt: row.completedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -739,6 +764,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
         commonPrompt: storyboard.commonPrompt,
         story: storyboard.story,
         negativePrompt: storyboard.negativePrompt,
+        setupCompletedAt: storyboard.setupCompletedAt,
         createdAt: storyboard.createdAt,
         updatedAt: storyboard.updatedAt,
       })
@@ -752,6 +778,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
           commonPrompt: storyboard.commonPrompt,
           story: storyboard.story,
           negativePrompt: storyboard.negativePrompt,
+          setupCompletedAt: storyboard.setupCompletedAt,
           updatedAt: storyboard.updatedAt,
           deletedAt: null,
         },
@@ -1107,6 +1134,21 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
     return rows.map(mapGenerationRequest);
   }
 
+  async findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]> {
+    const rows = await this.db
+      .select()
+      .from(generationRequests)
+      .where(
+        and(
+          eq(generationRequests.testGenerationBatchId, testBatchId),
+          isNull(generationRequests.deletedAt),
+        ),
+      )
+      .orderBy(generationRequests.createdAt, generationRequests.id);
+
+    return rows.map(mapGenerationRequest);
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     const appliedAdjustmentsJson = JSON.stringify(
       generationRequest.appliedAdjustments,
@@ -1124,6 +1166,7 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
         errorMessage: generationRequest.errorMessage,
         sourceGenerationRequestId: generationRequest.sourceGenerationRequestId,
         appliedAdjustmentsJson,
+        testGenerationBatchId: generationRequest.testGenerationBatchId,
         startedAt: generationRequest.startedAt,
         completedAt: generationRequest.completedAt,
         createdAt: generationRequest.createdAt,
@@ -1141,6 +1184,7 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
           sourceGenerationRequestId:
             generationRequest.sourceGenerationRequestId,
           appliedAdjustmentsJson,
+          testGenerationBatchId: generationRequest.testGenerationBatchId,
           startedAt: generationRequest.startedAt,
           completedAt: generationRequest.completedAt,
           updatedAt: generationRequest.updatedAt,
@@ -1167,6 +1211,93 @@ export class SqliteGenerationRequestRepository implements GenerationRequestRepos
       .update(generationRequests)
       .set({ deletedAt: null, updatedAt: restoredAt })
       .where(eq(generationRequests.id, generationRequestId));
+  }
+}
+
+export class SqliteAiJobRepository implements AiJobRepositoryPort {
+  constructor(private readonly db: GenStoryDatabase) {}
+
+  async findById(aiJobId: string): Promise<AiJob | null> {
+    const row = await this.db
+      .select()
+      .from(aiJobs)
+      .where(eq(aiJobs.id, aiJobId))
+      .get();
+
+    return row == null ? null : mapAiJob(row);
+  }
+
+  async findQueued(): Promise<AiJob[]> {
+    const rows = await this.db
+      .select()
+      .from(aiJobs)
+      .where(eq(aiJobs.status, "queued"))
+      .orderBy(aiJobs.createdAt, aiJobs.id);
+
+    return rows.map(mapAiJob);
+  }
+
+  async findRunning(): Promise<AiJob[]> {
+    const rows = await this.db
+      .select()
+      .from(aiJobs)
+      .where(eq(aiJobs.status, "running"))
+      .orderBy(aiJobs.createdAt, aiJobs.id);
+
+    return rows.map(mapAiJob);
+  }
+
+  async findRunningCountByProjectId(projectId: string): Promise<number> {
+    const result = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(aiJobs)
+      .where(and(eq(aiJobs.projectId, projectId), eq(aiJobs.status, "running")))
+      .get();
+
+    return result?.count ?? 0;
+  }
+
+  async findByProjectId(projectId: string): Promise<AiJob[]> {
+    const rows = await this.db
+      .select()
+      .from(aiJobs)
+      .where(eq(aiJobs.projectId, projectId))
+      .orderBy(desc(aiJobs.createdAt), desc(aiJobs.id));
+
+    return rows.map(mapAiJob);
+  }
+
+  async save(aiJob: AiJob): Promise<void> {
+    const resultJson =
+      aiJob.resultJson == null ? null : JSON.stringify(aiJob.resultJson);
+
+    await this.db
+      .insert(aiJobs)
+      .values({
+        id: aiJob.id,
+        projectId: aiJob.projectId,
+        kind: aiJob.kind,
+        status: aiJob.status,
+        inputJson: JSON.stringify(aiJob.inputJson),
+        resultJson,
+        errorMessage: aiJob.errorMessage,
+        startedAt: aiJob.startedAt,
+        completedAt: aiJob.completedAt,
+        createdAt: aiJob.createdAt,
+        updatedAt: aiJob.updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: aiJobs.id,
+        set: {
+          status: aiJob.status,
+          inputJson: JSON.stringify(aiJob.inputJson),
+          resultJson,
+          errorMessage: aiJob.errorMessage,
+          startedAt: aiJob.startedAt,
+          completedAt: aiJob.completedAt,
+          updatedAt: aiJob.updatedAt,
+        },
+      });
   }
 }
 
@@ -1429,6 +1560,21 @@ export class SqliteTestGenerationBatchRepository implements TestGenerationBatchR
     return row == null ? null : mapTestGenerationBatch(row);
   }
 
+  async listByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch[]> {
+    const rows = await this.db
+      .select()
+      .from(testGenerationBatches)
+      .where(eq(testGenerationBatches.storyboardId, storyboardId))
+      .orderBy(
+        sql`${testGenerationBatches.createdAt} desc`,
+        sql`${testGenerationBatches.id} desc`,
+      );
+
+    return rows.map(mapTestGenerationBatch);
+  }
+
   async save(batch: TestGenerationBatch): Promise<void> {
     await this.db
       .insert(testGenerationBatches)
@@ -1504,6 +1650,7 @@ export function createSqliteRepositories(db: GenStoryDatabase) {
     stylePresets: new SqliteStylePresetRepository(db),
     generationRequests: new SqliteGenerationRequestRepository(db),
     generatedImages: new SqliteGeneratedImageRepository(db),
+    aiJobs: new SqliteAiJobRepository(db),
     projectPhotoAnalyses: new SqliteProjectPhotoAnalysisRepository(db),
     testGenerationBatches: new SqliteTestGenerationBatchRepository(db),
     userPreferences: new SqliteUserPreferenceRepository(db),

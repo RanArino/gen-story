@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createAiJob,
   createGeneratedImage,
   createGenerationRequest,
   createOrganization,
@@ -14,6 +15,8 @@ import {
   createTestGenerationBatch,
   createUser,
   type TestAdjustmentId,
+  type AiJob,
+  type AiJobKind,
   type GeneratedImage,
   type GenerationRequest,
   type GenerationRequestStatus,
@@ -29,6 +32,7 @@ import {
 } from "@gen-story/domain";
 
 import type {
+  AiJobRepositoryPort,
   ApplicationDependencies,
   ComplementSceneProposal,
   ComplementSceneProposalInput,
@@ -51,6 +55,9 @@ import type {
   SceneFillGenerationPort,
   SceneFillSuggestion,
   SceneRepositoryPort,
+  StorySetupGenerationInput,
+  StorySetupGenerationPort,
+  StorySetupSuggestion,
   StoryboardRepositoryPort,
   StylePresetRepositoryPort,
   TestGenerationBatchRepositoryPort,
@@ -65,17 +72,25 @@ import {
   confirmTestGeneration,
   createGenerationRequestUseCase,
   createCustomStyle,
+  createTemplateScenesFromPhotos,
   createProjectUseCase,
   fillSceneWithAi,
+  fillStoryboardScenesWithAi,
+  generateStorySetup,
   getProjectPhotoAnalysis,
   getUserPreference,
   insertComplementScene,
+  listTestGenerationBatches,
   markGeneratedImageAdopted,
   proposeComplementScenes,
   registerPhotoAsset,
   reorderPhotos,
   reorderScenes,
   retryFailedGenerationRequest,
+  runComplementSceneProposalsJob,
+  runPhotoAnalysisJob,
+  runSceneAiFillJob,
+  runStorySetupJob,
   setUserPreference,
   updatePhotoCuration,
   upsertScenes,
@@ -296,6 +311,13 @@ class InMemoryGenerationRequestRepository implements GenerationRequestRepository
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async findByTestBatchId(testBatchId: string): Promise<GenerationRequest[]> {
+    return this.store
+      .values()
+      .filter((r) => r.testGenerationBatchId === testBatchId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
   async save(generationRequest: GenerationRequest): Promise<void> {
     await this.store.save(generationRequest);
   }
@@ -362,6 +384,18 @@ class InMemoryTestGenerationBatchRepository implements TestGenerationBatchReposi
         .filter((b) => b.storyboardId === storyboardId)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
     );
+  }
+
+  async listByStoryboardId(
+    storyboardId: string,
+  ): Promise<TestGenerationBatch[]> {
+    return this.store
+      .values()
+      .filter((b) => b.storyboardId === storyboardId)
+      .sort(
+        (a, b) =>
+          b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+      );
   }
 
   async save(batch: TestGenerationBatch): Promise<void> {
@@ -520,18 +554,80 @@ class InMemoryPhotoAnalysisGenerationPort implements PhotoAnalysisGenerationPort
   }
 }
 
+class InMemoryStorySetupGenerationPort implements StorySetupGenerationPort {
+  public readonly calls: StorySetupGenerationInput[] = [];
+  public result: StorySetupSuggestion = {
+    story: "A warm story about this family, told over one long summer.",
+    commonPrompt: "Warm grain, soft highlights, muted color, consistent cast.",
+    negativePrompt: "text, watermark, extra limbs",
+    model: "test-model",
+  };
+
+  async generateStorySetup(
+    input: StorySetupGenerationInput,
+  ): Promise<StorySetupSuggestion> {
+    this.calls.push(input);
+    return this.result;
+  }
+}
+
+class InMemoryAiJobRepository implements AiJobRepositoryPort {
+  constructor(private readonly store: MemoryStore<AiJob>) {}
+
+  async findById(aiJobId: string): Promise<AiJob | null> {
+    return this.store.findById(aiJobId);
+  }
+
+  async findQueued(): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.status === "queued");
+  }
+
+  async findRunning(): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.status === "running");
+  }
+
+  async findRunningCountByProjectId(projectId: string): Promise<number> {
+    return this.store
+      .values()
+      .filter((job) => job.projectId === projectId && job.status === "running")
+      .length;
+  }
+
+  async findByProjectId(projectId: string): Promise<AiJob[]> {
+    return this.store.values().filter((job) => job.projectId === projectId);
+  }
+
+  async save(aiJob: AiJob): Promise<void> {
+    await this.store.save(aiJob);
+  }
+}
+
 class InMemoryJobQueuePort implements JobQueuePort {
   public readonly jobs: Array<{
-    kind: string;
+    kind: AiJobKind;
+    projectId: string;
     payload: Record<string, unknown>;
   }> = [];
 
+  constructor(private readonly store: MemoryStore<AiJob>) {}
+
   async enqueue(job: {
-    kind: string;
+    kind: AiJobKind;
+    projectId: string;
     payload: Record<string, unknown>;
   }): Promise<{ jobId: string }> {
     this.jobs.push(job);
-    return { jobId: `job_${this.jobs.length}` };
+    const timestamp = new Date().toISOString();
+    const aiJob = createAiJob({
+      id: `job_${this.jobs.length}`,
+      projectId: job.projectId,
+      kind: job.kind,
+      inputJson: job.payload,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    await this.store.save(aiJob);
+    return { jobId: aiJob.id };
   }
 }
 
@@ -565,6 +661,7 @@ function createDependencies(initial?: {
   generatedImages?: GeneratedImage[];
   projectPhotoAnalyses?: ProjectPhotoAnalysis[];
   testGenerationBatches?: TestGenerationBatch[];
+  aiJobs?: AiJob[];
 }): ApplicationDependencies & {
   stores: {
     users: MemoryStore<User>;
@@ -578,6 +675,7 @@ function createDependencies(initial?: {
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
     testGenerationBatches: MemoryStore<TestGenerationBatch>;
+    aiJobs: MemoryStore<AiJob>;
   };
   jobQueue: InMemoryJobQueuePort;
   imagePreprocessing: InMemoryImagePreprocessingPort;
@@ -587,6 +685,7 @@ function createDependencies(initial?: {
   sceneFillGeneration: InMemorySceneFillGenerationPort;
   complementSceneProposal: InMemoryComplementSceneProposalPort;
   photoAnalysisGeneration: InMemoryPhotoAnalysisGenerationPort;
+  storySetupGeneration: InMemoryStorySetupGenerationPort;
   scenes: InMemorySceneRepository;
 } {
   const stores = {
@@ -609,9 +708,10 @@ function createDependencies(initial?: {
     testGenerationBatches: new MemoryStore<TestGenerationBatch>(
       initial?.testGenerationBatches ?? [],
     ),
+    aiJobs: new MemoryStore<AiJob>(initial?.aiJobs ?? []),
   };
 
-  const jobQueue = new InMemoryJobQueuePort();
+  const jobQueue = new InMemoryJobQueuePort(stores.aiJobs);
   const imagePreprocessing = new InMemoryImagePreprocessingPort();
   const progressEvents = new InMemoryProgressEventPort();
   const objectStorage = new InMemoryObjectStoragePort();
@@ -619,6 +719,7 @@ function createDependencies(initial?: {
   const sceneFillGeneration = new InMemorySceneFillGenerationPort();
   const complementSceneProposal = new InMemoryComplementSceneProposalPort();
   const photoAnalysisGeneration = new InMemoryPhotoAnalysisGenerationPort();
+  const storySetupGeneration = new InMemoryStorySetupGenerationPort();
 
   return {
     users: new InMemoryUserRepository(stores.users),
@@ -634,6 +735,7 @@ function createDependencies(initial?: {
     generatedImages: new InMemoryGeneratedImageRepository(
       stores.generatedImages,
     ),
+    aiJobs: new InMemoryAiJobRepository(stores.aiJobs),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
     ),
@@ -647,6 +749,7 @@ function createDependencies(initial?: {
     sceneFillGeneration,
     complementSceneProposal,
     photoAnalysisGeneration,
+    storySetupGeneration,
     jobQueue,
     progressEvents,
     authContext: {
@@ -1207,7 +1310,10 @@ describe("application use cases", () => {
     });
   }
 
-  it("auto-generates a common prompt for a new storyboard when none is provided", async () => {
+  // Setup step 4 gates on the common prompt being written, so a save that does
+  // not mention it must leave it blank. Composing one here would mark step 4
+  // done the moment the user picked a tone.
+  it("leaves the common prompt blank when the caller does not ask for one", async () => {
     const deps = createCommonPromptDeps();
 
     const result = await upsertStoryboard(deps, {
@@ -1219,7 +1325,24 @@ describe("application use cases", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.commonPrompt).not.toBe("");
+      expect(result.value.commonPrompt).toBe("");
+    }
+  });
+
+  it("composes a common prompt from tone and style on an explicit regenerate", async () => {
+    const deps = createCommonPromptDeps();
+
+    // An explicit empty string is the "regenerate from tone & style" action.
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      stylePresetId: "style_1",
+      commonPrompt: "",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
       expect(result.value.commonPrompt).toContain("Reflective");
       expect(result.value.commonPrompt).toContain("Cinematic");
     }
@@ -1292,13 +1415,31 @@ describe("application use cases", () => {
     }
   });
 
-  it("seeds a storyboard story from the latest photo analysis", async () => {
+  // Same rule as the common prompt: seeding only on an explicit request keeps
+  // setup step 4 gateable.
+  it("leaves the story blank when the caller does not ask for one", async () => {
     const deps = createStoryDeps();
 
     const result = await upsertStoryboard(deps, {
       storyboardId: "storyboard_1",
       projectId: "project_1",
       tone: "Reflective",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.story).toBe("");
+    }
+  });
+
+  it("seeds a storyboard story from the latest photo analysis on an explicit regenerate", async () => {
+    const deps = createStoryDeps();
+
+    const result = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_1",
+      projectId: "project_1",
+      tone: "Reflective",
+      story: "",
     });
 
     expect(result.ok).toBe(true);
@@ -1523,7 +1664,10 @@ describe("application use cases", () => {
 
     expect(result.ok).toBe(true);
     expect(deps.imagePreprocessing.calls).toHaveLength(1);
-    expect(deps.jobQueue.jobs).toHaveLength(1);
+    // Image work is queued by the generation_requests row itself, not the AI
+    // job queue.
+    expect(await deps.generationRequests.findQueued()).toHaveLength(1);
+    expect(deps.jobQueue.jobs).toHaveLength(0);
     expect(deps.progressEvents.events[0]?.kind).toBe(
       "generation-request.created",
     );
@@ -1721,7 +1865,8 @@ describe("application use cases", () => {
       expect(result.value.status).toBe("queued");
       expect(result.value.sourceGenerationRequestId).toBe("request_1");
     }
-    expect(deps.jobQueue.jobs).toHaveLength(1);
+    expect(await deps.generationRequests.findQueued()).toHaveLength(1);
+    expect(deps.jobQueue.jobs).toHaveLength(0);
   });
 
   it("fills blank scene fields with AI suggestions and preserves edited fields", async () => {
@@ -1776,23 +1921,37 @@ describe("application use cases", () => {
       ],
     });
 
-    const result = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+
+    expect(enqueued.ok).toBe(true);
+    // The enqueue half must not touch the AI port or the scene.
+    expect(deps.sceneFillGeneration.calls).toHaveLength(0);
+    expect(deps.scenes.saveCalls).toBe(0);
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("scene_ai_fill");
+    expect(job?.status).toBe("queued");
+
+    const result = await runSceneAiFillJob(deps, job!);
 
     expect(result.ok).toBe(true);
     expect(deps.sceneFillGeneration.calls).toHaveLength(1);
     expect(deps.scenes.saveCalls).toBe(1);
-    if (result.ok) {
-      expect(result.value).toMatchObject({
-        title: "Edited title",
-        description: "AI description",
-        imagePrompt: "AI image prompt",
-        emotion: "Wonder",
-        cameraDirection: "Medium",
-        lightingDirection: "Natural",
-        motionDirection: "Slow pan",
-      });
-      expect(result.value.updatedAt).not.toBe("2026-05-02T00:00:00.000Z");
-    }
+
+    const scene = await deps.scenes.findById("scene_ai");
+    expect(scene).toMatchObject({
+      title: "Edited title",
+      description: "AI description",
+      imagePrompt: "AI image prompt",
+      emotion: "Wonder",
+      cameraDirection: "Medium",
+      lightingDirection: "Natural",
+      motionDirection: "Slow pan",
+    });
+    expect(scene?.updatedAt).not.toBe("2026-05-02T00:00:00.000Z");
   });
 
   it("rejects AI fill when the scene has no primary photo", async () => {
@@ -1899,6 +2058,258 @@ describe("application use cases", () => {
     expect(deps.scenes.saveCalls).toBe(0);
   });
 
+  // ── Guided setup: step 4 (story) ───────────────────────────────────────────
+
+  function createStorySetupDeps(
+    storyboardOverrides: Partial<{
+      tone: string;
+      stylePresetId: string | null;
+    }> = {},
+  ) {
+    return createDependencies({
+      projects: [
+        createProject({
+          id: "project_setup",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      stylePresets: [
+        createStylePreset({
+          id: "style_setup",
+          scope: "system",
+          name: "Cinematic",
+          prompt: "Filmic contrast, shallow depth of field.",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_setup",
+          projectId: "project_setup",
+          tone: "warm_nostalgia",
+          stylePresetId: "style_setup",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+          ...storyboardOverrides,
+        }),
+      ],
+    });
+  }
+
+  it("writes the story, common prompt, and negative prompt from the story setup job", async () => {
+    const deps = createStorySetupDeps();
+
+    const enqueued = await generateStorySetup(deps, {
+      storyboardId: "storyboard_setup",
+    });
+
+    expect(enqueued.ok).toBe(true);
+    // The enqueue half must not touch the AI port.
+    expect(deps.storySetupGeneration.calls).toHaveLength(0);
+    if (!enqueued.ok) throw new Error("expected a job to be enqueued");
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("story_setup");
+
+    const result = await runStorySetupJob(deps, job!);
+
+    expect(result.ok).toBe(true);
+    expect(deps.storySetupGeneration.calls).toHaveLength(1);
+    // The chosen tone and style are what the model is given to write against.
+    expect(deps.storySetupGeneration.calls[0]?.storyboard.tone).toBe(
+      "warm_nostalgia",
+    );
+    expect(deps.storySetupGeneration.calls[0]?.stylePreset?.name).toBe(
+      "Cinematic",
+    );
+
+    const storyboard = await deps.storyboards.findById("storyboard_setup");
+    expect(storyboard).toMatchObject({
+      story: "A warm story about this family, told over one long summer.",
+      commonPrompt:
+        "Warm grain, soft highlights, muted color, consistent cast.",
+      negativePrompt: "text, watermark, extra limbs",
+    });
+  });
+
+  it("refuses to generate the story setup before tone and style are decided", async () => {
+    const noTone = await generateStorySetup(
+      createStorySetupDeps({ tone: "" }),
+      {
+        storyboardId: "storyboard_setup",
+      },
+    );
+    expect(noTone.ok).toBe(false);
+    if (!noTone.ok) expect(noTone.error.code).toBe("invalid_state");
+
+    const noStyle = await generateStorySetup(
+      createStorySetupDeps({ stylePresetId: null }),
+      { storyboardId: "storyboard_setup" },
+    );
+    expect(noStyle.ok).toBe(false);
+    if (!noStyle.ok) expect(noStyle.error.code).toBe("invalid_state");
+  });
+
+  // ── Guided setup: step 5 (scenes) ──────────────────────────────────────────
+
+  function createBulkFillDeps() {
+    const photo = (id: string) =>
+      createPhotoAsset({
+        id,
+        projectId: "project_bulk",
+        name: `${id}.jpg`,
+        storageKey: `photos/${id}.jpg`,
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: `${id}_checksum`,
+        sourceKind: "upload",
+        createdAt: "2026-05-02T00:00:00.000Z",
+        updatedAt: "2026-05-02T00:00:00.000Z",
+      });
+
+    return createDependencies({
+      projects: [
+        createProject({
+          id: "project_bulk",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Anniversary",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      stylePresets: [
+        createStylePreset({
+          id: "style_bulk",
+          scope: "system",
+          name: "Cinematic",
+          prompt: "Filmic contrast.",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_bulk",
+          projectId: "project_bulk",
+          tone: "warm_nostalgia",
+          stylePresetId: "style_bulk",
+          commonPrompt: "Warm grain.",
+          story: "A warm family story.",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [photo("photo_blank"), photo("photo_written")],
+      scenes: [
+        createTemplateScene({
+          id: "scene_blank",
+          projectId: "project_bulk",
+          storyboardId: "storyboard_bulk",
+          orderIndex: 0,
+          photoAssetId: "photo_blank",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+        createScene({
+          id: "scene_written",
+          projectId: "project_bulk",
+          storyboardId: "storyboard_bulk",
+          orderIndex: 1,
+          title: "Departure",
+          description: "They drive away at dusk.",
+          imagePrompt: "A car pulling away at dusk.",
+          emotion: "Nostalgia",
+          cameraDirection: "Medium",
+          lightingDirection: "Golden hour",
+          motionDirection: "Tracking",
+          photoAssets: [{ photoAssetId: "photo_written", role: "primary" }],
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+  }
+
+  it("enqueues one bulk fill job per blank scene and skips written ones", async () => {
+    const deps = createBulkFillDeps();
+
+    const result = await fillStoryboardScenesWithAi(deps, {
+      storyboardId: "storyboard_bulk",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.aiJobIds).toHaveLength(1);
+    expect(result.value.skippedSceneCount).toBe(1);
+    expect(deps.jobQueue.jobs).toHaveLength(1);
+    expect(deps.jobQueue.jobs[0]).toMatchObject({
+      kind: "scene_ai_fill",
+      payload: { sceneId: "scene_blank" },
+    });
+    // Enqueueing must not spend an AI call.
+    expect(deps.sceneFillGeneration.calls).toHaveLength(0);
+  });
+
+  it("stamps setup completion once the last blank scene is filled", async () => {
+    const deps = createBulkFillDeps();
+    // The photos have to be analyzable for step 1 to count as done.
+    expect(
+      (await deps.photoAssets.findByProjectId("project_bulk")).every(
+        (candidate) => candidate.usage === "candidate",
+      ),
+    ).toBe(true);
+
+    expect(
+      (await deps.storyboards.findById("storyboard_bulk"))?.setupCompletedAt,
+    ).toBeNull();
+
+    const enqueued = await fillStoryboardScenesWithAi(deps, {
+      storyboardId: "storyboard_bulk",
+    });
+    if (!enqueued.ok) throw new Error("expected jobs to be enqueued");
+
+    for (const jobId of enqueued.value.aiJobIds) {
+      const job = await deps.aiJobs.findById(jobId);
+      await runSceneAiFillJob(deps, job!);
+    }
+
+    const storyboard = await deps.storyboards.findById("storyboard_bulk");
+    expect(storyboard?.setupCompletedAt).not.toBeNull();
+    expect(
+      deps.progressEvents.events.some(
+        (event) => event.kind === "storyboard.setup_completed",
+      ),
+    ).toBe(true);
+  });
+
+  it("leaves setup incomplete while any step is still unsatisfied", async () => {
+    const deps = createBulkFillDeps();
+    // Blank the story so step 4 is open even after every scene is written.
+    const storyboard = await deps.storyboards.findById("storyboard_bulk");
+    await deps.storyboards.save({ ...storyboard!, story: "" });
+
+    const enqueued = await fillStoryboardScenesWithAi(deps, {
+      storyboardId: "storyboard_bulk",
+    });
+    if (!enqueued.ok) throw new Error("expected jobs to be enqueued");
+
+    for (const jobId of enqueued.value.aiJobIds) {
+      const job = await deps.aiJobs.findById(jobId);
+      await runSceneAiFillJob(deps, job!);
+    }
+
+    expect(
+      (await deps.storyboards.findById("storyboard_bulk"))?.setupCompletedAt,
+    ).toBeNull();
+  });
+
   it("analyzes only candidate and reference photos", async () => {
     const deps = createDependencies({
       projects: [
@@ -1998,7 +2409,23 @@ describe("application use cases", () => {
       ],
     };
 
-    const result = await analyzeProjectPhotos(deps, { projectId: "project_1" });
+    const enqueued = await analyzeProjectPhotos(deps, {
+      projectId: "project_1",
+    });
+
+    expect(enqueued.ok).toBe(true);
+    // The enqueue half must not spend anything.
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(0);
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    expect(enqueued.value.cached).toBe(false);
+    expect(enqueued.value.analysis).toBeNull();
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("photo_analysis");
+
+    const result = await runPhotoAnalysisJob(deps, job!);
 
     expect(result.ok).toBe(true);
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
@@ -2009,10 +2436,9 @@ describe("application use cases", () => {
       "storyboard_1",
     );
     expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(1);
-    if (result.ok) {
-      expect(result.value.cached).toBe(false);
-      expect(result.value.analysis.model).toBe("test-model");
-    }
+    expect(deps.stores.projectPhotoAnalyses.values()[0]!.model).toBe(
+      "test-model",
+    );
   });
 
   it("reuses the stored analysis when inputs are unchanged", async () => {
@@ -2046,16 +2472,26 @@ describe("application use cases", () => {
 
     const first = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(first.ok).toBe(true);
+    if (!first.ok || first.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    const firstJob = await deps.aiJobs.findById(first.value.jobId);
+    const ran = await runPhotoAnalysisJob(deps, firstJob!);
+    expect(ran.ok).toBe(true);
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
 
     const second = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(second.ok).toBe(true);
-    // No second AI call: the cached analysis is reused.
+    // No second AI call and no second job: the cached analysis is reused.
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
+    expect(deps.stores.aiJobs.values()).toHaveLength(1);
     expect(deps.stores.projectPhotoAnalyses.values()).toHaveLength(1);
-    if (first.ok && second.ok) {
+    if (second.ok) {
       expect(second.value.cached).toBe(true);
-      expect(second.value.analysis.id).toBe(first.value.analysis.id);
+      expect(second.value.jobId).toBeNull();
+      expect(second.value.analysis?.id).toBe(
+        deps.stores.projectPhotoAnalyses.values()[0]!.id,
+      );
     }
   });
 
@@ -2090,6 +2526,13 @@ describe("application use cases", () => {
 
     const first = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(first.ok).toBe(true);
+    if (!first.ok || first.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    await runPhotoAnalysisJob(
+      deps,
+      (await deps.aiJobs.findById(first.value.jobId))!,
+    );
     expect(deps.photoAnalysisGeneration.calls).toHaveLength(1);
 
     // A new candidate photo changes the analyzable set.
@@ -2111,10 +2554,16 @@ describe("application use cases", () => {
 
     const second = await analyzeProjectPhotos(deps, { projectId: "project_1" });
     expect(second.ok).toBe(true);
-    expect(deps.photoAnalysisGeneration.calls).toHaveLength(2);
-    if (second.ok) {
-      expect(second.value.cached).toBe(false);
+    if (!second.ok || second.value.jobId == null) {
+      throw new Error("expected a second job to be enqueued");
     }
+    expect(second.value.cached).toBe(false);
+
+    await runPhotoAnalysisJob(
+      deps,
+      (await deps.aiJobs.findById(second.value.jobId))!,
+    );
+    expect(deps.photoAnalysisGeneration.calls).toHaveLength(2);
   });
 
   it("rejects project photo analysis without included photos", async () => {
@@ -2310,16 +2759,26 @@ describe("application use cases", () => {
   it("returns AI complement-scene proposals for a bridge", async () => {
     const deps = seedComplementSceneDeps();
 
-    const result = await proposeComplementScenes(deps, {
+    const enqueued = await proposeComplementScenes(deps, {
       storyboardId: "storyboard_1",
       fromSceneId: "scene_1",
       toSceneId: "scene_2",
     });
 
+    expect(enqueued.ok).toBe(true);
+    expect(deps.complementSceneProposal.calls).toHaveLength(0);
+    if (!enqueued.ok) throw new Error("expected a job to be enqueued");
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("complement_scene_proposals");
+
+    const result = await runComplementSceneProposalsJob(deps, job!);
+
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.length).toBeGreaterThan(0);
-      expect(result.value.length).toBeLessThanOrEqual(3);
+      const proposals = result.value.proposals as unknown[];
+      expect(proposals.length).toBeGreaterThan(0);
+      expect(proposals.length).toBeLessThanOrEqual(3);
     }
     expect(deps.complementSceneProposal.calls).toHaveLength(1);
   });
@@ -2473,6 +2932,10 @@ describe("application use cases", () => {
           sceneId: "s1",
           inputJson: { testBatchId: "batch_1", testVariant: 0 },
           appliedAdjustments: opts?.adjustments ?? [],
+          // A sample is only confirmable once its image exists, and the batch
+          // link is now a field rather than something read back out of inputJson.
+          status: "succeeded",
+          testGenerationBatchId: "batch_1",
           createdAt: ts,
           updatedAt: ts,
         }),
@@ -2529,12 +2992,20 @@ describe("application use cases", () => {
         "Base prompt. warmer color temperature stronger cinematic grade",
       );
 
+      // Re-confirming the same sample is allowed now that a confirmation can be
+      // moved between batches, and it must be idempotent: the suffixes are
+      // already in the common prompt and must not be appended a second time.
       const reconfirm = await confirmTestGeneration(deps, {
         storyboardId: "sb1",
         confirmedGenerationRequestId: "variant_1",
         adjustmentSuffixes: SUFFIXES,
       });
-      expect(reconfirm.ok).toBe(false);
+      expect(reconfirm.ok).toBe(true);
+
+      const afterReconfirm = await deps.storyboards.findById("sb1");
+      expect(afterReconfirm?.commonPrompt).toBe(
+        "Base prompt. warmer color temperature stronger cinematic grade",
+      );
     });
 
     it("confirmTestGeneration with no adjustments leaves commonPrompt unchanged", async () => {
@@ -2551,5 +3022,508 @@ describe("application use cases", () => {
       const after = (await deps.storyboards.findById("sb1"))?.commonPrompt;
       expect(after).toBe(before);
     });
+  });
+
+  describe("test-generation sample history", () => {
+    // Two batches, older first, each with one succeeded sample carrying an image.
+    async function seedTwoBatches() {
+      const deps = createDependencies();
+      await deps.projects.save(
+        createProject({
+          id: "p1",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Trip",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      );
+      await deps.storyboards.save(
+        createStoryboard({
+          id: "sb1",
+          projectId: "p1",
+          tone: "warm",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      );
+      await deps.scenes.save(
+        createScene({
+          id: "s1",
+          projectId: "p1",
+          storyboardId: "sb1",
+          orderIndex: 0,
+          title: "T",
+          description: "D",
+          imagePrompt: "P",
+          emotion: "",
+          cameraDirection: "",
+          lightingDirection: "",
+          motionDirection: "",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        }),
+      );
+
+      const batches = [
+        { id: "batch_old", at: "2026-07-01T00:00:00.000Z" },
+        { id: "batch_new", at: "2026-07-02T00:00:00.000Z" },
+      ];
+      for (const { id, at } of batches) {
+        await deps.testGenerationBatches.save(
+          createTestGenerationBatch({
+            id,
+            storyboardId: "sb1",
+            status: "pending",
+            createdAt: at,
+          }),
+        );
+        // Saved out of variant order so the ordering assertion is meaningful.
+        for (const variantIndex of [1, 0]) {
+          const requestId = `${id}_v${variantIndex}`;
+          await deps.generationRequests.save(
+            createGenerationRequest({
+              id: requestId,
+              projectId: "p1",
+              storyboardId: "sb1",
+              sceneId: "s1",
+              status: "succeeded",
+              inputJson: { testBatchId: id, testVariant: variantIndex },
+              testGenerationBatchId: id,
+              createdAt: at,
+              updatedAt: at,
+            }),
+          );
+          await deps.generatedImages.save(
+            createGeneratedImage({
+              id: `img_${requestId}`,
+              projectId: "p1",
+              storyboardId: "sb1",
+              sceneId: "s1",
+              generationRequestId: requestId,
+              storageKey: `data/uploads/generated/${requestId}.jpg`,
+              mimeType: "image/jpeg",
+              size: 1,
+              checksum: requestId,
+              createdAt: at,
+              updatedAt: at,
+            }),
+          );
+        }
+      }
+
+      return deps;
+    }
+
+    it("lists every batch newest first with its samples in variant order", async () => {
+      const deps = await seedTwoBatches();
+
+      const result = await listTestGenerationBatches(deps, {
+        storyboardId: "sb1",
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.map((entry) => entry.batch.id)).toEqual([
+        "batch_new",
+        "batch_old",
+      ]);
+      expect(
+        result.value[0]!.variants.map((variant) => variant.request.id),
+      ).toEqual(["batch_new_v0", "batch_new_v1"]);
+      expect(result.value[1]!.variants[0]!.generatedImage?.id).toBe(
+        "img_batch_old_v0",
+      );
+    });
+
+    it("keeps each batch's samples to itself", async () => {
+      const deps = await seedTwoBatches();
+
+      const oldVariants =
+        await deps.generationRequests.findByTestBatchId("batch_old");
+
+      expect(oldVariants.map((variant) => variant.id).sort()).toEqual([
+        "batch_old_v0",
+        "batch_old_v1",
+      ]);
+    });
+
+    // The point of the feature: run the real generation from a different sample
+    // without losing the batch it came from.
+    it("moves the single confirmation when a sample from an older batch is confirmed", async () => {
+      const deps = await seedTwoBatches();
+
+      const first = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "batch_new_v0",
+      });
+      expect(first.ok).toBe(true);
+
+      const second = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "batch_old_v1",
+      });
+      expect(second.ok).toBe(true);
+
+      const listed = await listTestGenerationBatches(deps, {
+        storyboardId: "sb1",
+      });
+      expect(listed.ok).toBe(true);
+      if (!listed.ok) return;
+
+      const completed = listed.value.filter(
+        (entry) => entry.batch.status === "completed",
+      );
+      expect(completed).toHaveLength(1);
+      expect(completed[0]!.batch.id).toBe("batch_old");
+      expect(completed[0]!.batch.confirmedGenerationRequestId).toBe(
+        "batch_old_v1",
+      );
+
+      // The batch that lost the confirmation stays in place in the history.
+      const newBatch = listed.value.find(
+        (entry) => entry.batch.id === "batch_new",
+      );
+      expect(newBatch?.batch.status).toBe("pending");
+      expect(newBatch?.batch.createdAt).toBe("2026-07-02T00:00:00.000Z");
+      expect(listed.value.map((entry) => entry.batch.id)).toEqual([
+        "batch_new",
+        "batch_old",
+      ]);
+    });
+
+    it("refuses to confirm a sample that has not succeeded", async () => {
+      const deps = await seedTwoBatches();
+      const queued = await deps.generationRequests.findById("batch_new_v0");
+      await deps.generationRequests.save({ ...queued!, status: "queued" });
+
+      const result = await confirmTestGeneration(deps, {
+        storyboardId: "sb1",
+        confirmedGenerationRequestId: "batch_new_v0",
+      });
+
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  it("treats legacy placeholder scene fields as blank so AI fill still applies", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_ai",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_ai",
+          projectId: "project_ai",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_ai",
+          projectId: "project_ai",
+          name: "birthday.jpg",
+          storageKey: "photos/birthday.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "photo_ai_checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      scenes: [
+        {
+          ...createTemplateScene({
+            id: "scene_ai",
+            projectId: "project_ai",
+            storyboardId: "storyboard_ai",
+            orderIndex: 0,
+            photoAssetId: "photo_ai",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+          // Exactly what the web layer used to persist for a blank scene.
+          title: "Untitled",
+          description: "-",
+          imagePrompt: "-",
+          emotion: "Joy",
+          cameraDirection: "Wide",
+          lightingDirection: "Natural",
+          motionDirection: "Slow pan",
+        },
+      ],
+    });
+
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("placeholder-filled scene should still enqueue a job");
+    }
+
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    await runSceneAiFillJob(deps, job!);
+
+    const scene = await deps.scenes.findById("scene_ai");
+    expect(scene).toMatchObject({
+      title: "AI title",
+      description: "AI description",
+      imagePrompt: "AI image prompt",
+    });
+  });
+
+  it("passes the stored photo analysis to the scene fill port", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_ai",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_ai",
+          projectId: "project_ai",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: [
+        createPhotoAsset({
+          id: "photo_ai",
+          projectId: "project_ai",
+          name: "birthday.jpg",
+          storageKey: "photos/birthday.jpg",
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: "photo_ai_checksum",
+          sourceKind: "upload",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      scenes: [
+        createTemplateScene({
+          id: "scene_ai",
+          projectId: "project_ai",
+          storyboardId: "storyboard_ai",
+          orderIndex: 0,
+          photoAssetId: "photo_ai",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      projectPhotoAnalyses: [
+        createProjectPhotoAnalysis({
+          id: "analysis_1",
+          projectId: "project_ai",
+          emotionCandidates: [
+            {
+              value: "warm_nostalgia",
+              label: "Warm nostalgia",
+              description: "Tender.",
+              reason: "Because.",
+            },
+          ],
+          photoInsights: [
+            {
+              photoAssetId: "photo_ai",
+              summary: "A birthday table.",
+              people: "Two adults.",
+              setting: "Indoors.",
+              event: "Birthday.",
+              atmosphere: "Warm.",
+            },
+          ],
+          storySummary: "A warm family birthday.",
+          model: "test-model",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ai" });
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    await runSceneAiFillJob(deps, job!);
+
+    expect(deps.sceneFillGeneration.calls).toHaveLength(1);
+    expect(deps.sceneFillGeneration.calls[0]!.photoAnalysis).toMatchObject({
+      id: "analysis_1",
+      storySummary: "A warm family birthday.",
+    });
+  });
+
+  // The scene fill used to receive every project photo, so each scene's call
+  // billed one image per photo in the project. Only what the scene actually
+  // references is sent now; the rest of the project arrives as analysis text.
+  it("passes only the scene's reference photos to the scene fill port", async () => {
+    const photo = (id: string) =>
+      createPhotoAsset({
+        id,
+        projectId: "project_ref",
+        name: `${id}.jpg`,
+        storageKey: `photos/${id}.jpg`,
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: `${id}_checksum`,
+        sourceKind: "upload",
+        createdAt: "2026-05-02T00:00:00.000Z",
+        updatedAt: "2026-05-02T00:00:00.000Z",
+      });
+
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_ref",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Family Story",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      storyboards: [
+        createStoryboard({
+          id: "storyboard_ref",
+          projectId: "project_ref",
+          tone: "Warm",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      // Four photos in the project, but the scene only names two of them.
+      photoAssets: [
+        photo("photo_primary"),
+        photo("photo_reference"),
+        photo("photo_other_1"),
+        photo("photo_other_2"),
+      ],
+      scenes: [
+        createScene({
+          id: "scene_ref",
+          projectId: "project_ref",
+          storyboardId: "storyboard_ref",
+          orderIndex: 0,
+          title: "",
+          description: "",
+          imagePrompt: "",
+          emotion: "",
+          cameraDirection: "",
+          lightingDirection: "",
+          motionDirection: "",
+          photoAssets: [
+            { photoAssetId: "photo_primary", role: "primary" },
+            { photoAssetId: "photo_reference", role: "reference" },
+          ],
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const enqueued = await fillSceneWithAi(deps, { sceneId: "scene_ref" });
+    if (!enqueued.ok || enqueued.value.jobId == null) {
+      throw new Error("expected a job to be enqueued");
+    }
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    await runSceneAiFillJob(deps, job!);
+
+    const call = deps.sceneFillGeneration.calls[0]!;
+    expect(call.primaryPhoto.id).toBe("photo_primary");
+    expect(call.referencePhotos.map((candidate) => candidate.id)).toEqual([
+      "photo_reference",
+    ]);
+  });
+
+  it("enqueues one AI fill job per created scene only when autoFill is requested", async () => {
+    function seed() {
+      return createDependencies({
+        projects: [
+          createProject({
+            id: "project_t",
+            organizationId: "org_1",
+            ownerUserId: "user_1",
+            name: "Trip",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        storyboards: [
+          createStoryboard({
+            id: "storyboard_t",
+            projectId: "project_t",
+            tone: "Warm",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        photoAssets: ["photo_a", "photo_b"].map((id) =>
+          createPhotoAsset({
+            id,
+            projectId: "project_t",
+            name: `${id}.jpg`,
+            usage: "candidate",
+            storageKey: `photos/${id}.jpg`,
+            mimeType: "image/jpeg",
+            size: 1,
+            checksum: id,
+            sourceKind: "upload",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ),
+      });
+    }
+
+    const withoutFill = seed();
+    const plain = await createTemplateScenesFromPhotos(withoutFill, {
+      storyboardId: "storyboard_t",
+      projectId: "project_t",
+      photoAssetIds: ["photo_a", "photo_b"],
+    });
+    expect(plain.ok).toBe(true);
+    if (plain.ok) {
+      expect(plain.value.scenes).toHaveLength(2);
+      expect(plain.value.aiJobIds).toEqual([]);
+    }
+    expect(withoutFill.stores.aiJobs.values()).toHaveLength(0);
+
+    const withFill = seed();
+    const auto = await createTemplateScenesFromPhotos(withFill, {
+      storyboardId: "storyboard_t",
+      projectId: "project_t",
+      photoAssetIds: ["photo_a", "photo_b"],
+      autoFill: true,
+    });
+    expect(auto.ok).toBe(true);
+    if (auto.ok) {
+      expect(auto.value.aiJobIds).toHaveLength(2);
+    }
+    const jobs = withFill.stores.aiJobs.values();
+    expect(jobs).toHaveLength(2);
+    expect(jobs.every((job) => job.kind === "scene_ai_fill")).toBe(true);
+    expect(jobs.map((job) => job.inputJson.sceneId).sort()).toEqual(
+      auto.ok ? auto.value.scenes.map((s) => s.id).sort() : [],
+    );
+    // Enqueue must not call the model.
+    expect(withFill.sceneFillGeneration.calls).toHaveLength(0);
   });
 });

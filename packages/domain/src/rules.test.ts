@@ -11,12 +11,18 @@ import {
 import {
   appendAdjustmentsToCommonPrompt,
   assertAdjustmentsValid,
+  canStartTestGeneration,
+  completeTestGenerationBatch,
   composeCommonPrompt,
+  computeStoryboardSetupStep,
+  createTestGenerationBatch,
+  isVisibleInSceneHistory,
   replaceScenePhotoAssets,
   retryGenerationRequest,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
   transitionGenerationRequestStatus,
+  unconfirmTestGenerationBatch,
   updatePhotoUsage,
   updateStylePreset,
 } from "./index";
@@ -440,5 +446,265 @@ describe("appendAdjustmentsToCommonPrompt", () => {
     expect(appendAdjustmentsToCommonPrompt("", ["cooler"], FAKE_SUFFIXES)).toBe(
       "cooler color temperature, blue tones",
     );
+  });
+});
+
+describe("computeStoryboardSetupStep", () => {
+  function storyboardWith(
+    overrides: Partial<{
+      tone: string;
+      stylePresetId: string | null;
+      story: string;
+      commonPrompt: string;
+    }> = {},
+  ) {
+    return {
+      tone: "warm_nostalgia",
+      stylePresetId: "style_1",
+      story: "A warm family story told across one summer.",
+      commonPrompt: "Warm grain, soft highlights, muted color.",
+      ...overrides,
+    };
+  }
+
+  function writtenScene(overrides: Partial<Record<string, string>> = {}) {
+    return {
+      title: "Arrival",
+      description: "The family gathers on the porch.",
+      imagePrompt: "A warm porch gathering at golden hour.",
+      emotion: "Nostalgia",
+      cameraDirection: "Medium",
+      lightingDirection: "Golden hour",
+      motionDirection: "Static",
+      ...overrides,
+    };
+  }
+
+  it("asks for photos when the project has no analyzable photo", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 0,
+        storyboard: storyboardWith(),
+        scenes: [writtenScene()],
+      }),
+    ).toBe("photos");
+  });
+
+  it("asks for a tone when the tone is blank", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith({ tone: "" }),
+        scenes: [writtenScene()],
+      }),
+    ).toBe("tone");
+  });
+
+  it("asks for a style when no style preset is chosen", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith({ stylePresetId: null }),
+        scenes: [writtenScene()],
+      }),
+    ).toBe("style");
+  });
+
+  it("asks for the story when either the story or the common prompt is blank", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith({ story: "" }),
+        scenes: [writtenScene()],
+      }),
+    ).toBe("story");
+
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith({ commonPrompt: "  " }),
+        scenes: [writtenScene()],
+      }),
+    ).toBe("story");
+  });
+
+  it("asks for scenes when there are none, or when one still has a blank field", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith(),
+        scenes: [],
+      }),
+    ).toBe("scenes");
+
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith(),
+        scenes: [writtenScene(), writtenScene({ imagePrompt: "" })],
+      }),
+    ).toBe("scenes");
+  });
+
+  // The placeholder text the web used to write into free-text fields is not
+  // real content, so a scene carrying it is still unwritten.
+  it("treats legacy placeholder text as a blank free-text field", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith(),
+        scenes: [writtenScene({ title: "Untitled" })],
+      }),
+    ).toBe("scenes");
+
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith(),
+        scenes: [writtenScene({ description: "-" })],
+      }),
+    ).toBe("scenes");
+  });
+
+  // "Natural" and "Slow pan" were also written as placeholders, but they are
+  // the first option of their dropdown and a legitimate choice. Treating them
+  // as blank would make such a scene impossible to finish.
+  it("accepts legitimate dropdown values that were once used as placeholders", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith(),
+        scenes: [
+          writtenScene({
+            emotion: "Joy",
+            cameraDirection: "Wide",
+            lightingDirection: "Natural",
+            motionDirection: "Slow pan",
+          }),
+        ],
+      }),
+    ).toBe("complete");
+  });
+
+  it("reports complete once every step is satisfied", () => {
+    expect(
+      computeStoryboardSetupStep({
+        analyzablePhotoCount: 3,
+        storyboard: storyboardWith(),
+        scenes: [writtenScene(), writtenScene()],
+      }),
+    ).toBe("complete");
+  });
+});
+
+describe("test generation batch rules", () => {
+  const batchAt = (createdAt: string) =>
+    createTestGenerationBatch({
+      id: "batch_1",
+      storyboardId: "sb_1",
+      status: "pending",
+      createdAt,
+    });
+
+  // The removed `resetTestGenerationBatch` overwrote createdAt, which pushed an
+  // older batch to the front of a newest-first history.
+  it("keeps createdAt when a batch loses its confirmation", () => {
+    const confirmed = completeTestGenerationBatch(
+      batchAt("2026-07-01T00:00:00.000Z"),
+      "variant_1",
+      "2026-07-02T00:00:00.000Z",
+    );
+
+    const unconfirmed = unconfirmTestGenerationBatch(confirmed);
+
+    expect(unconfirmed.createdAt).toBe("2026-07-01T00:00:00.000Z");
+    expect(unconfirmed.status).toBe("pending");
+    expect(unconfirmed.confirmedGenerationRequestId).toBeNull();
+    expect(unconfirmed.completedAt).toBeNull();
+  });
+
+  it("allows a first batch and one after a confirmed batch", () => {
+    expect(canStartTestGeneration(null)).toBe(true);
+    expect(
+      canStartTestGeneration(
+        completeTestGenerationBatch(
+          batchAt("2026-07-01T00:00:00.000Z"),
+          "variant_1",
+          "2026-07-02T00:00:00.000Z",
+        ),
+        ["succeeded", "succeeded", "succeeded"],
+      ),
+    ).toBe(true);
+  });
+
+  // Without this, a batch whose samples all failed would need the reset that
+  // this change removes, leaving the operator with no way forward.
+  it("allows a new batch when a pending batch has no work left in flight", () => {
+    expect(
+      canStartTestGeneration(batchAt("2026-07-01T00:00:00.000Z"), [
+        "failed",
+        "failed",
+        "failed",
+      ]),
+    ).toBe(true);
+  });
+
+  it("refuses a new batch while a sample is still queued or running", () => {
+    expect(
+      canStartTestGeneration(batchAt("2026-07-01T00:00:00.000Z"), [
+        "succeeded",
+        "running",
+        "failed",
+      ]),
+    ).toBe(false);
+    expect(
+      canStartTestGeneration(batchAt("2026-07-01T00:00:00.000Z"), [
+        "queued",
+        "queued",
+        "queued",
+      ]),
+    ).toBe(false);
+  });
+
+  // Samples are generated from the storyboard's first scene, so all three of
+  // them used to show up in that scene's history beside its real generations.
+  it("keeps only the confirmed sample in a scene's history", () => {
+    const confirmed = new Set(["variant_2"]);
+
+    expect(
+      isVisibleInSceneHistory(
+        { id: "req_1", testGenerationBatchId: null },
+        confirmed,
+      ),
+    ).toBe(true);
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_2", testGenerationBatchId: "batch_1" },
+        confirmed,
+      ),
+    ).toBe(true);
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_1", testGenerationBatchId: "batch_1" },
+        confirmed,
+      ),
+    ).toBe(false);
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_3", testGenerationBatchId: "batch_1" },
+        confirmed,
+      ),
+    ).toBe(false);
+  });
+
+  // A batch nobody confirmed contributes nothing to the scene: those samples
+  // are only meaningful inside the test-generation dialog.
+  it("hides every sample of a batch that was never confirmed", () => {
+    expect(
+      isVisibleInSceneHistory(
+        { id: "variant_1", testGenerationBatchId: "batch_1" },
+        new Set<string>(),
+      ),
+    ).toBe(false);
   });
 });

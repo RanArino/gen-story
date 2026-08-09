@@ -66,8 +66,9 @@ function createInput() {
     scene,
     primaryPhoto,
     stylePreset,
-    projectPhotos: [primaryPhoto],
+    referencePhotos: [],
     siblingScenes: [scene],
+    photoAnalysis: null,
     language: "en" as const,
   };
 }

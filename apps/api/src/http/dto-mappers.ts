@@ -1,4 +1,5 @@
 import type {
+  AiJob,
   GeneratedImage,
   GenerationRequest,
   PhotoAsset,
@@ -10,6 +11,7 @@ import type {
   TestGenerationBatch,
 } from "@gen-story/domain";
 import type {
+  AiJobDto,
   GeneratedImageDto,
   GenerationRequestDto,
   MeDto,
@@ -20,12 +22,15 @@ import type {
   StylePresetDto,
   StoryboardDto,
   TestGenerationBatchDto,
+  TestGenerationBatchWithVariantsDto,
   GenerationRequestWithSceneTitleDto,
 } from "@gen-story/shared";
 
 import type {
   AuthPrincipal,
   ComplementSceneProposal,
+  StoryboardSetup,
+  TestGenerationBatchWithVariants,
   UserPreference,
 } from "@gen-story/application";
 import type {
@@ -128,7 +133,13 @@ export function toProjectPhotoAnalysisDto(
   };
 }
 
-export function toStoryboardDto(storyboard: Storyboard): StoryboardDto {
+// The derived setup step is passed in rather than computed here: it needs the
+// project's photos and the storyboard's scenes, which the mapper has no way to
+// read. Callers get it from `getStoryboardSetup`.
+export function toStoryboardDto(
+  storyboard: Storyboard,
+  setup: StoryboardSetup,
+): StoryboardDto {
   return {
     id: storyboard.id,
     projectId: storyboard.projectId,
@@ -139,6 +150,9 @@ export function toStoryboardDto(storyboard: Storyboard): StoryboardDto {
     story: storyboard.story,
     negativePrompt: storyboard.negativePrompt,
     sceneIds: storyboard.sceneIds,
+    setupStep: setup.step,
+    setupCompletedAt: setup.setupCompletedAt,
+    pendingSceneFillCount: setup.pendingSceneFillCount,
     createdAt: storyboard.createdAt,
     updatedAt: storyboard.updatedAt,
   };
@@ -202,6 +216,21 @@ export function toTestGenerationBatchDto(
   };
 }
 
+export function toTestGenerationBatchWithVariantsDto(
+  entry: TestGenerationBatchWithVariants,
+): TestGenerationBatchWithVariantsDto {
+  return {
+    batch: toTestGenerationBatchDto(entry.batch),
+    variants: entry.variants.map((variant) => ({
+      request: toGenerationRequestDto(variant.request),
+      generatedImage:
+        variant.generatedImage == null
+          ? null
+          : toGeneratedImageDto(variant.generatedImage),
+    })),
+  };
+}
+
 export function toGenerationRequestDto(
   req: GenerationRequest,
 ): GenerationRequestDto {
@@ -214,11 +243,28 @@ export function toGenerationRequestDto(
     inputJson: req.inputJson,
     errorMessage: req.errorMessage,
     sourceGenerationRequestId: req.sourceGenerationRequestId,
+    testGenerationBatchId: req.testGenerationBatchId,
     appliedAdjustments: req.appliedAdjustments ?? [],
     startedAt: req.startedAt,
     completedAt: req.completedAt,
     createdAt: req.createdAt,
     updatedAt: req.updatedAt,
+  };
+}
+
+export function toAiJobDto(job: AiJob): AiJobDto {
+  return {
+    id: job.id,
+    projectId: job.projectId,
+    kind: job.kind,
+    status: job.status,
+    inputJson: job.inputJson,
+    resultJson: job.resultJson,
+    errorMessage: job.errorMessage,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
   };
 }
 

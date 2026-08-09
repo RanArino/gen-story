@@ -149,7 +149,57 @@
       "localModelBadge": "Local (no AI)",
       "analyzedAt": "Analyzed: {when}",
       "emptyNoPhotos": "Mark at least one photo as candidate or reference on the Photos page to enable analysis.",
-      "emptyClickToStart": "Click <strong>Analyze photos</strong> to generate tone suggestions based on your selected photo set."
+      "emptyClickToStart": "Click <strong>Analyze photos</strong> to generate tone suggestions based on your selected photo set.",
+      "cancelJob": "Cancel",
+      "jobStatus": {
+        "queued": "Queued…",
+        "running": "Working…",
+        "succeeded": "Done",
+        "failed": "Failed",
+        "canceled": "Canceled"
+      }
+    },
+    "setup": {
+      "title": "Storyboard setup",
+      "progressLabel": "Storyboard setup progress",
+      "progressCount": "{done} of {total} steps done",
+      "steps": {
+        "photos": {
+          "title": "1. Photos",
+          "hint": "Pick the photos this video is built from.",
+          "locked": "Waiting for photos."
+        },
+        "tone": {
+          "title": "2. Tone",
+          "hint": "Analyze the photos, then choose the emotion they suggest.",
+          "locked": "Mark at least one photo as candidate or reference first."
+        },
+        "style": {
+          "title": "3. Style",
+          "hint": "Choose the visual style, or create your own.",
+          "locked": "Choose a tone first."
+        },
+        "story": {
+          "title": "4. Story",
+          "hint": "Write the story, common prompt and negative prompt from your tone and style.",
+          "locked": "Choose a style first."
+        },
+        "scenes": {
+          "title": "5. Scenes",
+          "hint": "Write each scene's title, description and image prompt.",
+          "locked": "Write the story first."
+        }
+      },
+      "storyTitle": "Story setup",
+      "storyIntro": "Writes the story, the common prompt and the negative prompt together, so all three stay consistent with the tone and style you chose. Review and edit them below before continuing.",
+      "storyGenerate": "Generate with AI (1 AI call)",
+      "storyGenerating": "Writing…",
+      "storyGeneratedMsg": "Story, common prompt and negative prompt written — review them below.",
+      "storyFailed": "Failed to generate the story setup",
+      "scenesFillAll": "Write {count} scene(s) with AI ({count} AI calls)",
+      "scenesFilling": "Writing scenes…",
+      "scenesNothingToFill": "Every scene is already written.",
+      "scenesFailed": "Failed to write scenes with AI"
     },
     "tones": {
       "warm": {
@@ -248,7 +298,10 @@
       "selectAll": "Select all",
       "deselectAll": "Deselect all",
       "hint": "💡 Select one or more candidate photos below, then click the button to create draft scenes",
-      "failed": "Failed to create template scenes"
+      "failed": "Failed to create template scenes",
+      "autoFill": "Also write titles and prompts with AI ({count} photos → {count} AI calls)",
+      "autoFillProgress": "AI writing scenes… {done}/{total}",
+      "autoFillFailed": "AI fill failed for {count} scene(s). Use “Fill with AI” on those scenes to retry."
     },
     "scenes": {
       "addScene": "+ Add scene",
@@ -295,7 +348,8 @@
       "continueToGenerate": "Continue to Generate →",
       "testInProgress": "Test in progress…",
       "viewTestGeneration": "View Test Generation",
-      "startTestGeneration": "Test Generation →"
+      "startTestGeneration": "Test Generation →",
+      "reviewTestGeneration": "Review samples"
     },
     "negativePrompt": {
       "notSet": "Not set",
@@ -322,7 +376,6 @@
     "confirmStyle": "Confirm this style",
     "confirming": "Confirming…",
     "confirmedBadge": "✓ Confirmed",
-    "regenerate": "Generate new tests",
     "adjustments": {
       "heading": "Adjust this variant",
       "saveHint": "These adjustments will be saved to the project prompt when you confirm this variant.",
@@ -341,9 +394,15 @@
     "errors": {
       "start": "Failed to start test generation.",
       "confirm": "Failed to confirm.",
-      "reset": "Failed to reset.",
       "apply": "Failed to apply adjustments."
-    }
+    },
+    "loadingHistory": "Loading sample history…",
+    "historyHeading": "Sample history",
+    "batchTab": "Run {number} · {time}",
+    "batchConfirmedMark": "✓",
+    "newBatchCta": "Generate 3 new samples (3 images)",
+    "batchInFlight": "Samples are still generating. Wait for them to finish.",
+    "olderBatchNotice": "These are earlier samples. Adjustments apply to the newest run only, but you can confirm one of these and continue to generation."
   },
   "generate": {
     "title": "Generate",
@@ -401,7 +460,6 @@
       }
     },
     "card": {
-      "adoptedBadge": "✓ Adopted",
       "failedBadge": "Generation failed",
       "regenerate": "Re-generate",
       "sourcePhoto": "Source photo",
@@ -414,8 +472,8 @@
       "retryGeneration": "Retry generation",
       "goToGenerate": "Go to Generate →",
       "historyHeader": "Generation history ({count})",
-      "adopt": "Adopt",
-      "adopted": "Adopted"
+      "useThis": "Use this image",
+      "sampleTag": "Sample"
     },
     "regenModal": {
       "title": "Re-generate — {sceneTitle}",
@@ -473,6 +531,15 @@
       "created": "Created",
       "completed": "Completed",
       "error": "Error"
+    },
+    "testGeneration": {
+      "heading": "Test generation samples ({count} runs)",
+      "runLabel": "Run {number}",
+      "confirmed": "Confirmed",
+      "notConfirmed": "Not confirmed",
+      "sampleAlt": "Test sample",
+      "openStoryboard": "Open samples in storyboard",
+      "sampleRow": "Sample"
     }
   },
   "settings": {

@@ -314,9 +314,9 @@ function SceneReviewCard({
     <div className={`card ${styles.sceneCard}`}>
       <div className={styles.sceneHeader}>
         <h3 className={styles.sceneTitle}>{scene.title}</h3>
-        {adoptedImage && (
-          <span className={styles.adoptedBadge}>{t("card.adoptedBadge")}</span>
-        )}
+        {/* No "adopted" status here either: the image in use is shown right
+            below, and the history's radio group says which row it is. The
+            failure badge stays — that is a problem to act on, not a state. */}
         {latestRequestStatus === "failed" && (
           <span className={styles.failedBadge}>{t("card.failedBadge")}</span>
         )}
@@ -438,6 +438,14 @@ function SceneReviewCard({
                       <span className={styles.historyTime}>
                         {formatRelativeTime(req.createdAt)}
                       </span>
+                      {/* Where the image came from, not a status: a sample was
+                          rendered for the style test rather than by a full
+                          generation pass, and it is picked the same way. */}
+                      {req.testGenerationBatchId !== null && (
+                        <span className={styles.sampleTag}>
+                          {t("card.sampleTag")}
+                        </span>
+                      )}
                       {req.errorMessage && (
                         <span className={styles.historyError}>
                           {req.errorMessage}
@@ -445,23 +453,21 @@ function SceneReviewCard({
                       )}
                     </div>
                     <div className={styles.historyActions}>
-                      {img &&
-                        (img.adoptedAt ? (
-                          <span
-                            className={styles.adoptedBadge}
-                            style={{ fontSize: 11 }}
-                          >
-                            {t("card.adopted")}
-                          </span>
-                        ) : (
-                          <button
-                            className="btn btn-primary"
-                            style={{ fontSize: 12, padding: "4px 10px" }}
-                            onClick={() => onAdopt(scene.id, img.id)}
-                          >
-                            {t("card.adopt")}
-                          </button>
-                        ))}
+                      {/* Choosing this scene's image is a pick-one-of-many, so
+                          it is a radio group. The checked row is the image in
+                          use, which is why no row carries an "adopted" status
+                          of its own. */}
+                      {img && (
+                        <label className={styles.useChoice}>
+                          <input
+                            type="radio"
+                            name={`adopted-${scene.id}`}
+                            checked={img.adoptedAt !== null}
+                            onChange={() => onAdopt(scene.id, img.id)}
+                          />
+                          {t("card.useThis")}
+                        </label>
+                      )}
                     </div>
                   </div>
                 );

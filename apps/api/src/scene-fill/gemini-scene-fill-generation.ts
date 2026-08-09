@@ -50,11 +50,44 @@ const responseJsonSchema = {
   ],
 } as const;
 
-function languageDirective(language: SceneFillGenerationInput["language"]): string {
+function languageDirective(
+  language: SceneFillGenerationInput["language"],
+): string {
   if (language === "ja") {
     return 'Respond in Japanese. All title, description, image prompt, and any free-text fields MUST be written in natural Japanese. Selection enum values such as cameraDirection, lightingDirection, motionDirection, and emotion MUST remain in English (e.g., "Wide", "Close-up", "Joy").';
   }
   return "Respond in English. All title, description, image prompt, and any free-text fields MUST be English.";
+}
+
+// The project-level vision pass already described every photo and summarized the
+// story. Feeding the relevant slice back in keeps each scene consistent with the
+// others and with the emotion the user picked, instead of the model re-reading
+// one photo in isolation.
+function analysisContext(input: SceneFillGenerationInput): string[] {
+  const analysis = input.photoAnalysis;
+  if (analysis == null) return [];
+
+  const lines = [
+    `Story summary from the project photo analysis: ${analysis.storySummary}`,
+  ];
+
+  const primaryInsight = analysis.photoInsights.find(
+    (insight) => insight.photoAssetId === input.primaryPhoto.id,
+  );
+  if (primaryInsight) {
+    lines.push(
+      [
+        "Established facts about THIS scene's primary photo (treat as ground truth):",
+        `- Summary: ${primaryInsight.summary}`,
+        `- People: ${primaryInsight.people}`,
+        `- Setting: ${primaryInsight.setting}`,
+        `- Event: ${primaryInsight.event}`,
+        `- Atmosphere: ${primaryInsight.atmosphere}`,
+      ].join("\n"),
+    );
+  }
+
+  return lines;
 }
 
 function buildPrompt(input: SceneFillGenerationInput): string {
@@ -69,7 +102,7 @@ function buildPrompt(input: SceneFillGenerationInput): string {
   return [
     "You are drafting one scene of an anniversary-style storyboard.",
     languageDirective(input.language),
-    "The FIRST image is this scene's primary photo; any following images are other project photos for context.",
+    "The FIRST image is this scene's primary photo; any following images are reference photos this scene was given for context.",
     "Generate scene fields grounded in what is actually visible in the primary photo.",
     "Return only JSON matching the provided schema.",
     `Project: ${input.project.name}`,
@@ -79,6 +112,7 @@ function buildPrompt(input: SceneFillGenerationInput): string {
       ? `Visual style: ${input.stylePreset.name} — ${input.stylePreset.prompt}`
       : "Visual style: AI's choice, consistent with the tone.",
     `Primary photo: name="${input.primaryPhoto.name}", notes="${input.primaryPhoto.notes ?? ""}"`,
+    ...analysisContext(input),
     `This is scene ${input.scene.orderIndex + 1}.`,
     siblings ? `Other scenes in the storyboard:\n${siblings}` : "",
     "emotion/cameraDirection/lightingDirection/motionDirection should be short label-style values (always English).",
@@ -122,11 +156,13 @@ export class GeminiSceneFillGenerationAdapter implements SceneFillGenerationPort
     const client = this.getClient();
     const parts: unknown[] = [{ text: buildPrompt(input) }];
 
+    // The primary photo, then whatever this scene named as a reference. The
+    // project's other photos are deliberately not sent: what the vision pass
+    // learned about them already arrives as text in `analysisContext`.
     const photoOrder = [
       input.primaryPhoto,
-      ...input.projectPhotos.filter(
-        (photo) =>
-          photo.id !== input.primaryPhoto.id && photo.deletedAt === null,
+      ...input.referencePhotos.filter(
+        (photo) => photo.id !== input.primaryPhoto.id,
       ),
     ];
 

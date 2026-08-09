@@ -350,14 +350,22 @@ describe("PUT /api/storyboards/:storyboardId", () => {
     expect(body).toMatchObject({ id: "sb-1", projectId, tone: "heartwarming" });
   });
 
-  it("returns 422 when tone is missing", async () => {
+  // A storyboard with no tone yet is the normal starting state of the guided
+  // setup flow, not a validation error: step 2 is what fills it in.
+  it("creates a storyboard with an undecided tone when none is sent", async () => {
     const created = await req(base, "POST", "/api/projects", { name: "P2" });
     const projectId = (created.body as Record<string, unknown>).id as string;
 
-    const { status } = await req(base, "PUT", "/api/storyboards/sb-fail", {
+    const { status, body } = await req(base, "PUT", "/api/storyboards/sb-new", {
       projectId,
     });
-    expect(status).toBe(422);
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      tone: "",
+      setupStep: "photos",
+      setupCompletedAt: null,
+    });
   });
 
   it("returns 422 when projectId is missing", async () => {
@@ -507,9 +515,20 @@ describe("POST /api/storyboards/:storyboardId/complement-scenes", () => {
       "/api/storyboards/sb-comp/complement-scenes/proposals",
       { fromSceneId: "scene-a", toSceneId: "scene-b" },
     );
-    expect(result.status).toBe(200);
-    const body = result.body as { proposals: unknown[] };
-    expect(body.proposals.length).toBeGreaterThan(0);
+    expect(result.status).toBe(202);
+    const { jobId } = result.body as { jobId: string };
+    expect(jobId).toBeTruthy();
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("complement_scene_proposals");
+
+    const { runComplementSceneProposalsJob } =
+      await import("@gen-story/application");
+    const run = await runComplementSceneProposalsJob(deps, job!);
+    expect(run.ok).toBe(true);
+    if (run.ok) {
+      expect((run.value.proposals as unknown[]).length).toBeGreaterThan(0);
+    }
   });
 
   it("reorders scenes via PUT /scene-order", async () => {
@@ -592,8 +611,21 @@ describe("POST /api/scenes/:sceneId/ai-fill", () => {
       {},
     );
 
-    expect(status).toBe(200);
-    expect(body).toMatchObject({
+    // The AI call now runs in the background; the route returns a job handle.
+    expect(status).toBe(202);
+    const { jobId } = body as { jobId: string; scene: null };
+    expect(jobId).toBeTruthy();
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("scene_ai_fill");
+    expect(job?.status).toBe("queued");
+
+    const { runSceneAiFillJob } = await import("@gen-story/application");
+    const run = await runSceneAiFillJob(deps, job!);
+    expect(run.ok).toBe(true);
+
+    const scene = await deps.scenes.findById("ai-scene");
+    expect(scene).toMatchObject({
       id: "ai-scene",
       title: "AI family.jpg",
       description: "AI description for family.jpg",
@@ -701,6 +733,205 @@ describe("POST /api/scenes/:sceneId/ai-fill", () => {
     );
 
     expect(status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guided storyboard setup
+// ---------------------------------------------------------------------------
+
+describe("guided storyboard setup routes", () => {
+  async function seedSetupStoryboard(options?: {
+    idPrefix?: string;
+    organizationId?: string;
+    ownerUserId?: string;
+    tone?: string;
+    stylePresetId?: string | null;
+  }) {
+    const {
+      createPhotoAsset,
+      createProject,
+      createStylePreset,
+      createStoryboard,
+      createTemplateScene,
+    } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    const prefix = options?.idPrefix ?? "setup";
+
+    await deps.stylePresets.save(
+      createStylePreset({
+        id: `${prefix}-style`,
+        scope: "system",
+        name: "Cinematic",
+        prompt: "Filmic contrast.",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.projects.save(
+      createProject({
+        id: `${prefix}-proj`,
+        organizationId: options?.organizationId ?? LOCAL_ORGANIZATION_ID,
+        ownerUserId: options?.ownerUserId ?? LOCAL_USER_ID,
+        name: "Setup Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: `${prefix}-sb`,
+        projectId: `${prefix}-proj`,
+        tone: options?.tone ?? "warm_nostalgia",
+        stylePresetId:
+          options?.stylePresetId === undefined
+            ? `${prefix}-style`
+            : options.stylePresetId,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.photoAssets.save(
+      createPhotoAsset({
+        id: `${prefix}-photo`,
+        projectId: `${prefix}-proj`,
+        name: "family.jpg",
+        storageKey: "photos/family.jpg",
+        mimeType: "image/jpeg",
+        size: 1,
+        checksum: `${prefix}-photo-checksum`,
+        sourceKind: "upload",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await deps.scenes.save(
+      createTemplateScene({
+        id: `${prefix}-scene`,
+        projectId: `${prefix}-proj`,
+        storyboardId: `${prefix}-sb`,
+        orderIndex: 0,
+        photoAssetId: `${prefix}-photo`,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    return prefix;
+  }
+
+  it("returns 202 with a job handle for story setup", async () => {
+    const prefix = await seedSetupStoryboard({ idPrefix: "story-ok" });
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/story-setup`,
+      {},
+    );
+
+    expect(status).toBe(202);
+    const { jobId } = body as { jobId: string };
+    expect(jobId).toBeTruthy();
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("story_setup");
+    expect(job?.status).toBe("queued");
+  });
+
+  it("rejects story setup before a tone is chosen", async () => {
+    const prefix = await seedSetupStoryboard({
+      idPrefix: "story-no-tone",
+      tone: "",
+    });
+
+    const { status } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/story-setup`,
+      {},
+    );
+
+    expect(status).toBe(422);
+  });
+
+  it("returns 403 for story setup on a storyboard in another organization", async () => {
+    const prefix = await seedSetupStoryboard({
+      idPrefix: "story-foreign",
+      organizationId: "other-org",
+      ownerUserId: "other-user",
+    });
+
+    const { status } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/story-setup`,
+      {},
+    );
+
+    expect(status).toBe(403);
+  });
+
+  it("returns 202 with one bulk fill job per blank scene", async () => {
+    const prefix = await seedSetupStoryboard({ idPrefix: "bulk-ok" });
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/scenes/ai-fill`,
+      {},
+    );
+
+    expect(status).toBe(202);
+    const { aiJobIds, skippedSceneCount } = body as {
+      aiJobIds: string[];
+      skippedSceneCount: number;
+    };
+    expect(aiJobIds).toHaveLength(1);
+    expect(skippedSceneCount).toBe(0);
+
+    const job = await deps.aiJobs.findById(aiJobIds[0]!);
+    expect(job?.kind).toBe("scene_ai_fill");
+  });
+
+  it("returns 403 for bulk fill on a storyboard in another organization", async () => {
+    const prefix = await seedSetupStoryboard({
+      idPrefix: "bulk-foreign",
+      organizationId: "other-org",
+      ownerUserId: "other-user",
+    });
+
+    const { status } = await req(
+      base,
+      "POST",
+      `/api/storyboards/${prefix}-sb/scenes/ai-fill`,
+      {},
+    );
+
+    expect(status).toBe(403);
+  });
+
+  it("reports the derived setup step on the storyboard DTO", async () => {
+    const prefix = await seedSetupStoryboard({ idPrefix: "step-dto" });
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      `/api/projects/${prefix}-proj/storyboards`,
+    );
+
+    expect(status).toBe(200);
+    const { storyboards } = body as {
+      storyboards: Array<{
+        setupStep: string;
+        setupCompletedAt: string | null;
+      }>;
+    };
+    // Photos, tone and style are set; the story has not been written yet.
+    expect(storyboards[0]).toMatchObject({
+      setupStep: "story",
+      setupCompletedAt: null,
+    });
   });
 });
 
@@ -1178,13 +1409,19 @@ describe("project photo analysis routes", () => {
       {},
     );
 
-    expect(created.status).toBe(200);
-    expect(created.body).toMatchObject({
-      photoAnalysis: {
-        projectId: "analysis-proj",
-        model: "in-memory",
-      },
-    });
+    expect(created.status).toBe(202);
+    const { jobId, cached } = created.body as {
+      jobId: string;
+      cached: boolean;
+    };
+    expect(cached).toBe(false);
+
+    const job = await deps.aiJobs.findById(jobId);
+    expect(job?.kind).toBe("photo_analysis");
+
+    const { runPhotoAnalysisJob } = await import("@gen-story/application");
+    const run = await runPhotoAnalysisJob(deps, job!);
+    expect(run.ok).toBe(true);
 
     const fetched = await req(
       base,
@@ -1412,5 +1649,453 @@ describe("POST /api/storyboards/:id/test-generation/variants/:vid/adjustments", 
     expect(body).toMatchObject({
       generationRequest: { appliedAdjustments: [] },
     });
+  });
+});
+
+describe("GET /api/storyboards/:storyboardId/test-generation/batches", () => {
+  async function seedHistory() {
+    const {
+      createProject,
+      createStoryboard,
+      createScene,
+      createGenerationRequest,
+      createGeneratedImage,
+      createTestGenerationBatch,
+    } = await import("@gen-story/domain");
+
+    await deps.projects.save(
+      createProject({
+        id: "hist-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "History Project",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "hist-sb",
+        projectId: "hist-proj",
+        tone: "warm",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+    await deps.scenes.save(
+      createScene({
+        id: "hist-scene",
+        projectId: "hist-proj",
+        storyboardId: "hist-sb",
+        orderIndex: 0,
+        title: "T",
+        description: "D",
+        imagePrompt: "P",
+        emotion: "calm",
+        cameraDirection: "wide",
+        lightingDirection: "natural",
+        motionDirection: "still",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+
+    for (const [batchId, at] of [
+      ["hist-old", "2026-07-01T00:00:00.000Z"],
+      ["hist-new", "2026-07-02T00:00:00.000Z"],
+    ] as const) {
+      await deps.testGenerationBatches.save(
+        createTestGenerationBatch({
+          id: batchId,
+          storyboardId: "hist-sb",
+          status: "pending",
+          createdAt: at,
+        }),
+      );
+      // Descending variant order on save, so the response ordering is a real
+      // assertion rather than an accident of insertion order.
+      for (const variantIndex of [2, 1, 0]) {
+        const requestId = `${batchId}-v${variantIndex}`;
+        await deps.generationRequests.save(
+          createGenerationRequest({
+            id: requestId,
+            projectId: "hist-proj",
+            storyboardId: "hist-sb",
+            sceneId: "hist-scene",
+            status: "succeeded",
+            inputJson: { testBatchId: batchId, testVariant: variantIndex },
+            testGenerationBatchId: batchId,
+            createdAt: at,
+            updatedAt: at,
+          }),
+        );
+        await deps.generatedImages.save(
+          createGeneratedImage({
+            id: `img-${requestId}`,
+            projectId: "hist-proj",
+            storyboardId: "hist-sb",
+            sceneId: "hist-scene",
+            generationRequestId: requestId,
+            storageKey: `data/uploads/generated/${requestId}.jpg`,
+            mimeType: "image/jpeg",
+            size: 1,
+            checksum: requestId,
+            createdAt: at,
+            updatedAt: at,
+          }),
+        );
+      }
+    }
+  }
+
+  it("returns every batch newest first with its samples and images", async () => {
+    await seedHistory();
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      "/api/storyboards/hist-sb/test-generation/batches",
+    );
+
+    expect(status).toBe(200);
+    const batches = (body as { batches: Array<Record<string, never>> }).batches;
+    expect(batches).toHaveLength(2);
+
+    const asIds = batches.map(
+      (entry) => (entry as unknown as { batch: { id: string } }).batch.id,
+    );
+    expect(asIds).toEqual(["hist-new", "hist-old"]);
+
+    const newest = batches[0] as unknown as {
+      variants: Array<{
+        request: { id: string };
+        generatedImage: { storageKey: string } | null;
+      }>;
+    };
+    expect(newest.variants.map((variant) => variant.request.id)).toEqual([
+      "hist-new-v0",
+      "hist-new-v1",
+      "hist-new-v2",
+    ]);
+    expect(newest.variants[0]!.generatedImage?.storageKey).toBe(
+      "data/uploads/generated/hist-new-v0.jpg",
+    );
+  });
+
+  it("returns an empty list for a storyboard that has no batches", async () => {
+    const { createProject, createStoryboard } =
+      await import("@gen-story/domain");
+    await deps.projects.save(
+      createProject({
+        id: "hist-empty-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Empty",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "hist-empty-sb",
+        projectId: "hist-empty-proj",
+        tone: "warm",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      "/api/storyboards/hist-empty-sb/test-generation/batches",
+    );
+
+    expect(status).toBe(200);
+    expect(body).toEqual({ batches: [] });
+  });
+
+  it("returns 404 for an unknown storyboard", async () => {
+    const { status } = await req(
+      base,
+      "GET",
+      "/api/storyboards/nope/test-generation/batches",
+    );
+    expect(status).toBe(404);
+  });
+});
+
+// Samples are generated from the storyboard's first scene, so before this
+// filter every rejected sample sat in that scene's history and in its image
+// list, burying the scene's real generations.
+describe("test-generation samples in scene history", () => {
+  async function seedSceneWithSamples() {
+    const {
+      createProject,
+      createStoryboard,
+      createScene,
+      createGenerationRequest,
+      createGeneratedImage,
+      createTestGenerationBatch,
+    } = await import("@gen-story/domain");
+
+    await deps.projects.save(
+      createProject({
+        id: "sh-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Sample History Project",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+    await deps.storyboards.save(
+      createStoryboard({
+        id: "sh-sb",
+        projectId: "sh-proj",
+        tone: "warm",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+    await deps.scenes.save(
+      createScene({
+        id: "sh-scene",
+        projectId: "sh-proj",
+        storyboardId: "sh-sb",
+        orderIndex: 0,
+        title: "T",
+        description: "D",
+        imagePrompt: "P",
+        emotion: "calm",
+        cameraDirection: "wide",
+        lightingDirection: "natural",
+        motionDirection: "still",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+
+    // One confirmed batch and one the operator never confirmed: the second
+    // batch's samples must disappear from the scene entirely.
+    await deps.testGenerationBatches.save(
+      createTestGenerationBatch({
+        id: "sh-batch-done",
+        storyboardId: "sh-sb",
+        status: "completed",
+        confirmedGenerationRequestId: "sh-batch-done-v1",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        completedAt: "2026-07-01T01:00:00.000Z",
+      }),
+    );
+    await deps.testGenerationBatches.save(
+      createTestGenerationBatch({
+        id: "sh-batch-open",
+        storyboardId: "sh-sb",
+        status: "pending",
+        createdAt: "2026-07-02T00:00:00.000Z",
+      }),
+    );
+
+    const seedRequest = async (
+      id: string,
+      batchId: string | null,
+      at: string,
+    ) => {
+      await deps.generationRequests.save(
+        createGenerationRequest({
+          id,
+          projectId: "sh-proj",
+          storyboardId: "sh-sb",
+          sceneId: "sh-scene",
+          status: "succeeded",
+          inputJson: {},
+          testGenerationBatchId: batchId,
+          createdAt: at,
+          updatedAt: at,
+        }),
+      );
+      await deps.generatedImages.save(
+        createGeneratedImage({
+          id: `img-${id}`,
+          projectId: "sh-proj",
+          storyboardId: "sh-sb",
+          sceneId: "sh-scene",
+          generationRequestId: id,
+          storageKey: `data/uploads/generated/${id}.jpg`,
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: id,
+          createdAt: at,
+          updatedAt: at,
+        }),
+      );
+    };
+
+    for (const variant of [0, 1, 2]) {
+      await seedRequest(
+        `sh-batch-done-v${variant}`,
+        "sh-batch-done",
+        "2026-07-01T00:30:00.000Z",
+      );
+      await seedRequest(
+        `sh-batch-open-v${variant}`,
+        "sh-batch-open",
+        "2026-07-02T00:30:00.000Z",
+      );
+    }
+    await seedRequest("sh-main", null, "2026-07-03T00:00:00.000Z");
+  }
+
+  it("lists the scene's real generations and only the confirmed sample", async () => {
+    await seedSceneWithSamples();
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      "/api/scenes/sh-scene/generation-requests",
+    );
+
+    expect(status).toBe(200);
+    const requests = (
+      body as {
+        generationRequests: Array<{
+          id: string;
+          testGenerationBatchId: string | null;
+        }>;
+      }
+    ).generationRequests;
+    expect(requests.map((r) => r.id).sort()).toEqual([
+      "sh-batch-done-v1",
+      "sh-main",
+    ]);
+    // The web tells a sample apart from a real generation by this field.
+    expect(
+      requests.find((r) => r.id === "sh-batch-done-v1")?.testGenerationBatchId,
+    ).toBe("sh-batch-done");
+    expect(
+      requests.find((r) => r.id === "sh-main")?.testGenerationBatchId,
+    ).toBeNull();
+  });
+
+  it("drops the images of rejected samples from the scene", async () => {
+    await seedSceneWithSamples();
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      "/api/scenes/sh-scene/generated-images",
+    );
+
+    expect(status).toBe(200);
+    const images = (
+      body as { generatedImages: Array<{ generationRequestId: string }> }
+    ).generatedImages;
+    expect(images.map((i) => i.generationRequestId).sort()).toEqual([
+      "sh-batch-done-v1",
+      "sh-main",
+    ]);
+  });
+
+  it("applies the same filter to the storyboard-wide history", async () => {
+    await seedSceneWithSamples();
+
+    const { status, body } = await req(
+      base,
+      "GET",
+      "/api/storyboards/sh-sb/generation-requests",
+    );
+
+    expect(status).toBe(200);
+    const requests = (body as { generationRequests: Array<{ id: string }> })
+      .generationRequests;
+    expect(requests.map((r) => r.id).sort()).toEqual([
+      "sh-batch-done-v1",
+      "sh-main",
+    ]);
+  });
+});
+
+describe("AI job routes", () => {
+  async function seedJob() {
+    const { createProject } = await import("@gen-story/domain");
+    const now = new Date().toISOString();
+    await deps.projects.save(
+      createProject({
+        id: "job-proj",
+        organizationId: LOCAL_ORGANIZATION_ID,
+        ownerUserId: LOCAL_USER_ID,
+        name: "Job Project",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "photo_analysis",
+      projectId: "job-proj",
+      payload: { projectId: "job-proj" },
+    });
+    return jobId;
+  }
+
+  it("returns an AI job by id", async () => {
+    const jobId = await seedJob();
+
+    const { status, body } = await req(base, "GET", `/api/ai-jobs/${jobId}`);
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      id: jobId,
+      projectId: "job-proj",
+      kind: "photo_analysis",
+      status: "queued",
+    });
+  });
+
+  it("returns 404 for an unknown AI job", async () => {
+    const { status } = await req(base, "GET", "/api/ai-jobs/missing");
+    expect(status).toBe(404);
+  });
+
+  it("cancels a queued AI job", async () => {
+    const jobId = await seedJob();
+
+    const { status, body } = await req(
+      base,
+      "POST",
+      `/api/ai-jobs/${jobId}/cancel`,
+    );
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ id: jobId, status: "canceled" });
+    expect(await deps.aiJobs.findQueued()).toHaveLength(0);
+  });
+
+  it("streams project events as server-sent events", async () => {
+    const jobId = await seedJob();
+
+    const controller = new AbortController();
+    const res = await fetch(`${base}/api/projects/job-proj/events`, {
+      signal: controller.signal,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/event-stream");
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+
+    // The stream opens with a comment frame before any event.
+    const first = await reader.read();
+    expect(decoder.decode(first.value)).toContain(": connected");
+
+    await req(base, "POST", `/api/ai-jobs/${jobId}/cancel`);
+
+    const next = await reader.read();
+    const frame = decoder.decode(next.value);
+    expect(frame).toContain("event: ai-job.canceled");
+    expect(frame).toContain(jobId);
+
+    controller.abort();
   });
 });
