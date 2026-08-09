@@ -119,6 +119,10 @@ describe("LocalJobWorker", () => {
     const images = await deps.generatedImages.findBySceneId(scene.id);
     expect(images).toHaveLength(1);
     expect(images[0]!.storageKey).toContain("proj-1");
+    expect(images[0]!.adoptedAt).not.toBeNull();
+    await expect(deps.scenes.findById(scene.id)).resolves.toMatchObject({
+      adoptedGeneratedImageId: images[0]!.id,
+    });
   });
 
   it("caps concurrent running jobs at 5 per project", async () => {

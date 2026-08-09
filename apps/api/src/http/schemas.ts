@@ -104,6 +104,12 @@ export const PreviewScenePromptSchema = z.object({
 
 export const AnalyzeProjectPhotosSchema = z.object({}).strict();
 
+export const ExportStoryboardAssetsSchema = z
+  .object({
+    assetSelection: z.enum(["both", "original_only", "generated_only"]),
+  })
+  .strict();
+
 export const CreateTemplateScenesSchema = z.object({
   photoAssetIds: z.array(z.string().min(1)).min(1).max(30),
   // Opt-in: enqueues one AI fill job per created scene, so it bills one model

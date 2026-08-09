@@ -865,6 +865,15 @@ export function exportStoryboardUrl(
   return `${base}/api/storyboards/${storyboardId}/export.json${qs}`;
 }
 
+export async function exportStoryboardAssetBundle(
+  storyboardId: string,
+  assetSelection: "both" | "original_only" | "generated_only",
+): Promise<{ exportPath: string; manifestPath: string }> {
+  return request("POST", `/api/storyboards/${storyboardId}/export-assets`, {
+    assetSelection,
+  });
+}
+
 // ── User preferences ──────────────────────────────────────────────────────────
 
 export async function getUserLanguagePreference(): Promise<UserPreferenceDto> {

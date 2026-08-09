@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -9,22 +9,24 @@ import {
   type PreviewScenePromptOverrides,
 } from "../../lib/api-client";
 
-// Collapsible "What we'll send to the model" panel. On expand (and debounced on
-// change) it asks the API for the exact positive prompt and merged negative
-// prompt the next generation would use, computed from the current draft form
-// values. It performs no image generation, so it is free to call freely.
+// Collapsible model-input panel. It starts from the composed prompt, then lets
+// the caller carry any edits into the next generation request.
 export function ComposedPromptPreview({
   sceneId,
   overrides,
+  onChange,
 }: {
   sceneId: string;
   overrides: PreviewScenePromptOverrides;
+  onChange?: (value: ComposedPromptPreviewData) => void;
 }) {
   const t = useTranslations("composedPrompt");
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<ComposedPromptPreviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // Serialize the overrides so the effect only refetches when their content
   // (not their object identity) changes.
@@ -38,7 +40,10 @@ export function ComposedPromptPreview({
     const handle = setTimeout(() => {
       previewScenePrompt(sceneId, JSON.parse(overridesKey))
         .then((result) => {
-          if (!cancelled) setData(result);
+          if (!cancelled) {
+            setData(result);
+            onChangeRef.current?.(result);
+          }
         })
         .catch((e: unknown) => {
           if (!cancelled) {
@@ -54,6 +59,20 @@ export function ComposedPromptPreview({
       clearTimeout(handle);
     };
   }, [open, sceneId, overridesKey, t]);
+
+  function updatePrompt(prompt: string) {
+    if (data == null) return;
+    const next = { ...data, prompt };
+    setData(next);
+    onChangeRef.current?.(next);
+  }
+
+  function updateNegativePrompt(negativePrompt: string) {
+    if (data == null) return;
+    const next = { ...data, negativePrompt };
+    setData(next);
+    onChangeRef.current?.(next);
+  }
 
   return (
     <div style={panelStyle}>
@@ -73,11 +92,20 @@ export function ComposedPromptPreview({
           {data && !loading && !error && (
             <>
               <p style={labelStyle}>{t("promptLabel")}</p>
-              <pre style={textStyle}>{data.prompt}</pre>
+              <textarea
+                aria-label={t("promptLabel")}
+                value={data.prompt}
+                onChange={(event) => updatePrompt(event.target.value)}
+                style={textStyle}
+              />
               <p style={labelStyle}>{t("avoidLabel")}</p>
-              <pre style={textStyle}>
-                {data.negativePrompt || t("avoidNone")}
-              </pre>
+              <textarea
+                aria-label={t("avoidLabel")}
+                placeholder={t("avoidNone")}
+                value={data.negativePrompt}
+                onChange={(event) => updateNegativePrompt(event.target.value)}
+                style={textStyle}
+              />
             </>
           )}
           <p style={{ ...noteStyle, fontStyle: "italic" }}>{t("note")}</p>
@@ -120,6 +148,9 @@ const labelStyle: React.CSSProperties = {
 };
 
 const textStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  minHeight: 88,
   margin: 0,
   padding: 8,
   background: "#ffffff",
@@ -127,8 +158,6 @@ const textStyle: React.CSSProperties = {
   borderRadius: 6,
   fontSize: 12.5,
   lineHeight: 1.5,
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
   fontFamily:
     "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
   color: "#1e293b",

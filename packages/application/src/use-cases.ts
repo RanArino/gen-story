@@ -2430,7 +2430,29 @@ export async function markGenerationRequestCompleted(
       updatedAt: input.completedAt,
     });
 
-    await deps.generatedImages.save(generatedImage);
+    const scene = await deps.scenes.findById(generationRequest.sceneId);
+    const sceneImages = await deps.generatedImages.findBySceneId(
+      generationRequest.sceneId,
+    );
+    const hasAdoptedImage = sceneImages.some(
+      (image) => image.adoptedAt != null,
+    );
+
+    if (scene != null && !hasAdoptedImage) {
+      const adopted = setSceneAdoptedGeneratedImage(
+        scene,
+        [...sceneImages, generatedImage],
+        generatedImage.id,
+        input.completedAt,
+        input.completedAt,
+      );
+      await deps.scenes.save(adopted.scene);
+      for (const image of adopted.generatedImages) {
+        await deps.generatedImages.save(image);
+      }
+    } else {
+      await deps.generatedImages.save(generatedImage);
+    }
 
     await deps.progressEvents.publish({
       kind: "generation-request.succeeded",
@@ -2841,7 +2863,9 @@ export type StoryboardExportScene = {
   motionDirection: string;
   notes: string;
   sourcePhotoStorageKey: string | null;
+  sourcePhotoMimeType: string | null;
   adoptedImageStorageKey: string | null;
+  adoptedImageMimeType: string | null;
 };
 
 export type StoryboardExportData = {
@@ -2882,20 +2906,24 @@ export async function exportStoryboardAsJson(
         (p) => p.role === "primary",
       );
       let sourcePhotoStorageKey: string | null = null;
+      let sourcePhotoMimeType: string | null = null;
       if (primaryPhotoAsset) {
         const photo = await deps.photoAssets.findById(
           primaryPhotoAsset.photoAssetId,
         );
         sourcePhotoStorageKey = photo?.storageKey ?? null;
+        sourcePhotoMimeType = photo?.mimeType ?? null;
       }
 
       let adoptedImageStorageKey: string | null = null;
+      let adoptedImageMimeType: string | null = null;
       if (scene.adoptedGeneratedImageId) {
         const images = await deps.generatedImages.findBySceneId(scene.id);
         const adopted = images.find(
           (img) => img.id === scene.adoptedGeneratedImageId,
         );
         adoptedImageStorageKey = adopted?.storageKey ?? null;
+        adoptedImageMimeType = adopted?.mimeType ?? null;
       }
 
       exportScenes.push({
@@ -2910,7 +2938,9 @@ export async function exportStoryboardAsJson(
         motionDirection: scene.motionDirection,
         notes: scene.notes,
         sourcePhotoStorageKey,
+        sourcePhotoMimeType,
         adoptedImageStorageKey,
+        adoptedImageMimeType,
       });
     }
 
