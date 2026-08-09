@@ -149,6 +149,7 @@ export function toStoryboardDto(
     commonPrompt: storyboard.commonPrompt,
     story: storyboard.story,
     negativePrompt: storyboard.negativePrompt,
+    characterPolicy: storyboard.characterPolicy,
     sceneIds: storyboard.sceneIds,
     setupStep: setup.step,
     setupCompletedAt: setup.setupCompletedAt,

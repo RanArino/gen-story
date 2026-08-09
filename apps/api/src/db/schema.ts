@@ -113,6 +113,9 @@ export const storyboards = sqliteTable(
     commonPrompt: text("common_prompt").notNull().default(""),
     story: text("story").notNull().default(""),
     negativePrompt: text("negative_prompt").notNull().default(""),
+    characterPolicy: text("character_policy")
+      .notNull()
+      .default("background_only"),
     // Null while the guided five-step setup is still gating this storyboard.
     // Stamped once it has been through all five steps, after which every
     // section is freely editable.

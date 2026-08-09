@@ -23,6 +23,7 @@ import {
   createStylePreset,
   createTestGenerationBatch,
   createUser,
+  isCharacterPolicy,
   isPhotoFidelity,
   isTestAdjustmentId,
   sortScenesByOrderIndex,
@@ -203,6 +204,9 @@ function mapStoryboard(row: StoryboardRow, sceneIds: string[]): Storyboard {
     commonPrompt: row.commonPrompt,
     story: row.story,
     negativePrompt: row.negativePrompt,
+    characterPolicy: isCharacterPolicy(row.characterPolicy)
+      ? row.characterPolicy
+      : "background_only",
     sceneIds,
     setupCompletedAt: row.setupCompletedAt,
     createdAt: row.createdAt,
@@ -768,6 +772,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
         commonPrompt: storyboard.commonPrompt,
         story: storyboard.story,
         negativePrompt: storyboard.negativePrompt,
+        characterPolicy: storyboard.characterPolicy,
         setupCompletedAt: storyboard.setupCompletedAt,
         createdAt: storyboard.createdAt,
         updatedAt: storyboard.updatedAt,
@@ -782,6 +787,7 @@ export class SqliteStoryboardRepository implements StoryboardRepositoryPort {
           commonPrompt: storyboard.commonPrompt,
           story: storyboard.story,
           negativePrompt: storyboard.negativePrompt,
+          characterPolicy: storyboard.characterPolicy,
           setupCompletedAt: storyboard.setupCompletedAt,
           updatedAt: storyboard.updatedAt,
           deletedAt: null,

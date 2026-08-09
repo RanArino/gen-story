@@ -146,6 +146,18 @@ export function isPhotoFidelity(value: unknown): value is PhotoFidelity {
   return value === "off" || value === "low" || value === "high";
 }
 
+// Decided once per storyboard, not per scene: whether generated scenes are
+// allowed to feature a character at all, and how prominently. This is the
+// single lever that stops an uninvited person from appearing in a story
+// built from a plain landscape photo.
+export type CharacterPolicy = "featured" | "background_only" | "none";
+
+export function isCharacterPolicy(value: unknown): value is CharacterPolicy {
+  return (
+    value === "featured" || value === "background_only" || value === "none"
+  );
+}
+
 export type SceneBridge = {
   fromSceneId: SceneId;
   toSceneId: SceneId;
@@ -187,6 +199,8 @@ export type Storyboard = {
   commonPrompt: string;
   story: string;
   negativePrompt: string;
+  // Decided once for the whole storyboard; see `CharacterPolicy`.
+  characterPolicy: CharacterPolicy;
   sceneIds: SceneId[];
   // When set, the storyboard has been through all five setup steps and is
   // freely editable. Null means the guided flow is still gating it.
@@ -350,6 +364,7 @@ export type CreateStoryboardInput = {
   commonPrompt?: string;
   story?: string;
   negativePrompt?: string;
+  characterPolicy?: CharacterPolicy;
   sceneIds?: SceneId[];
   setupCompletedAt?: Timestamp | null;
   createdAt: Timestamp;
@@ -546,6 +561,7 @@ export function createStoryboard(input: CreateStoryboardInput): Storyboard {
     commonPrompt: (input.commonPrompt ?? "").trim(),
     story: (input.story ?? "").trim(),
     negativePrompt: (input.negativePrompt ?? "").trim(),
+    characterPolicy: input.characterPolicy ?? "background_only",
     sceneIds: [...(input.sceneIds ?? [])],
     setupCompletedAt: input.setupCompletedAt ?? null,
     createdAt: input.createdAt,

@@ -1,0 +1,1 @@
+ALTER TABLE `storyboards` ADD `character_policy` text DEFAULT 'background_only' NOT NULL;

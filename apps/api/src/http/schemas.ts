@@ -28,6 +28,7 @@ export const UpsertStoryboardSchema = z.object({
   commonPrompt: z.string().optional(),
   story: z.string().optional(),
   negativePrompt: z.string().optional(),
+  characterPolicy: z.enum(["featured", "background_only", "none"]).optional(),
 });
 
 // The AI-fillable fields accept the empty string on purpose: blank means "not
@@ -104,7 +105,7 @@ export const PreviewScenePromptSchema = z.object({
 export const AnalyzeProjectPhotosSchema = z.object({}).strict();
 
 export const CreateTemplateScenesSchema = z.object({
-  photoAssetIds: z.array(z.string().min(1)).min(1).max(20),
+  photoAssetIds: z.array(z.string().min(1)).min(1).max(30),
   // Opt-in: enqueues one AI fill job per created scene, so it bills one model
   // call per photo. Defaults to off.
   autoFill: z.boolean().optional(),

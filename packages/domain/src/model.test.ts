@@ -109,6 +109,7 @@ describe("domain factories", () => {
       commonPrompt: "",
       story: "",
       negativePrompt: "",
+      characterPolicy: "background_only",
       sceneIds: ["scene_2", "scene_1"],
       setupCompletedAt: null,
       createdAt: "2026-05-02T00:00:00.000Z",

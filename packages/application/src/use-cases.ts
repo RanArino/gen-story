@@ -27,9 +27,11 @@ import {
   SCENE_FILL_FIELDS,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
+  suggestCharacterPolicy,
   transitionGenerationRequestStatus,
   unconfirmTestGenerationBatch,
   type AiJob,
+  type CharacterPolicy,
   type GeneratedImage,
   type GenerationRequest,
   type PhotoAsset,
@@ -388,6 +390,7 @@ export type UpsertStoryboardInput = {
   commonPrompt?: string;
   story?: string;
   negativePrompt?: string;
+  characterPolicy?: CharacterPolicy;
   sceneIds?: string[];
 };
 
@@ -499,6 +502,10 @@ export async function upsertStoryboard(
       story,
       negativePrompt:
         input.negativePrompt ?? existingStoryboard?.negativePrompt ?? "",
+      characterPolicy:
+        input.characterPolicy ??
+        existingStoryboard?.characterPolicy ??
+        "background_only",
       sceneIds: input.sceneIds ?? existingStoryboard?.sceneIds ?? [],
       setupCompletedAt: existingStoryboard?.setupCompletedAt ?? null,
       createdAt: existingStoryboard?.createdAt ?? now(),
@@ -1350,12 +1357,21 @@ export async function runStorySetupJob(
       language: readLanguagePayload(job.inputJson),
     });
 
+    // Only overwrite while the storyboard is still at the default policy: once
+    // a user has moved it to "featured" or "none" via the storyboard UI, a
+    // re-run of story setup must not silently discard that decision.
+    const characterPolicy =
+      storyboard.characterPolicy === "background_only" && photoAnalysis
+        ? suggestCharacterPolicy(photoAnalysis.photoInsights)
+        : storyboard.characterPolicy;
+
     const timestamp = now();
     const updated = createStoryboard({
       ...storyboard,
       story: suggestion.story,
       commonPrompt: suggestion.commonPrompt,
       negativePrompt: suggestion.negativePrompt,
+      characterPolicy,
       updatedAt: timestamp,
     });
 

@@ -22,7 +22,7 @@ type UsageValue = PhotoUsage;
 type ViewSize = "small" | "medium" | "large";
 
 const ACCEPTED = "image/jpeg,image/jpg,image/png,image/heic,image/webp";
-const MAX_PHOTOS = 20;
+const MAX_PHOTOS = 30;
 
 export function PhotosPage({ projectId }: { projectId: string }) {
   const t = useTranslations("photos");

@@ -1,5 +1,10 @@
 import type { ApplicationDependencies } from "@gen-story/application";
-import type { Scene, Storyboard, StylePreset } from "@gen-story/domain";
+import type {
+  CharacterPolicy,
+  Scene,
+  Storyboard,
+  StylePreset,
+} from "@gen-story/domain";
 import { BASE_NEGATIVE_PROMPT, composeNegativePrompt } from "@gen-story/shared";
 
 import { composeImagePrompt } from "./prompt-composer";
@@ -48,6 +53,24 @@ function photoFidelityDirective(
   }
 
   return "Use the attached reference photo only as loose inspiration for mood and composition — feel free to reinterpret the subject's pose, framing, and setting rather than replicating the photo.";
+}
+
+// Decided once for the whole storyboard (`Storyboard.characterPolicy`), not
+// per scene: the story-level lever that stops the model from inventing an
+// uninvited character in, say, a story built from a plain landscape photo.
+// "featured" adds no directive — a character is exactly what that policy
+// wants, and any consistency is instead the job of a character reference
+// sheet passed in as a photo reference, not this text directive.
+function characterPolicyDirective(policy: CharacterPolicy): string | null {
+  if (policy === "none") {
+    return "Do not add any human figures or characters to the scene beyond what an attached reference photo already shows.";
+  }
+
+  if (policy === "background_only") {
+    return "Any people in the scene should stay incidental and in the background — do not invent a new prominent, named, or repeatedly-featured character.";
+  }
+
+  return null;
 }
 
 export type ComposeScenePromptResult = {
@@ -106,9 +129,12 @@ export async function composeScenePrompt(
     overrides.photoFidelity ?? scene.photoFidelity,
     scene.photoAssets.length > 0,
   );
-  const prompt = fidelityDirective
-    ? `${basePrompt}. ${fidelityDirective}`
-    : basePrompt;
+  const characterDirective = characterPolicyDirective(
+    storyboard.characterPolicy,
+  );
+  const prompt = [basePrompt, fidelityDirective, characterDirective]
+    .filter((part): part is string => part != null && part !== "")
+    .join(". ");
 
   return { prompt, negativePrompt, scene, storyboard, stylePreset };
 }

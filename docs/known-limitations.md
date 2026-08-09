@@ -70,6 +70,15 @@ any cloud setup. The following features are deliberately excluded from this vers
 - Story setup (setup step 4) falls back to the deterministic `composeCommonPrompt`
   template without a `GEMINI_API_KEY`, so the flow still completes but the story
   is only as good as the stored photo analysis summary.
+- Every storyboard carries a `characterPolicy` (`featured` / `background_only` /
+  `none`, default `background_only`) that adds a suppression or encouragement
+  directive to every scene's composed prompt — this is what stops a story built
+  from a plain landscape photo from getting an uninvented character. Story setup
+  auto-suggests `none` when no photo insight mentions a person, but only while
+  the storyboard is still at the default; it never overwrites a value the user
+  set on the Storyboard page. There is no character reference sheet or other
+  consistency tool yet for `featured` stories — the policy only controls whether
+  a character is allowed to appear, not how consistent it looks across scenes.
 
 ## Guided storyboard setup
 

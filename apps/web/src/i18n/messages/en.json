@@ -236,7 +236,8 @@
       "projectSettings": "Project settings",
       "createScenes": "Create Scenes from Photos",
       "scenes": "Scenes ({count})",
-      "negativePrompt": "Negative prompt (deviation fence)"
+      "negativePrompt": "Negative prompt (deviation fence)",
+      "characterPolicy": "Characters"
     },
     "style": {
       "aiRecommend": "AI recommend",
@@ -369,6 +370,16 @@
       "savedMsg": "Negative prompt saved!",
       "failed": "Failed to save negative prompt",
       "insertFence": "Insert recommended fence"
+    },
+    "characterPolicy": {
+      "intro": "Decide once whether this story should feature a character. This is what stops an uninvited character from appearing in a story built from a plain landscape photo.",
+      "savedMsg": "Character policy saved!",
+      "failed": "Failed to save character policy",
+      "options": {
+        "featured": "Featured — the story centers on a character",
+        "background_only": "Background only — people may appear incidentally",
+        "none": "None — no human figures beyond what a source photo shows"
+      }
     }
   },
   "testGeneration": {

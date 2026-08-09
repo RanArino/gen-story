@@ -124,6 +124,15 @@
   margin-top: 8px;
 }
 
+.radioOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #152033;
+  cursor: pointer;
+}
+
 .accordionSummaryStyle {
   display: inline-flex;
   align-items: center;
@@ -883,6 +892,11 @@
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.filmstripItemDropTarget {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.28);
 }
 
 .filmstripItemActive {

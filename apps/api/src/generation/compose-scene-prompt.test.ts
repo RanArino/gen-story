@@ -7,6 +7,7 @@ import {
   createScene,
   createStoryboard,
   createUser,
+  type CharacterPolicy,
 } from "@gen-story/domain";
 
 import { createInMemoryApplicationDependencies } from "../test-support/in-memory-application";
@@ -14,7 +15,11 @@ import { composeScenePrompt } from "./compose-scene-prompt";
 
 const now = "2026-05-02T00:00:00.000Z";
 
-function baseFixture(photoFidelity: "off" | "low" | "high", hasPhoto: boolean) {
+function baseFixture(
+  photoFidelity: "off" | "low" | "high",
+  hasPhoto: boolean,
+  characterPolicy: CharacterPolicy = "background_only",
+) {
   return createInMemoryApplicationDependencies({
     users: [
       createUser({
@@ -48,6 +53,7 @@ function baseFixture(photoFidelity: "off" | "low" | "high", hasPhoto: boolean) {
         id: "storyboard_1",
         projectId: "project_1",
         tone: "warm",
+        characterPolicy,
         createdAt: now,
         updatedAt: now,
       }),
@@ -134,5 +140,27 @@ describe("composeScenePrompt — photo fidelity directive", () => {
       overrides: { photoFidelity: "high" },
     });
     expect(prompt).toContain("ground truth");
+  });
+});
+
+describe("composeScenePrompt — character policy directive", () => {
+  it("adds no directive when the storyboard is featured", async () => {
+    const deps = baseFixture("off", false, "featured");
+    const { prompt } = await composeScenePrompt(deps, { sceneId: "scene_1" });
+    expect(prompt).not.toContain("human figures");
+    expect(prompt).not.toContain("incidental");
+  });
+
+  it("instructs against any new human figures when the policy is none", async () => {
+    const deps = baseFixture("off", false, "none");
+    const { prompt } = await composeScenePrompt(deps, { sceneId: "scene_1" });
+    expect(prompt).toContain("Do not add any human figures");
+  });
+
+  it("keeps people incidental and background-only under background_only", async () => {
+    const deps = baseFixture("off", false, "background_only");
+    const { prompt } = await composeScenePrompt(deps, { sceneId: "scene_1" });
+    expect(prompt).toContain("incidental");
+    expect(prompt).toContain("do not invent a new prominent");
   });
 });

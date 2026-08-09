@@ -465,6 +465,7 @@ export async function upsertStoryboard(
     commonPrompt?: string;
     story?: string;
     negativePrompt?: string;
+    characterPolicy?: "featured" | "background_only" | "none";
   },
 ): Promise<StoryboardDto> {
   return request<StoryboardDto>(

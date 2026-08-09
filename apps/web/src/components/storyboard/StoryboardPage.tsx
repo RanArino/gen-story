@@ -215,6 +215,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [savingStory, setSavingStory] = useState(false);
   const [negativePromptDraft, setNegativePromptDraft] = useState("");
   const [savingNegativePrompt, setSavingNegativePrompt] = useState(false);
+  const [savingCharacterPolicy, setSavingCharacterPolicy] = useState(false);
   const [showCustomStyleModal, setShowCustomStyleModal] = useState(false);
   const [customStyleForm, setCustomStyleForm] = useState({
     name: "",
@@ -229,6 +230,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     "small" | "medium" | "large"
   >("small");
   const [sceneDragIndex, setSceneDragIndex] = useState<number | null>(null);
+  const [filmstripDropIndex, setFilmstripDropIndex] = useState<number | null>(
+    null,
+  );
   const [showAddScenesModal, setShowAddScenesModal] = useState(false);
   // Opt-in: bills one model call per selected photo.
   const [autoFillNewScenes, setAutoFillNewScenes] = useState(false);
@@ -589,6 +593,27 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setError(e instanceof Error ? e.message : t("negativePrompt.failed"));
     } finally {
       setSavingNegativePrompt(false);
+    }
+  }
+
+  async function saveCharacterPolicy(
+    characterPolicy: "featured" | "background_only" | "none",
+  ) {
+    if (!sbId) return;
+    setSavingCharacterPolicy(true);
+    setError(null);
+    try {
+      const updated = await upsertStoryboard(sbId, {
+        projectId,
+        characterPolicy,
+      });
+      setStoryboard(updated);
+      setSaveMsg(t("characterPolicy.savedMsg"));
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("characterPolicy.failed"));
+    } finally {
+      setSavingCharacterPolicy(false);
     }
   }
 
@@ -1355,6 +1380,36 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               </div>
             </section>
           )}
+
+          {showStep("story") && (
+            <section className={styles.projectSettingBlock}>
+              <div className={styles.sectionHeader}>
+                <h4 className={styles.settingTitle}>
+                  {t("sections.characterPolicy")}
+                </h4>
+              </div>
+              <p className={styles.photoAssignHint}>
+                {t("characterPolicy.intro")}
+              </p>
+              <div className={styles.inlineActions} role="radiogroup">
+                {(
+                  ["featured", "background_only", "none"] as const
+                ).map((policy) => (
+                  <label key={policy} className={styles.radioOption}>
+                    <input
+                      type="radio"
+                      name="characterPolicy"
+                      value={policy}
+                      checked={storyboard.characterPolicy === policy}
+                      disabled={savingCharacterPolicy}
+                      onChange={() => saveCharacterPolicy(policy)}
+                    />
+                    {t(`characterPolicy.options.${policy}`)}
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </CollapsibleSection>
 
@@ -1625,14 +1680,44 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                         activeSceneAnchor === anchorId
                           ? styles.filmstripItemActive
                           : ""
+                      } ${
+                        filmstripDropIndex === idx && sceneDragIndex !== idx
+                          ? styles.filmstripItemDropTarget
+                          : ""
                       }`}
-                      style={
-                        primaryPhoto
+                      style={{
+                        ...(primaryPhoto
                           ? {
                               backgroundImage: `url(${storageKeyToUrl(primaryPhoto.storageKey)})`,
                             }
-                          : undefined
-                      }
+                          : {}),
+                        opacity: sceneDragIndex === idx ? 0.4 : 1,
+                      }}
+                      draggable
+                      title={t("scenes.dragTitle")}
+                      onDragStart={() => setSceneDragIndex(idx)}
+                      onDragEnd={() => {
+                        setSceneDragIndex(null);
+                        setFilmstripDropIndex(null);
+                      }}
+                      onDragOver={(e) => {
+                        if (sceneDragIndex === null) return;
+                        e.preventDefault();
+                        setFilmstripDropIndex(idx);
+                      }}
+                      onDragLeave={() => {
+                        setFilmstripDropIndex((prev) =>
+                          prev === idx ? null : prev,
+                        );
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (sceneDragIndex !== null) {
+                          void handleSceneReorder(sceneDragIndex, idx);
+                        }
+                        setSceneDragIndex(null);
+                        setFilmstripDropIndex(null);
+                      }}
                       onClick={() =>
                         document.getElementById(anchorId)?.scrollIntoView({
                           behavior: "smooth",

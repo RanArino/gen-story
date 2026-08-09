@@ -236,7 +236,8 @@
       "projectSettings": "プロジェクト設定",
       "createScenes": "写真からシーンを作成",
       "scenes": "シーン({count})",
-      "negativePrompt": "ネガティブプロンプト（逸脱フェンス）"
+      "negativePrompt": "ネガティブプロンプト（逸脱フェンス）",
+      "characterPolicy": "キャラクター"
     },
     "style": {
       "aiRecommend": "AIにおまかせ",
@@ -369,6 +370,16 @@
       "savedMsg": "ネガティブプロンプトを保存しました！",
       "failed": "ネガティブプロンプトの保存に失敗しました",
       "insertFence": "推奨フェンスを挿入"
+    },
+    "characterPolicy": {
+      "intro": "このストーリーにキャラクターを登場させるかどうかを、一度だけ決めます。風景写真から作ったストーリーに意図しないキャラクターが現れるのを防ぐための設定です。",
+      "savedMsg": "キャラクターポリシーを保存しました！",
+      "failed": "キャラクターポリシーの保存に失敗しました",
+      "options": {
+        "featured": "積極的に登場させる — キャラクターを中心に据える",
+        "background_only": "背景程度 — 人物が偶発的に写り込む程度は許容",
+        "none": "登場させない — 元写真に写っている以外の人物は入れない"
+      }
     }
   },
   "testGeneration": {
