@@ -291,7 +291,15 @@
       "open": "Add scenes",
       "title": "Add scenes from unused photos",
       "hint": "Only candidate photos not already assigned as a scene's primary photo are shown.",
-      "empty": "All candidate photos are already assigned to scenes."
+      "empty": "All candidate photos are already assigned to scenes.",
+      "filterLabel": "Photo filter",
+      "filter": {
+        "unused": "Unused only ({count})",
+        "all": "All ({count})"
+      },
+      "emptyAll": "No candidate photos yet. Mark some as candidates on the photos page.",
+      "hintAll": "💡 Showing every candidate photo. Photos already in use can be picked again — a second scene from the same shot can carry a different palette",
+      "alreadyUsed": "In use"
     },
     "changePhoto": {
       "open": "Change photo",
@@ -309,6 +317,7 @@
       "deselectAll": "Deselect all",
       "hint": "💡 Select one or more candidate photos below, then click the button to create draft scenes",
       "failed": "Failed to create template scenes",
+      "confirmDuplicates": "{count} of the selected photos are already the main photo of another scene. Add scenes for them anyway?",
       "autoFill": "Also write titles and prompts with AI ({count} photos → {count} AI calls)",
       "autoFillProgress": "AI writing scenes… {done}/{total}",
       "autoFillFailed": "AI fill failed for {count} scene(s). Use “Fill with AI” on those scenes to retry."
@@ -327,16 +336,33 @@
       "moveUp": "Move up",
       "moveDown": "Move down",
       "deleteTitle": "Delete this scene",
+      "confirmDelete": "Delete this scene? This cannot be undone.",
       "primaryClickReassign": "Click another photo to reassign the primary.",
       "primaryClickAssign": "Click a photo to assign it as primary for this scene.",
       "bridgingScene": "AI-only bridging scene · {label}",
       "failedSave": "Failed to save scenes",
       "failedFill": "Failed to fill scene",
       "failedReorder": "Failed to reorder scenes",
+      "failedDelete": "Failed to delete the scene",
       "failedTone": "Failed to save tone",
       "failedStyle": "Failed to save style",
       "failedAnalyze": "Failed to analyze photos",
-      "failedInit": "Failed to create storyboard"
+      "failedInit": "Failed to create storyboard",
+      "deleteMany": "Bulk delete",
+      "deleteManyTitle": "Delete scenes in bulk",
+      "deleteScope": {
+        "all": "All scenes ({count})",
+        "unfilled": "Only scenes AI has not filled ({count})"
+      },
+      "deleteScopeWarning": {
+        "all": "This deletes every scene in this storyboard. Titles, descriptions, image prompts and photo assignments are lost and cannot be restored. Unsaved edits are discarded too.",
+        "unfilled": "This deletes only scenes that still have blank fields — the same test that decides which scenes “Fill all with AI” bills for. It cannot be undone, and unsaved edits are discarded too."
+      },
+      "deleteManyAcknowledge": "Yes, delete {count} scenes",
+      "deleteManyConfirm": "Delete {count} scenes",
+      "deletingMany": "Deleting…",
+      "deletedScenesMsg": "Deleted {count} scenes.",
+      "failedDeleteScenes": "Failed to delete the scenes"
     },
     "complement": {
       "insertBlank": "+ Complement scene",

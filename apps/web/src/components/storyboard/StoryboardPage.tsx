@@ -29,6 +29,8 @@ import {
   cancelAiJob,
   createCustomStyle,
   createTemplateScenesFromPhotos,
+  deleteScene as deleteSceneRequest,
+  deleteScenes as deleteScenesRequest,
   fillSceneWithAi,
   fillStoryboardScenesWithAi,
   generateStorySetup,
@@ -43,6 +45,7 @@ import {
   reorderScenes,
   upsertScenes,
   upsertStoryboard,
+  type DeleteScenesScope,
   type UpsertSceneInput,
 } from "../../lib/api-client";
 import { TestGenerationModal } from "./TestGenerationModal";
@@ -200,6 +203,13 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [creatingTemplates, setCreatingTemplates] = useState(false);
   const [analyzingPhotos, setAnalyzingPhotos] = useState(false);
   const [aiFillingSceneId, setAiFillingSceneId] = useState<string | null>(null);
+  const [deletingSceneId, setDeletingSceneId] = useState<string | null>(null);
+  const [showDeleteScenesModal, setShowDeleteScenesModal] = useState(false);
+  const [deleteScenesScope, setDeleteScenesScope] =
+    useState<DeleteScenesScope>("all");
+  const [deleteScenesAcknowledged, setDeleteScenesAcknowledged] =
+    useState(false);
+  const [deletingScenes, setDeletingScenes] = useState(false);
   // The background AI job currently being watched, so it can be cancelled.
   const [activeAiJob, setActiveAiJob] = useState<{
     id: string;
@@ -234,6 +244,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     null,
   );
   const [showAddScenesModal, setShowAddScenesModal] = useState(false);
+  const [photoPickerFilter, setPhotoPickerFilter] = useState<"unused" | "all">(
+    "unused",
+  );
   // Opt-in: bills one model call per selected photo.
   const [autoFillNewScenes, setAutoFillNewScenes] = useState(false);
   const [autoFillProgress, setAutoFillProgress] = useState<{
@@ -283,6 +296,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const unusedCandidatePhotos = useMemo(
     () => candidatePhotos.filter((photo) => !usedPrimaryPhotoIds.has(photo.id)),
     [candidatePhotos, usedPrimaryPhotoIds],
+  );
+  // The picker defaults to photos no scene uses yet, but a photo may
+  // deliberately be reused — a second scene from the same shot is how you get a
+  // different palette or moment out of it — so "all" stays one click away.
+  const pickerPhotos = useMemo(
+    () =>
+      photoPickerFilter === "unused" ? unusedCandidatePhotos : candidatePhotos,
+    [photoPickerFilter, unusedCandidatePhotos, candidatePhotos],
   );
 
   const analyzablePhotos = photos.filter(
@@ -385,11 +406,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     setSelectedPhotoIds((prev) => {
-      const allowed = new Set(unusedCandidatePhotos.map((photo) => photo.id));
+      // Keep the selection to what the picker currently shows: switching back
+      // to "unused only" must not leave an invisible already-used photo queued
+      // for creation.
+      const allowed = new Set(pickerPhotos.map((photo) => photo.id));
       const next = new Set([...prev].filter((id) => allowed.has(id)));
       return next.size === prev.size ? prev : next;
     });
-  }, [unusedCandidatePhotos]);
+  }, [pickerPhotos]);
 
   const load = useCallback(async () => {
     const [sbs, presets, photoList, latestPhotoAnalysis] = await Promise.all([
@@ -701,6 +725,37 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
   async function handleCreateTemplateScenes() {
     if (!sbId || selectedPhotoIds.size === 0) return;
+
+    // Adding a second scene for a photo is allowed, but never silently. The
+    // picker's "unused" filter is computed from the scenes held in this page's
+    // state, so it is checked here against the server's list too — a stale
+    // local list must not duplicate a whole batch without a word.
+    let duplicateCount = 0;
+    try {
+      const serverScenes = await listScenes(sbId);
+      const usedIds = new Set([
+        ...usedPrimaryPhotoIds,
+        ...serverScenes
+          .flatMap((scene) => scene.photoAssets)
+          .filter((asset) => asset.role === "primary")
+          .map((asset) => asset.photoAssetId),
+      ]);
+      duplicateCount = [...selectedPhotoIds].filter((photoId) =>
+        usedIds.has(photoId),
+      ).length;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("createScenes.failed"));
+      return;
+    }
+    if (
+      duplicateCount > 0 &&
+      !window.confirm(
+        t("createScenes.confirmDuplicates", { count: duplicateCount }),
+      )
+    ) {
+      return;
+    }
+
     setCreatingTemplates(true);
     try {
       const { scenes: newScenes, aiJobIds } =
@@ -748,10 +803,76 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     );
   }
 
-  function deleteScene(idx: number) {
-    setScenes((prev) =>
-      prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, orderIndex: i })),
-    );
+  // Dropping the scene from local state alone is not a delete: the row stays in
+  // the database, comes back on the next load, and — because the photo now
+  // looks unused — lets the add-scenes picker offer the same photo again.
+  // Returns whether the scene is now gone, so callers such as the gallery
+  // editor only close when the delete actually went through.
+  async function deleteScene(idx: number): Promise<boolean> {
+    const target = scenes[idx];
+    if (!target) return false;
+
+    function removeLocally() {
+      setScenes((prev) =>
+        prev
+          .filter((_, i) => i !== idx)
+          .map((s, i) => ({ ...s, orderIndex: i })),
+      );
+    }
+
+    // An unsaved draft exists only in this page's state, so there is nothing to
+    // delete on the server and nothing to lose by dropping it silently.
+    if (!target.id) {
+      removeLocally();
+      return true;
+    }
+
+    if (!window.confirm(t("scenes.confirmDelete"))) return false;
+
+    setDeletingSceneId(target.id);
+    setError(null);
+    try {
+      await deleteSceneRequest(target.id);
+      removeLocally();
+      await refreshStoryboard();
+      return true;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("scenes.failedDelete"));
+      return false;
+    } finally {
+      setDeletingSceneId(null);
+    }
+  }
+
+  function openDeleteScenesModal() {
+    setDeleteScenesScope("all");
+    setDeleteScenesAcknowledged(false);
+    setShowDeleteScenesModal(true);
+  }
+
+  async function handleDeleteScenes() {
+    if (!sbId || !deleteScenesAcknowledged) return;
+    setDeletingScenes(true);
+    setError(null);
+    try {
+      const { deletedCount } = await deleteScenesRequest(
+        sbId,
+        deleteScenesScope,
+      );
+      // "unfilled" leaves scenes behind, so the list is re-read rather than
+      // cleared — the server decides which ones survived.
+      const remaining = await listScenes(sbId);
+      setScenes(remaining.map(sceneDtoToState));
+      setGalleryEditingIndex(null);
+      setShowDeleteScenesModal(false);
+      await refreshStoryboard();
+      setSaveMsg(t("scenes.deletedScenesMsg", { count: deletedCount }));
+      setTimeout(() => setSaveMsg(null), 4000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("scenes.failedDeleteScenes"));
+    } finally {
+      setDeletingScenes(false);
+    }
   }
 
   function addScene() {
@@ -988,10 +1109,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const selectedStyle = stylePresets.find(
     (p) => p.id === storyboard.stylePresetId,
   );
-  const allUnusedSelected =
-    unusedCandidatePhotos.length > 0 &&
-    unusedCandidatePhotos.every((photo) => selectedPhotoIds.has(photo.id));
-  const someUnusedSelected = selectedPhotoIds.size > 0;
+  const allPickerSelected =
+    pickerPhotos.length > 0 &&
+    pickerPhotos.every((photo) => selectedPhotoIds.has(photo.id));
+  const somePickerSelected = selectedPhotoIds.size > 0;
   const selectedGalleryScene =
     galleryEditingIndex == null ? null : (scenes[galleryEditingIndex] ?? null);
 
@@ -1006,6 +1127,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const showStep = (step: SetupStep) =>
     !setupGated || SETUP_STEP_ORDER.indexOf(step) <= currentStepIndex;
   const pendingSceneFillCount = storyboard.pendingSceneFillCount;
+  // How many scenes each bulk-delete scope would remove. "unfilled" reuses the
+  // storyboard's blank-field count — the same number the "fill all" button
+  // bills for — so the modal previews exactly what the server will delete.
+  const deleteScopeCount = (scope: DeleteScenesScope = deleteScenesScope) =>
+    scope === "all" ? scenes.length : pendingSceneFillCount;
 
   return (
     <AppShell projectId={projectId}>
@@ -1532,9 +1658,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowAddScenesModal(true)}
-                disabled={
-                  unusedCandidatePhotos.length === 0 || creatingTemplates
-                }
+                disabled={candidatePhotos.length === 0 || creatingTemplates}
               >
                 {t("addScenes.open")}
               </button>
@@ -1555,6 +1679,20 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               )}
               <button className="btn btn-secondary" onClick={addScene}>
                 {t("scenes.addScene")}
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={openDeleteScenesModal}
+                disabled={
+                  scenes.length === 0 ||
+                  saving ||
+                  creatingTemplates ||
+                  bulkFilling ||
+                  aiFillingSceneId !== null ||
+                  deletingSceneId !== null
+                }
+              >
+                {t("scenes.deleteMany")}
               </button>
               <button
                 className="btn btn-primary"
@@ -1644,10 +1782,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                       onDragHandleEnd={() => setSceneDragIndex(null)}
                       onUpdate={(patch) => updateScene(idx, patch)}
                       onMove={(dir) => moveScene(idx, dir)}
-                      onDelete={() => deleteScene(idx)}
+                      onDelete={() => void deleteScene(idx)}
                       onAiFill={handleAiFill}
                       isAiFilling={aiFillingSceneId === scene.id}
-                      isBusy={saving || aiFillingSceneId !== null}
+                      isBusy={
+                        saving ||
+                        aiFillingSceneId !== null ||
+                        deletingSceneId !== null
+                      }
                       projectCommonPromptDraft={commonPromptDraft}
                       projectStoryDraft={storyDraft}
                       projectNegativePromptDraft={negativePromptDraft}
@@ -1736,6 +1878,84 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         </section>
       )}
 
+      {/* Bulk deletion is unrecoverable, so the modal is a second check on top
+          of the button, and its own confirm stays disabled until the user picks
+          a scope that would delete something and ticks the acknowledgement. */}
+      {showDeleteScenesModal && (
+        <div className={styles.modalOverlay} role="presentation">
+          <div
+            className={styles.modalContent}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-scenes-title"
+          >
+            <h4 id="delete-scenes-title" className={styles.modalTitle}>
+              {t("scenes.deleteManyTitle")}
+            </h4>
+            <div
+              className={styles.radioGroup}
+              role="radiogroup"
+              aria-labelledby="delete-scenes-title"
+            >
+              {(["all", "unfilled"] as const).map((scope) => (
+                <label key={scope} className={styles.radioOption}>
+                  <input
+                    type="radio"
+                    name="deleteScenesScope"
+                    value={scope}
+                    checked={deleteScenesScope === scope}
+                    disabled={deletingScenes}
+                    onChange={() => {
+                      setDeleteScenesScope(scope);
+                      setDeleteScenesAcknowledged(false);
+                    }}
+                  />
+                  {t(`scenes.deleteScope.${scope}`, {
+                    count: deleteScopeCount(scope),
+                  })}
+                </label>
+              ))}
+            </div>
+            <p className={styles.dangerNote}>
+              {t(`scenes.deleteScopeWarning.${deleteScenesScope}`)}
+            </p>
+            <label className={styles.photoModalSelectAll}>
+              <input
+                type="checkbox"
+                checked={deleteScenesAcknowledged}
+                onChange={(e) => setDeleteScenesAcknowledged(e.target.checked)}
+                disabled={deletingScenes || deleteScopeCount() === 0}
+              />
+              {t("scenes.deleteManyAcknowledge", { count: deleteScopeCount() })}
+            </label>
+            <div className={styles.modalActions}>
+              <button
+                className="btn btn-danger"
+                onClick={handleDeleteScenes}
+                disabled={
+                  !deleteScenesAcknowledged ||
+                  deletingScenes ||
+                  deleteScopeCount() === 0
+                }
+              >
+                {deletingScenes
+                  ? t("scenes.deletingMany")
+                  : t("scenes.deleteManyConfirm", {
+                      count: deleteScopeCount(),
+                    })}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowDeleteScenesModal(false)}
+                disabled={deletingScenes}
+              >
+                {tCommon("cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddScenesModal && (
         <div
           className={styles.modalOverlay}
@@ -1770,31 +1990,61 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                       )}
               </button>
             </div>
-            {unusedCandidatePhotos.length === 0 ? (
-              <p className={styles.analysisEmpty}>{t("addScenes.empty")}</p>
+            <div className={styles.photoModalToolbar}>
+              <div
+                className={styles.viewSwitcher}
+                aria-label={t("addScenes.filterLabel")}
+              >
+                {(["unused", "all"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    className={
+                      photoPickerFilter === filter
+                        ? styles.viewBtnActive
+                        : styles.viewBtn
+                    }
+                    onClick={() => setPhotoPickerFilter(filter)}
+                  >
+                    {t(`addScenes.filter.${filter}`, {
+                      count:
+                        filter === "unused"
+                          ? unusedCandidatePhotos.length
+                          : candidatePhotos.length,
+                    })}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {pickerPhotos.length === 0 ? (
+              <p className={styles.analysisEmpty}>
+                {t(
+                  photoPickerFilter === "unused"
+                    ? "addScenes.empty"
+                    : "addScenes.emptyAll",
+                )}
+              </p>
             ) : (
               <>
                 <div className={styles.photoModalToolbar}>
                   <label className={styles.photoModalSelectAll}>
                     <input
                       type="checkbox"
-                      checked={allUnusedSelected}
+                      checked={allPickerSelected}
                       ref={(el) => {
                         if (el)
                           el.indeterminate =
-                            someUnusedSelected && !allUnusedSelected;
+                            somePickerSelected && !allPickerSelected;
                       }}
                       onChange={() => {
                         setSelectedPhotoIds(
-                          allUnusedSelected
+                          allPickerSelected
                             ? new Set()
-                            : new Set(
-                                unusedCandidatePhotos.map((photo) => photo.id),
-                              ),
+                            : new Set(pickerPhotos.map((photo) => photo.id)),
                         );
                       }}
                     />
-                    {allUnusedSelected
+                    {allPickerSelected
                       ? t("createScenes.deselectAll")
                       : t("createScenes.selectAll")}
                   </label>
@@ -1830,11 +2080,17 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                     ))}
                   </div>
                 </div>
-                <p className={styles.photoAssignHint}>{t("addScenes.hint")}</p>
+                <p className={styles.photoAssignHint}>
+                  {t(
+                    photoPickerFilter === "unused"
+                      ? "addScenes.hint"
+                      : "addScenes.hintAll",
+                  )}
+                </p>
                 <div
                   className={`${styles.photoPickerGrid} ${styles[`photoPickerGrid${photoViewSize}`]}`}
                 >
-                  {unusedCandidatePhotos.map((photo) => (
+                  {pickerPhotos.map((photo) => (
                     <label key={photo.id} className={styles.photoPickerItem}>
                       <input
                         type="checkbox"
@@ -1856,6 +2112,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                         alt={photo.name}
                       />
                       <span>{photo.name}</span>
+                      {usedPrimaryPhotoIds.has(photo.id) && (
+                        <span className={styles.photoUsedBadge}>
+                          {t("addScenes.alreadyUsed")}
+                        </span>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -1898,12 +2159,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               onUpdate={(patch) => updateScene(galleryEditingIndex, patch)}
               onMove={(dir) => moveScene(galleryEditingIndex, dir)}
               onDelete={() => {
-                deleteScene(galleryEditingIndex);
-                setGalleryEditingIndex(null);
+                void deleteScene(galleryEditingIndex).then((deleted) => {
+                  if (deleted) setGalleryEditingIndex(null);
+                });
               }}
               onAiFill={handleAiFill}
               isAiFilling={aiFillingSceneId === selectedGalleryScene.id}
-              isBusy={saving || aiFillingSceneId !== null}
+              isBusy={
+                saving || aiFillingSceneId !== null || deletingSceneId !== null
+              }
               projectCommonPromptDraft={commonPromptDraft}
               projectStoryDraft={storyDraft}
               projectNegativePromptDraft={negativePromptDraft}

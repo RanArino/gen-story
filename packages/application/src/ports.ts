@@ -88,6 +88,7 @@ export interface SceneRepositoryPort {
   findById(sceneId: string): Promise<Scene | null>;
   findByStoryboardId(storyboardId: string): Promise<Scene[]>;
   save(scene: Scene): Promise<void>;
+  softDelete(sceneId: string, deletedAt: string): Promise<void>;
 }
 
 export interface StylePresetRepositoryPort {

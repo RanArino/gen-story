@@ -92,6 +92,22 @@ any cloud setup. The following features are deliberately excluded from this vers
 - Steps 2, 4 and 5 spend AI calls. Each runs from an explicit button that states
   the number of calls it will make; nothing generates on arrival at a step.
   Step 5 bills once per scene that still has a blank field.
+- Deleting a scene with the ✕ on its card is immediate and permanent: it asks
+  for confirmation, then deletes on the server rather than waiting for "Save
+  scenes". There is no undo and no restore screen for scenes.
+- "Bulk delete" in the scene toolbar deletes in one request, with a choice of
+  scope: **all scenes**, or **only the scenes AI has not filled** (scenes that
+  still have a blank field — the same test that decides what "Fill all with AI"
+  bills for). It is double-checked: a modal states the count for each scope, and
+  its confirm button stays disabled until the acknowledgement checkbox is
+  ticked. It is equally permanent, it discards unsaved edits because the scene
+  list is re-read afterwards, and generated images survive with no scene
+  referencing them.
+- A photo may be the primary photo of more than one scene — a second scene from
+  the same shot is how you get a different palette or moment out of it. The "Add
+  scenes" picker opens on "Unused only" and switches to "All", where in-use
+  photos are marked and can be picked again; selecting one asks for confirmation
+  before the scenes are created.
 
 ## Video & audio
 
