@@ -117,6 +117,7 @@ describe("LocalImagePreprocessingAdapter", () => {
               cameraDirection: "medium shot",
               lightingDirection: "soft light",
               motionDirection: "still",
+              photoFidelity: "high",
               photoAssets: [{ photoAssetId: "photo_1", role: "primary" }],
               createdAt: now,
               updatedAt: now,
@@ -159,6 +160,9 @@ describe("LocalImagePreprocessingAdapter", () => {
       expect(generationRequest?.inputJson).toMatchObject({
         projectId: "project_1",
         sceneId: "scene_1",
+        // Carried through unmodified so the image-generation adapter can
+        // decide generate vs. edit without a second lookup of the scene.
+        photoFidelity: "high",
       });
 
       const aiInputBody = await storage.getObject(aiInputStorageKey);

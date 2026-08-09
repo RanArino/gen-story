@@ -583,6 +583,7 @@ export function buildRouter(deps: ApiDependencies): Router {
         commonPrompt: parsed.data.commonPrompt,
         story: parsed.data.story,
         negativePrompt: parsed.data.negativePrompt,
+        characterPolicy: parsed.data.characterPolicy,
       });
 
       if (!result.ok) {
@@ -808,6 +809,7 @@ export function buildRouter(deps: ApiDependencies): Router {
         motionDirection: s.motionDirection,
         notes: s.notes,
         negativePrompt: s.negativePrompt,
+        photoFidelity: s.photoFidelity,
         photoAssets: s.photoAssets,
       }));
 

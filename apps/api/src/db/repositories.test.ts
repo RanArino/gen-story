@@ -249,6 +249,24 @@ describe("SQLite persistence", () => {
     });
   });
 
+  it("round-trips a scene's photoFidelity through SQLite, defaulting to off", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(buildStoryboard());
+      await repositories.scenes.save(buildScene("scene_default", 0));
+      await repositories.scenes.save({
+        ...buildScene("scene_high", 1),
+        photoFidelity: "high",
+      });
+
+      const defaultScene = await repositories.scenes.findById("scene_default");
+      const highScene = await repositories.scenes.findById("scene_high");
+
+      expect(defaultScene?.photoFidelity).toBe("off");
+      expect(highScene?.photoFidelity).toBe("high");
+    });
+  });
+
   it("rejects duplicate and multi-primary scene photo rows", async () => {
     await withDatabase(async ({ repositories }) => {
       await seedBase(repositories);

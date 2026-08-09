@@ -465,6 +465,7 @@ export async function upsertStoryboard(
     commonPrompt?: string;
     story?: string;
     negativePrompt?: string;
+    characterPolicy?: "featured" | "background_only" | "none";
   },
 ): Promise<StoryboardDto> {
   return request<StoryboardDto>(
@@ -536,6 +537,7 @@ export type UpsertSceneInput = {
   motionDirection: string;
   notes?: string;
   negativePrompt?: string;
+  photoFidelity?: "off" | "low" | "high";
 };
 
 export type PreviewScenePromptOverrides = {
@@ -548,6 +550,7 @@ export type PreviewScenePromptOverrides = {
   projectNegativePrompt?: string;
   commonPrompt?: string;
   story?: string;
+  photoFidelity?: "off" | "low" | "high";
 };
 
 export type ComposedPromptPreview = {

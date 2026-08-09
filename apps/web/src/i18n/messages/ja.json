@@ -123,7 +123,16 @@
       "tone": "トーン",
       "primaryPhoto": "メイン写真",
       "sceneNegativePrompt": "シーン別ネガティブプロンプト",
-      "sceneNegativePromptPlaceholder": "このシーンだけで避けたい要素（任意）"
+      "sceneNegativePromptPlaceholder": "このシーンだけで避けたい要素（任意）",
+      "photoFidelity": "元写真への忠実度"
+    },
+    "photoFidelity": {
+      "off": "オフ",
+      "offHint": "写真は使わず、プロンプトのみで生成します。",
+      "low": "低",
+      "lowHint": "写真を参考にします。現在は高と同じ結果になります — gpt-image-2にはこれより低い忠実度の設定がありません。",
+      "high": "高",
+      "highHint": "写真に忠実に、特に顔の特徴を再現します。写真を添付した場合、gpt-image-2ではこれが唯一の忠実度レベルです。"
     },
     "selectOption": "選択…",
     "save": "シーンを保存",
@@ -227,7 +236,8 @@
       "projectSettings": "プロジェクト設定",
       "createScenes": "写真からシーンを作成",
       "scenes": "シーン({count})",
-      "negativePrompt": "ネガティブプロンプト（逸脱フェンス）"
+      "negativePrompt": "ネガティブプロンプト（逸脱フェンス）",
+      "characterPolicy": "キャラクター"
     },
     "style": {
       "aiRecommend": "AIにおまかせ",
@@ -360,6 +370,16 @@
       "savedMsg": "ネガティブプロンプトを保存しました！",
       "failed": "ネガティブプロンプトの保存に失敗しました",
       "insertFence": "推奨フェンスを挿入"
+    },
+    "characterPolicy": {
+      "intro": "このストーリーにキャラクターを登場させるかどうかを、一度だけ決めます。風景写真から作ったストーリーに意図しないキャラクターが現れるのを防ぐための設定です。",
+      "savedMsg": "キャラクターポリシーを保存しました！",
+      "failed": "キャラクターポリシーの保存に失敗しました",
+      "options": {
+        "featured": "積極的に登場させる — キャラクターを中心に据える",
+        "background_only": "背景程度 — 人物が偶発的に写り込む程度は許容",
+        "none": "登場させない — 元写真に写っている以外の人物は入れない"
+      }
     }
   },
   "testGeneration": {
@@ -484,6 +504,15 @@
       "camera": "カメラ",
       "lighting": "ライティング",
       "motion": "モーション",
+      "photoFidelityLabel": "元写真への忠実度",
+      "photoFidelity": {
+        "off": "オフ",
+        "offHint": "写真は使わず、プロンプトのみで生成します。",
+        "low": "低",
+        "lowHint": "写真を参考にします。現在は高と同じ結果になります — gpt-image-2にはこれより低い忠実度の設定がありません。",
+        "high": "高",
+        "highHint": "写真に忠実に、特に顔の特徴を再現します。写真を添付した場合、gpt-image-2ではこれが唯一の忠実度レベルです。"
+      },
       "cancel": "キャンセル",
       "queue": "生成をキューに追加",
       "queuing": "キュー追加中…"

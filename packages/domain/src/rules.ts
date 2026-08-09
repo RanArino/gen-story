@@ -1,8 +1,10 @@
 import {
+  type CharacterPolicy,
   type GeneratedImage,
   type GenerationRequest,
   type GenerationRequestStatus,
   type PhotoAsset,
+  type PhotoInsight,
   type PhotoUsage,
   type Scene,
   type SceneBridge,
@@ -453,6 +455,28 @@ export function appendAdjustmentsToCommonPrompt(
   }
 
   return result;
+}
+
+// A conservative heuristic, not a classifier: photo analysis writes a free-text
+// `people` summary per photo (e.g. "No people visible" or "A young woman
+// smiling"), and this never has enough signal to know whether a person should
+// become a *prominent, recurring* character — that is deliberately left to the
+// user. It only ever suggests "none" (when nothing in the photo set mentions a
+// person) or "background_only" (the safe default otherwise); it never suggests
+// "featured", since promising a story is "about" a character is a real
+// commitment the user makes explicitly, not something to infer from a caption.
+const NO_PEOPLE_PATTERN =
+  /^(no\s+(one|people|person)|none|n\/a|nobody)\b/i;
+
+export function suggestCharacterPolicy(
+  photoInsights: PhotoInsight[],
+): CharacterPolicy {
+  const mentionsAnyone = photoInsights.some((insight) => {
+    const people = insight.people.trim();
+    return people !== "" && !NO_PEOPLE_PATTERN.test(people);
+  });
+
+  return mentionsAnyone ? "background_only" : "none";
 }
 
 export function composeCommonPrompt(input: {

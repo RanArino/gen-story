@@ -132,6 +132,32 @@ export type ScenePhotoAsset = {
 
 export type SceneKind = "photo" | "complement";
 
+// How closely image generation should follow this scene's assigned photos.
+// "off" ignores them entirely (prompt-only, the long-standing default and the
+// only behavior that existed before this field). "low" and "high" send the
+// photos to the image model as an edit reference, trading prompt-driven
+// creative freedom for likeness to the source photo. OpenAI's images.edit API
+// exposes exactly two fidelity levels (no continuous value), so "low"/"high"
+// is not a UI simplification of a finer-grained backend — it is the full
+// range the underlying API supports.
+export type PhotoFidelity = "off" | "low" | "high";
+
+export function isPhotoFidelity(value: unknown): value is PhotoFidelity {
+  return value === "off" || value === "low" || value === "high";
+}
+
+// Decided once per storyboard, not per scene: whether generated scenes are
+// allowed to feature a character at all, and how prominently. This is the
+// single lever that stops an uninvited person from appearing in a story
+// built from a plain landscape photo.
+export type CharacterPolicy = "featured" | "background_only" | "none";
+
+export function isCharacterPolicy(value: unknown): value is CharacterPolicy {
+  return (
+    value === "featured" || value === "background_only" || value === "none"
+  );
+}
+
 export type SceneBridge = {
   fromSceneId: SceneId;
   toSceneId: SceneId;
@@ -154,6 +180,7 @@ export type Scene = {
   motionDirection: string;
   notes: string;
   negativePrompt: string;
+  photoFidelity: PhotoFidelity;
   photoAssets: ScenePhotoAsset[];
   adoptedGeneratedImageId: GeneratedImageId | null;
   createdAt: Timestamp;
@@ -172,6 +199,8 @@ export type Storyboard = {
   commonPrompt: string;
   story: string;
   negativePrompt: string;
+  // Decided once for the whole storyboard; see `CharacterPolicy`.
+  characterPolicy: CharacterPolicy;
   sceneIds: SceneId[];
   // When set, the storyboard has been through all five setup steps and is
   // freely editable. Null means the guided flow is still gating it.
@@ -335,6 +364,7 @@ export type CreateStoryboardInput = {
   commonPrompt?: string;
   story?: string;
   negativePrompt?: string;
+  characterPolicy?: CharacterPolicy;
   sceneIds?: SceneId[];
   setupCompletedAt?: Timestamp | null;
   createdAt: Timestamp;
@@ -358,6 +388,7 @@ export type CreateSceneInput = {
   motionDirection: string;
   notes?: string;
   negativePrompt?: string;
+  photoFidelity?: PhotoFidelity;
   photoAssets?: ScenePhotoAsset[];
   adoptedGeneratedImageId?: GeneratedImageId | null;
   createdAt: Timestamp;
@@ -530,6 +561,7 @@ export function createStoryboard(input: CreateStoryboardInput): Storyboard {
     commonPrompt: (input.commonPrompt ?? "").trim(),
     story: (input.story ?? "").trim(),
     negativePrompt: (input.negativePrompt ?? "").trim(),
+    characterPolicy: input.characterPolicy ?? "background_only",
     sceneIds: [...(input.sceneIds ?? [])],
     setupCompletedAt: input.setupCompletedAt ?? null,
     createdAt: input.createdAt,
@@ -555,6 +587,7 @@ export function createScene(input: CreateSceneInput): Scene {
     motionDirection: trimOptionalText(input.motionDirection),
     notes: trimOptionalText(input.notes),
     negativePrompt: trimOptionalText(input.negativePrompt),
+    photoFidelity: input.photoFidelity ?? "off",
     photoAssets: [...(input.photoAssets ?? [])],
     adoptedGeneratedImageId: input.adoptedGeneratedImageId ?? null,
     createdAt: input.createdAt,
@@ -590,6 +623,7 @@ export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
     motionDirection: "",
     notes: "",
     negativePrompt: "",
+    photoFidelity: "off",
     photoAssets: input.photoAssetId
       ? [{ photoAssetId: input.photoAssetId, role: "primary" }]
       : [],
@@ -638,6 +672,7 @@ export function createComplementScene(
     motionDirection: "",
     notes: "",
     negativePrompt: "",
+    photoFidelity: "off",
     photoAssets: [],
     adoptedGeneratedImageId: null,
     createdAt: input.createdAt,

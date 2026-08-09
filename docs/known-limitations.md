@@ -28,6 +28,24 @@ any cloud setup. The following features are deliberately excluded from this vers
 - Image generation defaults to a **mock adapter** that returns placeholder
   images. Real generation requires an `OPENAI_API_KEY`; its presence alone
   selects the OpenAI adapter.
+- Each scene has a "Follow source photo" control (Off / Low / High), default
+  Off, on its card in the storyboard. Off is the long-standing behavior:
+  prompt-only, the photo is never sent to the image model. Low and High send
+  the scene's primary and reference photos to OpenAI's `images.edit`. **Under
+  the default model, `gpt-image-2`, there is no API-level fidelity parameter
+  at all**: this model always processes an attached photo at maximum fidelity
+  and rejects the `input_fidelity` parameter outright (confirmed against a
+  live `400` and against OpenAI's image generation guide). Only `gpt-image-1`
+  is confirmed to honor `input_fidelity: "low" | "high"` as a real parameter;
+  this codebase has no way to select that model. To still give Low and High a
+  real distinction, the composed prompt sent alongside the photo carries an
+  explicit instruction — "preserve precisely" at High, "loose inspiration,
+  reinterpret freely" at Low — following OpenAI's own documented technique for
+  steering multi-image reference use when no numeric parameter exists. This is
+  prompt-following, not an enforced setting, and its real effect on output is
+  unverified without a paid generation at each level. Attaching photos at any
+  non-Off level costs more input tokens than prompt-only generation, per the
+  same OpenAI guidance.
 - Confirming a test-generation sample only records the choice. It does not start
   the real generation — that is a separate action on the Generate screen.
 - A storyboard may hold any number of test-generation batches. Exactly one of
@@ -52,6 +70,15 @@ any cloud setup. The following features are deliberately excluded from this vers
 - Story setup (setup step 4) falls back to the deterministic `composeCommonPrompt`
   template without a `GEMINI_API_KEY`, so the flow still completes but the story
   is only as good as the stored photo analysis summary.
+- Every storyboard carries a `characterPolicy` (`featured` / `background_only` /
+  `none`, default `background_only`) that adds a suppression or encouragement
+  directive to every scene's composed prompt — this is what stops a story built
+  from a plain landscape photo from getting an uninvented character. Story setup
+  auto-suggests `none` when no photo insight mentions a person, but only while
+  the storyboard is still at the default; it never overwrites a value the user
+  set on the Storyboard page. There is no character reference sheet or other
+  consistency tool yet for `featured` stories — the policy only controls whether
+  a character is allowed to appear, not how consistent it looks across scenes.
 
 ## Guided storyboard setup
 

@@ -28,6 +28,7 @@ export const UpsertStoryboardSchema = z.object({
   commonPrompt: z.string().optional(),
   story: z.string().optional(),
   negativePrompt: z.string().optional(),
+  characterPolicy: z.enum(["featured", "background_only", "none"]).optional(),
 });
 
 // The AI-fillable fields accept the empty string on purpose: blank means "not
@@ -47,6 +48,11 @@ export const SceneInputSchema = z.object({
   motionDirection: z.string(),
   notes: z.string().optional(),
   negativePrompt: z.string().optional(),
+  // How closely image generation should follow this scene's photos: "off"
+  // ignores them (prompt-only, the default), "low"/"high" send them to the
+  // image model as an edit reference via OpenAI's input_fidelity parameter,
+  // which only has these two levels.
+  photoFidelity: z.enum(["off", "low", "high"]).optional(),
   photoAssets: z
     .array(
       z.object({
@@ -93,12 +99,13 @@ export const PreviewScenePromptSchema = z.object({
   projectNegativePrompt: z.string().optional(),
   commonPrompt: z.string().optional(),
   story: z.string().optional(),
+  photoFidelity: z.enum(["off", "low", "high"]).optional(),
 });
 
 export const AnalyzeProjectPhotosSchema = z.object({}).strict();
 
 export const CreateTemplateScenesSchema = z.object({
-  photoAssetIds: z.array(z.string().min(1)).min(1).max(20),
+  photoAssetIds: z.array(z.string().min(1)).min(1).max(30),
   // Opt-in: enqueues one AI fill job per created scene, so it bills one model
   // call per photo. Defaults to off.
   autoFill: z.boolean().optional(),

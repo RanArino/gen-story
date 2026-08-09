@@ -116,6 +116,7 @@ export type StoryboardDto = {
   commonPrompt: string;
   story: string;
   negativePrompt: string;
+  characterPolicy: "featured" | "background_only" | "none";
   sceneIds: string[];
   setupStep: StoryboardSetupStepDto;
   // Set once the storyboard has been through all five steps; from then on the
@@ -150,6 +151,7 @@ export type SceneDto = {
   motionDirection: string;
   notes: string;
   negativePrompt: string;
+  photoFidelity: "off" | "low" | "high";
   photoAssets: ScenePhotoAssetDto[];
   adoptedGeneratedImageId: string | null;
   createdAt: string;

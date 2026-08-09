@@ -21,12 +21,24 @@ import {
   retryGenerationRequest,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
+  suggestCharacterPolicy,
   transitionGenerationRequestStatus,
   unconfirmTestGenerationBatch,
   updatePhotoUsage,
   updateStylePreset,
 } from "./index";
-import type { TestAdjustmentId } from "./index";
+import type { PhotoInsight, TestAdjustmentId } from "./index";
+
+function fakeInsight(people: string): PhotoInsight {
+  return {
+    photoAssetId: "photo_1",
+    summary: "A scene.",
+    people,
+    setting: "outdoors",
+    event: "a walk",
+    atmosphere: "calm",
+  };
+}
 
 const FAKE_SUFFIXES: Record<TestAdjustmentId, string> = {
   warmer: "warmer color temperature, amber tones",
@@ -366,6 +378,30 @@ describe("domain rules", () => {
     };
 
     expect(composeCommonPrompt(input)).toBe(composeCommonPrompt(input));
+  });
+});
+
+describe("suggestCharacterPolicy", () => {
+  it("suggests none when no photo insight mentions anyone", () => {
+    expect(
+      suggestCharacterPolicy([
+        fakeInsight("No people visible."),
+        fakeInsight("None."),
+      ]),
+    ).toBe("none");
+  });
+
+  it("suggests none for an empty insight list", () => {
+    expect(suggestCharacterPolicy([])).toBe("none");
+  });
+
+  it("suggests background_only when any insight mentions a person", () => {
+    expect(
+      suggestCharacterPolicy([
+        fakeInsight("No people visible."),
+        fakeInsight("A young woman smiling at the camera."),
+      ]),
+    ).toBe("background_only");
   });
 });
 

@@ -126,7 +126,8 @@ export function ReviewPage({ projectId }: { projectId: string }) {
         overrides.emotion !== base.emotion ||
         overrides.cameraDirection !== base.cameraDirection ||
         overrides.lightingDirection !== base.lightingDirection ||
-        overrides.motionDirection !== base.motionDirection
+        overrides.motionDirection !== base.motionDirection ||
+        overrides.photoFidelity !== base.photoFidelity
       ) {
         await upsertScenes(storyboardId, [
           {
@@ -140,6 +141,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
             lightingDirection: overrides.lightingDirection,
             motionDirection: overrides.motionDirection,
             notes: scene.notes ?? "",
+            photoFidelity: overrides.photoFidelity,
           },
         ]);
       }
@@ -514,7 +516,21 @@ type RegenFields = {
   cameraDirection: string;
   lightingDirection: string;
   motionDirection: string;
+  photoFidelity: "off" | "low" | "high";
 };
+
+const PHOTO_FIDELITY_OPTIONS = ["off", "low", "high"] as const;
+
+// AI scene fill is asked to keep these fields short, English, label-style
+// values, but nothing constrains it to this exact list — a value like "Peace"
+// or "Straight-on" is a legitimate AI choice that just isn't one of the fixed
+// options below. Without this, the <select> silently shows no selection (or
+// the wrong one) for a scene whose real value is perfectly valid, which reads
+// as "the scene lost its setting" and invites overwriting it by accident.
+function withCurrentOption(options: string[], current: string): string[] {
+  if (!current || options.includes(current)) return options;
+  return [current, ...options];
+}
 
 const EMOTION_OPTIONS = [
   "Joy",
@@ -574,6 +590,7 @@ function RegenModal({
     cameraDirection: scene.cameraDirection ?? "",
     lightingDirection: scene.lightingDirection ?? "",
     motionDirection: scene.motionDirection ?? "",
+    photoFidelity: scene.photoFidelity ?? "off",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -617,9 +634,9 @@ function RegenModal({
                 onChange={(e) => set("emotion", e.target.value)}
               >
                 <option value="">—</option>
-                {EMOTION_OPTIONS.map((o) => (
+                {withCurrentOption(EMOTION_OPTIONS, fields.emotion).map((o) => (
                   <option key={o} value={o}>
-                    {tSel(`emotion.${o}`)}
+                    {EMOTION_OPTIONS.includes(o) ? tSel(`emotion.${o}`) : o}
                   </option>
                 ))}
               </select>
@@ -633,11 +650,13 @@ function RegenModal({
                 onChange={(e) => set("cameraDirection", e.target.value)}
               >
                 <option value="">—</option>
-                {CAMERA_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {tSel(`camera.${o}`)}
-                  </option>
-                ))}
+                {withCurrentOption(CAMERA_OPTIONS, fields.cameraDirection).map(
+                  (o) => (
+                    <option key={o} value={o}>
+                      {CAMERA_OPTIONS.includes(o) ? tSel(`camera.${o}`) : o}
+                    </option>
+                  ),
+                )}
               </select>
             </label>
 
@@ -649,9 +668,12 @@ function RegenModal({
                 onChange={(e) => set("lightingDirection", e.target.value)}
               >
                 <option value="">—</option>
-                {LIGHTING_OPTIONS.map((o) => (
+                {withCurrentOption(
+                  LIGHTING_OPTIONS,
+                  fields.lightingDirection,
+                ).map((o) => (
                   <option key={o} value={o}>
-                    {tSel(`lighting.${o}`)}
+                    {LIGHTING_OPTIONS.includes(o) ? tSel(`lighting.${o}`) : o}
                   </option>
                 ))}
               </select>
@@ -665,14 +687,37 @@ function RegenModal({
                 onChange={(e) => set("motionDirection", e.target.value)}
               >
                 <option value="">—</option>
-                {MOTION_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {tSel(`motion.${o}`)}
-                  </option>
-                ))}
+                {withCurrentOption(MOTION_OPTIONS, fields.motionDirection).map(
+                  (o) => (
+                    <option key={o} value={o}>
+                      {MOTION_OPTIONS.includes(o) ? tSel(`motion.${o}`) : o}
+                    </option>
+                  ),
+                )}
               </select>
             </label>
           </div>
+
+          <label className={styles.modalLabel}>
+            {t("photoFidelityLabel")}
+            <div className={styles.photoFidelityOptions}>
+              {PHOTO_FIDELITY_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={`${styles.photoFidelityOption} ${
+                    fields.photoFidelity === option
+                      ? styles.photoFidelityOptionActive
+                      : ""
+                  }`}
+                  onClick={() => set("photoFidelity", option)}
+                  title={t(`photoFidelity.${option}Hint`)}
+                >
+                  {t(`photoFidelity.${option}`)}
+                </button>
+              ))}
+            </div>
+          </label>
         </div>
 
         <ComposedPromptPreview
@@ -683,6 +728,7 @@ function RegenModal({
             cameraDirection: fields.cameraDirection,
             lightingDirection: fields.lightingDirection,
             motionDirection: fields.motionDirection,
+            photoFidelity: fields.photoFidelity,
           }}
         />
 

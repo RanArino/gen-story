@@ -474,6 +474,31 @@
   background: #fff;
 }
 
+.photoFidelityOptions {
+  display: flex;
+  gap: 8px;
+}
+
+.photoFidelityOption {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #d5dbe5;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #4a5568;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.photoFidelityOptionActive {
+  border-color: #1a56db;
+  background: #eff6ff;
+  color: #1a56db;
+}
+
 .modalFooter {
   display: flex;
   justify-content: flex-end;
