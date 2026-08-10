@@ -34,8 +34,10 @@ export async function exportStoryboardAssetBundle(input: {
   const assetsPath = resolve(exportPath, "assets");
   await mkdir(assetsPath, { recursive: true });
 
+  const sceneCount = input.storyboard.scenes.length;
   const scenes = await Promise.all(
     input.storyboard.scenes.map(async (scene) => {
+      const sceneNumber = padSceneNumber(scene.orderIndex + 1, sceneCount);
       const sourcePhoto =
         input.assetSelection === "generated_only"
           ? null
@@ -44,7 +46,7 @@ export async function exportStoryboardAssetBundle(input: {
               storageKey: scene.sourcePhotoStorageKey,
               mimeType: scene.sourcePhotoMimeType,
               destinationPath: assetsPath,
-              filename: `scene-${scene.orderIndex + 1}-source`,
+              filename: `scene-${sceneNumber}-source`,
             });
       const adoptedImage =
         input.assetSelection === "original_only"
@@ -54,7 +56,7 @@ export async function exportStoryboardAssetBundle(input: {
               storageKey: scene.adoptedImageStorageKey,
               mimeType: scene.adoptedImageMimeType,
               destinationPath: assetsPath,
-              filename: `scene-${scene.orderIndex + 1}-generated`,
+              filename: `scene-${sceneNumber}-generated`,
             });
 
       return {
@@ -95,6 +97,11 @@ async function writeAsset(input: {
     body,
   );
   return { storageKey: input.storageKey, relativePath };
+}
+
+function padSceneNumber(number: number, totalScenes: number): string {
+  const width = Math.max(2, String(totalScenes).length);
+  return String(number).padStart(width, "0");
 }
 
 function extensionFor(mimeType: string | null): string {

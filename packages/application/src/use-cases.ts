@@ -2873,6 +2873,8 @@ export type StoryboardExportData = {
   projectId: string;
   tone: string;
   stylePresetName: string | null;
+  story: string;
+  commonPrompt: string;
   exportedAt: string;
   language: Language;
   scenes: StoryboardExportScene[];
@@ -2950,6 +2952,8 @@ export async function exportStoryboardAsJson(
       projectId: storyboard.projectId,
       tone: storyboard.tone,
       stylePresetName,
+      story: storyboard.story,
+      commonPrompt: storyboard.commonPrompt,
       exportedAt: new Date().toISOString(),
       language,
       scenes: exportScenes,

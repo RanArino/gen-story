@@ -37,27 +37,27 @@ describe("exportStoryboardAssetBundle", () => {
     );
     expect(manifest.scenes[0]).toMatchObject({
       imagePrompt: "A cinematic reunion.",
-      sourcePhotoPath: "assets/scene-1-source.jpg",
-      adoptedImagePath: "assets/scene-1-generated.png",
+      sourcePhotoPath: "assets/scene-01-source.jpg",
+      adoptedImagePath: "assets/scene-01-generated.png",
     });
     await expect(
-      readFile(join(result.exportPath, "assets/scene-1-source.jpg")),
+      readFile(join(result.exportPath, "assets/scene-01-source.jpg")),
     ).resolves.toEqual(Buffer.from([1, 2]));
     await expect(
-      readFile(join(result.exportPath, "assets/scene-1-generated.png")),
+      readFile(join(result.exportPath, "assets/scene-01-generated.png")),
     ).resolves.toEqual(Buffer.from([3, 4]));
   });
 
   it.each([
     [
       "original_only",
-      "assets/scene-1-source.jpg",
-      "assets/scene-1-generated.png",
+      "assets/scene-01-source.jpg",
+      "assets/scene-01-generated.png",
     ],
     [
       "generated_only",
-      "assets/scene-1-generated.png",
-      "assets/scene-1-source.jpg",
+      "assets/scene-01-generated.png",
+      "assets/scene-01-source.jpg",
     ],
   ] as const)(
     "copies only the selected %s assets without changing the manifest shape",
@@ -115,6 +115,8 @@ function storyboardExportData(): StoryboardExportData {
     projectId: "project-1",
     tone: "warm",
     stylePresetName: "Film Photo",
+    story: "A family reunion trip.",
+    commonPrompt: "Warm nostalgic film look.",
     exportedAt: "2026-08-09T00:00:00.000Z",
     language: "en",
     scenes: [
