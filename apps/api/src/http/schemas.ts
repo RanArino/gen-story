@@ -84,7 +84,12 @@ export const FillSceneWithAiSchema = z.object({}).strict();
 export const FillStoryboardScenesWithAiSchema = z.object({}).strict();
 
 // Setup step 4. One AI call; tone and style must already be decided.
-export const GenerateStorySetupSchema = z.object({}).strict();
+// storyPurpose is optional free text the user typed in the "Create with AI"
+// modal (e.g. the purpose of a trip); an empty/omitted value lets the model
+// decide the story and common prompt on its own.
+export const GenerateStorySetupSchema = z
+  .object({ storyPurpose: z.string().max(2000).optional() })
+  .strict();
 
 // Preview the composed prompt for a scene. Every field is optional: omitted
 // fields fall back to the persisted scene/storyboard values, so the preview can

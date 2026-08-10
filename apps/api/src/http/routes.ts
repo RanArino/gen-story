@@ -711,7 +711,10 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      const result = await generateStorySetup(deps, { storyboardId });
+      const result = await generateStorySetup(deps, {
+        storyboardId,
+        storyPurpose: parsed.data.storyPurpose,
+      });
       if (!result.ok) {
         sendJson(
           res,

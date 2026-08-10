@@ -1276,6 +1276,9 @@ export async function fillStoryboardScenesWithAi(
 export type GenerateStorySetupInput = {
   storyboardId: string;
   language?: Language;
+  // Optional free text the user typed in the "Create with AI" modal (e.g. the
+  // purpose of a trip); empty means the model decides on its own.
+  storyPurpose?: string;
 };
 
 export type GenerateStorySetupResult = {
@@ -1309,10 +1312,15 @@ export async function generateStorySetup(
     }
 
     const language = await resolvePrincipalLanguage(deps, input.language);
+    const storyPurpose = input.storyPurpose?.trim();
     const { jobId } = await deps.jobQueue.enqueue({
       kind: "story_setup",
       projectId: storyboard.projectId,
-      payload: { storyboardId: storyboard.id, language },
+      payload: {
+        storyboardId: storyboard.id,
+        language,
+        ...(storyPurpose ? { storyPurpose } : {}),
+      },
     });
 
     return success({ jobId });
@@ -1355,6 +1363,8 @@ export async function runStorySetupJob(
       stylePreset,
       photoAnalysis,
       language: readLanguagePayload(job.inputJson),
+      storyPurpose:
+        readStringPayload(job.inputJson, "storyPurpose") ?? undefined,
     });
 
     // Only overwrite while the storyboard is still at the default policy: once

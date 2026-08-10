@@ -479,13 +479,16 @@ export async function upsertStoryboard(
 // prompt together. Resolves once the job lands and returns the saved storyboard.
 export async function generateStorySetup(
   storyboardId: string,
-  context: { projectId: string } & Omit<AiJobWatchOptions, "projectId">,
+  context: { projectId: string; storyPurpose?: string } & Omit<
+    AiJobWatchOptions,
+    "projectId"
+  >,
 ): Promise<StoryboardDto> {
-  const { projectId, ...watch } = context;
+  const { projectId, storyPurpose, ...watch } = context;
   const data = await request<{ jobId: string }>(
     "POST",
     `/api/storyboards/${storyboardId}/story-setup`,
-    {},
+    storyPurpose ? { storyPurpose } : {},
   );
   watch.onJobId?.(data.jobId);
 
