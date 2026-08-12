@@ -479,13 +479,16 @@ export async function upsertStoryboard(
 // prompt together. Resolves once the job lands and returns the saved storyboard.
 export async function generateStorySetup(
   storyboardId: string,
-  context: { projectId: string } & Omit<AiJobWatchOptions, "projectId">,
+  context: { projectId: string; storyPurpose?: string } & Omit<
+    AiJobWatchOptions,
+    "projectId"
+  >,
 ): Promise<StoryboardDto> {
-  const { projectId, ...watch } = context;
+  const { projectId, storyPurpose, ...watch } = context;
   const data = await request<{ jobId: string }>(
     "POST",
     `/api/storyboards/${storyboardId}/story-setup`,
-    {},
+    storyPurpose ? { storyPurpose } : {},
   );
   watch.onJobId?.(data.jobId);
 
@@ -863,6 +866,15 @@ export function exportStoryboardUrl(
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
   const qs = language ? `?lang=${language}` : "";
   return `${base}/api/storyboards/${storyboardId}/export.json${qs}`;
+}
+
+export async function exportStoryboardAssetBundle(
+  storyboardId: string,
+  assetSelection: "both" | "original_only" | "generated_only",
+): Promise<{ exportPath: string; manifestPath: string }> {
+  return request("POST", `/api/storyboards/${storyboardId}/export-assets`, {
+    assetSelection,
+  });
 }
 
 // ── User preferences ──────────────────────────────────────────────────────────

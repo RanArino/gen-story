@@ -1276,6 +1276,9 @@ export async function fillStoryboardScenesWithAi(
 export type GenerateStorySetupInput = {
   storyboardId: string;
   language?: Language;
+  // Optional free text the user typed in the "Create with AI" modal (e.g. the
+  // purpose of a trip); empty means the model decides on its own.
+  storyPurpose?: string;
 };
 
 export type GenerateStorySetupResult = {
@@ -1309,10 +1312,15 @@ export async function generateStorySetup(
     }
 
     const language = await resolvePrincipalLanguage(deps, input.language);
+    const storyPurpose = input.storyPurpose?.trim();
     const { jobId } = await deps.jobQueue.enqueue({
       kind: "story_setup",
       projectId: storyboard.projectId,
-      payload: { storyboardId: storyboard.id, language },
+      payload: {
+        storyboardId: storyboard.id,
+        language,
+        ...(storyPurpose ? { storyPurpose } : {}),
+      },
     });
 
     return success({ jobId });
@@ -1355,6 +1363,8 @@ export async function runStorySetupJob(
       stylePreset,
       photoAnalysis,
       language: readLanguagePayload(job.inputJson),
+      storyPurpose:
+        readStringPayload(job.inputJson, "storyPurpose") ?? undefined,
     });
 
     // Only overwrite while the storyboard is still at the default policy: once
@@ -2430,7 +2440,29 @@ export async function markGenerationRequestCompleted(
       updatedAt: input.completedAt,
     });
 
-    await deps.generatedImages.save(generatedImage);
+    const scene = await deps.scenes.findById(generationRequest.sceneId);
+    const sceneImages = await deps.generatedImages.findBySceneId(
+      generationRequest.sceneId,
+    );
+    const hasAdoptedImage = sceneImages.some(
+      (image) => image.adoptedAt != null,
+    );
+
+    if (scene != null && !hasAdoptedImage) {
+      const adopted = setSceneAdoptedGeneratedImage(
+        scene,
+        [...sceneImages, generatedImage],
+        generatedImage.id,
+        input.completedAt,
+        input.completedAt,
+      );
+      await deps.scenes.save(adopted.scene);
+      for (const image of adopted.generatedImages) {
+        await deps.generatedImages.save(image);
+      }
+    } else {
+      await deps.generatedImages.save(generatedImage);
+    }
 
     await deps.progressEvents.publish({
       kind: "generation-request.succeeded",
@@ -2841,7 +2873,9 @@ export type StoryboardExportScene = {
   motionDirection: string;
   notes: string;
   sourcePhotoStorageKey: string | null;
+  sourcePhotoMimeType: string | null;
   adoptedImageStorageKey: string | null;
+  adoptedImageMimeType: string | null;
 };
 
 export type StoryboardExportData = {
@@ -2849,6 +2883,8 @@ export type StoryboardExportData = {
   projectId: string;
   tone: string;
   stylePresetName: string | null;
+  story: string;
+  commonPrompt: string;
   exportedAt: string;
   language: Language;
   scenes: StoryboardExportScene[];
@@ -2882,20 +2918,24 @@ export async function exportStoryboardAsJson(
         (p) => p.role === "primary",
       );
       let sourcePhotoStorageKey: string | null = null;
+      let sourcePhotoMimeType: string | null = null;
       if (primaryPhotoAsset) {
         const photo = await deps.photoAssets.findById(
           primaryPhotoAsset.photoAssetId,
         );
         sourcePhotoStorageKey = photo?.storageKey ?? null;
+        sourcePhotoMimeType = photo?.mimeType ?? null;
       }
 
       let adoptedImageStorageKey: string | null = null;
+      let adoptedImageMimeType: string | null = null;
       if (scene.adoptedGeneratedImageId) {
         const images = await deps.generatedImages.findBySceneId(scene.id);
         const adopted = images.find(
           (img) => img.id === scene.adoptedGeneratedImageId,
         );
         adoptedImageStorageKey = adopted?.storageKey ?? null;
+        adoptedImageMimeType = adopted?.mimeType ?? null;
       }
 
       exportScenes.push({
@@ -2910,7 +2950,9 @@ export async function exportStoryboardAsJson(
         motionDirection: scene.motionDirection,
         notes: scene.notes,
         sourcePhotoStorageKey,
+        sourcePhotoMimeType,
         adoptedImageStorageKey,
+        adoptedImageMimeType,
       });
     }
 
@@ -2920,6 +2962,8 @@ export async function exportStoryboardAsJson(
       projectId: storyboard.projectId,
       tone: storyboard.tone,
       stylePresetName,
+      story: storyboard.story,
+      commonPrompt: storyboard.commonPrompt,
       exportedAt: new Date().toISOString(),
       language,
       scenes: exportScenes,

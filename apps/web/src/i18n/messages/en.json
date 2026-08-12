@@ -205,6 +205,12 @@
       "storyGenerating": "Writing…",
       "storyGeneratedMsg": "Story, common prompt and negative prompt written — review them below.",
       "storyFailed": "Failed to generate the story setup",
+      "storyModalTitle": "Create story with AI",
+      "storyModalIntro": "Optionally tell us more about this project — for example, the purpose of a trip or how you want it to feel. We'll use it to write the story and common prompt. You can leave this blank.",
+      "storyModalLabel": "Story notes (optional)",
+      "storyModalPlaceholder": "e.g. A family trip to Okinawa. Seeing our grandparents again after three years was the whole point.",
+      "storyModalGenerate": "Generate",
+      "storyModalCancel": "Cancel",
       "scenesFillAll": "Write {count} scene(s) with AI ({count} AI calls)",
       "scenesFilling": "Writing scenes…",
       "scenesNothingToFill": "Every scene is already written.",
@@ -389,8 +395,8 @@
     },
     "negativePrompt": {
       "notSet": "Not set",
-      "intro": "Phrases to keep OUT of every scene's image generation. This is the fence that keeps a series inside its intended look. A base floor (text, watermark, deformed hands, …) is always applied on top of this.",
-      "placeholder": "Things to avoid (e.g. text, watermark, extra people)",
+      "intro": "Phrases to keep OUT of every scene's image generation. This is the fence that keeps a series inside its intended look. A base floor (watermarks, deformed hands, …) is always applied on top of this. Do not add text-related terms when place names, station names, building names, or other signs should remain visible.",
+      "placeholder": "Things to avoid (e.g. watermark, extra people)",
       "save": "Save negative prompt",
       "saving": "Saving…",
       "savedMsg": "Negative prompt saved!",
@@ -491,6 +497,16 @@
     "backToGenerate": "← Back to Generate",
     "generationHistory": "Generation history",
     "exportJson": "Export Storyboard JSON",
+    "exportAssets": "Export images and prompts locally",
+    "assetSelection": {
+      "label": "Images to export: ",
+      "placeholder": "Select images",
+      "both": "Original and generated images",
+      "originalOnly": "Original images only",
+      "generatedOnly": "Generated images only"
+    },
+    "assetExported": "Exported to: {path}",
+    "assetExportFailed": "Failed to export assets locally",
     "controls": {
       "view": "View",
       "show": "Show",
@@ -671,7 +687,7 @@
     "promptLabel": "Prompt",
     "avoidLabel": "Avoid",
     "avoidNone": "(none)",
-    "note": "Preview only — no image is generated.",
+    "note": "Edits are applied to the next generated image.",
     "loading": "Composing preview…",
     "failed": "Failed to load preview"
   }

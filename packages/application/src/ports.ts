@@ -249,6 +249,9 @@ export type StorySetupGenerationInput = {
   stylePreset: StylePreset | null;
   photoAnalysis: ProjectPhotoAnalysis | null;
   language: Language;
+  // Optional free text the user typed when starting this generation (e.g. the
+  // purpose of a trip, or what they want the story to emphasize).
+  storyPurpose?: string;
 };
 
 export type StorySetupSuggestion = {

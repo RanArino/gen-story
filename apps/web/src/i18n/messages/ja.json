@@ -205,6 +205,12 @@
       "storyGenerating": "作成中…",
       "storyGeneratedMsg": "ストーリー・共通プロンプト・ネガティブプロンプトを作成しました。下で内容を確認してください。",
       "storyFailed": "ストーリー設定の作成に失敗しました",
+      "storyModalTitle": "AIでストーリーを作成",
+      "storyModalIntro": "このプロジェクトについて伝えたいことがあれば入力してください（任意）。例：旅行の目的や、伝えたい気持ちなど。入力した内容をもとに、ストーリー・共通プロンプトを作成します。空欄のままでも作成できます。",
+      "storyModalLabel": "ストーリー構成メモ（任意）",
+      "storyModalPlaceholder": "例：家族4人での沖縄旅行。三年ぶりに祖父母に会えたことが一番の目的でした。",
+      "storyModalGenerate": "作成する",
+      "storyModalCancel": "キャンセル",
       "scenesFillAll": "{count}件のシーンをAIで作成（AI呼び出し{count}回）",
       "scenesFilling": "シーンを作成中…",
       "scenesNothingToFill": "すべてのシーンは作成済みです。",
@@ -389,8 +395,8 @@
     },
     "negativePrompt": {
       "notSet": "未設定",
-      "intro": "すべてのシーンの画像生成から除外したい要素を指定します。シリーズを意図した見た目の範囲内に保つための「フェンス」です。これに加えて、基本の抑制（文字・透かし・崩れた手など）が常に適用されます。",
-      "placeholder": "避けたい要素（例: 文字, 透かし, 余計な人物）",
+      "intro": "すべてのシーンの画像生成から除外したい要素を指定します。シリーズを意図した見た目の範囲内に保つための「フェンス」です。これに加えて、基本の抑制（透かし・崩れた手など）が常に適用されます。地名・駅名・建物名などの看板や場所を示す文字を残したい場合は、文字に関する語を追加しないでください。",
+      "placeholder": "避けたい要素（例: 透かし, 余計な人物）",
       "save": "ネガティブプロンプトを保存",
       "saving": "保存中…",
       "savedMsg": "ネガティブプロンプトを保存しました！",
@@ -491,6 +497,16 @@
     "backToGenerate": "← 生成に戻る",
     "generationHistory": "生成履歴",
     "exportJson": "絵コンテJSONをエクスポート",
+    "exportAssets": "画像・プロンプトをローカルへ書き出し",
+    "assetSelection": {
+      "label": "書き出す画像: ",
+      "placeholder": "画像を選択",
+      "both": "オリジナル画像と生成画像の両方",
+      "originalOnly": "オリジナル画像のみ",
+      "generatedOnly": "生成画像のみ"
+    },
+    "assetExported": "書き出しました: {path}",
+    "assetExportFailed": "ローカル書き出しに失敗しました",
     "controls": {
       "view": "表示",
       "show": "表示対象",
@@ -671,7 +687,7 @@
     "promptLabel": "プロンプト",
     "avoidLabel": "避ける（Avoid）",
     "avoidNone": "（なし）",
-    "note": "プレビューのみ — 画像は生成されません。",
+    "note": "編集内容は次に生成する画像へ反映されます。",
     "loading": "プレビューを作成中…",
     "failed": "プレビューの読み込みに失敗しました"
   }

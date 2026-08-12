@@ -52,6 +52,7 @@ import {
 } from "@gen-story/shared";
 
 import type { ApiDependencies } from "../app/create-api-context";
+import { exportStoryboardAssetBundle } from "../exports/local-storyboard-asset-export";
 import { composeScenePrompt } from "../generation/compose-scene-prompt";
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
@@ -88,6 +89,7 @@ import {
   ComplementSceneBridgeSchema,
   CreateGenerationRequestSchema,
   CreateCustomStyleSchema,
+  ExportStoryboardAssetsSchema,
   ReorderPhotosSchema,
   ReorderScenesSchema,
   CreateProjectSchema,
@@ -278,6 +280,65 @@ export function buildRouter(deps: ApiDependencies): Router {
         includeDeleted,
       );
       sendJson(res, 200, { photoAssets: photoAssets.map(toPhotoAssetDto) });
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/export-assets
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/export-assets",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      let rawBody: unknown;
+      try {
+        rawBody = await readJsonBody(req);
+      } catch (err) {
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
+        return;
+      }
+      const parsed = ExportStoryboardAssetsSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      const result = await exportStoryboardAsJson(deps, { storyboardId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      const exported = await exportStoryboardAssetBundle({
+        storyboard: result.value,
+        objectStorage: deps.objectStorage,
+        assetSelection: parsed.data.assetSelection,
+      });
+      sendJson(res, 201, exported);
     },
   );
 
@@ -650,7 +711,10 @@ export function buildRouter(deps: ApiDependencies): Router {
         return;
       }
 
-      const result = await generateStorySetup(deps, { storyboardId });
+      const result = await generateStorySetup(deps, {
+        storyboardId,
+        storyPurpose: parsed.data.storyPurpose,
+      });
       if (!result.ok) {
         sendJson(
           res,

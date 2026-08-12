@@ -84,7 +84,12 @@ export const FillSceneWithAiSchema = z.object({}).strict();
 export const FillStoryboardScenesWithAiSchema = z.object({}).strict();
 
 // Setup step 4. One AI call; tone and style must already be decided.
-export const GenerateStorySetupSchema = z.object({}).strict();
+// storyPurpose is optional free text the user typed in the "Create with AI"
+// modal (e.g. the purpose of a trip); an empty/omitted value lets the model
+// decide the story and common prompt on its own.
+export const GenerateStorySetupSchema = z
+  .object({ storyPurpose: z.string().max(2000).optional() })
+  .strict();
 
 // Preview the composed prompt for a scene. Every field is optional: omitted
 // fields fall back to the persisted scene/storyboard values, so the preview can
@@ -103,6 +108,12 @@ export const PreviewScenePromptSchema = z.object({
 });
 
 export const AnalyzeProjectPhotosSchema = z.object({}).strict();
+
+export const ExportStoryboardAssetsSchema = z
+  .object({
+    assetSelection: z.enum(["both", "original_only", "generated_only"]),
+  })
+  .strict();
 
 export const CreateTemplateScenesSchema = z.object({
   photoAssetIds: z.array(z.string().min(1)).min(1).max(30),
