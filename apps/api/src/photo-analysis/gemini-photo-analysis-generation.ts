@@ -9,6 +9,7 @@ import type {
 } from "@gen-story/application";
 
 import { createAiInputImage } from "../images/image-metadata";
+import { retryGeminiRateLimit } from "../gemini/gemini-rate-limit";
 
 export const DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL = "gemini-2.5-flash";
 
@@ -157,14 +158,16 @@ export class GeminiPhotoAnalysisGenerationAdapter implements PhotoAnalysisGenera
       });
     }
 
-    const response = await this.client.models.generateContent({
-      model: this.model,
-      contents: [{ role: "user", parts }],
-      config: {
-        responseMimeType: "application/json",
-        responseJsonSchema,
-      },
-    });
+    const response = await retryGeminiRateLimit(() =>
+      this.client.models.generateContent({
+        model: this.model,
+        contents: [{ role: "user", parts }],
+        config: {
+          responseMimeType: "application/json",
+          responseJsonSchema,
+        },
+      }),
+    );
     const text = response.text;
 
     if (text == null || text.trim().length === 0) {

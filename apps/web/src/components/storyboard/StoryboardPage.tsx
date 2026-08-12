@@ -48,6 +48,7 @@ import {
   type DeleteScenesScope,
   type UpsertSceneInput,
 } from "../../lib/api-client";
+import { StorySetupAiModal } from "./StorySetupAiModal";
 import { TestGenerationModal } from "./TestGenerationModal";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
@@ -235,6 +236,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [savingCustomStyle, setSavingCustomStyle] = useState(false);
   const [complementBusy, setComplementBusy] = useState(false);
   const [generatingStorySetup, setGeneratingStorySetup] = useState(false);
+  const [showStorySetupModal, setShowStorySetupModal] = useState(false);
   const [bulkFilling, setBulkFilling] = useState(false);
   const [photoViewSize, setPhotoViewSize] = useState<
     "small" | "medium" | "large"
@@ -644,13 +646,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   // Setup step 4. One AI call producing the story, common prompt and negative
   // prompt together, so all three stay consistent with the chosen tone and
   // style instead of being written independently.
-  async function handleGenerateStorySetup() {
+  async function handleGenerateStorySetup(storyPurpose: string) {
     if (!sbId) return;
+    setShowStorySetupModal(false);
     setGeneratingStorySetup(true);
     setError(null);
     try {
       const updated = await generateStorySetup(sbId, {
         projectId,
+        storyPurpose: storyPurpose.trim() || undefined,
         ...aiJobWatch,
       });
       setStoryboard(updated);
@@ -1361,7 +1365,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                 <div className={styles.inlineActions}>
                   <button
                     className="btn btn-primary"
-                    onClick={handleGenerateStorySetup}
+                    onClick={() => setShowStorySetupModal(true)}
                     disabled={generatingStorySetup}
                   >
                     {generatingStorySetup
@@ -1518,21 +1522,21 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                 {t("characterPolicy.intro")}
               </p>
               <div className={styles.inlineActions} role="radiogroup">
-                {(
-                  ["featured", "background_only", "none"] as const
-                ).map((policy) => (
-                  <label key={policy} className={styles.radioOption}>
-                    <input
-                      type="radio"
-                      name="characterPolicy"
-                      value={policy}
-                      checked={storyboard.characterPolicy === policy}
-                      disabled={savingCharacterPolicy}
-                      onChange={() => saveCharacterPolicy(policy)}
-                    />
-                    {t(`characterPolicy.options.${policy}`)}
-                  </label>
-                ))}
+                {(["featured", "background_only", "none"] as const).map(
+                  (policy) => (
+                    <label key={policy} className={styles.radioOption}>
+                      <input
+                        type="radio"
+                        name="characterPolicy"
+                        value={policy}
+                        checked={storyboard.characterPolicy === policy}
+                        disabled={savingCharacterPolicy}
+                        onChange={() => saveCharacterPolicy(policy)}
+                      />
+                      {t(`characterPolicy.options.${policy}`)}
+                    </label>
+                  ),
+                )}
               </div>
             </section>
           )}
@@ -2264,6 +2268,13 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
             </div>
           )}
         </div>
+      )}
+
+      {showStorySetupModal && (
+        <StorySetupAiModal
+          onGenerate={handleGenerateStorySetup}
+          onClose={() => setShowStorySetupModal(false)}
+        />
       )}
 
       {showTestModal && storyboard && scenes[0] && (

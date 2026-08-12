@@ -134,7 +134,10 @@ describe("LocalImagePreprocessingAdapter", () => {
         projectId: "project_1",
         storyboardId: "storyboard_1",
         sceneId: "scene_1",
-        inputJson: { prompt: "scene prompt" },
+        inputJson: {
+          promptOverride: "Draw the station sign exactly as written.",
+          negativePromptOverride: "watermark",
+        },
       });
 
       expect(result.ok).toBe(true);
@@ -163,6 +166,8 @@ describe("LocalImagePreprocessingAdapter", () => {
         // Carried through unmodified so the image-generation adapter can
         // decide generate vs. edit without a second lookup of the scene.
         photoFidelity: "high",
+        prompt: "Draw the station sign exactly as written., avoid: watermark",
+        negativePrompt: "watermark",
       });
 
       const aiInputBody = await storage.getObject(aiInputStorageKey);

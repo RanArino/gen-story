@@ -8,6 +8,8 @@ import type {
 } from "@gen-story/application";
 import { RECOMMENDED_NEGATIVE_FENCE } from "@gen-story/shared";
 
+import { retryGeminiRateLimit } from "../gemini/gemini-rate-limit";
+
 export const DEFAULT_GEMINI_STORY_SETUP_MODEL = "gemini-2.5-flash";
 
 const StorySetupSchema = z.object({
@@ -79,10 +81,13 @@ function buildPrompt(input: StorySetupGenerationInput): string {
       ? `Chosen visual style: ${input.stylePreset.name} — ${input.stylePreset.prompt}`
       : "Visual style: not chosen; keep the visual language consistent with the tone.",
     ...analysisContext(input),
+    input.storyPurpose?.trim()
+      ? `What the user told us about this project (treat as the strongest signal for the story and common prompt): ${input.storyPurpose.trim()}`
+      : undefined,
     "",
     "story: 3-5 sentences describing the narrative arc and world of this video — who it is about, what it moves through, and how it should feel by the end. Concrete, not generic.",
     "commonPrompt: one paragraph of image-generation direction applied to EVERY scene. Cover the visual treatment, palette, and mood that hold the series together. Do not describe any single scene.",
-    `negativePrompt: comma-separated phrases to keep OUT of every image, chosen for this tone and style. Start from these and add what this specific project needs: ${RECOMMENDED_NEGATIVE_FENCE}`,
+    `negativePrompt: comma-separated phrases to keep OUT of every image, chosen for this tone and style. Do NOT include text, captions, letters, numbers, or any instruction that suppresses visible place names, station names, building names, signs, or other location-identifying text. Start from these and add what this specific project needs: ${RECOMMENDED_NEGATIVE_FENCE}`,
   ]
     .filter((line) => line !== undefined)
     .join("\n");
@@ -115,14 +120,16 @@ export class GeminiStorySetupGenerationAdapter implements StorySetupGenerationPo
   ): Promise<StorySetupSuggestion> {
     const client = this.getClient();
 
-    const response = await client.models.generateContent({
-      model: this.model,
-      contents: [{ role: "user", parts: [{ text: buildPrompt(input) }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseJsonSchema,
-      },
-    });
+    const response = await retryGeminiRateLimit(() =>
+      client.models.generateContent({
+        model: this.model,
+        contents: [{ role: "user", parts: [{ text: buildPrompt(input) }] }],
+        config: {
+          responseMimeType: "application/json",
+          responseJsonSchema,
+        },
+      }),
+    );
     const text = response.text;
 
     if (text == null || text.trim().length === 0) {

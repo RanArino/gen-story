@@ -12,6 +12,7 @@ import type {
 import {
   adoptGeneratedImage,
   createGenerationRequest,
+  exportStoryboardAssetBundle,
   exportStoryboardUrl,
   listGeneratedImages,
   listGenerationRequests,
@@ -34,6 +35,8 @@ type SceneReview = {
   requests: GenerationRequestDto[];
 };
 
+type AssetSelection = "both" | "original_only" | "generated_only";
+
 function latestRequest(r: SceneReview): GenerationRequestDto | null {
   return r.requests.length > 0 ? r.requests[0]! : null;
 }
@@ -48,6 +51,9 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   const [view, setView] = useState<"card" | "timeline" | "table">("card");
   const [filter, setFilter] = useState<"all" | "original" | "generated">("all");
   const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
+  const [assetExportPath, setAssetExportPath] = useState<string | null>(null);
+  const [assetSelection, setAssetSelection] =
+    useState<AssetSelection | null>(null);
 
   const load = useCallback(async () => {
     const [storyboards, photoList] = await Promise.all([
@@ -96,6 +102,25 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       .finally(() => setLoading(false));
   }, [load]);
 
+  // A generation runs in the API worker after this page has loaded. Refresh
+  // only while work is active so its completed (and automatically adopted)
+  // image replaces the placeholder without requiring a manual page reload.
+  useEffect(() => {
+    const hasActiveGeneration = reviews.some((review) =>
+      review.requests.some(
+        (request) =>
+          request.status === "queued" || request.status === "running",
+      ),
+    );
+    if (!hasActiveGeneration) return;
+
+    const interval = window.setInterval(() => {
+      load().catch((e: Error) => setError(e.message));
+    }, 2_000);
+
+    return () => window.clearInterval(interval);
+  }, [load, reviews]);
+
   async function handleAdopt(sceneId: string, imageId: string) {
     setError(null);
     try {
@@ -103,6 +128,20 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       await load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("errors.adopt"));
+    }
+  }
+
+  async function handleAssetExport() {
+    if (!storyboardId || assetSelection == null) return;
+    setError(null);
+    try {
+      const result = await exportStoryboardAssetBundle(
+        storyboardId,
+        assetSelection,
+      );
+      setAssetExportPath(result.exportPath);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("assetExportFailed"));
     }
   }
 
@@ -149,6 +188,12 @@ export function ReviewPage({ projectId }: { projectId: string }) {
         sceneId: scene.id,
         storyboardId,
         projectId,
+        ...(overrides.promptOverride != null
+          ? { promptOverride: overrides.promptOverride }
+          : {}),
+        ...(overrides.negativePromptOverride != null
+          ? { negativePromptOverride: overrides.negativePromptOverride }
+          : {}),
       });
       setRegenSceneId(null);
       await load();
@@ -271,7 +316,46 @@ export function ReviewPage({ projectId }: { projectId: string }) {
               {t("exportJson")}
             </a>
           )}
+          {storyboardId && (
+            <>
+              <label style={{ marginLeft: 8 }}>
+                {t("assetSelection.label")}
+                <select
+                  value={assetSelection ?? ""}
+                  onChange={(event) =>
+                    setAssetSelection(
+                      event.target.value === ""
+                        ? null
+                        : (event.target.value as AssetSelection),
+                    )
+                  }
+                >
+                  <option value="">{t("assetSelection.placeholder")}</option>
+                  <option value="both">{t("assetSelection.both")}</option>
+                  <option value="original_only">
+                    {t("assetSelection.originalOnly")}
+                  </option>
+                  <option value="generated_only">
+                    {t("assetSelection.generatedOnly")}
+                  </option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={assetSelection == null}
+                onClick={handleAssetExport}
+                style={{ marginLeft: 8 }}
+              >
+                {t("exportAssets")}
+              </button>
+            </>
+          )}
         </div>
+      )}
+
+      {assetExportPath && (
+        <p>{t("assetExported", { path: assetExportPath })}</p>
       )}
 
       {regenReview && (
@@ -517,6 +601,8 @@ type RegenFields = {
   lightingDirection: string;
   motionDirection: string;
   photoFidelity: "off" | "low" | "high";
+  promptOverride?: string;
+  negativePromptOverride?: string;
 };
 
 const PHOTO_FIDELITY_OPTIONS = ["off", "low", "high"] as const;
@@ -729,6 +815,13 @@ function RegenModal({
             lightingDirection: fields.lightingDirection,
             motionDirection: fields.motionDirection,
             photoFidelity: fields.photoFidelity,
+          }}
+          onChange={({ prompt, negativePrompt }) => {
+            setFields((current) => ({
+              ...current,
+              promptOverride: prompt,
+              negativePromptOverride: negativePrompt,
+            }));
           }}
         />
 

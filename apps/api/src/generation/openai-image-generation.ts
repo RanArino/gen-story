@@ -6,6 +6,7 @@ import type {
 } from "@gen-story/application";
 import OpenAI, { toFile } from "openai";
 
+import { ensurePngImage } from "../images/image-metadata";
 import { buildGeneratedImageStorageKey } from "../storage/storage-keys";
 
 type NormalizedInputImageRef = { storageKey: string };
@@ -206,7 +207,9 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
       throw new Error("OpenAI returned an empty image response.");
     }
 
-    const bytes = new Uint8Array(Buffer.from(b64, "base64"));
+    const bytes = await ensurePngImage(
+      new Uint8Array(Buffer.from(b64, "base64")),
+    );
     const checksum = createHash("sha256").update(bytes).digest("hex");
 
     const generatedImageId = `openai-${input.requestId}`;
@@ -214,18 +217,18 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
       projectId: String(projectId),
       sceneId: String(sceneId),
       generatedImageId,
-      extension: "jpg",
+      extension: "png",
     });
 
     await this.objectStorage.putObject({
       key: storageKey,
       body: bytes,
-      contentType: "image/jpeg",
+      contentType: "image/png",
     });
 
     return {
       storageKey,
-      mimeType: "image/jpeg",
+      mimeType: "image/png",
       size: bytes.byteLength,
       width: null,
       height: null,

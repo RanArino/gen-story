@@ -62,6 +62,22 @@ export async function detectSupportedImageType(
   return supportedType;
 }
 
+// Generated images are stored as PNG so the extension and Content-Type always
+// match the bytes. gpt-image already returns PNG by default, but that is a
+// response-side default rather than something we can pin in the request:
+// gpt-image-2 rejects parameters it does not support, and a 400 on an image
+// call is a wasted paid request. Re-encoding is lossless, so the non-PNG branch
+// costs quality nothing.
+export async function ensurePngImage(body: Uint8Array): Promise<Uint8Array> {
+  const detectedType = await fileTypeFromBuffer(body);
+
+  if (detectedType?.mime === "image/png") {
+    return body;
+  }
+
+  return new Uint8Array(await sharp(Buffer.from(body)).png().toBuffer());
+}
+
 export async function readOriginalImageMetadata(input: {
   body: Uint8Array;
   mimeType: string;

@@ -123,6 +123,18 @@ pnpm test
 pnpm build
 ```
 
+## Exporting Images and Prompts for Coding Agents
+
+On the review screen, **Export images and prompts locally** creates a
+timestamped bundle in `data/exports/` at the repository root. This directory is
+excluded from Git. Each bundle contains
+`storyboard.json` (scene prompts and metadata) and an `assets/` directory with
+the source photos and adopted generated images. The JSON includes each asset's
+relative local path, so Codex or Claude Code can read the bundle directly.
+
+The existing JSON export remains a browser download; its destination is set by
+your browser.
+
 ## Maintenance Scripts
 
 Purge records soft-deleted more than 7 days ago and their associated files:

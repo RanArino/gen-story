@@ -102,6 +102,11 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       });
     }
 
+    const promptOverride = readOptionalString(input.inputJson.promptOverride);
+    const negativePromptOverride = readOptionalString(
+      input.inputJson.negativePromptOverride,
+    );
+
     return {
       ...input.inputJson,
       // Set after the spread on purpose: these are the validated targets, and
@@ -112,8 +117,30 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       sceneId: input.sceneId,
       normalizedInputImages,
       photoFidelity: scene.photoFidelity,
-      prompt: composedPrompt,
-      negativePrompt,
+      prompt: applyNegativePromptOverride(
+        promptOverride ?? composedPrompt,
+        negativePromptOverride,
+      ),
+      negativePrompt: negativePromptOverride ?? negativePrompt,
     };
   }
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+// gpt-image accepts one prompt rather than a separate negative-prompt field.
+// The composed prompt always puts its avoid clause last, so replacing it here
+// lets users change the visible negative prompt without editing both fields.
+function applyNegativePromptOverride(
+  prompt: string,
+  negativePromptOverride: string | undefined,
+): string {
+  if (negativePromptOverride === undefined) return prompt;
+
+  const withoutAvoidClause = prompt.replace(/, avoid: [\s\S]*$/, "").trim();
+  return negativePromptOverride.trim()
+    ? `${withoutAvoidClause}, avoid: ${negativePromptOverride.trim()}`
+    : withoutAvoidClause;
 }
