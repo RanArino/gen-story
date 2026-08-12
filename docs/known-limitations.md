@@ -17,7 +17,9 @@ any cloud setup. The following features are deliberately excluded from this vers
   table and text/vision AI work (photo analysis, story setup, scene AI fill,
   complement scene proposals) uses the `ai_jobs` table; both are polled by
   `LocalJobWorker` inside the API process. There is no external queue, no
-  multi-process worker, and no retry-with-backoff.
+  multi-process worker. Gemini `429 RESOURCE_EXHAUSTED` responses retry at
+  most twice, honoring the provider's retry delay when supplied; other
+  failures remain terminal.
 - Progress is delivered by server-sent events on
   `GET /api/projects/:projectId/events`, fanned out in memory to subscribers of
   the same API process. Events are not persisted or replayed: a client that
