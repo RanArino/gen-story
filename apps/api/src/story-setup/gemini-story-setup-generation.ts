@@ -8,6 +8,8 @@ import type {
 } from "@gen-story/application";
 import { RECOMMENDED_NEGATIVE_FENCE } from "@gen-story/shared";
 
+import { retryGeminiRateLimit } from "../gemini/gemini-rate-limit";
+
 export const DEFAULT_GEMINI_STORY_SETUP_MODEL = "gemini-2.5-flash";
 
 const StorySetupSchema = z.object({
@@ -118,14 +120,16 @@ export class GeminiStorySetupGenerationAdapter implements StorySetupGenerationPo
   ): Promise<StorySetupSuggestion> {
     const client = this.getClient();
 
-    const response = await client.models.generateContent({
-      model: this.model,
-      contents: [{ role: "user", parts: [{ text: buildPrompt(input) }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseJsonSchema,
-      },
-    });
+    const response = await retryGeminiRateLimit(() =>
+      client.models.generateContent({
+        model: this.model,
+        contents: [{ role: "user", parts: [{ text: buildPrompt(input) }] }],
+        config: {
+          responseMimeType: "application/json",
+          responseJsonSchema,
+        },
+      }),
+    );
     const text = response.text;
 
     if (text == null || text.trim().length === 0) {
