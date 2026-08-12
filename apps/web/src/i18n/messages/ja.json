@@ -291,7 +291,15 @@
       "open": "シーンを追加",
       "title": "未使用写真からシーンを追加",
       "hint": "候補写真のうち、まだシーンのメイン写真に使われていないものだけを表示します。",
-      "empty": "すべての候補写真はすでにシーンに割り当てられています。"
+      "empty": "すべての候補写真はすでにシーンに割り当てられています。",
+      "filterLabel": "写真の絞り込み",
+      "filter": {
+        "unused": "未使用のみ（{count}）",
+        "all": "すべて（{count}）"
+      },
+      "emptyAll": "候補写真がありません。写真ページで候補に設定してください。",
+      "hintAll": "💡 すべての候補写真を表示しています。使用済みの写真も選べます（同じ写真から色合いの違うシーンを作れます）",
+      "alreadyUsed": "使用済み"
     },
     "changePhoto": {
       "open": "写真を変更",
@@ -309,6 +317,7 @@
       "deselectAll": "選択を解除",
       "hint": "💡 候補写真を1枚以上選び、ボタンを押すと下書きシーンが作成されます",
       "failed": "テンプレートシーンの作成に失敗しました",
+      "confirmDuplicates": "選択した写真のうち{count}枚は、すでに別のシーンのメイン写真として使われています。重複したままシーンを追加しますか?",
       "autoFill": "タイトルとプロンプトもAIで作成する（写真{count}枚 → AI呼び出し{count}回）",
       "autoFillProgress": "AIがシーンを作成中… {done}/{total}",
       "autoFillFailed": "{count}件のシーンでAI補完に失敗しました。該当シーンの「AIで埋める」から再試行できます。"
@@ -327,16 +336,33 @@
       "moveUp": "上へ",
       "moveDown": "下へ",
       "deleteTitle": "このシーンを削除",
+      "confirmDelete": "このシーンを削除します。この操作は取り消せません。続行しますか?",
       "primaryClickReassign": "別の写真をクリックして、メイン写真を変更できます。",
       "primaryClickAssign": "写真をクリックして、このシーンのメイン写真に設定してください。",
       "bridgingScene": "AIによる橋渡しシーン · {label}",
       "failedSave": "シーンの保存に失敗しました",
       "failedFill": "シーンの自動入力に失敗しました",
       "failedReorder": "シーンの並び替えに失敗しました",
+      "failedDelete": "シーンの削除に失敗しました",
       "failedTone": "トーンの保存に失敗しました",
       "failedStyle": "スタイルの保存に失敗しました",
       "failedAnalyze": "写真の分析に失敗しました",
-      "failedInit": "絵コンテの作成に失敗しました"
+      "failedInit": "絵コンテの作成に失敗しました",
+      "deleteMany": "まとめて削除",
+      "deleteManyTitle": "シーンをまとめて削除",
+      "deleteScope": {
+        "all": "すべてのシーン（{count}件）",
+        "unfilled": "AIで未入力のシーンのみ（{count}件）"
+      },
+      "deleteScopeWarning": {
+        "all": "この絵コンテのシーンをすべて削除します。タイトル・説明・画像プロンプト・写真の割り当ては失われ、元に戻せません。未保存の編集も破棄されます。",
+        "unfilled": "タイトル・説明・画像プロンプトなどに未入力の項目が残っているシーンだけを削除します（「AIですべて埋める」が対象にするシーンと同じ判定です）。元に戻せず、未保存の編集も破棄されます。"
+      },
+      "deleteManyAcknowledge": "はい、{count}件のシーンを削除します",
+      "deleteManyConfirm": "{count}件を削除する",
+      "deletingMany": "削除中…",
+      "deletedScenesMsg": "{count}件のシーンを削除しました。",
+      "failedDeleteScenes": "シーンの一括削除に失敗しました"
     },
     "complement": {
       "insertBlank": "+ 補完シーン",

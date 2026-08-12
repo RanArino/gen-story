@@ -73,6 +73,10 @@ export class MemoryStore<T extends EntityWithId> {
     this.items.set(item.id, item);
   }
 
+  async delete(id: string): Promise<void> {
+    this.items.delete(id);
+  }
+
   values(): T[] {
     return [...this.items.values()];
   }
@@ -198,6 +202,10 @@ class InMemorySceneRepository implements SceneRepositoryPort {
 
   async save(scene: Scene): Promise<void> {
     await this.store.save(scene);
+  }
+
+  async softDelete(sceneId: string, _deletedAt: string): Promise<void> {
+    await this.store.delete(sceneId);
   }
 }
 

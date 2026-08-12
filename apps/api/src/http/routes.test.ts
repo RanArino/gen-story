@@ -531,6 +531,96 @@ describe("POST /api/storyboards/:storyboardId/complement-scenes", () => {
     }
   });
 
+  it("deletes a scene via DELETE /api/scenes/:sceneId", async () => {
+    await seedTwoScenes();
+
+    // Raw fetch, not `req`: a 204 has no body for `req` to parse.
+    const deleted = await fetch(`${base}/api/scenes/scene-a`, {
+      method: "DELETE",
+    });
+    expect(deleted.status).toBe(204);
+
+    const listed = await req(base, "GET", "/api/storyboards/sb-comp/scenes");
+    const body = listed.body as { scenes: Array<{ id: string }> };
+    expect(body.scenes.map((scene) => scene.id)).toEqual(["scene-b"]);
+
+    // The surviving scene closes the order-index gap so a later reorder — which
+    // requires a complete list — stays valid.
+    const reordered = await req(
+      base,
+      "PUT",
+      "/api/storyboards/sb-comp/scene-order",
+      { sceneIds: ["scene-b"] },
+    );
+    expect(reordered.status).toBe(200);
+  });
+
+  it("deletes every scene via DELETE /api/storyboards/:storyboardId/scenes", async () => {
+    await seedTwoScenes();
+
+    const deleted = await req(
+      base,
+      "DELETE",
+      "/api/storyboards/sb-comp/scenes",
+    );
+    expect(deleted.status).toBe(200);
+    expect(deleted.body).toEqual({ deletedCount: 2 });
+
+    const listed = await req(base, "GET", "/api/storyboards/sb-comp/scenes");
+    expect((listed.body as { scenes: unknown[] }).scenes).toEqual([]);
+  });
+
+  it("deletes only the scenes with blank fields when scope=unfilled", async () => {
+    await seedTwoScenes();
+    // A third scene left blank, the way a template scene arrives before AI fill.
+    await req(base, "PUT", "/api/storyboards/sb-comp/scenes", {
+      scenes: [
+        {
+          sceneId: "scene-blank",
+          orderIndex: 2,
+          title: "",
+          description: "",
+          imagePrompt: "",
+          emotion: "",
+          cameraDirection: "",
+          lightingDirection: "",
+          motionDirection: "",
+        },
+      ],
+    });
+
+    const deleted = await req(
+      base,
+      "DELETE",
+      "/api/storyboards/sb-comp/scenes?scope=unfilled",
+    );
+    expect(deleted.status).toBe(200);
+    expect(deleted.body).toEqual({ deletedCount: 1 });
+
+    const listed = await req(base, "GET", "/api/storyboards/sb-comp/scenes");
+    const body = listed.body as { scenes: Array<{ id: string }> };
+    expect(body.scenes.map((scene) => scene.id)).toEqual([
+      "scene-a",
+      "scene-b",
+    ]);
+  });
+
+  it("rejects an unknown bulk-delete scope", async () => {
+    await seedTwoScenes();
+
+    const result = await req(
+      base,
+      "DELETE",
+      "/api/storyboards/sb-comp/scenes?scope=everything",
+    );
+    expect(result.status).toBe(422);
+  });
+
+  it("returns 404 when deleting an unknown scene", async () => {
+    const result = await req(base, "DELETE", "/api/scenes/no-such-scene");
+    expect(result.status).toBe(404);
+  });
+
   it("reorders scenes via PUT /scene-order", async () => {
     await seedTwoScenes();
 

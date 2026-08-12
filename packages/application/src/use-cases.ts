@@ -1915,6 +1915,103 @@ export async function reorderScenes(
   }
 }
 
+export async function deleteScene(
+  deps: ApplicationDependencies,
+  sceneId: string,
+): Promise<UseCaseResult<void>> {
+  try {
+    const scene = await deps.scenes.findById(sceneId);
+    if (scene == null) return failure("not_found", "Scene not found.");
+
+    const timestamp = now();
+    await deps.scenes.softDelete(sceneId, timestamp);
+
+    // Keep the storyboard's scene list in step, and close the order-index gap
+    // so a later reorder (which requires a complete, contiguous list) stays
+    // valid.
+    const storyboard = await deps.storyboards.findById(scene.storyboardId);
+    const remaining = sortScenesByOrderIndex(
+      await deps.scenes.findByStoryboardId(scene.storyboardId),
+    );
+    for (let index = 0; index < remaining.length; index++) {
+      const remainingScene = remaining[index]!;
+      if (remainingScene.orderIndex !== index) {
+        await deps.scenes.save({
+          ...remainingScene,
+          orderIndex: index,
+          updatedAt: timestamp,
+        });
+      }
+    }
+    if (storyboard != null) {
+      await deps.storyboards.save({
+        ...storyboard,
+        sceneIds: remaining.map((remainingScene) => remainingScene.id),
+        updatedAt: timestamp,
+      });
+    }
+
+    return success(undefined);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// "unfilled" is the same blank-field test that decides which scenes AI fill
+// bills for, so "delete the ones AI has not written" means exactly what the
+// step-5 counter shows.
+export type DeleteScenesScope = "all" | "unfilled";
+
+export type DeleteScenesInput = {
+  storyboardId: string;
+  scope: DeleteScenesScope;
+};
+
+export async function deleteScenes(
+  deps: ApplicationDependencies,
+  input: DeleteScenesInput,
+): Promise<UseCaseResult<{ deletedCount: number }>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+
+    const scenes = await deps.scenes.findByStoryboardId(input.storyboardId);
+    const doomed =
+      input.scope === "all" ? scenes : scenes.filter(hasBlankSceneFields);
+
+    const timestamp = now();
+    for (const scene of doomed) {
+      await deps.scenes.softDelete(scene.id, timestamp);
+    }
+
+    // Close the order-index gaps the deletions left, so a later reorder — which
+    // requires a complete, contiguous list — stays valid.
+    const remaining = sortScenesByOrderIndex(
+      await deps.scenes.findByStoryboardId(input.storyboardId),
+    );
+    for (let index = 0; index < remaining.length; index++) {
+      const scene = remaining[index]!;
+      if (scene.orderIndex !== index) {
+        await deps.scenes.save({
+          ...scene,
+          orderIndex: index,
+          updatedAt: timestamp,
+        });
+      }
+    }
+
+    await deps.storyboards.save({
+      ...storyboard,
+      sceneIds: remaining.map((scene) => scene.id),
+      updatedAt: timestamp,
+    });
+
+    return success({ deletedCount: doomed.length });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
 export type AssignPhotosToSceneInput = {
   sceneId: string;
   photoAssets: ScenePhotoAsset[];

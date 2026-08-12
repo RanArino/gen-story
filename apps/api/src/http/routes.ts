@@ -15,6 +15,8 @@ import {
   createTemplateScenesFromPhotos,
   deletePhotoAsset,
   deleteProject,
+  deleteScene,
+  deleteScenes,
   exportStoryboardAsJson,
   fillSceneWithAi,
   fillStoryboardScenesWithAi,
@@ -832,6 +834,58 @@ export function buildRouter(deps: ApiDependencies): Router {
     },
   );
 
+  // DELETE /api/storyboards/:storyboardId/scenes
+  router.add(
+    "DELETE",
+    "/api/storyboards/:storyboardId/scenes",
+    async (req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (
+        project == null ||
+        project.organizationId !== principal.organization.id
+      ) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const scopeParam = url.searchParams.get("scope") ?? "all";
+      if (scopeParam !== "all" && scopeParam !== "unfilled") {
+        sendJson(
+          res,
+          422,
+          errorBody("validation_error", "scope must be 'all' or 'unfilled'."),
+        );
+        return;
+      }
+
+      const result = await deleteScenes(deps, {
+        storyboardId,
+        scope: scopeParam,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, result.value);
+    },
+  );
+
   // POST /api/storyboards/:storyboardId/template-scenes
   router.add(
     "POST",
@@ -956,6 +1010,41 @@ export function buildRouter(deps: ApiDependencies): Router {
       sendJson(res, 200, toSceneDto(result.value));
     },
   );
+
+  // DELETE /api/scenes/:sceneId
+  router.add("DELETE", "/api/scenes/:sceneId", async (_req, res, params) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+
+    const sceneId = getParam(params, "sceneId");
+    const scene = await deps.scenes.findById(sceneId);
+    if (scene == null) {
+      sendJson(res, 404, notFoundBody("Scene not found."));
+      return;
+    }
+
+    const project = await deps.projects.findById(scene.projectId);
+    if (
+      project == null ||
+      project.organizationId !== principal.organization.id
+    ) {
+      sendJson(res, 403, forbiddenBody());
+      return;
+    }
+
+    const result = await deleteScene(deps, sceneId);
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
+
+    res.writeHead(204);
+    res.end();
+  });
 
   // POST /api/scenes/:sceneId/ai-fill
   router.add(

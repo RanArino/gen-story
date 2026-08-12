@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  OpenAiImageGenerationInterval,
   selectImageGenerationMode,
   supportsInputFidelity,
 } from "./openai-image-generation";
@@ -25,6 +26,34 @@ import {
 describe("OpenAiImageGenerationAdapter", () => {
   it("is covered by manual smoke tests only — see file header for instructions", () => {
     // intentionally empty
+  });
+});
+
+describe("OpenAiImageGenerationInterval", () => {
+  it("spaces concurrent request starts by the configured interval", async () => {
+    let time = 0;
+    const waits: number[] = [];
+    const interval = new OpenAiImageGenerationInterval(
+      12_000,
+      () => time,
+      async (milliseconds) => {
+        waits.push(milliseconds);
+        time += milliseconds;
+      },
+    );
+    const starts: number[] = [];
+
+    await interval.waitForNextStart();
+    starts.push(time);
+    await Promise.all(
+      [1, 2].map(async () => {
+        await interval.waitForNextStart();
+        starts.push(time);
+      }),
+    );
+
+    expect(starts[0]).toBe(0);
+    expect(waits).toEqual([12_000, 12_000]);
   });
 });
 

@@ -596,6 +596,22 @@ export async function reorderScenes(
   return data.scenes;
 }
 
+export async function deleteScene(sceneId: string): Promise<void> {
+  return request<void>("DELETE", `/api/scenes/${sceneId}`);
+}
+
+export type DeleteScenesScope = "all" | "unfilled";
+
+export async function deleteScenes(
+  storyboardId: string,
+  scope: DeleteScenesScope,
+): Promise<{ deletedCount: number }> {
+  return request<{ deletedCount: number }>(
+    "DELETE",
+    `/api/storyboards/${storyboardId}/scenes?scope=${scope}`,
+  );
+}
+
 export async function assignPhotosToScene(
   sceneId: string,
   photoAssets: { photoAssetId: string; role: "primary" | "reference" }[],
