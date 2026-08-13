@@ -1,6 +1,7 @@
 import type {
   AiJobDto,
   ComplementSceneProposalDto,
+  CharacterReferenceSheetDto,
   GeneratedImageDto,
   GenerationRequestDto,
   GenerationRequestWithSceneTitleDto,
@@ -473,6 +474,31 @@ export async function upsertStoryboard(
     `/api/storyboards/${storyboardId}`,
     input,
   );
+}
+
+export async function getCharacterReferenceSheet(
+  storyboardId: string,
+): Promise<CharacterReferenceSheetDto | null> {
+  const data = await request<{
+    characterReferenceSheet: CharacterReferenceSheetDto | null;
+  }>("GET", `/api/storyboards/${storyboardId}/character-reference-sheet`);
+  return data.characterReferenceSheet;
+}
+
+export async function generateCharacterReferenceSheet(
+  storyboardId: string,
+  projectId: string,
+): Promise<CharacterReferenceSheetDto> {
+  const queued = await request<CharacterReferenceSheetDto>(
+    "POST",
+    `/api/storyboards/${storyboardId}/character-reference-sheet`,
+  );
+  const job = await awaitAiJob(queued.jobId, { projectId });
+  aiJobResultOrThrow(job, "Character reference sheet generation failed.");
+  const result = await getCharacterReferenceSheet(storyboardId);
+  if (result == null)
+    throw new Error("Character reference sheet was not saved.");
+  return result;
 }
 
 // Setup step 4: one AI call producing the story, common prompt, and negative

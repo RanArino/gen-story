@@ -12,6 +12,7 @@ import {
 } from "react";
 import type {
   ComplementSceneProposalDto,
+  CharacterReferenceSheetDto,
   PhotoAssetDto,
   ProjectPhotoAnalysisDto,
   SceneDto,
@@ -34,6 +35,8 @@ import {
   fillSceneWithAi,
   fillStoryboardScenesWithAi,
   generateStorySetup,
+  generateCharacterReferenceSheet,
+  getCharacterReferenceSheet,
   getProjectPhotoAnalysis,
   getTestGenerationBatch,
   insertComplementScene,
@@ -227,6 +230,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [negativePromptDraft, setNegativePromptDraft] = useState("");
   const [savingNegativePrompt, setSavingNegativePrompt] = useState(false);
   const [savingCharacterPolicy, setSavingCharacterPolicy] = useState(false);
+  const [characterSheet, setCharacterSheet] =
+    useState<CharacterReferenceSheetDto | null>(null);
+  const [generatingCharacterSheet, setGeneratingCharacterSheet] =
+    useState(false);
   const [showCustomStyleModal, setShowCustomStyleModal] = useState(false);
   const [customStyleForm, setCustomStyleForm] = useState({
     name: "",
@@ -430,12 +437,14 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     if (sbs.length > 0) {
       const sb = sbs[0]!;
       setStoryboard(sb);
-      const [sceneList, batch] = await Promise.all([
+      const [sceneList, batch, sheet] = await Promise.all([
         listScenes(sb.id),
         getTestGenerationBatch(sb.id),
+        getCharacterReferenceSheet(sb.id),
       ]);
       setScenes(sceneList.map(sceneDtoToState));
       setTestBatch(batch);
+      setCharacterSheet(sheet);
     }
   }, [projectId]);
 
@@ -640,6 +649,24 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       setError(e instanceof Error ? e.message : t("characterPolicy.failed"));
     } finally {
       setSavingCharacterPolicy(false);
+    }
+  }
+
+  async function handleGenerateCharacterSheet() {
+    if (!sbId) return;
+    setGeneratingCharacterSheet(true);
+    setError(null);
+    try {
+      const sheet = await generateCharacterReferenceSheet(sbId, projectId);
+      setCharacterSheet(sheet);
+      setSaveMsg(t("characterPolicy.sheetReady"));
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : t("characterPolicy.sheetFailed"),
+      );
+    } finally {
+      setGeneratingCharacterSheet(false);
     }
   }
 
@@ -1538,6 +1565,30 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   ),
                 )}
               </div>
+              {storyboard.characterPolicy === "featured" && (
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={generatingCharacterSheet}
+                    onClick={handleGenerateCharacterSheet}
+                  >
+                    {generatingCharacterSheet
+                      ? t("characterPolicy.generatingSheet")
+                      : characterSheet?.status === "succeeded"
+                        ? t("characterPolicy.regenerateSheet")
+                        : t("characterPolicy.generateSheet")}
+                  </button>
+                  {characterSheet?.status === "succeeded" &&
+                    characterSheet.storageKey && (
+                      <img
+                        className={styles.characterSheetPreview}
+                        src={storageKeyToUrl(characterSheet.storageKey)}
+                        alt={t("characterPolicy.sheetAlt")}
+                      />
+                    )}
+                </div>
+              )}
             </section>
           )}
         </div>
