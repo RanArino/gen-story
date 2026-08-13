@@ -32,6 +32,14 @@ export function buildGeneratedImageStorageKey(input: {
   return `data/uploads/generated/images/projects/${input.projectId}/scenes/${input.sceneId}/${input.generatedImageId}.${normalizeExtension(input.extension)}`;
 }
 
+export function buildCharacterSheetStorageKey(input: {
+  projectId: string;
+  storyboardId: string;
+  jobId: string;
+}): string {
+  return `data/uploads/generated/character-sheets/projects/${input.projectId}/storyboards/${input.storyboardId}/${input.jobId}.png`;
+}
+
 function normalizeExtension(extension: string): string {
   const normalizedExtension = extension.trim().toLowerCase().replace(/^\./, "");
 

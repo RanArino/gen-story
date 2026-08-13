@@ -7,6 +7,7 @@ import {
   markGenerationRequestFailed,
   markGenerationRequestRunning,
   runComplementSceneProposalsJob,
+  runCharacterSheetGenerationJob,
   runPhotoAnalysisJob,
   runSceneAiFillJob,
   runStorySetupJob,
@@ -28,6 +29,7 @@ const AI_JOB_RUNNERS: Record<
   story_setup: runStorySetupJob,
   scene_ai_fill: runSceneAiFillJob,
   complement_scene_proposals: runComplementSceneProposalsJob,
+  character_sheet_generation: runCharacterSheetGenerationJob,
 };
 
 // Caps how many new items one scan may start, so a backlog spread over many

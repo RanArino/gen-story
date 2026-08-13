@@ -662,6 +662,7 @@ export function createInMemoryApplicationDependencies(
     objectStorage: new InMemoryObjectStorage(),
     imagePreprocessing: new InMemoryImagePreprocessing(),
     imageGeneration: new InMemoryImageGeneration(),
+    characterSheetGeneration: new InMemoryImageGeneration(),
     sceneFillGeneration: new InMemorySceneFillGeneration(),
     complementSceneProposal: new InMemoryComplementSceneProposal(),
     photoAnalysisGeneration: new InMemoryPhotoAnalysisGeneration(),

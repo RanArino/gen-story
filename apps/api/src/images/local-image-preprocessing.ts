@@ -28,6 +28,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       | "objectStorage"
       | "storyboards"
       | "stylePresets"
+      | "aiJobs"
     >,
   ) {}
 
@@ -99,6 +100,29 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
         height: normalizedImage.height,
         checksum: normalizedImage.checksum,
         preset: normalizedImage.preset,
+      });
+    }
+
+    const sheetJob = (await this.deps.aiJobs.findByProjectId(input.projectId))
+      .filter(
+        (job) =>
+          job.kind === "character_sheet_generation" &&
+          job.status === "succeeded" &&
+          job.inputJson.storyboardId === input.storyboardId &&
+          typeof job.resultJson?.storageKey === "string",
+      )
+      .sort((a, b) => b.completedAt!.localeCompare(a.completedAt!))[0];
+    if (sheetJob?.resultJson) {
+      normalizedInputImages.push({
+        photoAssetId: `character-sheet:${sheetJob.id}`,
+        role: "character_reference",
+        storageKey: String(sheetJob.resultJson.storageKey),
+        mimeType: String(sheetJob.resultJson.mimeType ?? "image/png"),
+        size: Number(sheetJob.resultJson.size ?? 0),
+        width: Number(sheetJob.resultJson.width ?? 0),
+        height: Number(sheetJob.resultJson.height ?? 0),
+        checksum: String(sheetJob.resultJson.checksum ?? ""),
+        preset: "character-reference-sheet",
       });
     }
 
