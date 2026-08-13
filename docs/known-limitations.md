@@ -78,9 +78,10 @@ any cloud setup. The following features are deliberately excluded from this vers
   from a plain landscape photo from getting an uninvented character. Story setup
   auto-suggests `none` when no photo insight mentions a person, but only while
   the storyboard is still at the default; it never overwrites a value the user
-  set on the Storyboard page. There is no character reference sheet or other
-  consistency tool yet for `featured` stories — the policy only controls whether
-  a character is allowed to appear, not how consistent it looks across scenes.
+  set on the Storyboard page. For `featured` stories, an optional paid image call
+  can generate one single-character reference sheet. The latest successful sheet
+  is automatically attached to later scene image requests. Multi-character cast
+  management and separate named-character sheets are not supported.
 
 ## Guided storyboard setup
 
