@@ -158,6 +158,25 @@ describe("detectAgentRuntime", () => {
     });
   });
 
+  it("reads codex login status from stderr, matching the real CLI (M1-10 finding)", async () => {
+    const cli = writeFakeCli(`
+      const isVersion = process.argv[2] === "--version";
+      if (isVersion) {
+        process.stdout.write("codex-cli 0.147.0");
+      } else {
+        process.stderr.write("Logged in using ChatGPT");
+      }
+    `);
+
+    await expect(detect(cli)).resolves.toEqual({
+      status: "available",
+      provider: "codex",
+      version: "0.147.0",
+      authMethod: "ChatGPT",
+      subscriptionLabel: "ChatGPT subscription",
+    });
+  });
+
   it("reports not_logged_in when claude auth status has loggedIn: false", async () => {
     const cli = writeFakeCli(`
       const isVersion = process.argv[2] === "--version";

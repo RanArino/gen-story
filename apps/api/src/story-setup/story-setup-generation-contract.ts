@@ -20,6 +20,7 @@ export const STORY_SETUP_RESPONSE_JSON_SCHEMA = {
     negativePrompt: { type: "string" },
   },
   required: ["story", "commonPrompt", "negativePrompt"],
+  additionalProperties: false,
 } as const;
 
 function languageDirective(

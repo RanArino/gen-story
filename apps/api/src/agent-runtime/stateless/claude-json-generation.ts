@@ -137,8 +137,15 @@ async function invokeClaudeOnce(
       stdout = result.stdout;
     } catch (error) {
       if (error instanceof CliProcessError) {
+        // error.message is a generic summary for a non-zero exit;
+        // error.stderr usually carries the actual reason. Both matter — see
+        // the matching fix in codex-json-generation.ts.
+        const detail = [error.message, error.stderr]
+          .filter((part) => part.trim().length > 0)
+          .join(" — stderr: ");
         throw new ClaudeGenerationError(
-          `Claude CLI generation failed (${error.reason}): ${error.message || error.stderr}`,
+          `Claude CLI generation failed (${error.reason}): ${detail}`,
+          error.stderr,
         );
       }
       throw error;

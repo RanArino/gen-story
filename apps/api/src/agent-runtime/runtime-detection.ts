@@ -49,17 +49,28 @@ type LoginStatus =
   | { kind: "logged_out" }
   | { kind: "unrecognized" };
 
+type LoginStepOutput = { stdout: string; stderr: string };
+
 type ProviderDetectionConfig = {
   binary: string;
   versionArgs: readonly string[];
   loginArgs: readonly string[];
   /** Lowest version verified to work with this integration; see the M1 ExecPlan Discoveries. */
   minimumSupportedVersion: string;
-  parseLoginStatus: (stdout: string) => LoginStatus;
+  parseLoginStatus: (output: LoginStepOutput) => LoginStatus;
 };
 
-function parseCodexLoginStatus(stdout: string): LoginStatus {
-  const text = stdout.trim();
+// `codex login status` writes its result to stderr, not stdout, when run as
+// a piped (non-TTY) child process — confirmed empirically against the real
+// CLI during M1-10's end-to-end smoke test, which is exactly the gap
+// fake-CLI unit tests (which controlled the stream directly) could not
+// catch. stdout is checked first in case a future Codex version changes
+// this back.
+function parseCodexLoginStatus({
+  stdout,
+  stderr,
+}: LoginStepOutput): LoginStatus {
+  const text = stdout.trim() || stderr.trim();
   if (/logged in using chatgpt/i.test(text)) {
     return {
       kind: "subscription",
@@ -82,7 +93,8 @@ const claudeAuthStatusSchema = z.object({
   subscriptionType: z.string().optional(),
 });
 
-function parseClaudeLoginStatus(stdout: string): LoginStatus {
+// Confirmed empirically: always plain JSON on stdout, never stderr.
+function parseClaudeLoginStatus({ stdout }: LoginStepOutput): LoginStatus {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stdout);
@@ -160,12 +172,12 @@ async function runDetectionStep(input: {
   timeoutMs: number;
   environment?: NodeJS.ProcessEnv;
 }): Promise<
-  | { ok: true; stdout: string }
+  | { ok: true; stdout: string; stderr: string }
   | { ok: false; failure: DetectionStepFailure; message: string }
 > {
   try {
     const result = await runCliProcess(input);
-    return { ok: true, stdout: result.stdout };
+    return { ok: true, stdout: result.stdout, stderr: result.stderr };
   } catch (error) {
     if (error instanceof CliProcessError) {
       if (error.reason === "spawn_failed") {
@@ -251,7 +263,10 @@ export async function detectAgentRuntime(
     );
   }
 
-  const loginStatus = config.parseLoginStatus(loginStep.stdout);
+  const loginStatus = config.parseLoginStatus({
+    stdout: loginStep.stdout,
+    stderr: loginStep.stderr,
+  });
   switch (loginStatus.kind) {
     case "logged_out":
       return unavailable(
@@ -269,7 +284,7 @@ export async function detectAgentRuntime(
       return unavailable(
         input.provider,
         "login_status_unrecognized",
-        `Could not interpret ${input.provider} login status output: ${loginStep.stdout.trim()}`,
+        `Could not interpret ${input.provider} login status output: ${loginStep.stdout.trim() || loginStep.stderr.trim()}`,
       );
     case "subscription":
       return {

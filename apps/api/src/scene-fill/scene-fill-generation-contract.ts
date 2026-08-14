@@ -35,6 +35,7 @@ export const SCENE_FILL_RESPONSE_JSON_SCHEMA = {
     "lightingDirection",
     "motionDirection",
   ],
+  additionalProperties: false,
 } as const;
 
 function languageDirective(

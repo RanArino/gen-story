@@ -40,10 +40,12 @@ export const COMPLEMENT_SCENE_RESPONSE_JSON_SCHEMA = {
         type: "object",
         properties: sceneProperties,
         required: Object.keys(sceneProperties),
+        additionalProperties: false,
       },
     },
   },
   required: ["proposals"],
+  additionalProperties: false,
 } as const;
 
 function languageDirective(

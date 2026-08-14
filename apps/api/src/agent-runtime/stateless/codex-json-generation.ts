@@ -85,6 +85,13 @@ async function invokeCodexOnce(
       scratchDir,
       ...(input.model ? ["-m", input.model] : []),
       ...imageArgs,
+      // `--` is required: `-i <FILE>...` is a variadic clap argument, and
+      // without an explicit end-of-flags marker it swallows the prompt
+      // positional as another "image path" instead of leaving it for codex
+      // to read as the prompt, which makes codex fall back to (empty,
+      // already-closed) stdin and fail with "No prompt provided via
+      // stdin." Confirmed against the real CLI during the M1-10 smoke test.
+      "--",
       input.prompt,
     ];
 
@@ -102,8 +109,17 @@ async function invokeCodexOnce(
       stdout = result.stdout;
     } catch (error) {
       if (error instanceof CliProcessError) {
+        // error.message is a generic summary ("CLI process exited with code
+        // 1") for a non-zero exit; error.stderr usually carries the actual
+        // reason codex printed. Both matter, and dropping stderr whenever
+        // message is non-empty (an earlier bug here) hid the real cause of
+        // every generation failure behind a useless message.
+        const detail = [error.message, error.stderr]
+          .filter((part) => part.trim().length > 0)
+          .join(" — stderr: ");
         throw new CodexGenerationError(
-          `Codex CLI generation failed (${error.reason}): ${error.message || error.stderr}`,
+          `Codex CLI generation failed (${error.reason}): ${detail}`,
+          error.stderr,
         );
       }
       throw error;

@@ -48,6 +48,7 @@ export const PHOTO_ANALYSIS_RESPONSE_JSON_SCHEMA = {
           reason: { type: "string" },
         },
         required: ["value", "label", "description", "reason"],
+        additionalProperties: false,
       },
     },
     photoInsights: {
@@ -70,11 +71,13 @@ export const PHOTO_ANALYSIS_RESPONSE_JSON_SCHEMA = {
           "event",
           "atmosphere",
         ],
+        additionalProperties: false,
       },
     },
     storySummary: { type: "string" },
   },
   required: ["emotionCandidates", "photoInsights", "storySummary"],
+  additionalProperties: false,
 } as const;
 
 function languageDirective(
