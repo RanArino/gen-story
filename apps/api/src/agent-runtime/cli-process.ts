@@ -63,7 +63,7 @@ export function createCliEnvironment(
   return environment;
 }
 
-function assertConfinedWorkingDirectory(
+export function assertConfinedWorkingDirectory(
   workingDirectory: string,
   allowedWorkingDirectoryRoot: string,
 ): void {
