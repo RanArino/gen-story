@@ -1,13 +1,17 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import {
   compareVersions,
   detectAgentRuntime,
   parseCliVersionOutput,
 } from "./runtime-detection";
+
+// These tests spawn real subprocesses; under heavy parallel test load the
+// default 5s per-test timeout can be too tight.
+vi.setConfig({ testTimeout: 20_000 });
 
 const temporaryRoot = mkdtempSync(join(tmpdir(), "gen-story-runtime-detect-"));
 const workingDirectory = join(temporaryRoot, "work");
@@ -35,7 +39,10 @@ function detect(
     binary,
     workingDirectory,
     allowedWorkingDirectoryRoot: temporaryRoot,
-    timeoutMs: 2_000,
+    // Generous headroom: many subprocess-spawning test files now run in
+    // parallel in this workspace, and a tight timeout here flakes under load
+    // even though the fake CLI itself responds instantly.
+    timeoutMs: 8_000,
     ...overrides,
   });
 }
@@ -237,7 +244,7 @@ describe("detectAgentRuntime", () => {
 
     // Timeout must comfortably exceed a single node-process spawn (the
     // version step) while still bounding the hung login step.
-    await expect(detect(cli, { timeoutMs: 3_000 })).resolves.toMatchObject({
+    await expect(detect(cli, { timeoutMs: 6_000 })).resolves.toMatchObject({
       status: "unavailable",
       reason: "login_command_timed_out",
     });

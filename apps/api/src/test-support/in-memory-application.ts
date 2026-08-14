@@ -38,6 +38,7 @@ import type {
   TestGenerationBatch,
 } from "@gen-story/domain";
 import { createAiJob } from "@gen-story/domain";
+import type { ApiAgentRuntimeInfo } from "../app/create-api-context";
 import { LocalAuthContext } from "../auth/local-auth";
 import { LocalProgressEvents } from "../jobs/local-progress-events";
 import type {
@@ -603,6 +604,7 @@ export function createInMemoryApplicationDependencies(
   },
 ): ApplicationDependencies & {
   progressEvents: LocalProgressEvents;
+  agentRuntime: ApiAgentRuntimeInfo;
   stores: {
     users: MemoryStore<User>;
     organizations: MemoryStore<Organization>;
@@ -637,6 +639,7 @@ export function createInMemoryApplicationDependencies(
   const progressEvents = new LocalProgressEvents();
   const dependencies: ApplicationDependencies & {
     progressEvents: LocalProgressEvents;
+    agentRuntime: ApiAgentRuntimeInfo;
   } = {
     users: new InMemoryUserRepository(stores.users),
     organizations: new InMemoryOrganizationRepository(stores.organizations),
@@ -672,6 +675,12 @@ export function createInMemoryApplicationDependencies(
       users: new InMemoryUserRepository(stores.users),
       organizations: new InMemoryOrganizationRepository(stores.organizations),
     }),
+    agentRuntime: {
+      selection: "api",
+      wallet: "api_key",
+      capabilities: null,
+      availability: { status: "not_applicable" },
+    },
     ...overrides,
   };
 

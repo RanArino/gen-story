@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { failInterruptedAiJobs } from "@gen-story/application";
 
+import { resolveAgentRuntimeAvailability } from "./agent-runtime/runtime-config";
 import { createApiContext } from "./app/create-api-context";
 import { seedLocalPrincipal } from "./auth/local-auth";
 import { openDatabase, migrateDatabase } from "./db";
@@ -126,6 +127,27 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
   migrateDatabase(client.db);
 
   const deps = createApiContext(client);
+
+  // R2.2/R4.7: fail fast if a selected CLI runtime is not installed or not
+  // logged in with a subscription account, instead of only discovering it
+  // on the first request.
+  if (deps.agentRuntime.selection !== "api") {
+    deps.agentRuntime.availability = await resolveAgentRuntimeAvailability(
+      deps.agentRuntime.selection,
+      {
+        workingDirectory: process.cwd(),
+        allowedWorkingDirectoryRoot: process.cwd(),
+      },
+    );
+    if (deps.agentRuntime.availability.status === "unavailable") {
+      const { reason, message } = deps.agentRuntime.availability;
+      console.error(
+        `[startup] GEN_STORY_AGENT_RUNTIME="${deps.agentRuntime.selection}" is unavailable (${reason}): ${message}`,
+      );
+      process.exit(1);
+    }
+  }
+
   await seedLocalPrincipal(deps);
 
   // Jobs left `running` by a previous process have no worker; fail them so the

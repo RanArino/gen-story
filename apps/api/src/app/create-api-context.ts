@@ -1,6 +1,24 @@
-import type { ApplicationDependencies } from "@gen-story/application";
+import type {
+  ApplicationDependencies,
+  ComplementSceneProposalPort,
+  PhotoAnalysisGenerationPort,
+  SceneFillGenerationPort,
+  StorySetupGenerationPort,
+} from "@gen-story/application";
 
+import type { AgentSessionCapabilities } from "../agent-runtime/agent-session-events";
+import {
+  agentRuntimeCapabilities,
+  agentRuntimeWallet,
+  assertLocalDeploymentForCliRuntime,
+  resolveAgentRuntimeSelection,
+  resolveDeployTarget,
+  type AgentRuntimeAvailability,
+  type AgentRuntimeSelection,
+} from "../agent-runtime/runtime-config";
 import { LocalAuthContext } from "../auth/local-auth";
+import { ClaudeComplementSceneProposalAdapter } from "../complement-scenes/claude-complement-scene-proposal";
+import { CodexComplementSceneProposalAdapter } from "../complement-scenes/codex-complement-scene-proposal";
 import type { GenStorySqliteClient } from "../db/client";
 import { createSqliteRepositories } from "../db/repositories";
 import { LocalProgressEvents } from "../jobs/local-progress-events";
@@ -11,6 +29,8 @@ import {
   OpenAiImageGenerationAdapter,
 } from "../generation/openai-image-generation";
 import { LocalImagePreprocessingAdapter } from "../images/local-image-preprocessing";
+import { ClaudePhotoAnalysisGenerationAdapter } from "../photo-analysis/claude-photo-analysis-generation";
+import { CodexPhotoAnalysisGenerationAdapter } from "../photo-analysis/codex-photo-analysis-generation";
 import {
   DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL,
   GeminiPhotoAnalysisGenerationAdapter,
@@ -20,25 +40,113 @@ import {
   DEFAULT_GEMINI_COMPLEMENT_SCENE_MODEL,
   GeminiComplementSceneProposalAdapter,
 } from "../complement-scenes/gemini-complement-scene-proposal";
+import { ClaudeSceneFillGenerationAdapter } from "../scene-fill/claude-scene-fill-generation";
+import { CodexSceneFillGenerationAdapter } from "../scene-fill/codex-scene-fill-generation";
 import {
   DEFAULT_GEMINI_SCENE_FILL_MODEL,
   GeminiSceneFillGenerationAdapter,
 } from "../scene-fill/gemini-scene-fill-generation";
 import { LocalObjectStorage } from "../storage/local-object-storage";
+import { ClaudeStorySetupGenerationAdapter } from "../story-setup/claude-story-setup-generation";
+import { CodexStorySetupGenerationAdapter } from "../story-setup/codex-story-setup-generation";
 import {
   DEFAULT_GEMINI_STORY_SETUP_MODEL,
   GeminiStorySetupGenerationAdapter,
 } from "../story-setup/gemini-story-setup-generation";
 import { LocalStorySetupGenerationAdapter } from "../story-setup/local-story-setup-generation";
 
+export type ApiAgentRuntimeInfo = {
+  selection: AgentRuntimeSelection;
+  wallet: "api_key" | "subscription";
+  capabilities: AgentSessionCapabilities | null;
+  // Filled in synchronously here as "not_applicable"/"unchecked"; server.ts
+  // resolves the real value (a live CLI probe) before the router starts
+  // accepting requests, so route handlers always see a checked result.
+  availability: AgentRuntimeAvailability;
+};
+
 // The router needs the concrete emitter, not just the port, because the SSE
 // route subscribes to it.
 export type ApiDependencies = ApplicationDependencies & {
   progressEvents: LocalProgressEvents;
+  agentRuntime: ApiAgentRuntimeInfo;
 };
+
+function createTextVisionGenerationPorts(
+  selection: AgentRuntimeSelection,
+  objectStorage: LocalObjectStorage,
+  env: NodeJS.ProcessEnv,
+): {
+  sceneFillGeneration: SceneFillGenerationPort;
+  complementSceneProposal: ComplementSceneProposalPort;
+  photoAnalysisGeneration: PhotoAnalysisGenerationPort;
+  storySetupGeneration: StorySetupGenerationPort;
+} {
+  if (selection === "codex") {
+    return {
+      sceneFillGeneration: new CodexSceneFillGenerationAdapter(objectStorage),
+      complementSceneProposal: new CodexComplementSceneProposalAdapter(
+        objectStorage,
+      ),
+      photoAnalysisGeneration: new CodexPhotoAnalysisGenerationAdapter(
+        objectStorage,
+      ),
+      storySetupGeneration: new CodexStorySetupGenerationAdapter(),
+    };
+  }
+  if (selection === "claude") {
+    return {
+      sceneFillGeneration: new ClaudeSceneFillGenerationAdapter(objectStorage),
+      complementSceneProposal: new ClaudeComplementSceneProposalAdapter(
+        objectStorage,
+      ),
+      photoAnalysisGeneration: new ClaudePhotoAnalysisGenerationAdapter(
+        objectStorage,
+      ),
+      storySetupGeneration: new ClaudeStorySetupGenerationAdapter(),
+    };
+  }
+
+  const geminiApiKey = env.GEMINI_API_KEY;
+  // Photo-aware AI requires Gemini at runtime; the adapter throws a clear
+  // error if GEMINI_API_KEY is unset. Tests inject mock ports instead.
+  const sceneFillGeneration = new GeminiSceneFillGenerationAdapter(
+    objectStorage,
+    geminiApiKey,
+    env.GEMINI_SCENE_FILL_MODEL ?? DEFAULT_GEMINI_SCENE_FILL_MODEL,
+  );
+  const complementSceneProposal = new GeminiComplementSceneProposalAdapter(
+    objectStorage,
+    geminiApiKey,
+    env.GEMINI_COMPLEMENT_SCENE_MODEL ?? DEFAULT_GEMINI_COMPLEMENT_SCENE_MODEL,
+  );
+  const photoAnalysisGeneration = geminiApiKey
+    ? new GeminiPhotoAnalysisGenerationAdapter(
+        objectStorage,
+        geminiApiKey,
+        env.GEMINI_PHOTO_ANALYSIS_MODEL ?? DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL,
+      )
+    : new LocalPhotoAnalysisGenerationAdapter();
+  // Step 4 falls back to the deterministic template rather than failing, so a
+  // setup without a Gemini key still walks all five steps.
+  const storySetupGeneration = geminiApiKey
+    ? new GeminiStorySetupGenerationAdapter(
+        geminiApiKey,
+        env.GEMINI_STORY_SETUP_MODEL ?? DEFAULT_GEMINI_STORY_SETUP_MODEL,
+      )
+    : new LocalStorySetupGenerationAdapter();
+
+  return {
+    sceneFillGeneration,
+    complementSceneProposal,
+    photoAnalysisGeneration,
+    storySetupGeneration,
+  };
+}
 
 export function createApiContext(
   client: GenStorySqliteClient,
+  env: NodeJS.ProcessEnv = process.env,
 ): ApiDependencies {
   const repos = createSqliteRepositories(client.db);
   const objectStorage = new LocalObjectStorage();
@@ -50,9 +158,9 @@ export function createApiContext(
     stylePresets: repos.stylePresets,
   });
 
-  const openaiApiKey = process.env.OPENAI_API_KEY;
+  const openaiApiKey = env.OPENAI_API_KEY;
   const configuredImageGenerationIntervalMs = Number(
-    process.env.OPENAI_IMAGE_GENERATION_INTERVAL_MS,
+    env.OPENAI_IMAGE_GENERATION_INTERVAL_MS,
   );
   const imageGenerationIntervalMs =
     Number.isFinite(configuredImageGenerationIntervalMs) &&
@@ -64,37 +172,26 @@ export function createApiContext(
         requestIntervalMs: imageGenerationIntervalMs,
       })
     : new MockImageGenerationAdapter(objectStorage);
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  // Photo-aware AI requires Gemini at runtime; the adapter throws a clear
-  // error if GEMINI_API_KEY is unset. Tests inject mock ports instead.
-  const sceneFillGeneration = new GeminiSceneFillGenerationAdapter(
-    objectStorage,
-    geminiApiKey,
-    process.env.GEMINI_SCENE_FILL_MODEL ?? DEFAULT_GEMINI_SCENE_FILL_MODEL,
+
+  // R1.1/R1.2/R2.1: a single env var selects the runtime for every
+  // text/vision capability; unknown values and non-local CLI selection fail
+  // fast here rather than falling back silently.
+  const agentRuntimeSelection = resolveAgentRuntimeSelection(env);
+  assertLocalDeploymentForCliRuntime(
+    agentRuntimeSelection,
+    resolveDeployTarget(env),
   );
-  const complementSceneProposal = new GeminiComplementSceneProposalAdapter(
+
+  const {
+    sceneFillGeneration,
+    complementSceneProposal,
+    photoAnalysisGeneration,
+    storySetupGeneration,
+  } = createTextVisionGenerationPorts(
+    agentRuntimeSelection,
     objectStorage,
-    geminiApiKey,
-    process.env.GEMINI_COMPLEMENT_SCENE_MODEL ??
-      DEFAULT_GEMINI_COMPLEMENT_SCENE_MODEL,
+    env,
   );
-  const photoAnalysisGeneration = geminiApiKey
-    ? new GeminiPhotoAnalysisGenerationAdapter(
-        objectStorage,
-        geminiApiKey,
-        process.env.GEMINI_PHOTO_ANALYSIS_MODEL ??
-          DEFAULT_GEMINI_PHOTO_ANALYSIS_MODEL,
-      )
-    : new LocalPhotoAnalysisGenerationAdapter();
-  // Step 4 falls back to the deterministic template rather than failing, so a
-  // setup without a Gemini key still walks all five steps.
-  const storySetupGeneration = geminiApiKey
-    ? new GeminiStorySetupGenerationAdapter(
-        geminiApiKey,
-        process.env.GEMINI_STORY_SETUP_MODEL ??
-          DEFAULT_GEMINI_STORY_SETUP_MODEL,
-      )
-    : new LocalStorySetupGenerationAdapter();
 
   const progressEvents = new LocalProgressEvents();
 
@@ -110,5 +207,14 @@ export function createApiContext(
     jobQueue: new SqliteJobQueue(repos.aiJobs, progressEvents),
     progressEvents,
     authContext: new LocalAuthContext(repos),
+    agentRuntime: {
+      selection: agentRuntimeSelection,
+      wallet: agentRuntimeWallet(agentRuntimeSelection),
+      capabilities: agentRuntimeCapabilities(agentRuntimeSelection),
+      availability:
+        agentRuntimeSelection === "api"
+          ? { status: "not_applicable" }
+          : { status: "unchecked" },
+    },
   };
 }
