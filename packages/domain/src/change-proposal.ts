@@ -84,6 +84,9 @@ export type CreateChangeProposalItemInput = {
   after: unknown;
   rationale: string;
   baseRevision: SemanticTargetRevision;
+  // Omitted for a newly authored item ("pending"); passed through when
+  // reconstructing an already-decided item read back from storage.
+  approval?: ChangeProposalItemApproval;
 };
 
 export type CreateChangeProposalChoiceOptionInput = {
@@ -108,6 +111,13 @@ export type CreateChangeProposalInput = {
   rationale: string;
   choices?: CreateChangeProposalChoiceInput[];
   clientRequestId: string;
+  // The next five are omitted for a newly authored proposal (defaulting to
+  // "pending"/null) and passed through when reconstructing a proposal read
+  // back from storage, mirroring createStoryboard/createScene's `status`.
+  status?: ChangeProposalStatus;
+  approvedBy?: UserId | null;
+  resolvedAt?: Timestamp | null;
+  applyOutcome?: ChangeProposalApplyOutcome | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -154,9 +164,11 @@ export function createChangeProposal(
         item.baseRevision,
         "Change proposal item base revision",
       ),
-      approval: "pending",
+      approval: item.approval ?? "pending",
     };
   });
+
+  const seenChoiceTargetItemIds = new Set<string>();
 
   const choices: ChangeProposalChoice[] = (input.choices ?? []).map(
     (choice) => {
@@ -165,6 +177,13 @@ export function createChangeProposal(
           `Change proposal choice targets an unknown item: ${choice.targetItemId}`,
         );
       }
+
+      if (seenChoiceTargetItemIds.has(choice.targetItemId)) {
+        throw new Error(
+          `A change proposal item can have at most one choice card: ${choice.targetItemId}`,
+        );
+      }
+      seenChoiceTargetItemIds.add(choice.targetItemId);
 
       if (choice.options.length < 2 || choice.options.length > 3) {
         throw new Error(
@@ -213,14 +232,14 @@ export function createChangeProposal(
     items,
     rationale: trimRequired(input.rationale, "Change proposal rationale"),
     choices,
-    status: "pending",
+    status: input.status ?? "pending",
     clientRequestId: trimRequired(
       input.clientRequestId,
       "Change proposal client request ID",
     ),
-    approvedBy: null,
-    resolvedAt: null,
-    applyOutcome: null,
+    approvedBy: input.approvedBy ?? null,
+    resolvedAt: input.resolvedAt ?? null,
+    applyOutcome: input.applyOutcome ?? null,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };

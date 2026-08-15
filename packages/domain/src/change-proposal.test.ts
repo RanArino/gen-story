@@ -59,6 +59,41 @@ describe("createChangeProposal", () => {
     expect(proposal.choices).toEqual([]);
   });
 
+  it("reconstructs an already-decided proposal without resetting it to pending", () => {
+    const proposal = createChangeProposal(
+      baseInput({
+        status: "applied",
+        approvedBy: "user_1",
+        resolvedAt: "2026-08-15T01:00:00.000Z",
+        applyOutcome: {
+          appliedItemIds: ["item_1"],
+          appliedAt: "2026-08-15T02:00:00.000Z",
+          appliedBy: "user_1",
+        },
+        items: [
+          {
+            id: "item_1",
+            target: storyboardSemanticTarget("storyboard_1", "tone"),
+            before: "",
+            after: "warm nostalgia",
+            rationale: "r",
+            baseRevision: "rev1",
+            approval: "approved",
+          },
+        ],
+      }),
+    );
+
+    expect(proposal.status).toBe("applied");
+    expect(proposal.approvedBy).toBe("user_1");
+    expect(proposal.items[0]?.approval).toBe("approved");
+    expect(proposal.applyOutcome).toEqual({
+      appliedItemIds: ["item_1"],
+      appliedAt: "2026-08-15T02:00:00.000Z",
+      appliedBy: "user_1",
+    });
+  });
+
   it("rejects a proposal with no items", () => {
     expect(() => createChangeProposal(baseInput({ items: [] }))).toThrow(
       /at least one item/,
@@ -144,6 +179,24 @@ describe("createChangeProposal", () => {
         }),
       ),
     ).toThrow(/unknown item/);
+  });
+
+  it("rejects two choice cards for the same item", () => {
+    const twoOptions = [
+      { id: "opt_1", label: "A", value: "a", reason: "r", impact: "i" },
+      { id: "opt_2", label: "B", value: "b", reason: "r", impact: "i" },
+    ];
+
+    expect(() =>
+      createChangeProposal(
+        baseInput({
+          choices: [
+            { targetItemId: "item_1", options: twoOptions },
+            { targetItemId: "item_1", options: twoOptions },
+          ],
+        }),
+      ),
+    ).toThrow(/at most one choice card/);
   });
 
   it("accepts a two-option choice with a pre-selected option", () => {
