@@ -137,6 +137,36 @@ relative local path, so Codex or Claude Code can read the bundle directly.
 The existing JSON export remains a browser download; its destination is set by
 your browser.
 
+## Refining a Project with Codex or Claude Code (MCP)
+
+The API hosts a project-scoped MCP server so an agent can inspect and refine a
+project's creative direction — AI photo analysis, emotion/tone, and style
+preset — without ever touching the database. An agent reads current values,
+records a **change proposal**, and can apply only the items you approved in the
+app. Nothing is written by the act of proposing.
+
+With the API running, attach an external agent to one project:
+
+```sh
+# stdio (Codex, Claude Code)
+pnpm --filter @gen-story/api mcp:stdio -- --project <projectId>
+
+# Streamable HTTP
+# http://localhost:4000/api/mcp/projects/<projectId>
+```
+
+The repository ships the workflow as a skill for both clients:
+`.claude/skills/gen-story-creative-refinement/` and
+`.codex/skills/gen-story-creative-refinement/`.
+
+The MCP surface is a fixed allowlist — read creative direction, list/read
+proposals, propose changes, apply an approved proposal. There is no general
+update tool, no SQL, and no shell access, and an agent cannot approve its own
+proposal: approval is your action in the app. A pending proposal is stored in
+SQLite, so it survives closing the browser and restarting the API. If you edit
+a field after a proposal was made, applying it fails with a visible conflict
+instead of overwriting your edit.
+
 ## Maintenance Scripts
 
 Purge records soft-deleted more than 7 days ago and their associated files:
