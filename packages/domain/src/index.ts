@@ -127,3 +127,26 @@ export {
   semanticTargetKey,
   storyboardSemanticTarget,
 } from "./semantic-target";
+export type {
+  AgentProvider,
+  ChangeProposal,
+  ChangeProposalApplyOutcome,
+  ChangeProposalChoice,
+  ChangeProposalChoiceOption,
+  ChangeProposalId,
+  ChangeProposalItem,
+  ChangeProposalItemApproval,
+  ChangeProposalItemId,
+  ChangeProposalProvenance,
+  ChangeProposalStatus,
+  CreateChangeProposalChoiceInput,
+  CreateChangeProposalChoiceOptionInput,
+  CreateChangeProposalInput,
+  CreateChangeProposalItemInput,
+} from "./change-proposal";
+export {
+  applyChangeProposalItemApproval,
+  approvedChangeProposalItems,
+  createChangeProposal,
+  selectChangeProposalChoiceOption,
+} from "./change-proposal";
