@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 import {
   appendAdjustmentsToCommonPrompt,
+  applyChangeProposalItemApproval,
+  approvedChangeProposalItems,
   assertAdjustmentsValid,
   assertComplementSceneBridge,
   canStartTestGeneration,
@@ -22,24 +24,36 @@ import {
   createAiJob,
   hasBlankSceneFields,
   isBlankSceneField,
+  markChangeProposalApplied,
+  markChangeProposalConflicted,
+  readProjectPhotoAnalysisSemanticTarget,
+  readStoryboardSemanticTarget,
   replaceScenePhotoAssets,
   retryGenerationRequest,
+  reviseChangeProposalItem,
   SCENE_FILL_FIELDS,
+  selectChangeProposalChoiceOption,
   setSceneAdoptedGeneratedImage,
   sortScenesByOrderIndex,
   suggestCharacterPolicy,
   transitionGenerationRequestStatus,
   unconfirmTestGenerationBatch,
   type AiJob,
+  type ChangeProposal,
+  type ChangeProposalItem,
+  type ChangeProposalItemApproval,
   type CharacterPolicy,
+  type EmotionCandidate,
   type GeneratedImage,
   type GenerationRequest,
   type PhotoAsset,
+  type PhotoInsight,
   type PhotoUsage,
   type Project,
   type ProjectPhotoAnalysis,
   type Scene,
   type SceneFillField,
+  type SemanticTargetSnapshot,
   type StoryboardSetupStatus,
   type ScenePhotoAsset,
   type Storyboard,
@@ -1000,6 +1014,314 @@ export async function getProjectPhotoAnalysis(
     );
 
     return success(analysis);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── Change proposal approval and apply ──────────────────────────────────────
+
+async function getChangeProposalOrNotFound(
+  deps: ApplicationDependencies,
+  changeProposalId: string,
+): Promise<ChangeProposal | UseCaseResult<never>> {
+  const proposal = await deps.changeProposals.findById(changeProposalId);
+  if (proposal == null) {
+    return failure("not_found", "Change proposal not found.");
+  }
+  return proposal;
+}
+
+// The operator's identity comes from the authenticated session, never from
+// caller-supplied input. Nothing in this codebase authenticates an agent
+// (Codex/Claude) as an AuthPrincipal, so this is also what keeps an agent
+// from approving, rejecting, or applying its own proposal: it has no session
+// to satisfy this check with.
+async function getApprovingPrincipalOrFailure(
+  deps: ApplicationDependencies,
+): Promise<{ user: { id: string } } | UseCaseResult<never>> {
+  const principal = await deps.authContext.getCurrentPrincipal();
+  if (principal == null) {
+    return failure(
+      "invalid_state",
+      "An authenticated user is required to decide a change proposal.",
+    );
+  }
+  return principal;
+}
+
+async function getSemanticTargetSnapshot(
+  deps: ApplicationDependencies,
+  target: ChangeProposalItem["target"],
+): Promise<SemanticTargetSnapshot | UseCaseResult<never>> {
+  if (target.entityType === "storyboard") {
+    const storyboard = await getStoryboardOrNotFound(deps, target.entityId);
+    if (isFailure(storyboard)) return storyboard;
+    return readStoryboardSemanticTarget(storyboard, target.field);
+  }
+
+  const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+    target.entityId,
+  );
+  if (analysis == null) {
+    return failure("not_found", "Project photo analysis not found.");
+  }
+  return readProjectPhotoAnalysisSemanticTarget(analysis);
+}
+
+export type DecideChangeProposalItemInput = {
+  changeProposalId: string;
+  itemId: string;
+  approval: ChangeProposalItemApproval;
+};
+
+// Item-level approve/reject. Approving every item moves the proposal to
+// "approved", rejecting every item to "rejected", and any other mix to
+// "partially_approved" — the domain layer derives this, so a partial
+// approval is just calling this once per accepted item.
+export async function decideChangeProposalItem(
+  deps: ApplicationDependencies,
+  input: DecideChangeProposalItemInput,
+): Promise<UseCaseResult<ChangeProposal>> {
+  try {
+    const proposal = await getChangeProposalOrNotFound(
+      deps,
+      input.changeProposalId,
+    );
+    if (isFailure(proposal)) return proposal;
+
+    const principal = await getApprovingPrincipalOrFailure(deps);
+    if (isFailure(principal)) return principal;
+
+    const timestamp = now();
+    const decided = applyChangeProposalItemApproval(
+      proposal,
+      input.itemId,
+      input.approval,
+      {
+        approvedBy: principal.user.id,
+        resolvedAt: timestamp,
+        updatedAt: timestamp,
+      },
+    );
+
+    await deps.changeProposals.save(decided);
+    return success(decided);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type SelectChangeProposalChoiceInput = {
+  changeProposalId: string;
+  targetItemId: string;
+  optionId: string;
+};
+
+export async function selectChangeProposalChoice(
+  deps: ApplicationDependencies,
+  input: SelectChangeProposalChoiceInput,
+): Promise<UseCaseResult<ChangeProposal>> {
+  try {
+    const proposal = await getChangeProposalOrNotFound(
+      deps,
+      input.changeProposalId,
+    );
+    if (isFailure(proposal)) return proposal;
+
+    const principal = await getApprovingPrincipalOrFailure(deps);
+    if (isFailure(principal)) return principal;
+
+    const updated = selectChangeProposalChoiceOption(
+      proposal,
+      input.targetItemId,
+      input.optionId,
+      now(),
+    );
+
+    await deps.changeProposals.save(updated);
+    return success(updated);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export type ReviseChangeProposalItemInput = {
+  changeProposalId: string;
+  itemId: string;
+  after: unknown;
+  rationale?: string;
+};
+
+// Rebases one item onto the target's current live value/revision (typically
+// used after a conflicted apply) and resets that item to "pending" so it goes
+// through approval again.
+export async function reviseChangeProposalItemUseCase(
+  deps: ApplicationDependencies,
+  input: ReviseChangeProposalItemInput,
+): Promise<UseCaseResult<ChangeProposal>> {
+  try {
+    const proposal = await getChangeProposalOrNotFound(
+      deps,
+      input.changeProposalId,
+    );
+    if (isFailure(proposal)) return proposal;
+
+    const item = proposal.items.find(
+      (candidate) => candidate.id === input.itemId,
+    );
+    if (item == null) {
+      return failure("not_found", "Change proposal item not found.");
+    }
+
+    const snapshot = await getSemanticTargetSnapshot(deps, item.target);
+    if (isFailure(snapshot)) return snapshot;
+
+    const revised = reviseChangeProposalItem(
+      proposal,
+      input.itemId,
+      {
+        after: input.after,
+        rationale: input.rationale,
+        baseRevision: snapshot.revision,
+      },
+      now(),
+    );
+
+    await deps.changeProposals.save(revised);
+    return success(revised);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// Writes one approved item through the same application use cases (and
+// therefore the same validation) as a direct edit would use. The semantic
+// target dispatch is intentionally narrow to the first slice's three fields.
+async function writeChangeProposalItem(
+  deps: ApplicationDependencies,
+  projectId: string,
+  item: ChangeProposalItem,
+): Promise<UseCaseResult<never> | undefined> {
+  if (item.target.entityType === "storyboard" && item.target.field === "tone") {
+    const result = await upsertStoryboard(deps, {
+      storyboardId: item.target.entityId,
+      projectId,
+      tone: item.after as string,
+    });
+    return result.ok ? undefined : result;
+  }
+
+  if (
+    item.target.entityType === "storyboard" &&
+    item.target.field === "stylePresetId"
+  ) {
+    const result = await upsertStoryboard(deps, {
+      storyboardId: item.target.entityId,
+      projectId,
+      stylePresetId: item.after as string | null,
+    });
+    return result.ok ? undefined : result;
+  }
+
+  const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+    item.target.entityId,
+  );
+  if (analysis == null) {
+    return failure("not_found", "Project photo analysis not found.");
+  }
+
+  const after = item.after as {
+    emotionCandidates: EmotionCandidate[];
+    photoInsights: PhotoInsight[];
+    storySummary: string;
+  };
+  const updated = createProjectPhotoAnalysis({
+    id: analysis.id,
+    projectId: analysis.projectId,
+    emotionCandidates: after.emotionCandidates,
+    photoInsights: after.photoInsights,
+    storySummary: after.storySummary,
+    model: analysis.model,
+    inputsHash: analysis.inputsHash,
+    createdAt: analysis.createdAt,
+    updatedAt: now(),
+  });
+  await deps.projectPhotoAnalyses.save(updated);
+  return undefined;
+}
+
+export type ApplyChangeProposalInput = {
+  changeProposalId: string;
+};
+
+// Accepts only a proposal ID. Re-verifies every approved item's base
+// revision against the target's current live value before writing anything:
+// any stale item marks the whole proposal "conflicted" (preserved, not
+// discarded) instead of applying a partial or stale result. Repeating a
+// successful apply is a no-op that returns the already-applied proposal.
+export async function applyChangeProposal(
+  deps: ApplicationDependencies,
+  input: ApplyChangeProposalInput,
+): Promise<UseCaseResult<ChangeProposal>> {
+  try {
+    const proposal = await getChangeProposalOrNotFound(
+      deps,
+      input.changeProposalId,
+    );
+    if (isFailure(proposal)) return proposal;
+
+    if (proposal.status === "applied") {
+      return success(proposal);
+    }
+
+    const principal = await getApprovingPrincipalOrFailure(deps);
+    if (isFailure(principal)) return principal;
+
+    const approvedItems = approvedChangeProposalItems(proposal);
+    if (approvedItems.length === 0) {
+      return failure(
+        "invalid_state",
+        "Change proposal has no approved items to apply.",
+      );
+    }
+
+    for (const item of approvedItems) {
+      const snapshot = await getSemanticTargetSnapshot(deps, item.target);
+      if (isFailure(snapshot)) return snapshot;
+
+      if (snapshot.revision !== item.baseRevision) {
+        const conflicted = markChangeProposalConflicted(proposal, now());
+        await deps.changeProposals.save(conflicted);
+        return failure(
+          "conflict",
+          `Change proposal item ${item.id} is stale: the target changed after this proposal was created.`,
+        );
+      }
+    }
+
+    for (const item of approvedItems) {
+      const writeFailure = await writeChangeProposalItem(
+        deps,
+        proposal.projectId,
+        item,
+      );
+      if (writeFailure != null) return writeFailure;
+    }
+
+    const timestamp = now();
+    const applied = markChangeProposalApplied(
+      proposal,
+      {
+        appliedItemIds: approvedItems.map((item) => item.id),
+        appliedAt: timestamp,
+        appliedBy: principal.user.id,
+      },
+      timestamp,
+    );
+
+    await deps.changeProposals.save(applied);
+    return success(applied);
   } catch (error) {
     return validationFailure(error);
   }

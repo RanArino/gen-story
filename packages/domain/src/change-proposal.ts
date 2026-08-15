@@ -331,3 +331,79 @@ export function approvedChangeProposalItems(
 ): ChangeProposalItem[] {
   return proposal.items.filter((item) => item.approval === "approved");
 }
+
+// Rebases one item onto the target's current value/revision after a stale
+// (conflicting) apply attempt, and puts that item back to "pending" so it
+// goes through approval again. Does not touch other items' decisions.
+export function reviseChangeProposalItem(
+  proposal: ChangeProposal,
+  itemId: ChangeProposalItemId,
+  revision: {
+    after: unknown;
+    rationale?: string;
+    baseRevision: SemanticTargetRevision;
+  },
+  updatedAt: Timestamp,
+): ChangeProposal {
+  if (proposal.status === "applied") {
+    throw new Error("Cannot revise an item on an already-applied proposal.");
+  }
+
+  if (!proposal.items.some((item) => item.id === itemId)) {
+    throw new Error(`Change proposal item not found: ${itemId}`);
+  }
+
+  const items = proposal.items.map((item) =>
+    item.id === itemId
+      ? {
+          ...item,
+          after: revision.after,
+          rationale: trimRequired(
+            revision.rationale ?? item.rationale,
+            "Change proposal item rationale",
+          ),
+          baseRevision: trimRequired(
+            revision.baseRevision,
+            "Change proposal item base revision",
+          ),
+          approval: "pending" as const,
+        }
+      : item,
+  );
+
+  return {
+    ...proposal,
+    items,
+    status: deriveChangeProposalStatus(items),
+    updatedAt,
+  };
+}
+
+// Set once an apply attempt finds a stale base revision on an approved item.
+// The proposal is preserved (not discarded) so the operator can revise/rebase
+// and try again, per M2's revision-conflict rule.
+export function markChangeProposalConflicted(
+  proposal: ChangeProposal,
+  updatedAt: Timestamp,
+): ChangeProposal {
+  if (proposal.status === "applied") {
+    throw new Error("Cannot conflict an already-applied proposal.");
+  }
+
+  return { ...proposal, status: "conflicted", updatedAt };
+}
+
+// Set once apply has written every approved item through application use
+// cases. Terminal: no further item decisions or revisions are allowed
+// afterward (enforced by applyChangeProposalItemApproval/reviseChangeProposalItem).
+export function markChangeProposalApplied(
+  proposal: ChangeProposal,
+  outcome: ChangeProposalApplyOutcome,
+  updatedAt: Timestamp,
+): ChangeProposal {
+  if (proposal.status === "applied") {
+    return proposal;
+  }
+
+  return { ...proposal, status: "applied", applyOutcome: outcome, updatedAt };
+}

@@ -148,5 +148,8 @@ export {
   applyChangeProposalItemApproval,
   approvedChangeProposalItems,
   createChangeProposal,
+  markChangeProposalApplied,
+  markChangeProposalConflicted,
+  reviseChangeProposalItem,
   selectChangeProposalChoiceOption,
 } from "./change-proposal";

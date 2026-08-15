@@ -4,6 +4,9 @@ import {
   applyChangeProposalItemApproval,
   approvedChangeProposalItems,
   createChangeProposal,
+  markChangeProposalApplied,
+  markChangeProposalConflicted,
+  reviseChangeProposalItem,
   selectChangeProposalChoiceOption,
   type CreateChangeProposalInput,
 } from "./change-proposal";
@@ -408,5 +411,127 @@ describe("selectChangeProposalChoiceOption", () => {
     expect(() =>
       selectChangeProposalChoiceOption(proposal, "item_1", "opt_missing", "t"),
     ).toThrow(/Unknown choice option/);
+  });
+});
+
+describe("reviseChangeProposalItem", () => {
+  it("rebases the item onto a new value/revision and resets it to pending", () => {
+    const decision = { approvedBy: "user_1", resolvedAt: "t", updatedAt: "t" };
+    const approved = applyChangeProposalItemApproval(
+      createChangeProposal(baseInput()),
+      "item_1",
+      "approved",
+      decision,
+    );
+
+    const revised = reviseChangeProposalItem(
+      approved,
+      "item_1",
+      {
+        after: "bright joy",
+        baseRevision: "2026-08-16T00:00:00.000Z",
+      },
+      "2026-08-16T00:00:01.000Z",
+    );
+
+    expect(revised.items[0]).toMatchObject({
+      after: "bright joy",
+      baseRevision: "2026-08-16T00:00:00.000Z",
+      approval: "pending",
+    });
+    expect(revised.status).toBe("pending");
+    expect(revised.updatedAt).toBe("2026-08-16T00:00:01.000Z");
+  });
+
+  it("rejects an unknown item ID", () => {
+    const proposal = createChangeProposal(baseInput());
+
+    expect(() =>
+      reviseChangeProposalItem(
+        proposal,
+        "item_missing",
+        { after: "x", baseRevision: "rev" },
+        "t",
+      ),
+    ).toThrow(/not found/);
+  });
+
+  it("rejects revising an already-applied proposal", () => {
+    const proposal = {
+      ...createChangeProposal(baseInput()),
+      status: "applied" as const,
+    };
+
+    expect(() =>
+      reviseChangeProposalItem(
+        proposal,
+        "item_1",
+        { after: "x", baseRevision: "rev" },
+        "t",
+      ),
+    ).toThrow(/already-applied/);
+  });
+});
+
+describe("markChangeProposalConflicted", () => {
+  it("moves the proposal to conflicted", () => {
+    const proposal = createChangeProposal(baseInput());
+
+    const conflicted = markChangeProposalConflicted(proposal, "t");
+
+    expect(conflicted.status).toBe("conflicted");
+    expect(conflicted.updatedAt).toBe("t");
+  });
+
+  it("rejects conflicting an already-applied proposal", () => {
+    const proposal = {
+      ...createChangeProposal(baseInput()),
+      status: "applied" as const,
+    };
+
+    expect(() => markChangeProposalConflicted(proposal, "t")).toThrow(
+      /already-applied/,
+    );
+  });
+});
+
+describe("markChangeProposalApplied", () => {
+  it("sets status to applied with the given outcome", () => {
+    const proposal = createChangeProposal(baseInput());
+    const outcome = {
+      appliedItemIds: ["item_1"],
+      appliedAt: "2026-08-16T00:00:00.000Z",
+      appliedBy: "user_1",
+    };
+
+    const applied = markChangeProposalApplied(proposal, outcome, "t");
+
+    expect(applied.status).toBe("applied");
+    expect(applied.applyOutcome).toEqual(outcome);
+    expect(applied.updatedAt).toBe("t");
+  });
+
+  it("is idempotent once already applied", () => {
+    const proposal = {
+      ...createChangeProposal(baseInput()),
+      status: "applied" as const,
+      applyOutcome: {
+        appliedItemIds: ["item_1"],
+        appliedAt: "2026-08-15T00:00:00.000Z",
+        appliedBy: "user_1",
+      },
+    };
+
+    const result = markChangeProposalApplied(
+      proposal,
+      {
+        appliedItemIds: ["item_1"],
+        appliedAt: "2026-08-16T00:00:00.000Z",
+        appliedBy: "user_2",
+      },
+      "t2",
+    );
+
+    expect(result).toBe(proposal);
   });
 });
