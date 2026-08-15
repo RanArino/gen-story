@@ -21,6 +21,8 @@ import {
   fillSceneWithAi,
   fillStoryboardScenesWithAi,
   generateStorySetup,
+  generateCharacterReferenceSheet,
+  getCharacterReferenceSheet,
   getProjectPhotoAnalysis,
   getStoryboardSetup,
   getUserPreference,
@@ -666,6 +668,69 @@ export function buildRouter(deps: ApiDependencies): Router {
           await getStoryboardSetup(deps, result.value),
         ),
       );
+    },
+  );
+
+  // POST /api/storyboards/:storyboardId/story-setup
+  router.add(
+    "GET",
+    "/api/storyboards/:storyboardId/character-reference-sheet",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (project?.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+      const result = await getCharacterReferenceSheet(deps, storyboardId);
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+      sendJson(res, 200, { characterReferenceSheet: result.value });
+    },
+  );
+
+  router.add(
+    "POST",
+    "/api/storyboards/:storyboardId/character-reference-sheet",
+    async (_req, res, params) => {
+      const principal = await requirePrincipal(deps, res);
+      if (principal == null) return;
+      const storyboardId = getParam(params, "storyboardId");
+      const storyboard = await deps.storyboards.findById(storyboardId);
+      if (storyboard == null) {
+        sendJson(res, 404, notFoundBody("Storyboard not found."));
+        return;
+      }
+      const project = await deps.projects.findById(storyboard.projectId);
+      if (project?.organizationId !== principal.organization.id) {
+        sendJson(res, 403, forbiddenBody());
+        return;
+      }
+      const result = await generateCharacterReferenceSheet(deps, {
+        storyboardId,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+      sendJson(res, 202, result.value);
     },
   );
 

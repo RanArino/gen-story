@@ -7,6 +7,10 @@ import { LocalProgressEvents } from "../jobs/local-progress-events";
 import { SqliteJobQueue } from "../jobs/sqlite-job-queue";
 import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
 import {
+  MockCharacterSheetGenerationAdapter,
+  OpenAiCharacterSheetGenerationAdapter,
+} from "../generation/character-sheet-generation";
+import {
   DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS,
   OpenAiImageGenerationAdapter,
 } from "../generation/openai-image-generation";
@@ -48,6 +52,7 @@ export function createApiContext(
     objectStorage,
     storyboards: repos.storyboards,
     stylePresets: repos.stylePresets,
+    aiJobs: repos.aiJobs,
   });
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -64,6 +69,9 @@ export function createApiContext(
         requestIntervalMs: imageGenerationIntervalMs,
       })
     : new MockImageGenerationAdapter(objectStorage);
+  const characterSheetGeneration = openaiApiKey
+    ? new OpenAiCharacterSheetGenerationAdapter(objectStorage, openaiApiKey)
+    : new MockCharacterSheetGenerationAdapter(objectStorage);
   const geminiApiKey = process.env.GEMINI_API_KEY;
   // Photo-aware AI requires Gemini at runtime; the adapter throws a clear
   // error if GEMINI_API_KEY is unset. Tests inject mock ports instead.
@@ -103,6 +111,7 @@ export function createApiContext(
     objectStorage,
     imagePreprocessing,
     imageGeneration,
+    characterSheetGeneration,
     sceneFillGeneration,
     complementSceneProposal,
     photoAnalysisGeneration,

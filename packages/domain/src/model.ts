@@ -27,13 +27,14 @@ export type GenerationRequestStatus =
   | "failed"
   | "canceled";
 
-// Background text/vision AI work. Image generation is not an AI job; it keeps
-// its own GenerationRequest lifecycle.
+// Background AI work. Normal scene image generation keeps its own
+// GenerationRequest lifecycle; storyboard-owned character sheets use AiJob.
 export type AiJobKind =
   | "photo_analysis"
   | "story_setup"
   | "scene_ai_fill"
-  | "complement_scene_proposals";
+  | "complement_scene_proposals"
+  | "character_sheet_generation";
 
 export type AiJobStatus =
   | "queued"
@@ -47,6 +48,7 @@ export const AI_JOB_KINDS: AiJobKind[] = [
   "story_setup",
   "scene_ai_fill",
   "complement_scene_proposals",
+  "character_sheet_generation",
 ];
 
 export function isAiJobKind(value: unknown): value is AiJobKind {

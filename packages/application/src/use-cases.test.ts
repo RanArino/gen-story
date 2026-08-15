@@ -77,6 +77,8 @@ import {
   fillSceneWithAi,
   fillStoryboardScenesWithAi,
   generateStorySetup,
+  generateCharacterReferenceSheet,
+  getCharacterReferenceSheet,
   getProjectPhotoAnalysis,
   getUserPreference,
   insertComplementScene,
@@ -91,6 +93,7 @@ import {
   runPhotoAnalysisJob,
   runSceneAiFillJob,
   runStorySetupJob,
+  runCharacterSheetGenerationJob,
   setUserPreference,
   updatePhotoCuration,
   upsertScenes,
@@ -690,6 +693,7 @@ function createDependencies(initial?: {
   progressEvents: InMemoryProgressEventPort;
   objectStorage: InMemoryObjectStoragePort;
   imageGeneration: InMemoryImageGenerationPort;
+  characterSheetGeneration: InMemoryImageGenerationPort;
   sceneFillGeneration: InMemorySceneFillGenerationPort;
   complementSceneProposal: InMemoryComplementSceneProposalPort;
   photoAnalysisGeneration: InMemoryPhotoAnalysisGenerationPort;
@@ -754,6 +758,7 @@ function createDependencies(initial?: {
     objectStorage,
     imagePreprocessing,
     imageGeneration,
+    characterSheetGeneration: imageGeneration,
     sceneFillGeneration,
     complementSceneProposal,
     photoAnalysisGeneration,
@@ -2254,6 +2259,50 @@ describe("application use cases", () => {
     );
     expect(noStyle.ok).toBe(false);
     if (!noStyle.ok) expect(noStyle.error.code).toBe("invalid_state");
+  });
+
+  it("generates and exposes one optional reference sheet for a featured storyboard", async () => {
+    const deps = createStorySetupDeps();
+    await deps.storyboards.save({
+      ...(await deps.storyboards.findById("storyboard_setup"))!,
+      characterPolicy: "featured",
+    });
+
+    const enqueued = await generateCharacterReferenceSheet(deps, {
+      storyboardId: "storyboard_setup",
+    });
+    expect(enqueued.ok).toBe(true);
+    if (!enqueued.ok) throw new Error("expected character sheet job");
+    const job = await deps.aiJobs.findById(enqueued.value.jobId);
+    expect(job?.kind).toBe("character_sheet_generation");
+
+    const generated = await runCharacterSheetGenerationJob(deps, job!);
+    expect(generated.ok).toBe(true);
+    if (!generated.ok) throw new Error("expected generated character sheet");
+    await deps.aiJobs.save({
+      ...job!,
+      status: "succeeded",
+      resultJson: generated.value,
+      completedAt: "2026-08-13T00:00:00.000Z",
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    });
+
+    const sheet = await getCharacterReferenceSheet(deps, "storyboard_setup");
+    expect(sheet).toMatchObject({
+      ok: true,
+      value: { status: "succeeded", storageKey: "generated/image.jpg" },
+    });
+  });
+
+  it("rejects a reference sheet unless the storyboard policy is featured", async () => {
+    const result = await generateCharacterReferenceSheet(
+      createStorySetupDeps(),
+      { storyboardId: "storyboard_setup" },
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "invalid_state" },
+    });
   });
 
   // ── Guided setup: step 5 (scenes) ──────────────────────────────────────────

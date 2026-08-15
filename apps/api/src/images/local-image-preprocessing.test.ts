@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { createGenerationRequestUseCase } from "@gen-story/application";
 import {
   createOrganization,
+  createAiJob,
   createPhotoAsset,
   createProject,
   createScene,
@@ -123,6 +124,26 @@ describe("LocalImagePreprocessingAdapter", () => {
               updatedAt: now,
             }),
           ],
+          aiJobs: [
+            createAiJob({
+              id: "sheet_job_1",
+              projectId: "project_1",
+              kind: "character_sheet_generation",
+              status: "succeeded",
+              inputJson: { storyboardId: "storyboard_1" },
+              resultJson: {
+                storageKey: "data/uploads/generated/character-sheet.png",
+                mimeType: "image/png",
+                size: 42,
+                width: 1536,
+                height: 1024,
+                checksum: "sheet-checksum",
+              },
+              completedAt: now,
+              createdAt: now,
+              updatedAt: now,
+            }),
+          ],
         },
         { objectStorage: storage },
       );
@@ -147,13 +168,18 @@ describe("LocalImagePreprocessingAdapter", () => {
       const normalizedInputImages = generationRequest?.inputJson
         .normalizedInputImages as Array<Record<string, unknown>>;
 
-      expect(normalizedInputImages).toHaveLength(1);
+      expect(normalizedInputImages).toHaveLength(2);
       expect(normalizedInputImages[0]).toMatchObject({
         photoAssetId: "photo_1",
         role: "primary",
         storageKey: aiInputStorageKey,
         mimeType: "image/jpeg",
         preset: "ai-input",
+      });
+      expect(normalizedInputImages[1]).toMatchObject({
+        role: "character_reference",
+        storageKey: "data/uploads/generated/character-sheet.png",
+        preset: "character-reference-sheet",
       });
       expect(JSON.stringify(generationRequest?.inputJson)).not.toContain(
         directory,

@@ -376,6 +376,63 @@ describe("PUT /api/storyboards/:storyboardId", () => {
   });
 });
 
+describe("character reference sheet routes", () => {
+  it("queues and returns the current sheet job for a featured storyboard", async () => {
+    await req(base, "POST", "/api/projects", {
+      projectId: "sheet-project",
+      name: "Character Story",
+    });
+    await req(base, "PUT", "/api/storyboards/sheet-storyboard", {
+      projectId: "sheet-project",
+      characterPolicy: "featured",
+    });
+
+    const queued = await req(
+      base,
+      "POST",
+      "/api/storyboards/sheet-storyboard/character-reference-sheet",
+    );
+    expect(queued.status).toBe(202);
+    expect(queued.body).toMatchObject({
+      storyboardId: "sheet-storyboard",
+      status: "queued",
+    });
+
+    const current = await req(
+      base,
+      "GET",
+      "/api/storyboards/sheet-storyboard/character-reference-sheet",
+    );
+    expect(current.status).toBe(200);
+    expect(current.body).toMatchObject({
+      characterReferenceSheet: {
+        storyboardId: "sheet-storyboard",
+        status: "queued",
+      },
+    });
+  });
+
+  it("rejects generation when the storyboard is not featured", async () => {
+    await req(base, "POST", "/api/projects", {
+      projectId: "sheet-policy-project",
+      name: "Landscape Story",
+    });
+    await req(base, "PUT", "/api/storyboards/sheet-policy-storyboard", {
+      projectId: "sheet-policy-project",
+    });
+
+    const result = await req(
+      base,
+      "POST",
+      "/api/storyboards/sheet-policy-storyboard/character-reference-sheet",
+    );
+    expect(result.status).toBe(422);
+    expect(result.body).toMatchObject({
+      error: { code: "invalid_state" },
+    });
+  });
+});
+
 describe("GET /api/storyboards/:storyboardId/scenes and PUT scenes", () => {
   it("round-trips: PUT storyboard → PUT scenes → GET scenes", async () => {
     const created = await req(base, "POST", "/api/projects", {
