@@ -147,7 +147,9 @@ export type {
 export {
   applyChangeProposalItemApproval,
   approvedChangeProposalItems,
+  CHANGE_PROPOSAL_STATUSES,
   createChangeProposal,
+  isChangeProposalStatus,
   markChangeProposalApplied,
   markChangeProposalConflicted,
   reviseChangeProposalItem,

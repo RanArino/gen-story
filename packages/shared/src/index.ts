@@ -322,3 +322,78 @@ export type ProjectPhotoAnalysisDto = {
   createdAt: string;
   updatedAt: string;
 };
+
+// ── Change proposals (agent propose -> approve -> apply) ────────────────────
+
+export type SemanticTargetDto = {
+  entityType: "project" | "storyboard";
+  entityId: string;
+  field: "photoAnalysis" | "tone" | "stylePresetId";
+};
+
+// The current value of one addressable creative field plus the revision a
+// proposal against it must be based on.
+export type SemanticTargetSnapshotDto = {
+  target: SemanticTargetDto;
+  value: unknown;
+  revision: string;
+};
+
+export type CreativeDirectionDto = {
+  projectId: string;
+  projectName: string;
+  storyboardId: string | null;
+  fields: SemanticTargetSnapshotDto[];
+};
+
+export type ChangeProposalItemDto = {
+  id: string;
+  target: SemanticTargetDto;
+  before: unknown;
+  after: unknown;
+  rationale: string;
+  baseRevision: string;
+  approval: "pending" | "approved" | "rejected";
+};
+
+export type ChangeProposalChoiceOptionDto = {
+  id: string;
+  label: string;
+  value: unknown;
+  reason: string;
+  impact: string;
+};
+
+export type ChangeProposalChoiceDto = {
+  targetItemId: string;
+  options: ChangeProposalChoiceOptionDto[];
+  selectedOptionId: string | null;
+};
+
+export type ChangeProposalDto = {
+  id: string;
+  projectId: string;
+  provider: "codex" | "claude";
+  conversationId: string;
+  turnId: string;
+  rationale: string;
+  status:
+    | "pending"
+    | "partially_approved"
+    | "approved"
+    | "rejected"
+    | "applied"
+    | "conflicted";
+  items: ChangeProposalItemDto[];
+  choices: ChangeProposalChoiceDto[];
+  clientRequestId: string;
+  approvedBy: string | null;
+  resolvedAt: string | null;
+  applyOutcome: {
+    appliedItemIds: string[];
+    appliedAt: string;
+    appliedBy: string;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+};

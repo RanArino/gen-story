@@ -22,6 +22,8 @@ import {
   composeCommonPrompt,
   computeStoryboardSetupStep,
   createAiJob,
+  createChangeProposal,
+  createSemanticTarget,
   hasBlankSceneFields,
   isBlankSceneField,
   markChangeProposalApplied,
@@ -38,11 +40,15 @@ import {
   suggestCharacterPolicy,
   transitionGenerationRequestStatus,
   unconfirmTestGenerationBatch,
+  type AgentProvider,
   type AiJob,
   type ChangeProposal,
   type ChangeProposalItem,
   type ChangeProposalItemApproval,
+  type ChangeProposalStatus,
   type CharacterPolicy,
+  type CreateChangeProposalChoiceInput,
+  type CreateChangeProposalItemInput,
   type EmotionCandidate,
   type GeneratedImage,
   type GenerationRequest,
@@ -53,6 +59,7 @@ import {
   type ProjectPhotoAnalysis,
   type Scene,
   type SceneFillField,
+  type SemanticTarget,
   type SemanticTargetSnapshot,
   type StoryboardSetupStatus,
   type ScenePhotoAsset,
@@ -1019,7 +1026,239 @@ export async function getProjectPhotoAnalysis(
   }
 }
 
+// ── Creative direction reads (M2 first slice) ───────────────────────────────
+
+export type CreativeDirection = {
+  projectId: string;
+  projectName: string;
+  storyboardId: string | null;
+  // Only the first-slice semantic targets that currently exist: photo analysis
+  // (when the project has been analyzed) plus the storyboard's tone and style
+  // preset (when the project has a storyboard).
+  fields: SemanticTargetSnapshot[];
+};
+
+// The read half of the MCP surface: current values plus the revision an agent
+// must quote when proposing a change to them. Deliberately narrow — an agent
+// gets product concepts, never rows.
+export async function getCreativeDirection(
+  deps: ApplicationDependencies,
+  input: { projectId: string },
+): Promise<UseCaseResult<CreativeDirection>> {
+  try {
+    const project = await getProjectOrNotFound(deps, input.projectId);
+    if (isFailure(project)) return project;
+
+    const storyboards = await deps.storyboards.findByProjectId(project.id);
+    const storyboard = storyboards[0] ?? null;
+    const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
+      project.id,
+    );
+
+    const fields: SemanticTargetSnapshot[] = [];
+    if (analysis != null) {
+      fields.push(readProjectPhotoAnalysisSemanticTarget(analysis));
+    }
+    if (storyboard != null) {
+      fields.push(readStoryboardSemanticTarget(storyboard, "tone"));
+      fields.push(readStoryboardSemanticTarget(storyboard, "stylePresetId"));
+    }
+
+    return success({
+      projectId: project.id,
+      projectName: project.name,
+      storyboardId: storyboard?.id ?? null,
+      fields,
+    });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+// ── Change proposal creation ────────────────────────────────────────────────
+
+// Project isolation: a semantic target is only addressable from the project
+// that owns it. Without this an MCP session scoped to project A could name
+// project B's storyboard and propose a change to it.
+async function assertTargetBelongsToProject(
+  deps: ApplicationDependencies,
+  projectId: string,
+  target: SemanticTarget,
+): Promise<UseCaseResult<never> | undefined> {
+  if (target.entityType === "project") {
+    return target.entityId === projectId
+      ? undefined
+      : failure(
+          "not_found",
+          "Semantic target does not belong to this project.",
+        );
+  }
+
+  const storyboard = await getStoryboardOrNotFound(deps, target.entityId);
+  if (isFailure(storyboard)) return storyboard;
+  return storyboard.projectId === projectId
+    ? undefined
+    : failure("not_found", "Semantic target does not belong to this project.");
+}
+
+export type CreateChangeProposalItemDraft = {
+  // Untrusted tuple from an agent; validated into a SemanticTarget here.
+  target: { entityType: string; entityId: string; field: string };
+  after: unknown;
+  rationale: string;
+  // Two or three reasoned alternatives for this item. Selecting one replaces
+  // the item's `after` value; `after` above is the recommended default.
+  choice?: {
+    options: {
+      id: string;
+      label: string;
+      value: unknown;
+      reason: string;
+      impact: string;
+    }[];
+  };
+};
+
+export type CreateChangeProposalInput = {
+  projectId: string;
+  provider: AgentProvider;
+  conversationId: string;
+  turnId: string;
+  rationale: string;
+  clientRequestId: string;
+  items: CreateChangeProposalItemDraft[];
+};
+
+// Records a reviewable before/after diff and changes nothing else: the
+// project's current data is untouched until a human approves items and apply
+// runs. `before` and `baseRevision` are read here from live state rather than
+// accepted from the caller, so an agent cannot backdate a diff or quote a
+// revision it never read.
+export async function createChangeProposalUseCase(
+  deps: ApplicationDependencies,
+  input: CreateChangeProposalInput,
+): Promise<UseCaseResult<ChangeProposal>> {
+  try {
+    const project = await getProjectOrNotFound(deps, input.projectId);
+    if (isFailure(project)) return project;
+
+    // Retrying a creation call with the same client request ID returns the
+    // proposal that already exists instead of duplicating the review unit.
+    const existing = await deps.changeProposals.findByClientRequestId(
+      project.id,
+      input.clientRequestId,
+    );
+    if (existing != null) return success(existing);
+
+    const items: CreateChangeProposalItemInput[] = [];
+    const choices: CreateChangeProposalChoiceInput[] = [];
+
+    for (const draft of input.items) {
+      const target = createSemanticTarget(draft.target);
+
+      const targetFailure = await assertTargetBelongsToProject(
+        deps,
+        project.id,
+        target,
+      );
+      if (targetFailure != null) return targetFailure;
+
+      const snapshot = await getSemanticTargetSnapshot(deps, target);
+      if (isFailure(snapshot)) return snapshot;
+
+      const itemId = randomUUID();
+      items.push({
+        id: itemId,
+        target,
+        before: snapshot.value,
+        after: draft.after,
+        rationale: draft.rationale,
+        baseRevision: snapshot.revision,
+      });
+
+      if (draft.choice != null) {
+        choices.push({ targetItemId: itemId, options: draft.choice.options });
+      }
+    }
+
+    const timestamp = now();
+    const proposal = createChangeProposal({
+      id: randomUUID(),
+      projectId: project.id,
+      provenance: {
+        provider: input.provider,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+      },
+      items,
+      rationale: input.rationale,
+      choices,
+      clientRequestId: input.clientRequestId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    await deps.changeProposals.save(proposal);
+    await publishChangeProposalEvent(deps, "created", proposal);
+
+    return success(proposal);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function getChangeProposal(
+  deps: ApplicationDependencies,
+  input: { changeProposalId: string },
+): Promise<UseCaseResult<ChangeProposal>> {
+  const proposal = await getChangeProposalOrNotFound(
+    deps,
+    input.changeProposalId,
+  );
+  if (isFailure(proposal)) return proposal;
+  return success(proposal);
+}
+
+export async function listChangeProposals(
+  deps: ApplicationDependencies,
+  input: { projectId: string; status?: ChangeProposalStatus },
+): Promise<UseCaseResult<ChangeProposal[]>> {
+  try {
+    const project = await getProjectOrNotFound(deps, input.projectId);
+    if (isFailure(project)) return project;
+
+    return success(
+      await deps.changeProposals.findByProjectId(project.id, input.status),
+    );
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
 // ── Change proposal approval and apply ──────────────────────────────────────
+
+// The proposal lifecycle an operator (and M3's UI) watches: created, resolved
+// by a human decision, applied, or conflicted by a stale base revision. Routed
+// through the project entity so it reaches that project's event subscribers.
+async function publishChangeProposalEvent(
+  deps: ApplicationDependencies,
+  event: "created" | "resolved" | "revised" | "applied" | "conflicted",
+  proposal: ChangeProposal,
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  await deps.progressEvents.publish({
+    kind: `change_proposal.${event}`,
+    entityType: "project",
+    entityId: proposal.projectId,
+    payload: {
+      changeProposalId: proposal.id,
+      projectId: proposal.projectId,
+      status: proposal.status,
+      provider: proposal.provenance.provider,
+      ...extra,
+    },
+  });
+}
 
 async function getChangeProposalOrNotFound(
   deps: ApplicationDependencies,
@@ -1106,6 +1345,10 @@ export async function decideChangeProposalItem(
     );
 
     await deps.changeProposals.save(decided);
+    await publishChangeProposalEvent(deps, "resolved", decided, {
+      itemId: input.itemId,
+      approval: input.approval,
+    });
     return success(decided);
   } catch (error) {
     return validationFailure(error);
@@ -1189,6 +1432,9 @@ export async function reviseChangeProposalItemUseCase(
     );
 
     await deps.changeProposals.save(revised);
+    await publishChangeProposalEvent(deps, "revised", revised, {
+      itemId: input.itemId,
+    });
     return success(revised);
   } catch (error) {
     return validationFailure(error);
@@ -1293,6 +1539,9 @@ export async function applyChangeProposal(
       if (snapshot.revision !== item.baseRevision) {
         const conflicted = markChangeProposalConflicted(proposal, now());
         await deps.changeProposals.save(conflicted);
+        await publishChangeProposalEvent(deps, "conflicted", conflicted, {
+          itemId: item.id,
+        });
         return failure(
           "conflict",
           `Change proposal item ${item.id} is stale: the target changed after this proposal was created.`,
@@ -1321,6 +1570,9 @@ export async function applyChangeProposal(
     );
 
     await deps.changeProposals.save(applied);
+    await publishChangeProposalEvent(deps, "applied", applied, {
+      appliedItemIds: approvedItems.map((item) => item.id),
+    });
     return success(applied);
   } catch (error) {
     return validationFailure(error);

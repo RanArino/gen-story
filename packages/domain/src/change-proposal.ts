@@ -18,6 +18,24 @@ export type ChangeProposalStatus =
   | "applied"
   | "conflicted";
 
+export const CHANGE_PROPOSAL_STATUSES: ChangeProposalStatus[] = [
+  "pending",
+  "partially_approved",
+  "approved",
+  "rejected",
+  "applied",
+  "conflicted",
+];
+
+export function isChangeProposalStatus(
+  value: unknown,
+): value is ChangeProposalStatus {
+  return (
+    typeof value === "string" &&
+    (CHANGE_PROPOSAL_STATUSES as string[]).includes(value)
+  );
+}
+
 export type ChangeProposalItemApproval = "pending" | "approved" | "rejected";
 
 export type ChangeProposalProvenance = {
