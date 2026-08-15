@@ -404,6 +404,30 @@ export const changeProposalChoices = sqliteTable(
   ],
 );
 
+// Every MCP tool call an agent makes against a project, successful or not.
+// Written by the MCP layer itself (not by a use case) so a rejected or
+// unauthorized call is recorded too, which is the point of the audit.
+export const mcpToolCallAudits = sqliteTable(
+  "mcp_tool_call_audits",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    transport: text("transport").notNull(),
+    toolName: text("tool_name").notNull(),
+    argumentsJson: text("arguments_json").notNull(),
+    outcome: text("outcome").notNull(),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    changeProposalId: text("change_proposal_id"),
+    durationMs: integer("duration_ms").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("mcp_tool_call_audits_project_id_idx").on(table.projectId),
+    index("mcp_tool_call_audits_created_at_idx").on(table.createdAt),
+  ],
+);
+
 export const testGenerationBatches = sqliteTable(
   "test_generation_batches",
   {

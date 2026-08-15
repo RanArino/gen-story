@@ -80,6 +80,13 @@ import type {
 } from "@gen-story/application";
 import { isLanguage } from "@gen-story/application";
 
+import type {
+  McpToolCallAuditEntry,
+  McpToolCallAuditPort,
+  McpTransportKind,
+  StoredMcpToolCallAudit,
+} from "../mcp/tool-call-audit";
+import { toStoredMcpToolCallAudit } from "../mcp/tool-call-audit";
 import type { GenStoryDatabase } from "./client";
 import {
   aiJobs,
@@ -88,6 +95,7 @@ import {
   changeProposals,
   generatedImages,
   generationRequests,
+  mcpToolCallAudits,
   organizations,
   photoAssets,
   projectPhotoAnalyses,
@@ -1849,6 +1857,50 @@ export class SqliteUserPreferenceRepository implements UserPreferenceRepositoryP
   }
 }
 
+export class SqliteMcpToolCallAuditRepository implements McpToolCallAuditPort {
+  constructor(private readonly db: GenStoryDatabase) {}
+
+  async record(entry: McpToolCallAuditEntry): Promise<void> {
+    const stored = toStoredMcpToolCallAudit(entry);
+
+    await this.db.insert(mcpToolCallAudits).values({
+      id: stored.id,
+      projectId: stored.projectId,
+      transport: stored.transport,
+      toolName: stored.toolName,
+      argumentsJson: JSON.stringify(stored.arguments ?? null),
+      outcome: stored.outcome,
+      errorCode: stored.errorCode,
+      errorMessage: stored.errorMessage,
+      changeProposalId: stored.changeProposalId,
+      durationMs: stored.durationMs,
+      createdAt: stored.createdAt,
+    });
+  }
+
+  async listByProjectId(projectId: string): Promise<StoredMcpToolCallAudit[]> {
+    const rows = await this.db
+      .select()
+      .from(mcpToolCallAudits)
+      .where(eq(mcpToolCallAudits.projectId, projectId))
+      .orderBy(asc(mcpToolCallAudits.createdAt), asc(mcpToolCallAudits.id));
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.projectId,
+      transport: row.transport as McpTransportKind,
+      toolName: row.toolName,
+      arguments: JSON.parse(row.argumentsJson) as unknown,
+      outcome: row.outcome as StoredMcpToolCallAudit["outcome"],
+      errorCode: row.errorCode,
+      errorMessage: row.errorMessage,
+      changeProposalId: row.changeProposalId,
+      durationMs: row.durationMs,
+      createdAt: row.createdAt,
+    }));
+  }
+}
+
 export function createSqliteRepositories(db: GenStoryDatabase) {
   return {
     users: new SqliteUserRepository(db),
@@ -1865,5 +1917,6 @@ export function createSqliteRepositories(db: GenStoryDatabase) {
     changeProposals: new SqliteChangeProposalRepository(db),
     testGenerationBatches: new SqliteTestGenerationBatchRepository(db),
     userPreferences: new SqliteUserPreferenceRepository(db),
+    mcpToolCallAudits: new SqliteMcpToolCallAuditRepository(db),
   };
 }
