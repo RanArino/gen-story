@@ -259,6 +259,21 @@ export type GeneratedImageDto = {
   updatedAt: string;
 };
 
+export type CharacterReferenceSheetDto = {
+  jobId: string;
+  storyboardId: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "canceled";
+  storageKey: string | null;
+  mimeType: string | null;
+  size: number | null;
+  width: number | null;
+  height: number | null;
+  checksum: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TestGenerationBatchDto = {
   id: string;
   storyboardId: string;

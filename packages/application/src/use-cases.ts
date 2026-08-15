@@ -1409,6 +1409,134 @@ export async function runStorySetupJob(
   }
 }
 
+export type CharacterReferenceSheet = {
+  jobId: string;
+  storyboardId: string;
+  status: AiJob["status"];
+  storageKey: string | null;
+  mimeType: string | null;
+  size: number | null;
+  width: number | null;
+  height: number | null;
+  checksum: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function toCharacterReferenceSheet(job: AiJob): CharacterReferenceSheet {
+  const result = job.resultJson ?? {};
+  return {
+    jobId: job.id,
+    storyboardId: String(job.inputJson.storyboardId ?? ""),
+    status: job.status,
+    storageKey:
+      typeof result.storageKey === "string" ? result.storageKey : null,
+    mimeType: typeof result.mimeType === "string" ? result.mimeType : null,
+    size: typeof result.size === "number" ? result.size : null,
+    width: typeof result.width === "number" ? result.width : null,
+    height: typeof result.height === "number" ? result.height : null,
+    checksum: typeof result.checksum === "string" ? result.checksum : null,
+    errorMessage: job.errorMessage,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  };
+}
+
+export async function getCharacterReferenceSheet(
+  deps: ApplicationDependencies,
+  storyboardId: string,
+): Promise<UseCaseResult<CharacterReferenceSheet | null>> {
+  const storyboard = await getStoryboardOrNotFound(deps, storyboardId);
+  if (isFailure(storyboard)) return storyboard;
+  const jobs = await deps.aiJobs.findByProjectId(storyboard.projectId);
+  const job = jobs
+    .filter(
+      (candidate) =>
+        candidate.kind === "character_sheet_generation" &&
+        candidate.inputJson.storyboardId === storyboardId,
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return success(job ? toCharacterReferenceSheet(job) : null);
+}
+
+export async function generateCharacterReferenceSheet(
+  deps: ApplicationDependencies,
+  input: { storyboardId: string },
+): Promise<UseCaseResult<CharacterReferenceSheet>> {
+  try {
+    const storyboard = await getStoryboardOrNotFound(deps, input.storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+    if (storyboard.characterPolicy !== "featured") {
+      return failure(
+        "invalid_state",
+        "Character reference sheets require the featured character policy.",
+      );
+    }
+    const current = await getCharacterReferenceSheet(deps, storyboard.id);
+    if (isFailure(current)) return current;
+    if (
+      current.value?.status === "queued" ||
+      current.value?.status === "running"
+    ) {
+      return failure(
+        "conflict",
+        "A character reference sheet is already being generated.",
+      );
+    }
+    const { jobId } = await deps.jobQueue.enqueue({
+      kind: "character_sheet_generation",
+      projectId: storyboard.projectId,
+      payload: { storyboardId: storyboard.id },
+    });
+    const job = await deps.aiJobs.findById(jobId);
+    if (job == null)
+      return failure("not_found", "Character reference sheet job not found.");
+    return success(toCharacterReferenceSheet(job));
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function runCharacterSheetGenerationJob(
+  deps: ApplicationDependencies,
+  job: AiJob,
+): Promise<UseCaseResult<Record<string, unknown>>> {
+  try {
+    const storyboardId = readStringPayload(job.inputJson, "storyboardId");
+    if (storyboardId == null) {
+      return failure("validation_error", "AI job is missing a storyboard ID.");
+    }
+    const storyboard = await getStoryboardOrNotFound(deps, storyboardId);
+    if (isFailure(storyboard)) return storyboard;
+    if (storyboard.characterPolicy !== "featured") {
+      return failure(
+        "invalid_state",
+        "Character policy is no longer featured.",
+      );
+    }
+    const prompt = [
+      "Create one clean animation character model sheet for a single recurring character.",
+      "Show the exact same person in front view, side profile, three-quarter view, full body, and two facial expressions.",
+      "Keep face, hair, clothing, colors, proportions, and accessories identical in every panel.",
+      "Use a plain neutral background with no labels, no story scene, and no additional characters.",
+      storyboard.story,
+      storyboard.commonPrompt,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const generated = await deps.characterSheetGeneration.generate({
+      jobId: job.id,
+      projectId: storyboard.projectId,
+      storyboardId,
+      prompt,
+    });
+    return success({ storyboardId, ...generated });
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
 // ── Complement Scenes ────────────────────────────────────────────────────────
 
 export type InsertComplementSceneInput = {

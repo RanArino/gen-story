@@ -179,6 +179,22 @@ export interface ImageGenerationPort {
   }>;
 }
 
+export interface CharacterSheetGenerationPort {
+  generate(input: {
+    jobId: string;
+    projectId: string;
+    storyboardId: string;
+    prompt: string;
+  }): Promise<{
+    storageKey: string;
+    mimeType: string;
+    size: number;
+    width: number | null;
+    height: number | null;
+    checksum: string;
+  }>;
+}
+
 export type SceneFillSuggestion = {
   title: string;
   description: string;
@@ -325,6 +341,7 @@ export interface ApplicationDependencies {
   objectStorage: ObjectStoragePort;
   imagePreprocessing: ImagePreprocessingPort;
   imageGeneration: ImageGenerationPort;
+  characterSheetGeneration: CharacterSheetGenerationPort;
   sceneFillGeneration: SceneFillGenerationPort;
   complementSceneProposal: ComplementSceneProposalPort;
   photoAnalysisGeneration: PhotoAnalysisGenerationPort;
