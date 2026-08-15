@@ -6,6 +6,7 @@ import {
   assignPhotosToScene,
   analyzeProjectPhotos,
   applyAdjustmentToTestVariant,
+  applyChangeProposal,
   cancelAiJob,
   cancelGenerationRequest,
   confirmTestGeneration,
@@ -13,6 +14,7 @@ import {
   createCustomStyle,
   createProjectUseCase,
   createTemplateScenesFromPhotos,
+  decideChangeProposalItem,
   deletePhotoAsset,
   deleteProject,
   deleteScene,
@@ -23,10 +25,13 @@ import {
   generateStorySetup,
   generateCharacterReferenceSheet,
   getCharacterReferenceSheet,
+  getChangeProposal,
+  getCreativeDirection,
   getProjectPhotoAnalysis,
   getStoryboardSetup,
   getUserPreference,
   insertComplementScene,
+  listChangeProposals,
   listTestGenerationBatches,
   markGeneratedImageAdopted,
   proposeComplementScenes,
@@ -36,6 +41,8 @@ import {
   restorePhotoAsset,
   restoreProject,
   retryFailedGenerationRequest,
+  reviseChangeProposalItemUseCase,
+  selectChangeProposalChoice,
   setUserPreference,
   updatePhotoCuration,
   upsertScenes,
@@ -44,8 +51,11 @@ import {
   type AuthPrincipal,
 } from "@gen-story/application";
 import { isLanguage as isLanguageValue } from "@gen-story/application";
-import type { AiJob } from "@gen-story/domain";
-import { isVisibleInSceneHistory } from "@gen-story/domain";
+import type { AiJob, ChangeProposal, Project } from "@gen-story/domain";
+import {
+  isChangeProposalStatus,
+  isVisibleInSceneHistory,
+} from "@gen-story/domain";
 import {
   getLocalizedLabels,
   isTestAdjustmentId,
@@ -56,10 +66,16 @@ import {
 import type { ApiDependencies } from "../app/create-api-context";
 import { exportStoryboardAssetBundle } from "../exports/local-storyboard-asset-export";
 import { composeScenePrompt } from "../generation/compose-scene-prompt";
+import {
+  handleProjectMcpHttpRequest,
+  resolveMcpProvider,
+} from "../mcp/http-transport";
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
   toAiJobDto,
   toAiRuntimeInfoDto,
+  toChangeProposalDto,
+  toCreativeDirectionDto,
   toGeneratedImageDto,
   toGenerationRequestDto,
   toGenerationRequestWithSceneTitleDto,
@@ -97,11 +113,14 @@ import {
   ReorderScenesSchema,
   CreateProjectSchema,
   CreateTemplateScenesSchema,
+  DecideChangeProposalItemSchema,
   FillSceneWithAiSchema,
   FillStoryboardScenesWithAiSchema,
   GenerateStorySetupSchema,
   PatchPhotoAssetSchema,
   PreviewScenePromptSchema,
+  ReviseChangeProposalItemSchema,
+  SelectChangeProposalChoiceSchema,
   SetUserPreferenceSchema,
   UploadPhotoAssetSchema,
   UpsertScenesSchema,
@@ -147,6 +166,70 @@ async function requireOwnedAiJob(
   }
 
   return job;
+}
+
+// Resolve a project and confirm it belongs to the caller's organization.
+// Every project-scoped change-proposal and MCP route funnels through this, so
+// one organization can never reach another's proposals or MCP session.
+async function requireOwnedProject(
+  deps: ApiDependencies,
+  res: ServerResponse,
+  projectId: string,
+): Promise<Project | null> {
+  const principal = await requirePrincipal(deps, res);
+  if (principal == null) return null;
+
+  const project = await deps.projects.findById(projectId);
+  if (project == null) {
+    sendJson(res, 404, notFoundBody("Project not found."));
+    return null;
+  }
+
+  if (project.organizationId !== principal.organization.id) {
+    sendJson(res, 403, forbiddenBody());
+    return null;
+  }
+
+  return project;
+}
+
+async function requireOwnedChangeProposal(
+  deps: ApiDependencies,
+  res: ServerResponse,
+  changeProposalId: string,
+): Promise<ChangeProposal | null> {
+  const result = await getChangeProposal(deps, { changeProposalId });
+  if (!result.ok) {
+    sendJson(
+      res,
+      useCaseErrorToStatus(result.error.code),
+      errorBody(result.error.code, result.error.message),
+    );
+    return null;
+  }
+
+  const project = await requireOwnedProject(deps, res, result.value.projectId);
+  if (project == null) return null;
+
+  return result.value;
+}
+
+// Body reading shared by the change-proposal decision endpoints; responds with
+// the same 400 the other POST handlers use when the body is not JSON.
+async function readBodyOrRespond(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<{ body: unknown } | null> {
+  try {
+    return { body: await readJsonBody(req) };
+  } catch (err) {
+    sendJson(
+      res,
+      400,
+      badRequestBody(err instanceof Error ? err.message : "Bad request."),
+    );
+    return null;
+  }
 }
 
 // The ids of the samples a storyboard's operator picked, one per completed
@@ -2471,6 +2554,270 @@ export function buildRouter(deps: ApiDependencies): Router {
 
     sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
   });
+
+  // ── Creative direction and change proposals ───────────────────────────────
+
+  // GET /api/projects/:projectId/creative-direction
+  router.add(
+    "GET",
+    "/api/projects/:projectId/creative-direction",
+    async (_req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
+
+      const result = await getCreativeDirection(deps, { projectId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toCreativeDirectionDto(result.value));
+    },
+  );
+
+  // GET /api/projects/:projectId/change-proposals?status=pending
+  router.add(
+    "GET",
+    "/api/projects/:projectId/change-proposals",
+    async (req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const status = url.searchParams.get("status");
+      if (status != null && !isChangeProposalStatus(status)) {
+        sendJson(res, 422, errorBody("validation_error", "Unknown status."));
+        return;
+      }
+
+      const result = await listChangeProposals(deps, {
+        projectId,
+        status: status ?? undefined,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, {
+        changeProposals: result.value.map(toChangeProposalDto),
+      });
+    },
+  );
+
+  // GET /api/change-proposals/:changeProposalId
+  router.add(
+    "GET",
+    "/api/change-proposals/:changeProposalId",
+    async (_req, res, params) => {
+      const proposal = await requireOwnedChangeProposal(
+        deps,
+        res,
+        getParam(params, "changeProposalId"),
+      );
+      if (proposal == null) return;
+
+      sendJson(res, 200, toChangeProposalDto(proposal));
+    },
+  );
+
+  // POST /api/change-proposals/:changeProposalId/items/:itemId/decision
+  router.add(
+    "POST",
+    "/api/change-proposals/:changeProposalId/items/:itemId/decision",
+    async (req, res, params) => {
+      const changeProposalId = getParam(params, "changeProposalId");
+      const proposal = await requireOwnedChangeProposal(
+        deps,
+        res,
+        changeProposalId,
+      );
+      if (proposal == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const parsed = DecideChangeProposalItemSchema.safeParse(body.body);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await decideChangeProposalItem(deps, {
+        changeProposalId,
+        itemId: getParam(params, "itemId"),
+        approval: parsed.data.approval,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toChangeProposalDto(result.value));
+    },
+  );
+
+  // POST /api/change-proposals/:changeProposalId/items/:itemId/choice
+  router.add(
+    "POST",
+    "/api/change-proposals/:changeProposalId/items/:itemId/choice",
+    async (req, res, params) => {
+      const changeProposalId = getParam(params, "changeProposalId");
+      const proposal = await requireOwnedChangeProposal(
+        deps,
+        res,
+        changeProposalId,
+      );
+      if (proposal == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const parsed = SelectChangeProposalChoiceSchema.safeParse(body.body);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await selectChangeProposalChoice(deps, {
+        changeProposalId,
+        targetItemId: getParam(params, "itemId"),
+        optionId: parsed.data.optionId,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toChangeProposalDto(result.value));
+    },
+  );
+
+  // POST /api/change-proposals/:changeProposalId/items/:itemId/revision
+  router.add(
+    "POST",
+    "/api/change-proposals/:changeProposalId/items/:itemId/revision",
+    async (req, res, params) => {
+      const changeProposalId = getParam(params, "changeProposalId");
+      const proposal = await requireOwnedChangeProposal(
+        deps,
+        res,
+        changeProposalId,
+      );
+      if (proposal == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const parsed = ReviseChangeProposalItemSchema.safeParse(body.body);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await reviseChangeProposalItemUseCase(deps, {
+        changeProposalId,
+        itemId: getParam(params, "itemId"),
+        after: parsed.data.after,
+        rationale: parsed.data.rationale,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toChangeProposalDto(result.value));
+    },
+  );
+
+  // POST /api/change-proposals/:changeProposalId/apply
+  router.add(
+    "POST",
+    "/api/change-proposals/:changeProposalId/apply",
+    async (_req, res, params) => {
+      const changeProposalId = getParam(params, "changeProposalId");
+      const proposal = await requireOwnedChangeProposal(
+        deps,
+        res,
+        changeProposalId,
+      );
+      if (proposal == null) return;
+
+      const result = await applyChangeProposal(deps, { changeProposalId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toChangeProposalDto(result.value));
+    },
+  );
+
+  // POST /api/mcp/projects/:projectId — the embedded client's MCP transport.
+  // The external CLI transport (`pnpm --filter @gen-story/api mcp:stdio`)
+  // serves the identical tool registry over stdio.
+  router.add(
+    "POST",
+    "/api/mcp/projects/:projectId",
+    async (req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      await handleProjectMcpHttpRequest({
+        deps,
+        projectId,
+        provider: resolveMcpProvider(url.searchParams.get("provider"), deps),
+        req,
+        res,
+        body: body.body,
+      });
+    },
+  );
+
+  // The transport is stateless, so there is no session to resume or delete.
+  for (const method of ["GET", "DELETE"] as const) {
+    router.add(method, "/api/mcp/projects/:projectId", async (_req, res) => {
+      sendJson(
+        res,
+        405,
+        errorBody(
+          "method_not_allowed",
+          "The Gen Story MCP endpoint accepts POST only.",
+        ),
+      );
+    });
+  }
 
   router.add("GET", "/files/*", async (_req, res, params) => {
     const tail = getParam(params, "*");

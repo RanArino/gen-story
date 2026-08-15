@@ -150,3 +150,19 @@ export const CreateCustomStyleSchema = z.object({
 export const SetUserPreferenceSchema = z.object({
   language: z.enum(["en", "ja"]),
 });
+
+// Item-level approval is a first-party operator action; an agent has no
+// session and therefore cannot reach these endpoints. "pending" is not
+// offered here — undoing a decision is a revise, not a decision.
+export const DecideChangeProposalItemSchema = z.object({
+  approval: z.enum(["approved", "rejected"]),
+});
+
+export const SelectChangeProposalChoiceSchema = z.object({
+  optionId: z.string().min(1),
+});
+
+export const ReviseChangeProposalItemSchema = z.object({
+  after: z.unknown(),
+  rationale: z.string().min(1).optional(),
+});
