@@ -185,17 +185,11 @@ export function createApiContext(
   assertLocalDeploymentForCliRuntime(
     agentRuntimeSelection,
     resolveDeployTarget(env),
+  );
+
   const characterSheetGeneration = openaiApiKey
     ? new OpenAiCharacterSheetGenerationAdapter(objectStorage, openaiApiKey)
     : new MockCharacterSheetGenerationAdapter(objectStorage);
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  // Photo-aware AI requires Gemini at runtime; the adapter throws a clear
-  // error if GEMINI_API_KEY is unset. Tests inject mock ports instead.
-  const sceneFillGeneration = new GeminiSceneFillGenerationAdapter(
-    objectStorage,
-    geminiApiKey,
-    process.env.GEMINI_SCENE_FILL_MODEL ?? DEFAULT_GEMINI_SCENE_FILL_MODEL,
-  );
 
   const {
     sceneFillGeneration,
