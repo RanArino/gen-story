@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "mcp:stdio": "tsx src/mcp/stdio-server.ts",
     "db:generate": "cd ../.. && drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx ../../scripts/seed.ts",
@@ -20,6 +21,7 @@
     "@gen-story/domain": "workspace:*",
     "@gen-story/shared": "workspace:*",
     "@google/genai": "^2.2.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^12.9.0",
     "drizzle-orm": "^0.45.2",
     "file-type": "^22.0.1",

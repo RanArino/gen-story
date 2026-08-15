@@ -33,6 +33,7 @@ import {
   OpenAiImageGenerationAdapter,
 } from "../generation/openai-image-generation";
 import { LocalImagePreprocessingAdapter } from "../images/local-image-preprocessing";
+import type { McpToolCallAuditPort } from "../mcp/tool-call-audit";
 import { ClaudePhotoAnalysisGenerationAdapter } from "../photo-analysis/claude-photo-analysis-generation";
 import { CodexPhotoAnalysisGenerationAdapter } from "../photo-analysis/codex-photo-analysis-generation";
 import {
@@ -74,6 +75,9 @@ export type ApiAgentRuntimeInfo = {
 export type ApiDependencies = ApplicationDependencies & {
   progressEvents: LocalProgressEvents;
   agentRuntime: ApiAgentRuntimeInfo;
+  // MCP tool-call audit. Not an application port: the MCP layer records calls
+  // the application layer never sees, including rejected ones.
+  mcpToolCallAudits: McpToolCallAuditPort;
 };
 
 function createTextVisionGenerationPorts(
