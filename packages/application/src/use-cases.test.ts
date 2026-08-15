@@ -14,6 +14,8 @@ import {
   createStylePreset,
   createTestGenerationBatch,
   createUser,
+  type ChangeProposal,
+  type ChangeProposalStatus,
   type TestAdjustmentId,
   type AiJob,
   type AiJobKind,
@@ -34,6 +36,7 @@ import {
 import type {
   AiJobRepositoryPort,
   ApplicationDependencies,
+  ChangeProposalRepositoryPort,
   ComplementSceneProposal,
   ComplementSceneProposalInput,
   ComplementSceneProposalPort,
@@ -371,6 +374,47 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
   }
 }
 
+class InMemoryChangeProposalRepository implements ChangeProposalRepositoryPort {
+  constructor(private readonly store: MemoryStore<ChangeProposal>) {}
+
+  async findById(changeProposalId: string): Promise<ChangeProposal | null> {
+    return this.store.findById(changeProposalId);
+  }
+
+  async findByClientRequestId(
+    projectId: string,
+    clientRequestId: string,
+  ): Promise<ChangeProposal | null> {
+    return (
+      this.store
+        .values()
+        .find(
+          (proposal) =>
+            proposal.projectId === projectId &&
+            proposal.clientRequestId === clientRequestId,
+        ) ?? null
+    );
+  }
+
+  async findByProjectId(
+    projectId: string,
+    status?: ChangeProposalStatus,
+  ): Promise<ChangeProposal[]> {
+    return this.store
+      .values()
+      .filter(
+        (proposal) =>
+          proposal.projectId === projectId &&
+          (status == null || proposal.status === status),
+      )
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async save(changeProposal: ChangeProposal): Promise<void> {
+    await this.store.save(changeProposal);
+  }
+}
+
 class InMemoryUserPreferenceRepository implements UserPreferenceRepositoryPort {
   private readonly items = new Map<string, UserPreference>();
 
@@ -671,6 +715,7 @@ function createDependencies(initial?: {
   generationRequests?: GenerationRequest[];
   generatedImages?: GeneratedImage[];
   projectPhotoAnalyses?: ProjectPhotoAnalysis[];
+  changeProposals?: ChangeProposal[];
   testGenerationBatches?: TestGenerationBatch[];
   aiJobs?: AiJob[];
 }): ApplicationDependencies & {
@@ -685,6 +730,7 @@ function createDependencies(initial?: {
     generationRequests: MemoryStore<GenerationRequest>;
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
+    changeProposals: MemoryStore<ChangeProposal>;
     testGenerationBatches: MemoryStore<TestGenerationBatch>;
     aiJobs: MemoryStore<AiJob>;
   };
@@ -716,6 +762,9 @@ function createDependencies(initial?: {
     ),
     projectPhotoAnalyses: new MemoryStore<ProjectPhotoAnalysis>(
       initial?.projectPhotoAnalyses ?? [],
+    ),
+    changeProposals: new MemoryStore<ChangeProposal>(
+      initial?.changeProposals ?? [],
     ),
     testGenerationBatches: new MemoryStore<TestGenerationBatch>(
       initial?.testGenerationBatches ?? [],
@@ -750,6 +799,9 @@ function createDependencies(initial?: {
     aiJobs: new InMemoryAiJobRepository(stores.aiJobs),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
+    ),
+    changeProposals: new InMemoryChangeProposalRepository(
+      stores.changeProposals,
     ),
     testGenerationBatches: new InMemoryTestGenerationBatchRepository(
       stores.testGenerationBatches,

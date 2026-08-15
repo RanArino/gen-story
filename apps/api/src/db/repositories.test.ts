@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createAiJob,
+  createChangeProposal,
   createGeneratedImage,
   createGenerationRequest,
   createOrganization,
@@ -17,6 +18,7 @@ import {
   createStoryboard,
   createStylePreset,
   createUser,
+  storyboardSemanticTarget,
   type ScenePhotoAsset,
 } from "@gen-story/domain";
 
@@ -265,6 +267,93 @@ describe("SQLite persistence", () => {
       expect(defaultScene?.photoFidelity).toBe("off");
       expect(highScene?.photoFidelity).toBe("high");
     });
+  });
+
+  it("round-trips a change proposal with items and a choice card", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(buildStoryboard());
+      const proposal = buildChangeProposal();
+
+      await repositories.changeProposals.save(proposal);
+
+      await expect(
+        repositories.changeProposals.findById(proposal.id),
+      ).resolves.toEqual(proposal);
+      await expect(
+        repositories.changeProposals.findByClientRequestId(
+          "project_1",
+          proposal.clientRequestId,
+        ),
+      ).resolves.toEqual(proposal);
+      await expect(
+        repositories.changeProposals.findByProjectId("project_1"),
+      ).resolves.toEqual([proposal]);
+      await expect(
+        repositories.changeProposals.findByProjectId("project_1", "pending"),
+      ).resolves.toEqual([proposal]);
+      await expect(
+        repositories.changeProposals.findByProjectId("project_1", "approved"),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  it("replaces a change proposal's items and choices wholesale on re-save", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(buildStoryboard());
+      const proposal = buildChangeProposal();
+      await repositories.changeProposals.save(proposal);
+
+      const resolved = {
+        ...proposal,
+        items: proposal.items.map((item) => ({
+          ...item,
+          approval: "approved" as const,
+        })),
+        choices: [],
+        status: "approved" as const,
+        approvedBy: "user_1",
+        resolvedAt: later,
+        updatedAt: later,
+      };
+      await repositories.changeProposals.save(resolved);
+
+      await expect(
+        repositories.changeProposals.findById(proposal.id),
+      ).resolves.toEqual(resolved);
+    });
+  });
+
+  it("keeps a pending change proposal durable across an API restart", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "gen-story-sqlite-"));
+    const databasePath = join(directory, "test.sqlite");
+
+    try {
+      const proposal = buildChangeProposal();
+
+      const firstClient = openDatabase(databasePath);
+      migrateDatabase(firstClient.db);
+      await seedBase(createSqliteRepositories(firstClient.db));
+      await createSqliteRepositories(firstClient.db).storyboards.save(
+        buildStoryboard(),
+      );
+      await createSqliteRepositories(firstClient.db).changeProposals.save(
+        proposal,
+      );
+      firstClient.close();
+
+      const restartedClient = openDatabase(databasePath);
+      const restartedRepositories = createSqliteRepositories(
+        restartedClient.db,
+      );
+      await expect(
+        restartedRepositories.changeProposals.findById(proposal.id),
+      ).resolves.toEqual(proposal);
+      restartedClient.close();
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
   });
 
   it("rejects duplicate and multi-primary scene photo rows", async () => {
@@ -651,6 +740,61 @@ function buildScene(
     lightingDirection: "soft window light",
     motionDirection: "still",
     photoAssets,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+function buildChangeProposal() {
+  return createChangeProposal({
+    id: "proposal_1",
+    projectId: "project_1",
+    provenance: {
+      provider: "codex",
+      conversationId: "conversation_1",
+      turnId: "turn_1",
+    },
+    items: [
+      {
+        id: "item_1",
+        target: storyboardSemanticTarget("storyboard_1", "tone"),
+        before: "warm",
+        after: "melancholic",
+        rationale: "The photos lean more reflective than warm.",
+        baseRevision: now,
+      },
+      {
+        id: "item_2",
+        target: storyboardSemanticTarget("storyboard_1", "stylePresetId"),
+        before: null,
+        after: "style_1",
+        rationale: "A watercolor preset matches the reflective tone.",
+        baseRevision: now,
+      },
+    ],
+    rationale: "Shifting tone and style to match the photos' mood.",
+    choices: [
+      {
+        targetItemId: "item_1",
+        options: [
+          {
+            id: "option_warm",
+            label: "Keep warm",
+            value: "warm",
+            reason: "Preserves the original nostalgic framing.",
+            impact: "No change to downstream scene prompts.",
+          },
+          {
+            id: "option_melancholic",
+            label: "Shift to melancholic",
+            value: "melancholic",
+            reason: "Matches the reflective mood detected in the photos.",
+            impact: "Scene prompts will lean more subdued.",
+          },
+        ],
+      },
+    ],
+    clientRequestId: "client_request_1",
     createdAt: now,
     updatedAt: now,
   });

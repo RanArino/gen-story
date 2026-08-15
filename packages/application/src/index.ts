@@ -4,6 +4,7 @@ export type {
   ApplicationDependencies,
   AuthContextPort,
   AuthPrincipal,
+  ChangeProposalRepositoryPort,
   CharacterSheetGenerationPort,
   ComplementSceneProposal,
   ComplementSceneProposalInput,

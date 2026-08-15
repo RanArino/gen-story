@@ -12,6 +12,7 @@ import {
 
 import {
   createAiJob,
+  createChangeProposal,
   createGeneratedImage,
   createGenerationRequest,
   createOrganization,
@@ -19,6 +20,7 @@ import {
   createProject,
   createProjectPhotoAnalysis,
   createScene,
+  createSemanticTarget,
   createStoryboard,
   createStylePreset,
   createTestGenerationBatch,
@@ -27,9 +29,14 @@ import {
   isPhotoFidelity,
   isTestAdjustmentId,
   sortScenesByOrderIndex,
+  type AgentProvider,
   type AiJob,
   type AiJobKind,
   type AiJobStatus,
+  type ChangeProposal,
+  type ChangeProposalItemApproval,
+  type ChangeProposalStatus,
+  type CreateChangeProposalChoiceInput,
   type GeneratedImage,
   type GenerationRequest,
   type GenerationRequestStatus,
@@ -55,6 +62,7 @@ import {
 } from "@gen-story/domain";
 import type {
   AiJobRepositoryPort,
+  ChangeProposalRepositoryPort,
   GeneratedImageRepositoryPort,
   GenerationRequestRepositoryPort,
   Language,
@@ -75,6 +83,9 @@ import { isLanguage } from "@gen-story/application";
 import type { GenStoryDatabase } from "./client";
 import {
   aiJobs,
+  changeProposalChoices,
+  changeProposalItems,
+  changeProposals,
   generatedImages,
   generationRequests,
   organizations,
@@ -1541,6 +1552,193 @@ export class SqliteProjectPhotoAnalysisRepository implements ProjectPhotoAnalysi
   }
 }
 
+type ChangeProposalRow = typeof changeProposals.$inferSelect;
+type ChangeProposalItemRow = typeof changeProposalItems.$inferSelect;
+type ChangeProposalChoiceRow = typeof changeProposalChoices.$inferSelect;
+
+async function loadChangeProposal(
+  db: GenStoryDatabase,
+  row: ChangeProposalRow,
+): Promise<ChangeProposal> {
+  const itemRows: ChangeProposalItemRow[] = await db
+    .select()
+    .from(changeProposalItems)
+    .where(eq(changeProposalItems.changeProposalId, row.id))
+    .orderBy(asc(changeProposalItems.orderIndex));
+
+  const choiceRows: ChangeProposalChoiceRow[] = await db
+    .select()
+    .from(changeProposalChoices)
+    .where(eq(changeProposalChoices.changeProposalId, row.id));
+
+  return createChangeProposal({
+    id: row.id,
+    projectId: row.projectId,
+    provenance: {
+      provider: row.provider as AgentProvider,
+      conversationId: row.conversationId,
+      turnId: row.turnId,
+    },
+    items: itemRows.map((itemRow) => ({
+      id: itemRow.id,
+      target: createSemanticTarget({
+        entityType: itemRow.entityType,
+        entityId: itemRow.entityId,
+        field: itemRow.field,
+      }),
+      before: JSON.parse(itemRow.beforeJson) as unknown,
+      after: JSON.parse(itemRow.afterJson) as unknown,
+      rationale: itemRow.rationale,
+      baseRevision: itemRow.baseRevision,
+      approval: itemRow.approval as ChangeProposalItemApproval,
+    })),
+    rationale: row.rationale,
+    choices: choiceRows.map((choiceRow) => ({
+      targetItemId: choiceRow.targetItemId,
+      options: JSON.parse(
+        choiceRow.optionsJson,
+      ) as CreateChangeProposalChoiceInput["options"],
+      selectedOptionId: choiceRow.selectedOptionId ?? null,
+    })),
+    clientRequestId: row.clientRequestId,
+    status: row.status as ChangeProposalStatus,
+    approvedBy: row.approvedBy,
+    resolvedAt: row.resolvedAt,
+    applyOutcome: row.applyOutcomeJson
+      ? (JSON.parse(row.applyOutcomeJson) as ChangeProposal["applyOutcome"])
+      : null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
+export class SqliteChangeProposalRepository implements ChangeProposalRepositoryPort {
+  constructor(private readonly db: GenStoryDatabase) {}
+
+  async findById(changeProposalId: string): Promise<ChangeProposal | null> {
+    const row = await this.db
+      .select()
+      .from(changeProposals)
+      .where(eq(changeProposals.id, changeProposalId))
+      .get();
+
+    return row == null ? null : loadChangeProposal(this.db, row);
+  }
+
+  async findByClientRequestId(
+    projectId: string,
+    clientRequestId: string,
+  ): Promise<ChangeProposal | null> {
+    const row = await this.db
+      .select()
+      .from(changeProposals)
+      .where(
+        and(
+          eq(changeProposals.projectId, projectId),
+          eq(changeProposals.clientRequestId, clientRequestId),
+        ),
+      )
+      .get();
+
+    return row == null ? null : loadChangeProposal(this.db, row);
+  }
+
+  async findByProjectId(
+    projectId: string,
+    status?: ChangeProposalStatus,
+  ): Promise<ChangeProposal[]> {
+    const rows = await this.db
+      .select()
+      .from(changeProposals)
+      .where(
+        status == null
+          ? eq(changeProposals.projectId, projectId)
+          : and(
+              eq(changeProposals.projectId, projectId),
+              eq(changeProposals.status, status),
+            ),
+      )
+      .orderBy(asc(changeProposals.createdAt), asc(changeProposals.id));
+
+    return Promise.all(rows.map((row) => loadChangeProposal(this.db, row)));
+  }
+
+  async save(changeProposal: ChangeProposal): Promise<void> {
+    this.db.transaction((tx) => {
+      tx.insert(changeProposals)
+        .values({
+          id: changeProposal.id,
+          projectId: changeProposal.projectId,
+          provider: changeProposal.provenance.provider,
+          conversationId: changeProposal.provenance.conversationId,
+          turnId: changeProposal.provenance.turnId,
+          rationale: changeProposal.rationale,
+          status: changeProposal.status,
+          clientRequestId: changeProposal.clientRequestId,
+          approvedBy: changeProposal.approvedBy,
+          resolvedAt: changeProposal.resolvedAt,
+          applyOutcomeJson: changeProposal.applyOutcome
+            ? JSON.stringify(changeProposal.applyOutcome)
+            : null,
+          createdAt: changeProposal.createdAt,
+          updatedAt: changeProposal.updatedAt,
+        })
+        .onConflictDoUpdate({
+          target: changeProposals.id,
+          set: {
+            rationale: changeProposal.rationale,
+            status: changeProposal.status,
+            approvedBy: changeProposal.approvedBy,
+            resolvedAt: changeProposal.resolvedAt,
+            applyOutcomeJson: changeProposal.applyOutcome
+              ? JSON.stringify(changeProposal.applyOutcome)
+              : null,
+            updatedAt: changeProposal.updatedAt,
+          },
+        })
+        .run();
+
+      tx.delete(changeProposalChoices)
+        .where(eq(changeProposalChoices.changeProposalId, changeProposal.id))
+        .run();
+      tx.delete(changeProposalItems)
+        .where(eq(changeProposalItems.changeProposalId, changeProposal.id))
+        .run();
+
+      tx.insert(changeProposalItems)
+        .values(
+          changeProposal.items.map((item, orderIndex) => ({
+            id: item.id,
+            changeProposalId: changeProposal.id,
+            orderIndex,
+            entityType: item.target.entityType,
+            entityId: item.target.entityId,
+            field: item.target.field,
+            beforeJson: JSON.stringify(item.before),
+            afterJson: JSON.stringify(item.after),
+            rationale: item.rationale,
+            baseRevision: item.baseRevision,
+            approval: item.approval,
+          })),
+        )
+        .run();
+
+      if (changeProposal.choices.length > 0) {
+        tx.insert(changeProposalChoices)
+          .values(
+            changeProposal.choices.map((choice) => ({
+              changeProposalId: changeProposal.id,
+              targetItemId: choice.targetItemId,
+              optionsJson: JSON.stringify(choice.options),
+              selectedOptionId: choice.selectedOptionId,
+            })),
+          )
+          .run();
+      }
+    });
+  }
+}
+
 type TestGenerationBatchRow = typeof testGenerationBatches.$inferSelect;
 
 function mapTestGenerationBatch(
@@ -1664,6 +1862,7 @@ export function createSqliteRepositories(db: GenStoryDatabase) {
     generatedImages: new SqliteGeneratedImageRepository(db),
     aiJobs: new SqliteAiJobRepository(db),
     projectPhotoAnalyses: new SqliteProjectPhotoAnalysisRepository(db),
+    changeProposals: new SqliteChangeProposalRepository(db),
     testGenerationBatches: new SqliteTestGenerationBatchRepository(db),
     userPreferences: new SqliteUserPreferenceRepository(db),
   };

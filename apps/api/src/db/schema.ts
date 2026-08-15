@@ -327,6 +327,83 @@ export const aiJobs = sqliteTable(
   ],
 );
 
+// Durable propose -> approve -> apply review unit for agent-authored data
+// changes (M2). Items and choices are stored in child tables and replaced
+// wholesale on every save, mirroring how scene_photo_assets tracks scenes.
+export const changeProposals = sqliteTable(
+  "change_proposals",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    provider: text("provider").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    turnId: text("turn_id").notNull(),
+    rationale: text("rationale").notNull(),
+    status: text("status").notNull(),
+    clientRequestId: text("client_request_id").notNull(),
+    approvedBy: text("approved_by"),
+    resolvedAt: text("resolved_at"),
+    applyOutcomeJson: text("apply_outcome_json"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("change_proposals_project_id_idx").on(table.projectId),
+    index("change_proposals_project_status_idx").on(
+      table.projectId,
+      table.status,
+    ),
+    uniqueIndex("change_proposals_project_client_request_unique").on(
+      table.projectId,
+      table.clientRequestId,
+    ),
+  ],
+);
+
+export const changeProposalItems = sqliteTable(
+  "change_proposal_items",
+  {
+    id: text("id").primaryKey(),
+    changeProposalId: text("change_proposal_id")
+      .notNull()
+      .references(() => changeProposals.id),
+    orderIndex: integer("order_index").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    field: text("field").notNull(),
+    beforeJson: text("before_json").notNull(),
+    afterJson: text("after_json").notNull(),
+    rationale: text("rationale").notNull(),
+    baseRevision: text("base_revision").notNull(),
+    approval: text("approval").notNull(),
+  },
+  (table) => [
+    index("change_proposal_items_proposal_id_idx").on(table.changeProposalId),
+  ],
+);
+
+export const changeProposalChoices = sqliteTable(
+  "change_proposal_choices",
+  {
+    changeProposalId: text("change_proposal_id")
+      .notNull()
+      .references(() => changeProposals.id),
+    targetItemId: text("target_item_id")
+      .notNull()
+      .references(() => changeProposalItems.id),
+    optionsJson: text("options_json").notNull(),
+    selectedOptionId: text("selected_option_id"),
+  },
+  (table) => [
+    uniqueIndex("change_proposal_choices_target_item_unique").on(
+      table.targetItemId,
+    ),
+    index("change_proposal_choices_proposal_id_idx").on(table.changeProposalId),
+  ],
+);
+
 export const testGenerationBatches = sqliteTable(
   "test_generation_batches",
   {
