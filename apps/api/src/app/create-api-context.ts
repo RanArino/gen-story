@@ -4,10 +4,6 @@ import { join } from "node:path";
 
 import type {
   ApplicationDependencies,
-  ComplementSceneProposalPort,
-  PhotoAnalysisGenerationPort,
-  SceneFillGenerationPort,
-  StorySetupGenerationPort,
   AgentRuntimeSelection,
 } from "@gen-story/application";
 
