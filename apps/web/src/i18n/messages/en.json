@@ -769,7 +769,7 @@
     },
     "disabled": {
       "title": "The AI chat is turned off.",
-      "hint": "Set GEN_STORY_AGENT_CHAT_RUNTIME=codex (or claude) in apps/api/.env and restart the API. It uses your existing subscription login — no API key — and leaves the rest of the app's AI settings alone."
+      "hint": "The chat needs a local CLI runtime. Set GEN_STORY_AGENT_RUNTIME=codex (or claude) in apps/api/.env and restart the API. It uses your existing subscription login — no API key."
     }
   }
 }

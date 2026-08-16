@@ -40,19 +40,27 @@ afterEach(() => {
 });
 
 describe("createApiContext runtime selection", () => {
-  it("runs the chat on a CLI while the capabilities stay on the API runtime", () => {
+  // R1.1: one variable selects the runtime for every text/vision capability,
+  // the embedded chat included — there is no chat-only selector.
+  it("puts the chat and the capabilities on the same selected runtime", () => {
     const deps = createApiContext(withClient(), {
-      GEN_STORY_AGENT_CHAT_RUNTIME: "codex",
+      GEN_STORY_AGENT_RUNTIME: "codex",
     });
 
-    // Turning the chat on must not re-route photo analysis, story setup, or
-    // scene fill onto the CLI.
-    expect(deps.agentRuntime.selection).toBe("api");
-    expect(deps.agentRuntime.chat).toEqual({
-      selection: "codex",
-      availability: { status: "unchecked" },
+    expect(deps.agentRuntime.selection).toBe("codex");
+    // The chat runner reads the one runtime's availability, so the startup
+    // probe result reaches it without a second selection to keep in sync.
+    deps.agentRuntime.availability = {
+      status: "available",
+      version: "0.0.0",
+      authMethod: "subscription",
+      subscriptionLabel: "ChatGPT",
+    };
+    expect(deps.agentTurnRunner.availability()).toMatchObject({
+      available: true,
+      provider: "codex",
     });
-    expect(deps.photoAnalysisGeneration).toBeInstanceOf(
+    expect(deps.photoAnalysisGeneration).not.toBeInstanceOf(
       LocalPhotoAnalysisGenerationAdapter,
     );
   });
@@ -65,7 +73,6 @@ describe("createApiContext runtime selection", () => {
       wallet: "api_key",
       capabilities: null,
       availability: { status: "not_applicable" },
-      chat: { selection: "api", availability: { status: "not_applicable" } },
     });
     // No GEMINI_API_KEY in the test env, so photo analysis/story setup fall
     // back to their deterministic local adapters (unchanged existing
@@ -109,8 +116,6 @@ describe("createApiContext runtime selection", () => {
       wallet: "subscription",
       capabilities: expect.objectContaining({ provider: "codex" }),
       availability: { status: "unchecked" },
-      // The chat follows the capability runtime unless it is set on its own.
-      chat: { selection: "codex", availability: { status: "unchecked" } },
     });
     expect(deps.photoAnalysisGeneration).toBeInstanceOf(
       CodexPhotoAnalysisGenerationAdapter,
@@ -136,7 +141,6 @@ describe("createApiContext runtime selection", () => {
       wallet: "subscription",
       capabilities: expect.objectContaining({ provider: "claude" }),
       availability: { status: "unchecked" },
-      chat: { selection: "claude", availability: { status: "unchecked" } },
     });
     expect(deps.photoAnalysisGeneration).toBeInstanceOf(
       ClaudePhotoAnalysisGenerationAdapter,

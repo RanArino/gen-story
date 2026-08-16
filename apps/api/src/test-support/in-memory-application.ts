@@ -897,7 +897,6 @@ export function createInMemoryApplicationDependencies(
       wallet: "api_key",
       capabilities: null,
       availability: { status: "not_applicable" },
-      chat: { selection: "api", availability: { status: "not_applicable" } },
     },
     ...overrides,
   };

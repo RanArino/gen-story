@@ -284,9 +284,8 @@ export function AgentChatPanel({ projectId }: Props) {
           </div>
           <div>
             <dt>{t("meta.wallet")}</dt>
-            {/* The chat's own wallet, not the app-wide AI runtime's: a chat
-                on a CLI runtime is paid for by the operator's subscription
-                even when the rest of the app runs on an API key. */}
+            {/* On a CLI runtime the turn is paid for by the operator's
+                existing subscription, not by an API key. */}
             <dd>
               {chatRuntime != null && chatRuntime.runtime !== "api"
                 ? t("meta.subscription")

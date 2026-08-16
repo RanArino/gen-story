@@ -67,7 +67,7 @@ export function toAiRuntimeInfoDto(
     wallet: info.wallet,
     availability: info.availability,
     chat: {
-      runtime: info.chat.selection,
+      runtime: info.selection,
       available: chatAvailability.available,
       reason: chatAvailability.available ? null : chatAvailability.reason,
     },
