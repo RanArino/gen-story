@@ -41,8 +41,7 @@ cp apps/api/.env.example apps/api/.env
 | `API_PORT`                    | `4000`                  | Port for the API server                                       |
 | `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000` | API base URL used by the web app                              |
 | `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite` | Path to the SQLite database file                              |
-| `GEN_STORY_AGENT_RUNTIME`     | `api`                   | Text/vision AI runtime: `api` (Gemini), `codex`, or `claude` (subscription CLI login, no new API key) |
-| `GEN_STORY_DEPLOY_TARGET`     | `local`                 | Must be `local` (or unset) to select a CLI runtime above       |
+| `GEN_STORY_DEPLOY_TARGET`     | `local`                 | CLI runtimes selected in Settings require local deployment      |
 | `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_    | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`) |
 | `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint |
 | `OPENAI_API_KEY`              | _(none)_                | Optional. Set it to use real image generation instead of mock |
@@ -142,11 +141,10 @@ your browser.
 
 ## Refining a Project in the App Chat
 
-Set `GEN_STORY_AGENT_RUNTIME=codex` (or `claude`) in `apps/api/.env`, restart
-the API, and open **AI refine** on a project. The chat runs on the same runtime
+Open **Settings** and choose Claude Code (default), Codex, or API. The chat runs on the same runtime
 as the rest of the app's text/vision AI. On `api` there is no CLI session to
 open, so the panel says so and the composer stays disabled instead of failing
-when you press Send. The chat talks to your already-authenticated Codex or Claude Code
+when you press Send. The CLI choices talk to your already-authenticated Codex or Claude Code
 subscription CLI — no new API key — and is scoped to that project's AI photo
 analysis, emotion/tone, and style preset.
 

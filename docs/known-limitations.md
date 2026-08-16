@@ -115,8 +115,8 @@ any cloud setup. The following features are deliberately excluded from this vers
 ## In-app agent chat
 
 - The chat requires a locally installed, subscription-logged-in Codex or Claude
-  Code CLI (`GEN_STORY_AGENT_RUNTIME=codex`/`claude`) and only runs on a local
-  deployment. On the default `api` runtime the chat is visible but disabled,
+  Code CLI selected in Settings and only runs on a local deployment. On the
+  `api` runtime the chat is visible but disabled,
   with the reason shown in the panel.
 - One conversation is bound to one provider-native session. Switching providers,
   or recovering a session the provider no longer has, means starting a new
