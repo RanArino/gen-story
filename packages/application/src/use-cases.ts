@@ -71,12 +71,18 @@ import {
 } from "@gen-story/domain";
 
 import type {
+  AgentRuntimeSelection,
   ApplicationDependencies,
   Language,
   UseCaseResult,
   UserPreference,
 } from "./ports";
-import { DEFAULT_LANGUAGE, isLanguage } from "./ports";
+import {
+  DEFAULT_AGENT_RUNTIME_SELECTION,
+  DEFAULT_LANGUAGE,
+  isAgentRuntimeSelection,
+  isLanguage,
+} from "./ports";
 
 export function success<T>(value: T): UseCaseResult<T> {
   return {
@@ -3712,6 +3718,7 @@ export async function getUserPreference(
     return success({
       userId: trimmedUserId,
       language: DEFAULT_LANGUAGE,
+      agentRuntime: DEFAULT_AGENT_RUNTIME_SELECTION,
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
@@ -3722,6 +3729,7 @@ export async function getUserPreference(
 export type SetUserPreferenceInput = {
   userId: string;
   language: Language;
+  agentRuntime?: AgentRuntimeSelection;
 };
 
 export async function setUserPreference(
@@ -3738,9 +3746,25 @@ export async function setUserPreference(
       return failure("validation_error", `language must be one of: en, ja`);
     }
 
+    if (
+      input.agentRuntime != null &&
+      !isAgentRuntimeSelection(input.agentRuntime)
+    ) {
+      return failure(
+        "validation_error",
+        "agentRuntime must be one of: claude, codex, api",
+      );
+    }
+
+    const existing = await deps.userPreferences.findByUserId(trimmedUserId);
+
     const preference: UserPreference = {
       userId: trimmedUserId,
       language: input.language,
+      agentRuntime:
+        input.agentRuntime ??
+        existing?.agentRuntime ??
+        DEFAULT_AGENT_RUNTIME_SELECTION,
       updatedAt: new Date().toISOString(),
     };
 

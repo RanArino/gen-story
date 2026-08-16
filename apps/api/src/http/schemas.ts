@@ -149,6 +149,7 @@ export const CreateCustomStyleSchema = z.object({
 
 export const SetUserPreferenceSchema = z.object({
   language: z.enum(["en", "ja"]),
+  agentRuntime: z.enum(["claude", "codex", "api"]).optional(),
 });
 
 // Item-level approval is a first-party operator action; an agent has no

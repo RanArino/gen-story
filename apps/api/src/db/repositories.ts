@@ -76,6 +76,7 @@ import {
 } from "@gen-story/domain";
 import type {
   AgentConversationRepositoryPort,
+  AgentRuntimeSelection,
   AiJobRepositoryPort,
   ChangeProposalRepositoryPort,
   GeneratedImageRepositoryPort,
@@ -93,7 +94,11 @@ import type {
   UserPreferenceRepositoryPort,
   UserRepositoryPort,
 } from "@gen-story/application";
-import { isLanguage } from "@gen-story/application";
+import {
+  DEFAULT_AGENT_RUNTIME_SELECTION,
+  isAgentRuntimeSelection,
+  isLanguage,
+} from "@gen-story/application";
 
 import type {
   McpToolCallAuditEntry,
@@ -1838,9 +1843,15 @@ type UserPreferenceRow = typeof userPreferences.$inferSelect;
 
 function mapUserPreference(row: UserPreferenceRow): UserPreference {
   const language: Language = isLanguage(row.language) ? row.language : "en";
+  const agentRuntime: AgentRuntimeSelection = isAgentRuntimeSelection(
+    row.agentRuntime,
+  )
+    ? row.agentRuntime
+    : DEFAULT_AGENT_RUNTIME_SELECTION;
   return {
     userId: row.userId,
     language,
+    agentRuntime,
     updatedAt: row.updatedAt,
   };
 }
@@ -1864,12 +1875,14 @@ export class SqliteUserPreferenceRepository implements UserPreferenceRepositoryP
       .values({
         userId: preference.userId,
         language: preference.language,
+        agentRuntime: preference.agentRuntime,
         updatedAt: preference.updatedAt,
       })
       .onConflictDoUpdate({
         target: userPreferences.userId,
         set: {
           language: preference.language,
+          agentRuntime: preference.agentRuntime,
           updatedAt: preference.updatedAt,
         },
       });

@@ -36,6 +36,7 @@ export const userPreferences = sqliteTable("user_preferences", {
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   language: text("language").notNull().default("en"),
+  agentRuntime: text("agent_runtime").notNull().default("claude"),
   updatedAt: text("updated_at").notNull(),
 });
 

@@ -1012,6 +1012,7 @@ describe("application use cases", () => {
     if (result.ok) {
       expect(result.value.userId).toBe("user_new");
       expect(result.value.language).toBe("en");
+      expect(result.value.agentRuntime).toBe("claude");
     }
   });
 
@@ -1021,6 +1022,7 @@ describe("application use cases", () => {
     const setResult = await setUserPreference(deps, {
       userId: "user_1",
       language: "ja",
+      agentRuntime: "codex",
     });
     expect(setResult.ok).toBe(true);
 
@@ -1028,6 +1030,7 @@ describe("application use cases", () => {
     expect(getResult.ok).toBe(true);
     if (getResult.ok) {
       expect(getResult.value.language).toBe("ja");
+      expect(getResult.value.agentRuntime).toBe("codex");
     }
   });
 

@@ -2585,6 +2585,7 @@ export function buildRouter(deps: ApiDependencies): Router {
     const result = await setUserPreference(deps, {
       userId: principal.user.id,
       language: parsed.data.language,
+      agentRuntime: parsed.data.agentRuntime,
     });
 
     if (!result.ok) {

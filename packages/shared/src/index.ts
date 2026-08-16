@@ -12,6 +12,7 @@ export function isLanguage(value: unknown): value is Language {
 export type UserPreferenceDto = {
   userId: string;
   language: Language;
+  agentRuntime: "api" | "codex" | "claude";
   updatedAt: string;
 };
 

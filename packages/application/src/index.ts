@@ -22,6 +22,7 @@ export type {
   AgentTurnReference,
   AgentTurnRequest,
   AgentTurnRunnerPort,
+  AgentRuntimeSelection,
   AiJobRepositoryPort,
   ApplicationDependencies,
   AuthContextPort,
@@ -63,7 +64,14 @@ export type {
   UserPreferenceRepositoryPort,
   UserRepositoryPort,
 } from "./ports";
-export { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, isLanguage } from "./ports";
+export {
+  AGENT_RUNTIME_SELECTIONS,
+  DEFAULT_AGENT_RUNTIME_SELECTION,
+  DEFAULT_LANGUAGE,
+  SUPPORTED_LANGUAGES,
+  isAgentRuntimeSelection,
+  isLanguage,
+} from "./ports";
 export {
   analyzeProjectPhotos,
   applyAdjustmentToTestVariant,

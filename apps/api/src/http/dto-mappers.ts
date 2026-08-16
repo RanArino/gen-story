@@ -90,6 +90,7 @@ export function toUserPreferenceDto(
   return {
     userId: preference.userId,
     language: preference.language,
+    agentRuntime: preference.agentRuntime,
     updatedAt: preference.updatedAt,
   };
 }

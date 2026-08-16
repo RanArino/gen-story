@@ -32,6 +32,23 @@ export type Language = "en" | "ja";
 export const SUPPORTED_LANGUAGES: Language[] = ["en", "ja"];
 export const DEFAULT_LANGUAGE: Language = "en";
 
+export type AgentRuntimeSelection = "api" | "codex" | "claude";
+export const AGENT_RUNTIME_SELECTIONS: AgentRuntimeSelection[] = [
+  "claude",
+  "codex",
+  "api",
+];
+export const DEFAULT_AGENT_RUNTIME_SELECTION: AgentRuntimeSelection = "claude";
+
+export function isAgentRuntimeSelection(
+  value: unknown,
+): value is AgentRuntimeSelection {
+  return (
+    typeof value === "string" &&
+    (AGENT_RUNTIME_SELECTIONS as string[]).includes(value)
+  );
+}
+
 export function isLanguage(value: unknown): value is Language {
   return (
     typeof value === "string" &&
@@ -42,6 +59,7 @@ export function isLanguage(value: unknown): value is Language {
 export type UserPreference = {
   userId: string;
   language: Language;
+  agentRuntime: AgentRuntimeSelection;
   updatedAt: string;
 };
 
