@@ -132,7 +132,7 @@ type LiveSession =
     };
 
 export type NativeSessionRunnerOptions = {
-  selection: AgentRuntimeSelection;
+  selection: AgentRuntimeSelection | (() => AgentRuntimeSelection);
   // Read at call time, not captured: server.ts resolves the real availability
   // asynchronously after the context is built.
   availability: () => AgentRuntimeAvailability;
@@ -174,8 +174,15 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
 
   constructor(private readonly options: NativeSessionRunnerOptions) {}
 
+  private selection(): AgentRuntimeSelection {
+    return typeof this.options.selection === "function"
+      ? this.options.selection()
+      : this.options.selection;
+  }
+
   availability(): AgentRunnerAvailability {
-    if (this.options.selection === "api") {
+    const selection = this.selection();
+    if (selection === "api") {
       return {
         available: false,
         reason:
@@ -187,7 +194,7 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
     if (runtime.status === "available") {
       return {
         available: true,
-        provider: this.options.selection,
+        provider: selection,
         model: this.options.model,
       };
     }

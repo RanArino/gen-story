@@ -213,7 +213,7 @@ export function createApiContext(
 
   const progressEvents = new LocalProgressEvents();
 
-  const agentRuntime = {
+  const agentRuntime: ApiAgentRuntimeInfo = {
     selection: configuredRuntime,
     wallet: agentRuntimeWallet(configuredRuntime),
     capabilities: agentRuntimeCapabilities(configuredRuntime),
@@ -234,7 +234,7 @@ export function createApiContext(
   // Reads `agentRuntime.availability` through the object, not a copy, so the
   // runner sees the real result once server.ts finishes its startup probe.
   const agentTurnRunner = new NativeSessionAgentTurnRunner({
-    selection: configuredRuntime,
+    selection: () => agentRuntime.selection,
     availability: () => agentRuntime.availability,
     model: env.GEN_STORY_AGENT_CHAT_MODEL?.trim() || null,
     workingDirectory: agentChatWorkingDirectory,

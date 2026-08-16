@@ -77,6 +77,11 @@ import {
 } from "@gen-story/shared";
 
 import type { ApiDependencies } from "../app/create-api-context";
+import {
+  agentRuntimeCapabilities,
+  agentRuntimeWallet,
+  resolveAgentRuntimeAvailability,
+} from "../agent-runtime/runtime-config";
 import { exportStoryboardAssetBundle } from "../exports/local-storyboard-asset-export";
 import { composeScenePrompt } from "../generation/compose-scene-prompt";
 import {
@@ -2556,6 +2561,16 @@ export function buildRouter(deps: ApiDependencies): Router {
       return;
     }
 
+    deps.agentRuntime.selection = result.value.agentRuntime;
+    deps.agentRuntime.wallet = agentRuntimeWallet(result.value.agentRuntime);
+    deps.agentRuntime.capabilities = agentRuntimeCapabilities(
+      result.value.agentRuntime,
+    );
+    deps.agentRuntime.availability =
+      result.value.agentRuntime === "api"
+        ? { status: "not_applicable" }
+        : { status: "unchecked" };
+
     sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
   });
 
@@ -2596,6 +2611,18 @@ export function buildRouter(deps: ApiDependencies): Router {
       );
       return;
     }
+
+    const selection = result.value.agentRuntime;
+    deps.agentRuntime.selection = selection;
+    deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+    deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+    deps.agentRuntime.availability =
+      selection === "api"
+        ? { status: "not_applicable" }
+        : await resolveAgentRuntimeAvailability(selection, {
+            workingDirectory: process.cwd(),
+            allowedWorkingDirectoryRoot: process.cwd(),
+          });
 
     sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
   });
