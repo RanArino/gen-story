@@ -625,6 +625,8 @@
     "subtitle": "アプリの設定",
     "languageLabel": "言語",
     "languageHelp": "インターフェース、AIによって生成されるテキスト、エクスポートされる絵コンテにこの言語が使われます。",
+    "agentRuntimeLabel": "AIランタイム",
+    "agentRuntimeHelp": "Claude Code と Codex はローカルのサブスクリプションログインを使います。API は設定済みの Gemini API キーを使います。既存の AI チャットはプロバイダー変更後に新しいセッションを開始してください。",
     "save": "保存",
     "saving": "保存中…",
     "saved": "保存しました",
@@ -632,6 +634,11 @@
     "language": {
       "en": "English",
       "ja": "日本語"
+    },
+    "agentRuntime": {
+      "claude": "Claude Code（既定）",
+      "codex": "Codex",
+      "api": "API"
     }
   },
   "errors": {

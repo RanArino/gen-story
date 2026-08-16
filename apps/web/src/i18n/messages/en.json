@@ -625,6 +625,8 @@
     "subtitle": "App preferences",
     "languageLabel": "Language",
     "languageHelp": "The interface, AI-generated text, and exported storyboards will use this language.",
+    "agentRuntimeLabel": "AI runtime",
+    "agentRuntimeHelp": "Claude Code and Codex use your local subscription login. API uses the configured Gemini API key. Existing AI chat sessions must be started again after changing providers.",
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",
@@ -632,6 +634,11 @@
     "language": {
       "en": "English",
       "ja": "日本語"
+    },
+    "agentRuntime": {
+      "claude": "Claude Code (default)",
+      "codex": "Codex",
+      "api": "API"
     }
   },
   "errors": {

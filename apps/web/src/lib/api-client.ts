@@ -933,11 +933,12 @@ export async function getUserLanguagePreference(): Promise<UserPreferenceDto> {
 
 export async function setUserLanguagePreference(
   language: Language,
+  agentRuntime?: "claude" | "codex" | "api",
 ): Promise<UserPreferenceDto> {
   const data = await request<{ preference: UserPreferenceDto }>(
     "PUT",
     "/api/user/preferences",
-    { language },
+    { language, ...(agentRuntime == null ? {} : { agentRuntime }) },
   );
   return data.preference;
 }
