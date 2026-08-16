@@ -766,6 +766,10 @@
         "approved": "承認",
         "rejected": "却下"
       }
+    },
+    "disabled": {
+      "title": "AIチャットは現在オフです。",
+      "hint": "apps/api/.env に GEN_STORY_AGENT_CHAT_RUNTIME=codex（または claude）を設定し、APIを再起動してください。既存のサブスクリプションのログインを使うためAPIキーは不要で、他のAI設定は変わりません。"
     }
   }
 }

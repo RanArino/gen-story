@@ -40,6 +40,23 @@ afterEach(() => {
 });
 
 describe("createApiContext runtime selection", () => {
+  it("runs the chat on a CLI while the capabilities stay on the API runtime", () => {
+    const deps = createApiContext(withClient(), {
+      GEN_STORY_AGENT_CHAT_RUNTIME: "codex",
+    });
+
+    // Turning the chat on must not re-route photo analysis, story setup, or
+    // scene fill onto the CLI.
+    expect(deps.agentRuntime.selection).toBe("api");
+    expect(deps.agentRuntime.chat).toEqual({
+      selection: "codex",
+      availability: { status: "unchecked" },
+    });
+    expect(deps.photoAnalysisGeneration).toBeInstanceOf(
+      LocalPhotoAnalysisGenerationAdapter,
+    );
+  });
+
   it("defaults to the Gemini/local adapter graph when unset", () => {
     const deps = createApiContext(withClient(), {});
 
@@ -48,6 +65,7 @@ describe("createApiContext runtime selection", () => {
       wallet: "api_key",
       capabilities: null,
       availability: { status: "not_applicable" },
+      chat: { selection: "api", availability: { status: "not_applicable" } },
     });
     // No GEMINI_API_KEY in the test env, so photo analysis/story setup fall
     // back to their deterministic local adapters (unchanged existing
@@ -91,6 +109,8 @@ describe("createApiContext runtime selection", () => {
       wallet: "subscription",
       capabilities: expect.objectContaining({ provider: "codex" }),
       availability: { status: "unchecked" },
+      // The chat follows the capability runtime unless it is set on its own.
+      chat: { selection: "codex", availability: { status: "unchecked" } },
     });
     expect(deps.photoAnalysisGeneration).toBeInstanceOf(
       CodexPhotoAnalysisGenerationAdapter,
@@ -116,6 +136,7 @@ describe("createApiContext runtime selection", () => {
       wallet: "subscription",
       capabilities: expect.objectContaining({ provider: "claude" }),
       availability: { status: "unchecked" },
+      chat: { selection: "claude", availability: { status: "unchecked" } },
     });
     expect(deps.photoAnalysisGeneration).toBeInstanceOf(
       ClaudePhotoAnalysisGenerationAdapter,

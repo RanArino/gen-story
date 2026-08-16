@@ -43,6 +43,7 @@ cp apps/api/.env.example apps/api/.env
 | `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite` | Path to the SQLite database file                              |
 | `GEN_STORY_AGENT_RUNTIME`     | `api`                   | Text/vision AI runtime: `api` (Gemini), `codex`, or `claude` (subscription CLI login, no new API key) |
 | `GEN_STORY_DEPLOY_TARGET`     | `local`                 | Must be `local` (or unset) to select a CLI runtime above       |
+| `GEN_STORY_AGENT_CHAT_RUNTIME`| _(follows `GEN_STORY_AGENT_RUNTIME`)_ | Runtime for the in-app chat only: `codex`, `claude`, or `api` (chat off) |
 | `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_    | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`) |
 | `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint |
 | `OPENAI_API_KEY`              | _(none)_                | Optional. Set it to use real image generation instead of mock |
@@ -55,7 +56,8 @@ The app works without a Gemini key; photo analysis and story setup use determini
 
 ## Apply Database Migrations
 
-Run this once before starting the app for the first time, and again after pulling changes:
+Run this once before starting the app for the first time, and again after pulling changes
+(the agent chat needs migration `0019`; without it the chat screen cannot store anything):
 
 ```sh
 pnpm --filter @gen-story/api db:migrate
@@ -141,8 +143,12 @@ your browser.
 
 ## Refining a Project in the App Chat
 
-Set `GEN_STORY_AGENT_RUNTIME` to `codex` or `claude` and open **AI refine** on a
-project. The chat talks to your already-authenticated Codex or Claude Code
+Set `GEN_STORY_AGENT_CHAT_RUNTIME=codex` (or `claude`) in `apps/api/.env`,
+restart the API, and open **AI refine** on a project. This setting is chat-only:
+photo analysis, story setup, and scene fill keep using whatever
+`GEN_STORY_AGENT_RUNTIME` selects, so turning the chat on does not re-route the
+rest of the app. If the CLI is missing or logged out, the panel says so and the
+composer stays disabled instead of failing when you press Send. The chat talks to your already-authenticated Codex or Claude Code
 subscription CLI — no new API key — and is scoped to that project's AI photo
 analysis, emotion/tone, and style preset.
 

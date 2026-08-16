@@ -303,7 +303,14 @@ export function buildRouter(deps: ApiDependencies): Router {
   router.add("GET", "/api/ai-runtime", async (_req, res) => {
     const principal = await requirePrincipal(deps, res);
     if (principal == null) return;
-    sendJson(res, 200, toAiRuntimeInfoDto(deps.agentRuntime));
+    sendJson(
+      res,
+      200,
+      toAiRuntimeInfoDto(
+        deps.agentRuntime,
+        deps.agentTurnRunner.availability(),
+      ),
+    );
   });
 
   // GET /api/projects

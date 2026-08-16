@@ -6,6 +6,7 @@ import {
   LOCAL_USER_ID,
   LOCAL_ORGANIZATION_ID,
 } from "../auth/local-auth";
+import type { StubAgentTurnRunner } from "../test-support/in-memory-application";
 import { createInMemoryApplicationDependencies } from "../test-support/in-memory-application";
 import { buildRouter, handleApiRequest } from "./routes";
 import { buildHealthResponse } from "../server";
@@ -137,7 +138,29 @@ describe("GET /api/ai-runtime", () => {
       wallet: "api_key",
       availability: { status: "not_applicable" },
       capabilities: null,
+      chat: { runtime: "api", available: true, reason: null },
     });
+  });
+
+  // Without this the chat panel looks usable and only fails on Send.
+  it("reports why the chat is unavailable", async () => {
+    const { server: s2, deps } = makeServer();
+    (deps.agentTurnRunner as StubAgentTurnRunner).available = {
+      available: false,
+      reason: "The codex CLI is not logged in.",
+    };
+    await seedLocalPrincipal(deps);
+    const b2 = await listen(s2);
+    try {
+      const { body } = await req(b2, "GET", "/api/ai-runtime");
+      expect((body as { chat: unknown }).chat).toEqual({
+        runtime: "api",
+        available: false,
+        reason: "The codex CLI is not logged in.",
+      });
+    } finally {
+      await close(s2);
+    }
   });
 
   it("returns 401 without a principal", async () => {

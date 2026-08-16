@@ -37,6 +37,29 @@ export function resolveAgentRuntimeSelection(
   return raw as AgentRuntimeSelection;
 }
 
+/**
+ * Which runtime powers the embedded chat. It defaults to
+ * `GEN_STORY_AGENT_RUNTIME`, but can be set on its own so the chat runs on a
+ * subscription CLI while photo analysis, story setup, and scene fill stay on
+ * whatever they use today — turning the chat on should not silently re-route
+ * every other AI capability in the app.
+ */
+export function resolveAgentChatRuntimeSelection(
+  env: NodeJS.ProcessEnv = process.env,
+  fallback: AgentRuntimeSelection = resolveAgentRuntimeSelection(env),
+): AgentRuntimeSelection {
+  const raw = env.GEN_STORY_AGENT_CHAT_RUNTIME?.trim();
+  if (raw == null || raw.length === 0) {
+    return fallback;
+  }
+  if (!VALID_SELECTIONS.includes(raw as AgentRuntimeSelection)) {
+    throw new RuntimeConfigError(
+      `Unknown GEN_STORY_AGENT_CHAT_RUNTIME value "${raw}". Supported values: ${VALID_SELECTIONS.join(", ")}.`,
+    );
+  }
+  return raw as AgentRuntimeSelection;
+}
+
 export type DeployTarget = "local" | "other";
 
 export function resolveDeployTarget(

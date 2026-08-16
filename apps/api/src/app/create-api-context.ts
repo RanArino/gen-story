@@ -15,6 +15,7 @@ import {
   agentRuntimeCapabilities,
   agentRuntimeWallet,
   assertLocalDeploymentForCliRuntime,
+  resolveAgentChatRuntimeSelection,
   resolveAgentRuntimeSelection,
   resolveDeployTarget,
   type AgentRuntimeAvailability,
@@ -69,6 +70,11 @@ export type ApiAgentRuntimeInfo = {
   selection: AgentRuntimeSelection;
   wallet: "api_key" | "subscription";
   capabilities: AgentSessionCapabilities | null;
+  // The embedded chat's own runtime, which may differ from the one above.
+  chat: {
+    selection: AgentRuntimeSelection;
+    availability: AgentRuntimeAvailability;
+  };
   // Filled in synchronously here as "not_applicable"/"unchecked"; server.ts
   // resolves the real value (a live CLI probe) before the router starts
   // accepting requests, so route handlers always see a checked result.
@@ -191,10 +197,14 @@ export function createApiContext(
   // text/vision capability; unknown values and non-local CLI selection fail
   // fast here rather than falling back silently.
   const agentRuntimeSelection = resolveAgentRuntimeSelection(env);
-  assertLocalDeploymentForCliRuntime(
+  const deployTarget = resolveDeployTarget(env);
+  assertLocalDeploymentForCliRuntime(agentRuntimeSelection, deployTarget);
+
+  const agentChatSelection = resolveAgentChatRuntimeSelection(
+    env,
     agentRuntimeSelection,
-    resolveDeployTarget(env),
   );
+  assertLocalDeploymentForCliRuntime(agentChatSelection, deployTarget);
 
   const characterSheetGeneration = openaiApiKey
     ? new OpenAiCharacterSheetGenerationAdapter(objectStorage, openaiApiKey)
@@ -221,6 +231,13 @@ export function createApiContext(
       agentRuntimeSelection === "api"
         ? ({ status: "not_applicable" } as AgentRuntimeAvailability)
         : ({ status: "unchecked" } as AgentRuntimeAvailability),
+    chat: {
+      selection: agentChatSelection,
+      availability:
+        agentChatSelection === "api"
+          ? ({ status: "not_applicable" } as AgentRuntimeAvailability)
+          : ({ status: "unchecked" } as AgentRuntimeAvailability),
+    },
   };
 
   // A dedicated empty directory outside the repository, because a CLI session
@@ -234,8 +251,8 @@ export function createApiContext(
   // Reads `agentRuntime.availability` through the object, not a copy, so the
   // runner sees the real result once server.ts finishes its startup probe.
   const agentTurnRunner = new NativeSessionAgentTurnRunner({
-    selection: agentRuntimeSelection,
-    availability: () => agentRuntime.availability,
+    selection: agentChatSelection,
+    availability: () => agentRuntime.chat.availability,
     model: env.GEN_STORY_AGENT_CHAT_MODEL?.trim() || null,
     workingDirectory: agentChatWorkingDirectory,
     allowedWorkingDirectoryRoot: agentChatWorkingDirectory,

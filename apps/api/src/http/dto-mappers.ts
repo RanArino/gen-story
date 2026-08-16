@@ -43,6 +43,7 @@ import type {
 
 import type {
   AgentChatConversationDetail,
+  AgentRunnerAvailability,
   AuthPrincipal,
   ComplementSceneProposal,
   CreativeDirection,
@@ -59,11 +60,17 @@ import type { ApiAgentRuntimeInfo } from "../app/create-api-context";
 
 export function toAiRuntimeInfoDto(
   info: ApiAgentRuntimeInfo,
+  chatAvailability: AgentRunnerAvailability,
 ): AiRuntimeInfoDto {
   return {
     runtime: info.selection,
     wallet: info.wallet,
     availability: info.availability,
+    chat: {
+      runtime: info.chat.selection,
+      available: chatAvailability.available,
+      reason: chatAvailability.available ? null : chatAvailability.reason,
+    },
     capabilities: info.capabilities
       ? {
           supportsExplicitCompact: info.capabilities.supportsExplicitCompact,

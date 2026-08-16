@@ -148,6 +148,22 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
     }
   }
 
+  // The chat's runtime is probed too, but never fatally: a missing chat CLI
+  // disables one screen, while the capability runtime above powers the whole
+  // app. The reason is surfaced in the chat panel instead.
+  const chat = deps.agentRuntime.chat;
+  if (chat.selection !== "api") {
+    chat.availability = await resolveAgentRuntimeAvailability(chat.selection, {
+      workingDirectory: process.cwd(),
+      allowedWorkingDirectoryRoot: process.cwd(),
+    });
+    if (chat.availability.status === "unavailable") {
+      console.warn(
+        `[startup] agent chat is disabled: ${chat.selection} is unavailable (${chat.availability.reason}): ${chat.availability.message}`,
+      );
+    }
+  }
+
   await seedLocalPrincipal(deps);
 
   // Jobs left `running` by a previous process have no worker; fail them so the

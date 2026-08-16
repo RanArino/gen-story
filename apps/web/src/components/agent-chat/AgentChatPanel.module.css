@@ -416,3 +416,29 @@
   font-size: 11px;
   color: #7a8699;
 }
+
+.disabledNotice {
+  border: 1px solid #e0c07a;
+  background: #fdf7e8;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.disabledTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7a5a12;
+}
+
+.disabledReason,
+.disabledHint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b5a3a;
+}
+
+.input:disabled {
+  background: #f4f6f9;
+  cursor: not-allowed;
+}

@@ -78,11 +78,20 @@ export type AiRuntimeCapabilitiesDto = {
   sessionIdKnownBeforeStart: boolean;
 };
 
+// Why the embedded chat is or is not usable right now. Separate from the
+// capability runtime above, because the two can be configured independently.
+export type AiChatRuntimeDto = {
+  runtime: "api" | "codex" | "claude";
+  available: boolean;
+  reason: string | null;
+};
+
 export type AiRuntimeInfoDto = {
   runtime: "api" | "codex" | "claude";
   wallet: "api_key" | "subscription";
   availability: AiRuntimeAvailabilityDto;
   capabilities: AiRuntimeCapabilitiesDto | null;
+  chat: AiChatRuntimeDto;
 };
 
 export type ProjectDto = {

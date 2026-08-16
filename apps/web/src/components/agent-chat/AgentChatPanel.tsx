@@ -5,6 +5,7 @@ import type {
   AgentConversationMessageDto,
   AgentConversationTurnDto,
   AgentProviderBindingDto,
+  AiChatRuntimeDto,
   ChangeProposalDto,
   ChangeProposalItemDto,
   CreativeDirectionDto,
@@ -53,7 +54,10 @@ export function AgentChatPanel({ projectId }: Props) {
   const t = useTranslations("agentChat");
   const [detail, setDetail] = useState<AgentConversationDetailDto | null>(null);
   const [direction, setDirection] = useState<CreativeDirectionDto | null>(null);
-  const [runtimeWallet, setRuntimeWallet] = useState<string | null>(null);
+
+  // Why the chat is off, if it is. Read once at load so the panel can say so
+  // up front instead of looking usable and failing on Send.
+  const [chatRuntime, setChatRuntime] = useState<AiChatRuntimeDto | null>(null);
   const [proposals, setProposals] = useState<Record<string, ChangeProposalDto>>(
     {},
   );
@@ -65,6 +69,7 @@ export function AgentChatPanel({ projectId }: Props) {
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const chatDisabled = chatRuntime != null && !chatRuntime.available;
   const conversationId = detail?.conversation.id ?? null;
   const activeTurn: AgentConversationTurnDto | null =
     detail?.turns.find((turn) => turn.status === "running") ?? null;
@@ -135,7 +140,7 @@ export function AgentChatPanel({ projectId }: Props) {
         ]);
         if (cancelled) return;
 
-        setRuntimeWallet(runtime.wallet);
+        setChatRuntime(runtime.chat);
         setDirection(creativeDirection);
 
         const conversation =
@@ -279,8 +284,11 @@ export function AgentChatPanel({ projectId }: Props) {
           </div>
           <div>
             <dt>{t("meta.wallet")}</dt>
+            {/* The chat's own wallet, not the app-wide AI runtime's: a chat
+                on a CLI runtime is paid for by the operator's subscription
+                even when the rest of the app runs on an API key. */}
             <dd>
-              {runtimeWallet === "subscription"
+              {chatRuntime != null && chatRuntime.runtime !== "api"
                 ? t("meta.subscription")
                 : t("meta.apiKey")}
             </dd>
@@ -302,7 +310,9 @@ export function AgentChatPanel({ projectId }: Props) {
       <div className={styles.sessionActions}>
         <button
           type="button"
-          disabled={conversationId == null || activeTurn != null}
+          disabled={
+            chatDisabled || conversationId == null || activeTurn != null
+          }
           onClick={() => {
             if (conversationId == null) return;
             void guarded(() => compactAgentChatSession(conversationId));
@@ -312,7 +322,9 @@ export function AgentChatPanel({ projectId }: Props) {
         </button>
         <button
           type="button"
-          disabled={conversationId == null || activeTurn != null}
+          disabled={
+            chatDisabled || conversationId == null || activeTurn != null
+          }
           onClick={() => {
             if (conversationId == null) return;
             void guarded(() => forkAgentChatSession(conversationId));
@@ -321,6 +333,14 @@ export function AgentChatPanel({ projectId }: Props) {
           {t("actions.fork")}
         </button>
       </div>
+
+      {chatRuntime != null && !chatRuntime.available && (
+        <div className={styles.disabledNotice} role="status">
+          <p className={styles.disabledTitle}>{t("disabled.title")}</p>
+          <p className={styles.disabledReason}>{chatRuntime.reason}</p>
+          <p className={styles.disabledHint}>{t("disabled.hint")}</p>
+        </div>
+      )}
 
       {error != null && <ErrorAlert message={error} />}
 
@@ -440,6 +460,7 @@ export function AgentChatPanel({ projectId }: Props) {
         <textarea
           id="agent-chat-input"
           ref={inputRef}
+          disabled={chatDisabled}
           className={styles.input}
           rows={3}
           value={draft}
@@ -450,6 +471,7 @@ export function AgentChatPanel({ projectId }: Props) {
           type="button"
           className={styles.primaryButton}
           disabled={
+            chatDisabled ||
             sending ||
             activeTurn != null ||
             conversationId == null ||
