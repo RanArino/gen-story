@@ -15,19 +15,32 @@ function request(overrides: Partial<AgentTurnRequest> = {}): AgentTurnRequest {
     text: "Should the tone be warmer?",
     mentions: [],
     references: [],
+    language: "en",
     ...overrides,
   };
 }
 
 describe("composeSessionPreamble", () => {
   it("scopes the agent to one project and to proposing rather than writing", () => {
-    const preamble = composeSessionPreamble({ projectId: "project_1" });
+    const preamble = composeSessionPreamble({
+      projectId: "project_1",
+      language: "en",
+    });
 
     expect(preamble).toContain("Project ID: project_1");
     expect(preamble).toContain("You cannot write project data");
+    expect(preamble).toContain("Reply in English");
     for (const tool of GEN_STORY_MCP_TOOL_NAMES) {
       expect(preamble).toContain(tool);
     }
+  });
+});
+
+describe("composeSessionPreamble language", () => {
+  it("names the operator's app language rather than leaving it to the locale", () => {
+    expect(
+      composeSessionPreamble({ projectId: "project_1", language: "ja" }),
+    ).toContain("Reply in Japanese");
   });
 });
 

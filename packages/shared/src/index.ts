@@ -339,10 +339,20 @@ export type SemanticTargetSnapshotDto = {
   revision: string;
 };
 
+// The valid values for the `stylePresetId` field, so an agent proposing a
+// style preset names a real one instead of inventing an ID.
+export type CreativeDirectionStylePresetOptionDto = {
+  id: string;
+  name: string;
+  description: string;
+  scope: string;
+};
+
 export type CreativeDirectionDto = {
   projectId: string;
   projectName: string;
   storyboardId: string | null;
+  stylePresetOptions: CreativeDirectionStylePresetOptionDto[];
   fields: SemanticTargetSnapshotDto[];
 };
 

@@ -213,6 +213,10 @@ export type AgentTurnRequest = {
   text: string;
   mentions: SemanticMention[];
   references: AgentTurnReference[];
+  // The operator's UI language. Without it the provider guesses from locale,
+  // which is how a live Codex session answered an English question in
+  // Japanese.
+  language: Language;
 };
 
 export type AgentTurnEvent =

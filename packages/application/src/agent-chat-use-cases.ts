@@ -33,8 +33,10 @@ import type {
   AgentTurnEvent,
   AgentTurnReference,
   ApplicationDependencies,
+  Language,
   UseCaseResult,
 } from "./ports";
+import { DEFAULT_LANGUAGE } from "./ports";
 import {
   failure,
   isFailure,
@@ -42,6 +44,17 @@ import {
   success,
   validationFailure,
 } from "./use-cases";
+
+// The chat answers in the language the operator set for the app, not the one
+// the provider infers from the machine's locale.
+async function resolveOperatorLanguage(
+  deps: ApplicationDependencies,
+): Promise<Language> {
+  const principal = await deps.authContext.getCurrentPrincipal();
+  if (principal == null) return DEFAULT_LANGUAGE;
+  const preference = await deps.userPreferences.findByUserId(principal.user.id);
+  return preference?.language ?? DEFAULT_LANGUAGE;
+}
 
 async function getConversationOrNotFound(
   deps: ApplicationDependencies,
@@ -397,17 +410,21 @@ export async function postAgentChatTurn(
 }
 
 // Proposals reach the transcript by reconciliation, not by trusting the agent
-// to report them: any proposal of this project that no transcript message
-// references yet becomes a proposal card. That holds even if the agent passes
-// a wrong conversation/turn id to the MCP propose tool.
+// to report them: the MCP tool takes the conversation/turn id as *input*, so a
+// wrong value there must not hide a proposal from the operator.
+//
+// The window is what keeps this precise. Only proposals created since this
+// turn started belong to it — an earlier conversation's proposals are already
+// shown in that conversation, and re-listing them here would put another
+// conversation's pending decision in front of the operator out of context.
 async function appendNewProposalMessages(
   deps: ApplicationDependencies,
   conversation: AgentConversation,
-  turnId: string,
+  turn: AgentConversationTurn,
 ): Promise<void> {
-  const proposals = await deps.changeProposals.findByProjectId(
-    conversation.projectId,
-  );
+  const proposals = (
+    await deps.changeProposals.findByProjectId(conversation.projectId)
+  ).filter((proposal) => proposal.createdAt >= turn.startedAt);
   if (proposals.length === 0) return;
 
   const messages = await deps.agentConversations.listMessages(conversation.id);
@@ -420,7 +437,7 @@ async function appendNewProposalMessages(
   for (const proposal of proposals) {
     if (referenced.has(proposal.id)) continue;
     await appendMessage(deps, conversation, {
-      turnId,
+      turnId: turn.id,
       role: "system",
       kind: "proposal",
       text: proposal.rationale,
@@ -490,6 +507,7 @@ export async function runAgentChatTurn(
       provider: turn.provider,
       model: turn.model,
       nativeSessionId: binding.nativeSessionId,
+      language: await resolveOperatorLanguage(deps),
       text: userMessage?.text ?? "",
       mentions: userMessage?.mentions ?? [],
       references,
@@ -563,7 +581,7 @@ export async function runAgentChatTurn(
     }
   }
 
-  await appendNewProposalMessages(deps, conversation, turn.id);
+  await appendNewProposalMessages(deps, conversation, turn);
 
   const timestamp = now();
   const finished: AgentConversationTurn = {

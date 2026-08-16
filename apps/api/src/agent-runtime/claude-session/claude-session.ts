@@ -37,7 +37,9 @@ export class ClaudeSessionError extends Error {
 }
 
 const DEFAULT_TURN_TIMEOUT_MS = 180_000;
-const STARTUP_TIMEOUT_MS = 30_000;
+// How long start()/resume() waits to see the process fail before treating it
+// as usable. `system/init` is NOT waited for — see waitUntilStarted.
+const STARTUP_GRACE_MS = 1_500;
 
 /**
  * A single `claude -p` conversational process bound to one session id. M1
@@ -69,6 +71,23 @@ export class ClaudeNativeSession {
     readonly sessionId: string,
   ) {
     process.on("event", (event: ClaudeStreamEvent) => this.handleEvent(event));
+    // A process that dies mid-turn would otherwise leave sendTurn waiting out
+    // its full timeout. Emitting the terminal event the caller is already
+    // listening for turns that hang into a prompt failure.
+    process.once(
+      "exit",
+      (code: number | null, signal: NodeJS.Signals | null) => {
+        const wasDeliberate = this.closed;
+        this.closed = true;
+        if (wasDeliberate) return;
+        this.emit({
+          type: "turn-completed",
+          isError: true,
+          subtype: "process_exited",
+          resultText: `Claude process exited (code=${code ?? "null"}, signal=${signal ?? "null"}).`,
+        });
+      },
+    );
   }
 
   private static spawn(input: {
@@ -134,7 +153,7 @@ export class ClaudeNativeSession {
     });
 
     const session = new ClaudeNativeSession(process, sessionId);
-    await session.waitUntilReady();
+    await session.waitUntilStarted();
     return session;
   }
 
@@ -161,21 +180,30 @@ export class ClaudeNativeSession {
     });
 
     const session = new ClaudeNativeSession(process, input.sessionId);
-    await session.waitUntilReady();
+    await session.waitUntilStarted();
     return session;
   }
 
-  /** Resolves on the first `system/init` event; rejects on early exit/error or timeout. */
-  private waitUntilReady(): Promise<void> {
+  /**
+   * Resolves once the process is usable; rejects only if it exits first.
+   *
+   * It deliberately does NOT wait for `system/init`. Under
+   * `--input-format stream-json`, Claude Code emits **nothing at all** until
+   * the first user message arrives (confirmed against 2.1.224), so a start
+   * that blocks on `init` before sending a message deadlocks until the turn
+   * timeout — which is exactly how M3's first live Claude chat failed. The
+   * session id is client-chosen, so there is nothing in `init` that start()
+   * actually needs.
+   *
+   * A CLI that dies immediately (not installed, not logged in, bad flag)
+   * still fails fast: that path exits well inside the grace window.
+   */
+  private waitUntilStarted(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const timer = setTimeout(() => {
         cleanup();
-        reject(
-          new ClaudeSessionError(
-            "Timed out waiting for the Claude process to start.",
-          ),
-        );
-      }, STARTUP_TIMEOUT_MS);
+        resolve();
+      }, STARTUP_GRACE_MS);
 
       const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
         cleanup();
@@ -185,6 +213,8 @@ export class ClaudeNativeSession {
           ),
         );
       };
+      // An early `init` means the process is up; no reason to wait out the
+      // rest of the grace window.
       const unsubscribeEvent = this.onEvent((event) => {
         if (event.type === "session-ready") {
           cleanup();
@@ -192,7 +222,7 @@ export class ClaudeNativeSession {
         }
       });
       const cleanup = () => {
-        clearTimeout(timeout);
+        clearTimeout(timer);
         unsubscribeEvent();
         this.process.off("exit", onExit);
       };

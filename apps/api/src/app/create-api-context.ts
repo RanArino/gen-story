@@ -1,3 +1,7 @@
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import type {
   ApplicationDependencies,
   ComplementSceneProposalPort,
@@ -219,14 +223,22 @@ export function createApiContext(
         : ({ status: "unchecked" } as AgentRuntimeAvailability),
   };
 
+  // A dedicated empty directory outside the repository, because a CLI session
+  // adopts its working directory's project context: started in the repo, Codex
+  // ingested this project's AGENTS.md and began running shell commands to
+  // explore the source tree. A chat about tone and style needs none of that —
+  // everything it may touch comes through the MCP endpoint over HTTP.
+  const agentChatWorkingDirectory = join(tmpdir(), "gen-story-agent-chat");
+  mkdirSync(agentChatWorkingDirectory, { recursive: true });
+
   // Reads `agentRuntime.availability` through the object, not a copy, so the
   // runner sees the real result once server.ts finishes its startup probe.
   const agentTurnRunner = new NativeSessionAgentTurnRunner({
     selection: agentRuntimeSelection,
     availability: () => agentRuntime.availability,
     model: env.GEN_STORY_AGENT_CHAT_MODEL?.trim() || null,
-    workingDirectory: process.cwd(),
-    allowedWorkingDirectoryRoot: process.cwd(),
+    workingDirectory: agentChatWorkingDirectory,
+    allowedWorkingDirectoryRoot: agentChatWorkingDirectory,
     apiBaseUrl:
       env.GEN_STORY_API_BASE_URL?.trim() ||
       `http://127.0.0.1:${env.API_PORT ?? 4000}`,

@@ -127,7 +127,7 @@ const getCreativeDirectionTool: McpToolDefinition = {
   name: "get_creative_direction",
   title: "Read creative direction",
   description:
-    "Read this project's current photo analysis, tone, and style preset with the base revision each one must be proposed against.",
+    "Read this project's current photo analysis, tone, and style preset with the base revision each one must be proposed against, plus the style presets that are valid values for stylePresetId.",
   inputShape: {},
   readOnly: true,
   handler: async (context) => {

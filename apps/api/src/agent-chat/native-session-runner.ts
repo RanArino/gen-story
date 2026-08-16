@@ -254,7 +254,10 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
       if (isNew) {
         await this.sendCodexTurn(
           live,
-          composeSessionPreamble({ projectId: request.projectId }),
+          composeSessionPreamble({
+            projectId: request.projectId,
+            language: request.language,
+          }),
           () => {},
         );
       }
@@ -278,7 +281,10 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
 
     if (isNew) {
       await session.sendTurn(
-        composeSessionPreamble({ projectId: request.projectId }),
+        composeSessionPreamble({
+          projectId: request.projectId,
+          language: request.language,
+        }),
         this.options.turnTimeoutMs,
       );
     }
@@ -302,9 +308,11 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
           return;
         }
         case "item-started": {
-          const item = event.item as { type?: unknown; name?: unknown };
-          if (item?.type === "mcpToolCall" && typeof item.name === "string") {
-            onEvent({ type: "tool-activity", toolName: item.name });
+          // Codex names the tool in `tool` (with the server in `server`);
+          // there is no `name` field on an mcpToolCall item.
+          const item = event.item as { type?: unknown; tool?: unknown };
+          if (item?.type === "mcpToolCall" && typeof item.tool === "string") {
+            onEvent({ type: "tool-activity", toolName: item.tool });
           }
           return;
         }

@@ -8,7 +8,11 @@ import { GEN_STORY_MCP_TOOL_NAMES } from "../mcp/tool-registry";
  * readable through the MCP tools; the Gen Story transcript is deliberately
  * not replayed, because the provider keeps (and compacts) its own context.
  */
-export function composeSessionPreamble(input: { projectId: string }): string {
+export function composeSessionPreamble(input: {
+  projectId: string;
+  language: "en" | "ja";
+}): string {
+  const language = input.language === "ja" ? "Japanese" : "English";
   return [
     "You are helping the operator of Gen Story refine one project's creative direction:",
     "AI photo analysis, emotion/tone, and style preset. Nothing else is in scope.",
@@ -24,8 +28,9 @@ export function composeSessionPreamble(input: { projectId: string }): string {
     "   each with a reason and its impact, instead of silently picking one.",
     "4. Only call apply_approved_change_proposal after the operator has approved",
     "   items; it writes just the approved ones.",
-    "5. Reply in the operator's language, in plain prose. Keep tool mechanics out",
-    "   of the reply: the UI renders proposals and tool activity itself.",
+    `5. Reply in ${language} — the operator's chosen app language — in plain`,
+    "   prose. Keep tool mechanics out of the reply: the UI renders proposals",
+    "   and tool activity itself.",
     "",
     `Available Gen Story tools: ${GEN_STORY_MCP_TOOL_NAMES.join(", ")}.`,
   ].join("\n");

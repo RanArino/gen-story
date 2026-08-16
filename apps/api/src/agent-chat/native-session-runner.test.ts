@@ -167,6 +167,7 @@ function request(overrides: Partial<AgentTurnRequest> = {}): AgentTurnRequest {
     text: "Should the tone be warmer?",
     mentions: [],
     references: [],
+    language: "en",
     ...overrides,
   };
 }
@@ -258,7 +259,14 @@ describe("NativeSessionAgentTurnRunner codex turns", () => {
     codex.duringTurn = [
       {
         type: "item-started",
-        item: { type: "mcpToolCall", name: "get_creative_direction" },
+        // The real item shape, captured from codex-cli 0.147.0: the tool name
+        // is in `tool`, not `name`. Reading `name` produced no activity at all.
+        item: {
+          type: "mcpToolCall",
+          server: "gen_story",
+          tool: "get_creative_direction",
+          status: "inProgress",
+        },
       },
       { type: "context-compacted" },
       {

@@ -352,6 +352,12 @@ export function toCreativeDirectionDto(
     projectId: direction.projectId,
     projectName: direction.projectName,
     storyboardId: direction.storyboardId,
+    stylePresetOptions: direction.stylePresetOptions.map((option) => ({
+      id: option.id,
+      name: option.name,
+      description: option.description,
+      scope: option.scope,
+    })),
     fields: direction.fields.map(toSemanticTargetSnapshotDto),
   };
 }

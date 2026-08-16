@@ -91,6 +91,7 @@ import {
 } from "./agent-chat-use-cases";
 import {
   analyzeProjectPhotos,
+  getCreativeDirection,
   applyAdjustmentToTestVariant,
   applyChangeProposal,
   assignPhotosToScene,
@@ -4288,6 +4289,32 @@ describe("application use cases", () => {
       });
     }
 
+    function buildToneProposal(
+      id: string,
+      conversationId: string,
+      createdAt: string,
+    ) {
+      return createChangeProposal({
+        id,
+        projectId: "project_1",
+        provenance: { provider: "codex", conversationId, turnId: "turn_1" },
+        items: [
+          {
+            id: `${id}_item`,
+            target: storyboardSemanticTarget("storyboard_1", "tone"),
+            before: "Reflective",
+            after: "Warm nostalgia",
+            rationale: "Photos lean warmer.",
+            baseRevision: "2026-05-02T00:00:10.000Z",
+          },
+        ],
+        rationale: "Shift the tone to match the photos.",
+        clientRequestId: `client_req_${id}`,
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
+
     async function startConversation(
       deps: ReturnType<typeof createDependencies>,
     ) {
@@ -4447,31 +4474,6 @@ describe("application use cases", () => {
         { type: "session-started", nativeSessionId: "session-1" },
         { type: "turn-completed", status: "completed" },
       ];
-      await deps.changeProposals.save(
-        createChangeProposal({
-          id: "proposal_1",
-          projectId: "project_1",
-          provenance: {
-            provider: "codex",
-            conversationId: conversation.id,
-            turnId: "turn_1",
-          },
-          items: [
-            {
-              id: "item_1",
-              target: storyboardSemanticTarget("storyboard_1", "tone"),
-              before: "Reflective",
-              after: "Warm nostalgia",
-              rationale: "Photos lean warmer.",
-              baseRevision: "2026-05-02T00:00:10.000Z",
-            },
-          ],
-          rationale: "Shift the tone to match the photos.",
-          clientRequestId: "client_req_1",
-          createdAt: "2026-08-16T00:00:00.000Z",
-          updatedAt: "2026-08-16T00:00:00.000Z",
-        }),
-      );
 
       const posted = await postAgentChatTurn(deps, {
         conversationId: conversation.id,
@@ -4479,6 +4481,16 @@ describe("application use cases", () => {
         text: "Warmer?",
       });
       if (!posted.ok) throw new Error("turn was not posted");
+
+      // Recorded after the turn opened, exactly as an MCP call during the
+      // turn would record it.
+      await deps.changeProposals.save(
+        buildToneProposal(
+          "proposal_1",
+          conversation.id,
+          new Date().toISOString(),
+        ),
+      );
       await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
 
       const proposalMessages = deps.agentConversations.messages.filter(
@@ -4492,6 +4504,30 @@ describe("application use cases", () => {
       // No project value changed: the card is a review unit, not a write.
       const storyboard = await deps.storyboards.findById("storyboard_1");
       expect(storyboard?.tone).toBe("Reflective");
+    });
+
+    it("does not replay another conversation's proposals into a new conversation", async () => {
+      const deps = seedChatDeps();
+      const first = await startConversation(deps);
+      await deps.changeProposals.save(
+        buildToneProposal("proposal_old", first.id, "2026-08-15T00:00:00.000Z"),
+      );
+
+      const second = await startConversation(deps);
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: second.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+      await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      expect(
+        deps.agentConversations.messages.filter(
+          (message) =>
+            message.conversationId === second.id && message.kind === "proposal",
+        ),
+      ).toHaveLength(0);
     });
 
     it("marks the binding recoverable when the provider session cannot be opened", async () => {
@@ -4612,6 +4648,37 @@ describe("application use cases", () => {
 
       expect(compacted.ok).toBe(true);
       if (compacted.ok) expect(compacted.value.compactCount).toBe(1);
+    });
+
+    it("offers the style presets an agent may name when proposing stylePresetId", async () => {
+      const deps = seedChatDeps();
+      await deps.stylePresets.save(
+        createStylePreset({
+          id: "preset_film",
+          scope: "system",
+          name: "Film Photo",
+          description: "Grainy 35mm warmth.",
+          prompt: "35mm film grain, halation",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      );
+
+      const direction = await getCreativeDirection(deps, {
+        projectId: "project_1",
+      });
+
+      expect(direction.ok).toBe(true);
+      if (direction.ok) {
+        expect(direction.value.stylePresetOptions).toEqual([
+          {
+            id: "preset_film",
+            name: "Film Photo",
+            description: "Grainy 35mm warmth.",
+            scope: "system",
+          },
+        ]);
+      }
     });
 
     it("compacts automatically once a session crosses the turn threshold", async () => {

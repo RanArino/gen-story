@@ -1028,10 +1028,21 @@ export async function getProjectPhotoAnalysis(
 
 // ── Creative direction reads (M2 first slice) ───────────────────────────────
 
+export type CreativeDirectionStylePresetOption = {
+  id: string;
+  name: string;
+  description: string;
+  scope: string;
+};
+
 export type CreativeDirection = {
   projectId: string;
   projectName: string;
   storyboardId: string | null;
+  // The vocabulary for the `stylePresetId` field. Without it an agent can
+  // only propose a style preset by inventing an ID, which a live Claude
+  // session correctly refused to do.
+  stylePresetOptions: CreativeDirectionStylePresetOption[];
   // Only the first-slice semantic targets that currently exist: photo analysis
   // (when the project has been analyzed) plus the storyboard's tone and style
   // preset (when the project has a storyboard).
@@ -1064,10 +1075,18 @@ export async function getCreativeDirection(
       fields.push(readStoryboardSemanticTarget(storyboard, "stylePresetId"));
     }
 
+    const stylePresets = await deps.stylePresets.findAll();
+
     return success({
       projectId: project.id,
       projectName: project.name,
       storyboardId: storyboard?.id ?? null,
+      stylePresetOptions: stylePresets.map((preset) => ({
+        id: preset.id,
+        name: preset.name,
+        description: preset.description,
+        scope: preset.scope,
+      })),
       fields,
     });
   } catch (error) {

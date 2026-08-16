@@ -50,6 +50,14 @@ function mcpServerArgs(servers: CodexMcpServers | undefined): string[] {
 }
 
 /**
+ * Suppresses AGENTS.md loading. A Gen Story chat is not a coding session: the
+ * operator's global AGENTS.md ("run pnpm typecheck", layer rules, ...) is
+ * noise here, and a live probe showed a session that had ingested it start
+ * running shell commands to explore the source tree.
+ */
+const NO_PROJECT_DOC_ARGS = ["-c", "project_doc_max_bytes=0"];
+
+/**
  * A single Codex App Server connection bound to one thread. M1 scope only:
  * start/resume, send a turn, interrupt, and explicit compact — enough to
  * prove the provider lifecycle M3 will build conversational chat on top of.
@@ -106,7 +114,11 @@ export class CodexNativeSession {
     mcpServers?: CodexMcpServers;
   }): Promise<CodexNativeSession> {
     const client = new CodexAppServerClient({
-      args: [...mcpServerArgs(input.mcpServers), "app-server"],
+      args: [
+        ...NO_PROJECT_DOC_ARGS,
+        ...mcpServerArgs(input.mcpServers),
+        "app-server",
+      ],
       workingDirectory: input.workingDirectory,
       allowedWorkingDirectoryRoot: input.allowedWorkingDirectoryRoot,
       environment: input.environment,
@@ -140,7 +152,11 @@ export class CodexNativeSession {
     mcpServers?: CodexMcpServers;
   }): Promise<CodexNativeSession> {
     const client = new CodexAppServerClient({
-      args: [...mcpServerArgs(input.mcpServers), "app-server"],
+      args: [
+        ...NO_PROJECT_DOC_ARGS,
+        ...mcpServerArgs(input.mcpServers),
+        "app-server",
+      ],
       workingDirectory: input.workingDirectory,
       allowedWorkingDirectoryRoot: input.allowedWorkingDirectoryRoot,
       environment: input.environment,
