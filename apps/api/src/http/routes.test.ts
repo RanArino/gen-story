@@ -130,15 +130,13 @@ describe("GET /api/me", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/ai-runtime", () => {
-  it("reports the default api runtime and wallet", async () => {
+  it("reports Claude Code as the default runtime and wallet", async () => {
     const { status, body } = await req(base, "GET", "/api/ai-runtime");
     expect(status).toBe(200);
-    expect(body).toEqual({
-      runtime: "api",
-      wallet: "api_key",
-      availability: { status: "not_applicable" },
-      capabilities: null,
-      chat: { runtime: "api", available: true, reason: null },
+    expect(body).toMatchObject({
+      runtime: "claude",
+      wallet: "subscription",
+      chat: { runtime: "claude" },
     });
   });
 
@@ -154,7 +152,7 @@ describe("GET /api/ai-runtime", () => {
     try {
       const { body } = await req(b2, "GET", "/api/ai-runtime");
       expect((body as { chat: unknown }).chat).toEqual({
-        runtime: "api",
+        runtime: "claude",
         available: false,
         reason: "The codex CLI is not logged in.",
       });

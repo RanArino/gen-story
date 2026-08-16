@@ -308,6 +308,26 @@ export function buildRouter(deps: ApiDependencies): Router {
   router.add("GET", "/api/ai-runtime", async (_req, res) => {
     const principal = await requirePrincipal(deps, res);
     if (principal == null) return;
+    const preference = await getUserPreference(deps, principal.user.id);
+    if (!preference.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(preference.error.code),
+        errorBody(preference.error.code, preference.error.message),
+      );
+      return;
+    }
+    const selection = preference.value.agentRuntime;
+    deps.agentRuntime.selection = selection;
+    deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+    deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+    deps.agentRuntime.availability =
+      selection === "api"
+        ? { status: "not_applicable" }
+        : await resolveAgentRuntimeAvailability(selection, {
+            workingDirectory: process.cwd(),
+            allowedWorkingDirectoryRoot: process.cwd(),
+          });
     sendJson(
       res,
       200,
