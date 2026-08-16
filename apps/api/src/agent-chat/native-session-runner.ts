@@ -14,16 +14,9 @@ import type {
   AgentRuntimeAvailability,
   AgentRuntimeSelection,
 } from "../agent-runtime/runtime-config";
-import { GEN_STORY_MCP_TOOL_NAMES } from "../mcp/tool-registry";
 import { composeSessionPreamble, composeTurnInput } from "./turn-input";
 
-// Claude namespaces MCP tools as `mcp__<server>__<tool>`; the server name here
-// must match the key used in the `--mcp-config` document below.
 const MCP_SERVER_NAME = "gen_story";
-
-export const CLAUDE_MCP_TOOL_NAMES: string[] = GEN_STORY_MCP_TOOL_NAMES.map(
-  (tool) => `mcp__${MCP_SERVER_NAME}__${tool}`,
-);
 
 /**
  * Only what this runner uses of a provider session. `CodexNativeSession` and
@@ -99,7 +92,11 @@ export const NATIVE_PROVIDER_SESSIONS: ProviderSessionFactory = {
       allowedWorkingDirectoryRoot: options.allowedWorkingDirectoryRoot,
       environment: options.environment,
       ...(options.model ? { model: options.model } : {}),
-      tools: CLAUDE_MCP_TOOL_NAMES,
+      // Claude's `--tools` selects from the *built-in* set only (verified
+      // against `claude --help`, 2.1.224), so the empty list disables Read,
+      // Bash and friends. MCP tools are a separate channel: with
+      // `--strict-mcp-config` the only ones that exist are Gen Story's.
+      tools: [],
       mcpConfig: {
         mcpServers: {
           [MCP_SERVER_NAME]: { type: "http", url: options.mcpUrl },
@@ -112,7 +109,7 @@ export const NATIVE_PROVIDER_SESSIONS: ProviderSessionFactory = {
       allowedWorkingDirectoryRoot: options.allowedWorkingDirectoryRoot,
       environment: options.environment,
       sessionId: options.sessionId,
-      tools: CLAUDE_MCP_TOOL_NAMES,
+      tools: [],
       mcpConfig: {
         mcpServers: {
           [MCP_SERVER_NAME]: { type: "http", url: options.mcpUrl },

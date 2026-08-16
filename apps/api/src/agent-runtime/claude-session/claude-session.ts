@@ -20,7 +20,7 @@ export type ClaudeSessionEvent =
 export type ClaudeSessionEventListener = (event: ClaudeSessionEvent) => void;
 
 /**
- * Which tools a session may use. Empty (the default) means none at all.
+ * Which *built-in* tools a session may use. Empty (the default) means none.
  * `mcpConfig` is the `--mcp-config` document; combined with
  * `--strict-mcp-config` it is the *only* MCP configuration the process sees.
  */
@@ -90,10 +90,10 @@ export class ClaudeNativeSession {
       "--verbose",
       "--permission-mode",
       "bypassPermissions",
-      // Empty by default: M1 sessions run with no tools at all, matching
-      // CodexNativeSession's sandbox: "read-only" posture. M3 chat sessions
-      // pass the Gen Story MCP tool names, and nothing else — no filesystem,
-      // shell, or web tool is ever enabled.
+      // Built-in tools only: `--tools` does not govern MCP tools. Empty means
+      // no Read/Bash/Edit at all, matching CodexNativeSession's
+      // sandbox: "read-only" posture, and M3 chat sessions keep it empty —
+      // their tools come from `--mcp-config` instead.
       "--tools",
       (options.tools ?? []).join(","),
       "--setting-sources",

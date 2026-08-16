@@ -124,11 +124,13 @@ any cloud setup. The following features are deliberately excluded from this vers
   provider session starts with no context. Gen Story never silently replays the
   transcript to fake that context.
 - The MCP server is attached to the spawned CLI per process — as
-  `-c mcp_servers.<name>.url=...` config overrides for Codex and as
-  `--mcp-config` plus an explicit tool allowlist for Claude Code. These flags
-  have not been re-verified against a live CLI since the M1 probes; if a CLI
-  changes them, the chat's tool calls stop working while ordinary conversation
-  still succeeds.
+  `-c mcp_servers.<name>.url=...` config overrides for Codex (verified against
+  codex-cli 0.147.0) and as `--mcp-config` with `--strict-mcp-config` for
+  Claude Code (verified against Claude Code 2.1.224). Built-in tools are
+  disabled in both cases, so the Gen Story tools are the only ones a chat
+  session has. What has *not* been exercised end to end here is a real tool
+  call over that attachment; if a CLI changes these flags, the chat's tool
+  calls stop working while ordinary conversation still succeeds.
 - Compaction policy is a turn count (20 turns per session), not provider token
   usage, which Gen Story cannot observe. Compaction is recorded and shown, and
   can also be triggered manually.
