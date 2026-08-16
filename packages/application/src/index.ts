@@ -1,5 +1,21 @@
 export { MAX_CONCURRENT_PER_PROJECT } from "./concurrency-policy";
 export type {
+  AgentChatConversationDetail,
+  CreateAgentChatConversationInput,
+  PostAgentChatTurnInput,
+  PostAgentChatTurnOutput,
+} from "./agent-chat-use-cases";
+export {
+  cancelAgentChatTurn,
+  compactAgentChatConversation,
+  createAgentChatConversation,
+  forkAgentChatProviderSession,
+  getAgentChatConversation,
+  listAgentChatConversations,
+  postAgentChatTurn,
+  runAgentChatTurn,
+} from "./agent-chat-use-cases";
+export type {
   AgentConversationRepositoryPort,
   AgentRunnerAvailability,
   AgentTurnEvent,

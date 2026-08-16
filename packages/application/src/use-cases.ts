@@ -78,14 +78,14 @@ import type {
 } from "./ports";
 import { DEFAULT_LANGUAGE, isLanguage } from "./ports";
 
-function success<T>(value: T): UseCaseResult<T> {
+export function success<T>(value: T): UseCaseResult<T> {
   return {
     ok: true,
     value,
   };
 }
 
-function failure(
+export function failure(
   code: "validation_error" | "not_found" | "conflict" | "invalid_state",
   message: string,
 ): UseCaseResult<never> {
@@ -98,18 +98,18 @@ function failure(
   };
 }
 
-function validationFailure(error: unknown): UseCaseResult<never> {
+export function validationFailure(error: unknown): UseCaseResult<never> {
   return failure(
     "validation_error",
     error instanceof Error ? error.message : "Invalid input.",
   );
 }
 
-function now(): string {
+export function now(): string {
   return new Date().toISOString();
 }
 
-function isFailure<T>(
+export function isFailure<T>(
   value: T | UseCaseResult<never>,
 ): value is UseCaseResult<never> {
   return (

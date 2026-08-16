@@ -397,3 +397,73 @@ export type ChangeProposalDto = {
   createdAt: string;
   updatedAt: string;
 };
+
+// ── Embedded agent chat (M3) ───────────────────────────────────────────────
+
+export type SemanticMentionDto = {
+  label: string;
+  target: SemanticTargetDto;
+};
+
+export type AgentConversationMessageDto = {
+  id: string;
+  conversationId: string;
+  turnId: string | null;
+  sequence: number;
+  role: "user" | "assistant" | "system";
+  kind:
+    | "user_text"
+    | "assistant_text"
+    | "tool_activity"
+    | "proposal"
+    | "notice";
+  text: string;
+  mentions: SemanticMentionDto[];
+  data: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type AgentConversationTurnDto = {
+  id: string;
+  conversationId: string;
+  bindingId: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  provider: "codex" | "claude";
+  model: string | null;
+  providerTurnId: string | null;
+  compacted: boolean;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
+};
+
+// What the chat header shows: which provider-native session this conversation
+// is continuing, and how its context has been managed.
+export type AgentProviderBindingDto = {
+  id: string;
+  conversationId: string;
+  provider: "codex" | "claude";
+  model: string | null;
+  nativeSessionId: string | null;
+  status: "active" | "compacting" | "recoverable" | "closed";
+  compactCount: number;
+  lastCompactedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentConversationDto = {
+  id: string;
+  projectId: string;
+  title: string;
+  activeBindingId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentConversationDetailDto = {
+  conversation: AgentConversationDto;
+  binding: AgentProviderBindingDto | null;
+  turns: AgentConversationTurnDto[];
+  messages: AgentConversationMessageDto[];
+};

@@ -166,3 +166,26 @@ export const ReviseChangeProposalItemSchema = z.object({
   after: z.unknown(),
   rationale: z.string().min(1).optional(),
 });
+
+// ── Embedded agent chat (M3) ───────────────────────────────────────────────
+
+const SemanticMentionSchema = z.object({
+  label: z.string().min(1),
+  target: z.object({
+    entityType: z.enum(["project", "storyboard"]),
+    entityId: z.string().min(1),
+    field: z.enum(["photoAnalysis", "tone", "stylePresetId"]),
+  }),
+});
+
+export const CreateAgentConversationSchema = z.object({
+  title: z.string().min(1).optional(),
+});
+
+// `clientRequestId` is what makes a resubmitted turn idempotent after a
+// dropped response, so it is required rather than generated server-side.
+export const PostAgentChatTurnSchema = z.object({
+  clientRequestId: z.string().min(1),
+  text: z.string().min(1),
+  mentions: z.array(SemanticMentionSchema).optional(),
+});

@@ -461,6 +461,9 @@ export class StubAgentTurnRunner implements AgentTurnRunnerPort {
     model: "gpt-5-codex",
   };
   public compactSupported = true;
+  // Set to keep a turn in flight (so a cancel has something to stop);
+  // resolve it to let the scripted events replay.
+  public hold: Promise<void> | null = null;
 
   availability(): AgentRunnerAvailability {
     return this.available;
@@ -471,6 +474,7 @@ export class StubAgentTurnRunner implements AgentTurnRunnerPort {
     onEvent: (event: AgentTurnEvent) => void,
   ): Promise<void> {
     this.requests.push(request);
+    if (this.hold != null) await this.hold;
     for (const event of this.script) {
       onEvent(event);
     }
