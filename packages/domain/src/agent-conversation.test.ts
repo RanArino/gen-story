@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_SESSION_COMPACT_TURN_THRESHOLD,
   canSendTurnOnBinding,
   createAgentConversation,
   createAgentConversationMessage,
@@ -13,6 +14,7 @@ import {
   recordAgentProviderBindingTurn,
   setAgentConversationActiveBinding,
   setAgentProviderBindingStatus,
+  shouldCompactAgentSession,
 } from "./agent-conversation";
 
 const NOW = "2026-08-16T00:00:00.000Z";
@@ -274,5 +276,56 @@ describe("conversation turns", () => {
     const compacted = markAgentConversationTurnCompacted(turn());
     expect(compacted.compacted).toBe(true);
     expect(markAgentConversationTurnCompacted(compacted)).toBe(compacted);
+  });
+});
+
+describe("shouldCompactAgentSession", () => {
+  function completedTurns(count: number, startedAt = LATER) {
+    return Array.from({ length: count }, (_, index) => ({
+      ...createAgentConversationTurn({
+        id: `turn-${index}`,
+        conversationId: "conversation-1",
+        bindingId: "binding-1",
+        clientRequestId: `request-${index}`,
+        provider: "codex" as const,
+        startedAt,
+      }),
+      status: "completed" as const,
+    }));
+  }
+
+  it("holds off until the threshold is reached", () => {
+    expect(
+      shouldCompactAgentSession(
+        binding(),
+        completedTurns(AGENT_SESSION_COMPACT_TURN_THRESHOLD - 1),
+      ),
+    ).toBe(false);
+    expect(
+      shouldCompactAgentSession(
+        binding(),
+        completedTurns(AGENT_SESSION_COMPACT_TURN_THRESHOLD),
+      ),
+    ).toBe(true);
+  });
+
+  it("counts only the turns since the last compaction", () => {
+    const compacted = recordAgentProviderBindingCompaction(binding(), LATER);
+
+    expect(
+      shouldCompactAgentSession(
+        compacted,
+        completedTurns(AGENT_SESSION_COMPACT_TURN_THRESHOLD, NOW),
+      ),
+    ).toBe(false);
+  });
+
+  it("never compacts a binding that is not active", () => {
+    expect(
+      shouldCompactAgentSession(
+        setAgentProviderBindingStatus(binding(), "recoverable", LATER),
+        completedTurns(AGENT_SESSION_COMPACT_TURN_THRESHOLD),
+      ),
+    ).toBe(false);
   });
 });

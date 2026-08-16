@@ -17,6 +17,7 @@ import {
   semanticTargetKey,
   setAgentConversationActiveBinding,
   setAgentProviderBindingStatus,
+  shouldCompactAgentSession,
   type AgentConversation,
   type AgentConversationMessage,
   type AgentConversationMessageKind,
@@ -606,7 +607,43 @@ export async function runAgentChatTurn(
     compacted: finished.compacted,
   });
 
+  await compactIfDue(deps, conversation, currentBinding);
+
   return success(finished);
+}
+
+// Long sessions eventually exhaust the provider's context. Compacting between
+// turns (never during one) keeps the next turn from failing for a reason the
+// operator cannot see or act on, and it is recorded in the transcript exactly
+// like a manual compaction.
+async function compactIfDue(
+  deps: ApplicationDependencies,
+  conversation: AgentConversation,
+  binding: AgentProviderBinding,
+): Promise<void> {
+  const turns = await deps.agentConversations.listTurns(conversation.id);
+  if (!shouldCompactAgentSession(binding, turns)) return;
+
+  const compacted = await deps.agentTurnRunner.compact({
+    conversationId: conversation.id,
+  });
+  if (!compacted) return;
+
+  const updated = recordAgentProviderBindingCompaction(binding, now());
+  await deps.agentConversations.saveBinding(updated);
+  await appendMessage(deps, conversation, {
+    turnId: null,
+    role: "system",
+    kind: "notice",
+    text: "The context was compacted automatically to keep this session going.",
+    data: { compactCount: updated.compactCount, automatic: true },
+  });
+  await publishChatEvent(deps, conversation.projectId, "binding", {
+    conversationId: conversation.id,
+    bindingId: updated.id,
+    status: updated.status,
+    compactCount: updated.compactCount,
+  });
 }
 
 export async function cancelAgentChatTurn(

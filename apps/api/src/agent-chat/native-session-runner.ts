@@ -6,7 +6,9 @@ import type {
 } from "@gen-story/application";
 import type { AgentProvider } from "@gen-story/domain";
 
+import type { ClaudeSessionEvent } from "../agent-runtime/claude-session/claude-session";
 import { ClaudeNativeSession } from "../agent-runtime/claude-session/claude-session";
+import type { CodexSessionEvent } from "../agent-runtime/codex-app-server/codex-session";
 import { CodexNativeSession } from "../agent-runtime/codex-app-server/codex-session";
 import type {
   AgentRuntimeAvailability,
@@ -23,16 +25,112 @@ export const CLAUDE_MCP_TOOL_NAMES: string[] = GEN_STORY_MCP_TOOL_NAMES.map(
   (tool) => `mcp__${MCP_SERVER_NAME}__${tool}`,
 );
 
+/**
+ * Only what this runner uses of a provider session. `CodexNativeSession` and
+ * `ClaudeNativeSession` satisfy these structurally; naming the subsets is what
+ * lets the runner's own logic be tested without spawning a CLI.
+ */
+export interface CodexChatSession {
+  readonly threadId: string;
+  onEvent(listener: (event: CodexSessionEvent) => void): () => void;
+  sendTurn(text: string): Promise<{ turnId: string }>;
+  waitForTurnCompletion(turnId: string): Promise<{ status: string }>;
+  interruptTurn(turnId: string): Promise<void>;
+  compact(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export interface ClaudeChatSession {
+  readonly sessionId: string;
+  readonly isClosed: boolean;
+  onEvent(listener: (event: ClaudeSessionEvent) => void): () => void;
+  sendTurn(
+    text: string,
+    timeoutMs?: number,
+  ): Promise<{ isError: boolean; subtype: string; resultText: string | null }>;
+  compact(): Promise<unknown>;
+  interrupt(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export type ProviderSessionOptions = {
+  workingDirectory: string;
+  allowedWorkingDirectoryRoot: string;
+  environment?: NodeJS.ProcessEnv;
+  model: string | null;
+  mcpUrl: string;
+};
+
+export type ProviderSessionFactory = {
+  startCodex(options: ProviderSessionOptions): Promise<CodexChatSession>;
+  resumeCodex(
+    options: ProviderSessionOptions & { threadId: string },
+  ): Promise<CodexChatSession>;
+  startClaude(options: ProviderSessionOptions): Promise<ClaudeChatSession>;
+  resumeClaude(
+    options: ProviderSessionOptions & { sessionId: string },
+  ): Promise<ClaudeChatSession>;
+};
+
+// Codex has no per-thread MCP parameter, so the server is attached as a
+// config override on the process; Claude takes a `--mcp-config` document plus
+// an explicit allowlist of the tool names it exposes.
+export const NATIVE_PROVIDER_SESSIONS: ProviderSessionFactory = {
+  startCodex: (options) =>
+    CodexNativeSession.start({
+      workingDirectory: options.workingDirectory,
+      allowedWorkingDirectoryRoot: options.allowedWorkingDirectoryRoot,
+      environment: options.environment,
+      cwd: options.workingDirectory,
+      ...(options.model ? { model: options.model } : {}),
+      mcpServers: { [MCP_SERVER_NAME]: { url: options.mcpUrl } },
+    }),
+  resumeCodex: (options) =>
+    CodexNativeSession.resume({
+      workingDirectory: options.workingDirectory,
+      allowedWorkingDirectoryRoot: options.allowedWorkingDirectoryRoot,
+      environment: options.environment,
+      threadId: options.threadId,
+      mcpServers: { [MCP_SERVER_NAME]: { url: options.mcpUrl } },
+    }),
+  startClaude: (options) =>
+    ClaudeNativeSession.start({
+      workingDirectory: options.workingDirectory,
+      allowedWorkingDirectoryRoot: options.allowedWorkingDirectoryRoot,
+      environment: options.environment,
+      ...(options.model ? { model: options.model } : {}),
+      tools: CLAUDE_MCP_TOOL_NAMES,
+      mcpConfig: {
+        mcpServers: {
+          [MCP_SERVER_NAME]: { type: "http", url: options.mcpUrl },
+        },
+      },
+    }),
+  resumeClaude: (options) =>
+    ClaudeNativeSession.resume({
+      workingDirectory: options.workingDirectory,
+      allowedWorkingDirectoryRoot: options.allowedWorkingDirectoryRoot,
+      environment: options.environment,
+      sessionId: options.sessionId,
+      tools: CLAUDE_MCP_TOOL_NAMES,
+      mcpConfig: {
+        mcpServers: {
+          [MCP_SERVER_NAME]: { type: "http", url: options.mcpUrl },
+        },
+      },
+    }),
+};
+
 /** One live provider session, plus what the runner needs to drive it. */
 type LiveSession =
   | {
       provider: "codex";
-      session: CodexNativeSession;
+      session: CodexChatSession;
       activeTurnId: string | null;
     }
   | {
       provider: "claude";
-      session: ClaudeNativeSession;
+      session: ClaudeChatSession;
       activeTurnId: string | null;
     };
 
@@ -48,6 +146,8 @@ export type NativeSessionRunnerOptions = {
   apiBaseUrl: string;
   environment?: NodeJS.ProcessEnv;
   turnTimeoutMs?: number;
+  // Overridden in tests; production always uses the real CLI sessions.
+  sessions?: ProviderSessionFactory;
 };
 
 export class AgentTurnRunnerError extends Error {
@@ -124,27 +224,27 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
     const existing = this.sessions.get(request.conversationId);
     if (existing != null) return existing;
 
-    const url = this.mcpUrl(request.projectId, provider);
-    const common = {
+    const factory = this.options.sessions ?? NATIVE_PROVIDER_SESSIONS;
+    const options: ProviderSessionOptions = {
       workingDirectory: this.options.workingDirectory,
       allowedWorkingDirectoryRoot: this.options.allowedWorkingDirectoryRoot,
       environment: this.options.environment,
+      model: this.options.model,
+      mcpUrl: this.mcpUrl(request.projectId, provider),
     };
 
+    // A conversation that already has a native session id continues it. The
+    // preamble is only sent when a session is genuinely new, so resuming
+    // after an API restart costs one turn, not a replay.
+    const isNew = request.nativeSessionId == null;
+
     if (provider === "codex") {
-      const session =
-        request.nativeSessionId == null
-          ? await CodexNativeSession.start({
-              ...common,
-              cwd: this.options.workingDirectory,
-              ...(this.options.model ? { model: this.options.model } : {}),
-              mcpServers: { [MCP_SERVER_NAME]: { url } },
-            })
-          : await CodexNativeSession.resume({
-              ...common,
-              threadId: request.nativeSessionId,
-              mcpServers: { [MCP_SERVER_NAME]: { url } },
-            });
+      const session = isNew
+        ? await factory.startCodex(options)
+        : await factory.resumeCodex({
+            ...options,
+            threadId: request.nativeSessionId as string,
+          });
 
       const live: LiveSession = {
         provider: "codex",
@@ -154,7 +254,7 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
       this.sessions.set(request.conversationId, live);
       onEvent({ type: "session-started", nativeSessionId: session.threadId });
 
-      if (request.nativeSessionId == null) {
+      if (isNew) {
         await this.sendCodexTurn(
           live,
           composeSessionPreamble({ projectId: request.projectId }),
@@ -164,23 +264,12 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
       return live;
     }
 
-    const mcpConfig = {
-      mcpServers: { [MCP_SERVER_NAME]: { type: "http", url } },
-    };
-    const session =
-      request.nativeSessionId == null
-        ? await ClaudeNativeSession.start({
-            ...common,
-            ...(this.options.model ? { model: this.options.model } : {}),
-            tools: CLAUDE_MCP_TOOL_NAMES,
-            mcpConfig,
-          })
-        : await ClaudeNativeSession.resume({
-            ...common,
-            sessionId: request.nativeSessionId,
-            tools: CLAUDE_MCP_TOOL_NAMES,
-            mcpConfig,
-          });
+    const session = isNew
+      ? await factory.startClaude(options)
+      : await factory.resumeClaude({
+          ...options,
+          sessionId: request.nativeSessionId as string,
+        });
 
     const live: LiveSession = {
       provider: "claude",
@@ -190,7 +279,7 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
     this.sessions.set(request.conversationId, live);
     onEvent({ type: "session-started", nativeSessionId: session.sessionId });
 
-    if (request.nativeSessionId == null) {
+    if (isNew) {
       await session.sendTurn(
         composeSessionPreamble({ projectId: request.projectId }),
         this.options.turnTimeoutMs,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_SESSION_COMPACT_TURN_THRESHOLD,
   createAiJob,
   createChangeProposal,
   createGeneratedImage,
@@ -4611,6 +4612,33 @@ describe("application use cases", () => {
 
       expect(compacted.ok).toBe(true);
       if (compacted.ok) expect(compacted.value.compactCount).toBe(1);
+    });
+
+    it("compacts automatically once a session crosses the turn threshold", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      for (
+        let index = 0;
+        index < AGENT_SESSION_COMPACT_TURN_THRESHOLD;
+        index += 1
+      ) {
+        const posted = await postAgentChatTurn(deps, {
+          conversationId: conversation.id,
+          clientRequestId: `request_${index}`,
+          text: `Question ${index}`,
+        });
+        if (!posted.ok) throw new Error("turn was not posted");
+        await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+      }
+
+      const binding = deps.agentConversations.bindings[0];
+      expect(binding?.compactCount).toBe(1);
+      expect(
+        deps.agentConversations.messages.some(
+          (message) => message.data?.automatic === true,
+        ),
+      ).toBe(true);
     });
 
     it("refuses a mention that points at another project's field", async () => {

@@ -164,6 +164,7 @@ export type {
   SemanticMention,
 } from "./agent-conversation";
 export {
+  AGENT_SESSION_COMPACT_TURN_THRESHOLD,
   canSendTurnOnBinding,
   createAgentConversation,
   createAgentConversationMessage,
@@ -176,6 +177,7 @@ export {
   recordAgentProviderBindingTurn,
   setAgentConversationActiveBinding,
   setAgentProviderBindingStatus,
+  shouldCompactAgentSession,
 } from "./agent-conversation";
 export {
   applyChangeProposalItemApproval,

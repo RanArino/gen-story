@@ -352,6 +352,28 @@ export function setAgentConversationActiveBinding(
   return { ...conversation, activeBindingId: bindingId, updatedAt };
 }
 
+// Long sessions must compact or the provider eventually refuses the next
+// turn. Gen Story does not track provider token usage, so the policy is a
+// turn count — coarse, but observable to the operator and never silently
+// dependent on a number only the provider knows.
+export const AGENT_SESSION_COMPACT_TURN_THRESHOLD = 20;
+
+export function shouldCompactAgentSession(
+  binding: AgentProviderBinding,
+  turns: AgentConversationTurn[],
+): boolean {
+  if (binding.status !== "active") return false;
+
+  const since = turns.filter(
+    (turn) =>
+      turn.bindingId === binding.id &&
+      turn.status === "completed" &&
+      (binding.lastCompactedAt == null ||
+        turn.startedAt > binding.lastCompactedAt),
+  );
+  return since.length >= AGENT_SESSION_COMPACT_TURN_THRESHOLD;
+}
+
 // A binding can carry the next turn only while it is genuinely usable.
 // "recoverable" deliberately fails this: the operator must fork a new
 // session instead of the runner pretending the provider still has context.
