@@ -49,6 +49,12 @@ export function AppShell({ children, projectId }: Props) {
                 {tNav("stepStoryboard")}
               </Link>
               <Link
+                href={`/projects/${projectId}/chat`}
+                className={`${styles.stepButton} ${isActive(`/projects/${projectId}/chat`) ? styles.stepButtonActive : ""}`}
+              >
+                {tNav("stepChat")}
+              </Link>
+              <Link
                 href={`/projects/${projectId}/generate`}
                 className={`${styles.stepButton} ${isActive(`/projects/${projectId}/generate`) ? styles.stepButtonActive : ""}`}
               >

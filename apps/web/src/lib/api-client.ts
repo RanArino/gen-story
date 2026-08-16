@@ -1,5 +1,14 @@
 import type {
+  AgentConversationDetailDto,
+  AgentConversationDto,
+  AgentConversationMessageDto,
+  AgentConversationTurnDto,
+  AgentProviderBindingDto,
   AiJobDto,
+  AiRuntimeInfoDto,
+  ChangeProposalDto,
+  CreativeDirectionDto,
+  SemanticMentionDto,
   ComplementSceneProposalDto,
   CharacterReferenceSheetDto,
   GeneratedImageDto,
@@ -122,6 +131,15 @@ const PROJECT_EVENT_KINDS = [
   "generation-request.running",
   "generation-request.succeeded",
   "generation-request.failed",
+  // M3 chat: a turn's visible progress and the proposal lifecycle it drives.
+  "agent_chat.message",
+  "agent_chat.turn",
+  "agent_chat.binding",
+  "change_proposal.created",
+  "change_proposal.resolved",
+  "change_proposal.revised",
+  "change_proposal.applied",
+  "change_proposal.conflicted",
 ];
 
 // One connection per project, shared by every subscriber. Waiting on a batch of
@@ -922,4 +940,144 @@ export async function setUserLanguagePreference(
     { language },
   );
   return data.preference;
+}
+
+// ── Creative direction and change proposals ───────────────────────────────────
+
+export async function getCreativeDirection(
+  projectId: string,
+): Promise<CreativeDirectionDto> {
+  return request<CreativeDirectionDto>(
+    "GET",
+    `/api/projects/${projectId}/creative-direction`,
+  );
+}
+
+export async function getChangeProposal(
+  changeProposalId: string,
+): Promise<ChangeProposalDto> {
+  return request<ChangeProposalDto>(
+    "GET",
+    `/api/change-proposals/${changeProposalId}`,
+  );
+}
+
+export async function decideChangeProposalItem(
+  changeProposalId: string,
+  itemId: string,
+  approval: "approved" | "rejected",
+): Promise<ChangeProposalDto> {
+  return request<ChangeProposalDto>(
+    "POST",
+    `/api/change-proposals/${changeProposalId}/items/${itemId}/decision`,
+    { approval },
+  );
+}
+
+export async function selectChangeProposalChoice(
+  changeProposalId: string,
+  itemId: string,
+  optionId: string,
+): Promise<ChangeProposalDto> {
+  return request<ChangeProposalDto>(
+    "POST",
+    `/api/change-proposals/${changeProposalId}/items/${itemId}/choice`,
+    { optionId },
+  );
+}
+
+export async function applyChangeProposal(
+  changeProposalId: string,
+): Promise<ChangeProposalDto> {
+  return request<ChangeProposalDto>(
+    "POST",
+    `/api/change-proposals/${changeProposalId}/apply`,
+  );
+}
+
+// ── Embedded agent chat ───────────────────────────────────────────────────────
+
+export async function getAiRuntimeInfo(): Promise<AiRuntimeInfoDto> {
+  return request<AiRuntimeInfoDto>("GET", "/api/ai-runtime");
+}
+
+export async function listAgentConversations(
+  projectId: string,
+): Promise<AgentConversationDto[]> {
+  const data = await request<{ conversations: AgentConversationDto[] }>(
+    "GET",
+    `/api/projects/${projectId}/agent-conversations`,
+  );
+  return data.conversations;
+}
+
+export async function createAgentConversation(
+  projectId: string,
+  title?: string,
+): Promise<AgentConversationDto> {
+  return request<AgentConversationDto>(
+    "POST",
+    `/api/projects/${projectId}/agent-conversations`,
+    title == null ? {} : { title },
+  );
+}
+
+// `afterSequence` fetches only what this client has not rendered yet, which is
+// how a reconnect resumes without replaying the whole transcript.
+export async function getAgentConversation(
+  conversationId: string,
+  afterSequence?: number,
+): Promise<AgentConversationDetailDto> {
+  const query = afterSequence == null ? "" : `?afterSequence=${afterSequence}`;
+  return request<AgentConversationDetailDto>(
+    "GET",
+    `/api/agent-conversations/${conversationId}${query}`,
+  );
+}
+
+export async function postAgentChatTurn(
+  conversationId: string,
+  input: {
+    clientRequestId: string;
+    text: string;
+    mentions?: SemanticMentionDto[];
+  },
+): Promise<{
+  turn: AgentConversationTurnDto;
+  message: AgentConversationMessageDto;
+}> {
+  return request("POST", `/api/agent-conversations/${conversationId}/turns`, {
+    clientRequestId: input.clientRequestId,
+    text: input.text,
+    ...(input.mentions && input.mentions.length > 0
+      ? { mentions: input.mentions }
+      : {}),
+  });
+}
+
+export async function cancelAgentChatTurn(
+  turnId: string,
+): Promise<AgentConversationTurnDto> {
+  return request<AgentConversationTurnDto>(
+    "POST",
+    `/api/agent-conversation-turns/${turnId}/cancel`,
+  );
+}
+
+export async function forkAgentChatSession(
+  conversationId: string,
+): Promise<AgentProviderBindingDto> {
+  return request<AgentProviderBindingDto>(
+    "POST",
+    `/api/agent-conversations/${conversationId}/fork`,
+  );
+}
+
+export async function compactAgentChatSession(
+  conversationId: string,
+): Promise<AgentProviderBindingDto> {
+  return request<AgentProviderBindingDto>(
+    "POST",
+    `/api/agent-conversations/${conversationId}/compact`,
+  );
 }

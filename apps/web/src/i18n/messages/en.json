@@ -19,7 +19,8 @@
     "stepPhotos": "1 · Photos",
     "stepStoryboard": "2 · Storyboard",
     "stepGenerate": "3 · Generate",
-    "stepReview": "4 · Review"
+    "stepReview": "4 · Review",
+    "stepChat": "AI refine"
   },
   "projects": {
     "title": "Projects",
@@ -696,5 +697,75 @@
     "note": "Edits are applied to the next generated image.",
     "loading": "Composing preview…",
     "failed": "Failed to load preview"
+  },
+  "agentChat": {
+    "title": "Refine with AI",
+    "subtitle": "Discuss photo analysis, emotion and tone, and the style preset. Nothing changes until you approve it.",
+    "inputLabel": "Message to the agent",
+    "placeholder": "Ask about the tone, the style preset, or the photo analysis…",
+    "running": "The agent is working…",
+    "loadingProposal": "Loading proposal…",
+    "toolActivity": "Used {tool}",
+    "noMentionTargets": "No fields to reference yet. Analyze photos or create a storyboard first.",
+    "fields": {
+      "photoAnalysis": "@photo-analysis",
+      "tone": "@tone",
+      "stylePreset": "@style-preset"
+    },
+    "meta": {
+      "provider": "Provider",
+      "model": "Model",
+      "wallet": "Billing",
+      "session": "Session",
+      "compactions": "Compactions",
+      "none": "Not bound yet",
+      "providerDefault": "Provider default",
+      "notStarted": "Not started",
+      "subscription": "Your subscription",
+      "apiKey": "API key",
+      "status": {
+        "active": "active",
+        "compacting": "compacting",
+        "recoverable": "needs a new session",
+        "closed": "closed"
+      }
+    },
+    "actions": {
+      "send": "Send",
+      "cancel": "Cancel turn",
+      "compact": "Compact context",
+      "fork": "New session",
+      "mention": "Reference a field"
+    },
+    "approval": {
+      "cardLabel": "Proposed change",
+      "title": "Proposed change",
+      "before": "Now",
+      "after": "Proposed",
+      "reason": "Why",
+      "impact": "Impact",
+      "choiceLabel": "Alternatives",
+      "approveItem": "Approve",
+      "rejectItem": "Reject",
+      "revise": "Revise",
+      "apply": "Apply {count} approved",
+      "continue": "Continue without applying",
+      "conflict": "This project changed after the proposal was made. Ask the agent to revise it, then approve again.",
+      "nothingChangesYet": "Nothing changes in the project until you apply approved items.",
+      "reviseDraft": "Please revise the {field} proposal:",
+      "status": {
+        "pending": "Awaiting your review",
+        "partially_approved": "Partly approved",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "applied": "Applied",
+        "conflicted": "Conflict"
+      },
+      "itemApproval": {
+        "pending": "undecided",
+        "approved": "approved",
+        "rejected": "rejected"
+      }
+    }
   }
 }
