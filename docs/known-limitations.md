@@ -112,6 +112,31 @@ any cloud setup. The following features are deliberately excluded from this vers
   photos are marked and can be picked again; selecting one asks for confirmation
   before the scenes are created.
 
+## In-app agent chat
+
+- The chat requires a locally installed, subscription-logged-in Codex or Claude
+  Code CLI (`GEN_STORY_AGENT_RUNTIME=codex`/`claude`) and only runs on a local
+  deployment. On the default `api` runtime the chat is visible but disabled,
+  with the reason shown in the panel.
+- One conversation is bound to one provider-native session. Switching providers,
+  or recovering a session the provider no longer has, means starting a new
+  session with **New session**: the Gen Story transcript is kept, but the new
+  provider session starts with no context. Gen Story never silently replays the
+  transcript to fake that context.
+- The MCP server is attached to the spawned CLI per process — as
+  `-c mcp_servers.<name>.url=...` config overrides for Codex and as
+  `--mcp-config` plus an explicit tool allowlist for Claude Code. These flags
+  have not been re-verified against a live CLI since the M1 probes; if a CLI
+  changes them, the chat's tool calls stop working while ordinary conversation
+  still succeeds.
+- Compaction policy is a turn count (20 turns per session), not provider token
+  usage, which Gen Story cannot observe. Compaction is recorded and shown, and
+  can also be triggered manually.
+- The chat's first slice covers AI photo analysis, emotion/tone, and style
+  preset only. Scenes, prompts, and image generation are not reachable from it.
+- Image generation is never triggered from the chat; it stays on the OpenAI API
+  behind its own explicitly labelled paid action.
+
 ## Video & audio
 
 - There is **no video rendering or export**. The product builds a storyboard and
