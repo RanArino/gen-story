@@ -1,5 +1,11 @@
 export { MAX_CONCURRENT_PER_PROJECT } from "./concurrency-policy";
 export type {
+  AgentConversationRepositoryPort,
+  AgentRunnerAvailability,
+  AgentTurnEvent,
+  AgentTurnReference,
+  AgentTurnRequest,
+  AgentTurnRunnerPort,
   AiJobRepositoryPort,
   ApplicationDependencies,
   AuthContextPort,

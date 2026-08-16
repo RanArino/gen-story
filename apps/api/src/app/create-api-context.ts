@@ -16,6 +16,7 @@ import {
   type AgentRuntimeAvailability,
   type AgentRuntimeSelection,
 } from "../agent-runtime/runtime-config";
+import { NativeSessionAgentTurnRunner } from "../agent-chat/native-session-runner";
 import { LocalAuthContext } from "../auth/local-auth";
 import { ClaudeComplementSceneProposalAdapter } from "../complement-scenes/claude-complement-scene-proposal";
 import { CodexComplementSceneProposalAdapter } from "../complement-scenes/codex-complement-scene-proposal";
@@ -208,6 +209,30 @@ export function createApiContext(
 
   const progressEvents = new LocalProgressEvents();
 
+  const agentRuntime = {
+    selection: agentRuntimeSelection,
+    wallet: agentRuntimeWallet(agentRuntimeSelection),
+    capabilities: agentRuntimeCapabilities(agentRuntimeSelection),
+    availability:
+      agentRuntimeSelection === "api"
+        ? ({ status: "not_applicable" } as AgentRuntimeAvailability)
+        : ({ status: "unchecked" } as AgentRuntimeAvailability),
+  };
+
+  // Reads `agentRuntime.availability` through the object, not a copy, so the
+  // runner sees the real result once server.ts finishes its startup probe.
+  const agentTurnRunner = new NativeSessionAgentTurnRunner({
+    selection: agentRuntimeSelection,
+    availability: () => agentRuntime.availability,
+    model: env.GEN_STORY_AGENT_CHAT_MODEL?.trim() || null,
+    workingDirectory: process.cwd(),
+    allowedWorkingDirectoryRoot: process.cwd(),
+    apiBaseUrl:
+      env.GEN_STORY_API_BASE_URL?.trim() ||
+      `http://127.0.0.1:${env.API_PORT ?? 4000}`,
+    environment: env,
+  });
+
   return {
     ...repos,
     objectStorage,
@@ -221,14 +246,7 @@ export function createApiContext(
     jobQueue: new SqliteJobQueue(repos.aiJobs, progressEvents),
     progressEvents,
     authContext: new LocalAuthContext(repos),
-    agentRuntime: {
-      selection: agentRuntimeSelection,
-      wallet: agentRuntimeWallet(agentRuntimeSelection),
-      capabilities: agentRuntimeCapabilities(agentRuntimeSelection),
-      availability:
-        agentRuntimeSelection === "api"
-          ? { status: "not_applicable" }
-          : { status: "unchecked" },
-    },
+    agentTurnRunner,
+    agentRuntime,
   };
 }

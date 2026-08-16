@@ -19,6 +19,16 @@ export type ClaudeSessionEvent =
 
 export type ClaudeSessionEventListener = (event: ClaudeSessionEvent) => void;
 
+/**
+ * Which tools a session may use. Empty (the default) means none at all.
+ * `mcpConfig` is the `--mcp-config` document; combined with
+ * `--strict-mcp-config` it is the *only* MCP configuration the process sees.
+ */
+export type ClaudeSessionToolOptions = {
+  tools?: readonly string[];
+  mcpConfig?: Record<string, unknown>;
+};
+
 export class ClaudeSessionError extends Error {
   constructor(message: string) {
     super(message);
@@ -70,7 +80,7 @@ export class ClaudeNativeSession {
     return new ClaudeSessionProcess(input);
   }
 
-  private static baseArgs(): string[] {
+  private static baseArgs(options: ClaudeSessionToolOptions = {}): string[] {
     return [
       "-p",
       "--input-format",
@@ -80,12 +90,19 @@ export class ClaudeNativeSession {
       "--verbose",
       "--permission-mode",
       "bypassPermissions",
-      // No built-in tools during M1: there is no approval/handling surface
-      // yet, matching CodexNativeSession's sandbox: "read-only" posture.
+      // Empty by default: M1 sessions run with no tools at all, matching
+      // CodexNativeSession's sandbox: "read-only" posture. M3 chat sessions
+      // pass the Gen Story MCP tool names, and nothing else — no filesystem,
+      // shell, or web tool is ever enabled.
       "--tools",
-      "",
+      (options.tools ?? []).join(","),
       "--setting-sources",
       "",
+      // With --strict-mcp-config only this config is honoured, so the
+      // operator's own MCP servers cannot leak into a Gen Story chat.
+      ...(options.mcpConfig
+        ? ["--mcp-config", JSON.stringify(options.mcpConfig)]
+        : []),
       "--strict-mcp-config",
       // Deliberately NOT --disable-slash-commands: /compact must work.
     ];
@@ -97,11 +114,16 @@ export class ClaudeNativeSession {
     environment?: NodeJS.ProcessEnv;
     model?: string;
     sessionId?: string;
+    tools?: readonly string[];
+    mcpConfig?: Record<string, unknown>;
   }): Promise<ClaudeNativeSession> {
     const sessionId = input.sessionId ?? randomUUID();
     const process = ClaudeNativeSession.spawn({
       args: [
-        ...ClaudeNativeSession.baseArgs(),
+        ...ClaudeNativeSession.baseArgs({
+          tools: input.tools,
+          mcpConfig: input.mcpConfig,
+        }),
         "--session-id",
         sessionId,
         ...(input.model ? ["--model", input.model] : []),
@@ -121,9 +143,18 @@ export class ClaudeNativeSession {
     workingDirectory: string;
     allowedWorkingDirectoryRoot: string;
     environment?: NodeJS.ProcessEnv;
+    tools?: readonly string[];
+    mcpConfig?: Record<string, unknown>;
   }): Promise<ClaudeNativeSession> {
     const process = ClaudeNativeSession.spawn({
-      args: [...ClaudeNativeSession.baseArgs(), "--resume", input.sessionId],
+      args: [
+        ...ClaudeNativeSession.baseArgs({
+          tools: input.tools,
+          mcpConfig: input.mcpConfig,
+        }),
+        "--resume",
+        input.sessionId,
+      ],
       workingDirectory: input.workingDirectory,
       allowedWorkingDirectoryRoot: input.allowedWorkingDirectoryRoot,
       environment: input.environment,
@@ -167,6 +198,11 @@ export class ClaudeNativeSession {
       };
       this.process.once("exit", onExit);
     });
+  }
+
+  /** True once interrupt()/close() killed the process: this instance cannot send further turns. */
+  get isClosed(): boolean {
+    return this.closed;
   }
 
   onEvent(listener: ClaudeSessionEventListener): () => void {

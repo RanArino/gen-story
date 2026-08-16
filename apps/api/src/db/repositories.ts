@@ -3,14 +3,20 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   isNotNull,
   isNull,
+  max,
   or,
   sql,
 } from "drizzle-orm";
 
 import {
+  createAgentConversation,
+  createAgentConversationMessage,
+  createAgentConversationTurn,
+  createAgentProviderBinding,
   createAiJob,
   createChangeProposal,
   createGeneratedImage,
@@ -29,7 +35,15 @@ import {
   isPhotoFidelity,
   isTestAdjustmentId,
   sortScenesByOrderIndex,
+  type AgentConversation,
+  type AgentConversationMessage,
+  type AgentConversationMessageKind,
+  type AgentConversationMessageRole,
+  type AgentConversationTurn,
+  type AgentConversationTurnStatus,
   type AgentProvider,
+  type AgentProviderBinding,
+  type AgentProviderBindingStatus,
   type AiJob,
   type AiJobKind,
   type AiJobStatus,
@@ -61,6 +75,7 @@ import {
   type User,
 } from "@gen-story/domain";
 import type {
+  AgentConversationRepositoryPort,
   AiJobRepositoryPort,
   ChangeProposalRepositoryPort,
   GeneratedImageRepositoryPort,
@@ -89,6 +104,10 @@ import type {
 import { toStoredMcpToolCallAudit } from "../mcp/tool-call-audit";
 import type { GenStoryDatabase } from "./client";
 import {
+  agentConversationMessages,
+  agentConversations,
+  agentConversationTurns,
+  agentProviderBindings,
   aiJobs,
   changeProposalChoices,
   changeProposalItems,
@@ -1901,6 +1920,302 @@ export class SqliteMcpToolCallAuditRepository implements McpToolCallAuditPort {
   }
 }
 
+type AgentConversationRow = typeof agentConversations.$inferSelect;
+type AgentProviderBindingRow = typeof agentProviderBindings.$inferSelect;
+type AgentConversationTurnRow = typeof agentConversationTurns.$inferSelect;
+type AgentConversationMessageRow =
+  typeof agentConversationMessages.$inferSelect;
+
+function mapAgentConversation(row: AgentConversationRow): AgentConversation {
+  return createAgentConversation({
+    id: row.id,
+    projectId: row.projectId,
+    title: row.title,
+    activeBindingId: row.activeBindingId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
+function mapAgentProviderBinding(
+  row: AgentProviderBindingRow,
+): AgentProviderBinding {
+  return createAgentProviderBinding({
+    id: row.id,
+    conversationId: row.conversationId,
+    provider: row.provider as AgentProvider,
+    model: row.model,
+    nativeSessionId: row.nativeSessionId,
+    status: row.status as AgentProviderBindingStatus,
+    compactCount: row.compactCount,
+    lastCompactedAt: row.lastCompactedAt,
+    lastTurnId: row.lastTurnId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
+function mapAgentConversationTurn(
+  row: AgentConversationTurnRow,
+): AgentConversationTurn {
+  return createAgentConversationTurn({
+    id: row.id,
+    conversationId: row.conversationId,
+    bindingId: row.bindingId,
+    clientRequestId: row.clientRequestId,
+    status: row.status as AgentConversationTurnStatus,
+    provider: row.provider as AgentProvider,
+    model: row.model,
+    providerTurnId: row.providerTurnId,
+    compacted: row.compacted === 1,
+    errorMessage: row.errorMessage,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+  });
+}
+
+function mapAgentConversationMessage(
+  row: AgentConversationMessageRow,
+): AgentConversationMessage {
+  return createAgentConversationMessage({
+    id: row.id,
+    conversationId: row.conversationId,
+    turnId: row.turnId,
+    sequence: row.sequence,
+    role: row.role as AgentConversationMessageRole,
+    kind: row.kind as AgentConversationMessageKind,
+    text: row.text,
+    mentions: JSON.parse(
+      row.mentionsJson,
+    ) as AgentConversationMessage["mentions"],
+    data: row.dataJson
+      ? (JSON.parse(row.dataJson) as Record<string, unknown>)
+      : null,
+    createdAt: row.createdAt,
+  });
+}
+
+export class SqliteAgentConversationRepository implements AgentConversationRepositoryPort {
+  constructor(private readonly db: GenStoryDatabase) {}
+
+  async findById(conversationId: string): Promise<AgentConversation | null> {
+    const row = await this.db
+      .select()
+      .from(agentConversations)
+      .where(eq(agentConversations.id, conversationId))
+      .get();
+
+    return row == null ? null : mapAgentConversation(row);
+  }
+
+  async findByProjectId(projectId: string): Promise<AgentConversation[]> {
+    const rows = await this.db
+      .select()
+      .from(agentConversations)
+      .where(eq(agentConversations.projectId, projectId))
+      .orderBy(desc(agentConversations.createdAt), asc(agentConversations.id));
+
+    return rows.map(mapAgentConversation);
+  }
+
+  async save(conversation: AgentConversation): Promise<void> {
+    await this.db
+      .insert(agentConversations)
+      .values({
+        id: conversation.id,
+        projectId: conversation.projectId,
+        title: conversation.title,
+        activeBindingId: conversation.activeBindingId,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: agentConversations.id,
+        set: {
+          title: conversation.title,
+          activeBindingId: conversation.activeBindingId,
+          updatedAt: conversation.updatedAt,
+        },
+      });
+  }
+
+  async findBindingById(
+    bindingId: string,
+  ): Promise<AgentProviderBinding | null> {
+    const row = await this.db
+      .select()
+      .from(agentProviderBindings)
+      .where(eq(agentProviderBindings.id, bindingId))
+      .get();
+
+    return row == null ? null : mapAgentProviderBinding(row);
+  }
+
+  async listBindings(conversationId: string): Promise<AgentProviderBinding[]> {
+    const rows = await this.db
+      .select()
+      .from(agentProviderBindings)
+      .where(eq(agentProviderBindings.conversationId, conversationId))
+      .orderBy(
+        asc(agentProviderBindings.createdAt),
+        asc(agentProviderBindings.id),
+      );
+
+    return rows.map(mapAgentProviderBinding);
+  }
+
+  async saveBinding(binding: AgentProviderBinding): Promise<void> {
+    await this.db
+      .insert(agentProviderBindings)
+      .values({
+        id: binding.id,
+        conversationId: binding.conversationId,
+        provider: binding.provider,
+        model: binding.model,
+        nativeSessionId: binding.nativeSessionId,
+        status: binding.status,
+        compactCount: binding.compactCount,
+        lastCompactedAt: binding.lastCompactedAt,
+        lastTurnId: binding.lastTurnId,
+        createdAt: binding.createdAt,
+        updatedAt: binding.updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: agentProviderBindings.id,
+        set: {
+          model: binding.model,
+          nativeSessionId: binding.nativeSessionId,
+          status: binding.status,
+          compactCount: binding.compactCount,
+          lastCompactedAt: binding.lastCompactedAt,
+          lastTurnId: binding.lastTurnId,
+          updatedAt: binding.updatedAt,
+        },
+      });
+  }
+
+  async findTurnById(turnId: string): Promise<AgentConversationTurn | null> {
+    const row = await this.db
+      .select()
+      .from(agentConversationTurns)
+      .where(eq(agentConversationTurns.id, turnId))
+      .get();
+
+    return row == null ? null : mapAgentConversationTurn(row);
+  }
+
+  async findTurnByClientRequestId(
+    conversationId: string,
+    clientRequestId: string,
+  ): Promise<AgentConversationTurn | null> {
+    const row = await this.db
+      .select()
+      .from(agentConversationTurns)
+      .where(
+        and(
+          eq(agentConversationTurns.conversationId, conversationId),
+          eq(agentConversationTurns.clientRequestId, clientRequestId),
+        ),
+      )
+      .get();
+
+    return row == null ? null : mapAgentConversationTurn(row);
+  }
+
+  async listTurns(conversationId: string): Promise<AgentConversationTurn[]> {
+    const rows = await this.db
+      .select()
+      .from(agentConversationTurns)
+      .where(eq(agentConversationTurns.conversationId, conversationId))
+      .orderBy(
+        asc(agentConversationTurns.startedAt),
+        asc(agentConversationTurns.id),
+      );
+
+    return rows.map(mapAgentConversationTurn);
+  }
+
+  async saveTurn(turn: AgentConversationTurn): Promise<void> {
+    await this.db
+      .insert(agentConversationTurns)
+      .values({
+        id: turn.id,
+        conversationId: turn.conversationId,
+        bindingId: turn.bindingId,
+        clientRequestId: turn.clientRequestId,
+        status: turn.status,
+        provider: turn.provider,
+        model: turn.model,
+        providerTurnId: turn.providerTurnId,
+        compacted: turn.compacted ? 1 : 0,
+        errorMessage: turn.errorMessage,
+        startedAt: turn.startedAt,
+        completedAt: turn.completedAt,
+      })
+      .onConflictDoUpdate({
+        target: agentConversationTurns.id,
+        set: {
+          status: turn.status,
+          model: turn.model,
+          providerTurnId: turn.providerTurnId,
+          compacted: turn.compacted ? 1 : 0,
+          errorMessage: turn.errorMessage,
+          completedAt: turn.completedAt,
+        },
+      });
+  }
+
+  async listMessages(
+    conversationId: string,
+    afterSequence?: number,
+  ): Promise<AgentConversationMessage[]> {
+    const rows = await this.db
+      .select()
+      .from(agentConversationMessages)
+      .where(
+        afterSequence == null
+          ? eq(agentConversationMessages.conversationId, conversationId)
+          : and(
+              eq(agentConversationMessages.conversationId, conversationId),
+              gt(agentConversationMessages.sequence, afterSequence),
+            ),
+      )
+      .orderBy(asc(agentConversationMessages.sequence));
+
+    return rows.map(mapAgentConversationMessage);
+  }
+
+  async saveMessage(message: AgentConversationMessage): Promise<void> {
+    // Transcript rows are append-only: a message that already exists is the
+    // same message, never an edit of what the operator already read.
+    await this.db
+      .insert(agentConversationMessages)
+      .values({
+        id: message.id,
+        conversationId: message.conversationId,
+        turnId: message.turnId,
+        sequence: message.sequence,
+        role: message.role,
+        kind: message.kind,
+        text: message.text,
+        mentionsJson: JSON.stringify(message.mentions),
+        dataJson: message.data ? JSON.stringify(message.data) : null,
+        createdAt: message.createdAt,
+      })
+      .onConflictDoNothing({ target: agentConversationMessages.id });
+  }
+
+  async nextMessageSequence(conversationId: string): Promise<number> {
+    const row = await this.db
+      .select({ maxSequence: max(agentConversationMessages.sequence) })
+      .from(agentConversationMessages)
+      .where(eq(agentConversationMessages.conversationId, conversationId))
+      .get();
+
+    return (row?.maxSequence ?? 0) + 1;
+  }
+}
+
 export function createSqliteRepositories(db: GenStoryDatabase) {
   return {
     users: new SqliteUserRepository(db),
@@ -1915,6 +2230,7 @@ export function createSqliteRepositories(db: GenStoryDatabase) {
     aiJobs: new SqliteAiJobRepository(db),
     projectPhotoAnalyses: new SqliteProjectPhotoAnalysisRepository(db),
     changeProposals: new SqliteChangeProposalRepository(db),
+    agentConversations: new SqliteAgentConversationRepository(db),
     testGenerationBatches: new SqliteTestGenerationBatchRepository(db),
     userPreferences: new SqliteUserPreferenceRepository(db),
     mcpToolCallAudits: new SqliteMcpToolCallAuditRepository(db),

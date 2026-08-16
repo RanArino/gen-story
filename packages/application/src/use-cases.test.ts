@@ -16,6 +16,10 @@ import {
   createTestGenerationBatch,
   createUser,
   storyboardSemanticTarget,
+  type AgentConversation,
+  type AgentConversationMessage,
+  type AgentConversationTurn,
+  type AgentProviderBinding,
   type ChangeProposal,
   type ChangeProposalStatus,
   type TestAdjustmentId,
@@ -36,6 +40,11 @@ import {
 } from "@gen-story/domain";
 
 import type {
+  AgentConversationRepositoryPort,
+  AgentRunnerAvailability,
+  AgentTurnEvent,
+  AgentTurnRequest,
+  AgentTurnRunnerPort,
   AiJobRepositoryPort,
   ApplicationDependencies,
   ChangeProposalRepositoryPort,
@@ -710,6 +719,152 @@ class InMemoryProgressEventPort implements ProgressEventPort {
   }
 }
 
+class InMemoryAgentConversationRepository implements AgentConversationRepositoryPort {
+  public readonly conversations: AgentConversation[] = [];
+  public readonly bindings: AgentProviderBinding[] = [];
+  public readonly turns: AgentConversationTurn[] = [];
+  public readonly messages: AgentConversationMessage[] = [];
+
+  async findById(conversationId: string): Promise<AgentConversation | null> {
+    return (
+      this.conversations.find(
+        (conversation) => conversation.id === conversationId,
+      ) ?? null
+    );
+  }
+
+  async findByProjectId(projectId: string): Promise<AgentConversation[]> {
+    return this.conversations.filter(
+      (conversation) => conversation.projectId === projectId,
+    );
+  }
+
+  async save(conversation: AgentConversation): Promise<void> {
+    upsertById(this.conversations, conversation);
+  }
+
+  async findBindingById(
+    bindingId: string,
+  ): Promise<AgentProviderBinding | null> {
+    return this.bindings.find((binding) => binding.id === bindingId) ?? null;
+  }
+
+  async listBindings(conversationId: string): Promise<AgentProviderBinding[]> {
+    return this.bindings.filter(
+      (binding) => binding.conversationId === conversationId,
+    );
+  }
+
+  async saveBinding(binding: AgentProviderBinding): Promise<void> {
+    upsertById(this.bindings, binding);
+  }
+
+  async findTurnById(turnId: string): Promise<AgentConversationTurn | null> {
+    return this.turns.find((turn) => turn.id === turnId) ?? null;
+  }
+
+  async findTurnByClientRequestId(
+    conversationId: string,
+    clientRequestId: string,
+  ): Promise<AgentConversationTurn | null> {
+    return (
+      this.turns.find(
+        (turn) =>
+          turn.conversationId === conversationId &&
+          turn.clientRequestId === clientRequestId,
+      ) ?? null
+    );
+  }
+
+  async listTurns(conversationId: string): Promise<AgentConversationTurn[]> {
+    return this.turns.filter((turn) => turn.conversationId === conversationId);
+  }
+
+  async saveTurn(turn: AgentConversationTurn): Promise<void> {
+    upsertById(this.turns, turn);
+  }
+
+  async listMessages(
+    conversationId: string,
+    afterSequence?: number,
+  ): Promise<AgentConversationMessage[]> {
+    return this.messages
+      .filter(
+        (message) =>
+          message.conversationId === conversationId &&
+          (afterSequence == null || message.sequence > afterSequence),
+      )
+      .sort((left, right) => left.sequence - right.sequence);
+  }
+
+  async saveMessage(message: AgentConversationMessage): Promise<void> {
+    upsertById(this.messages, message);
+  }
+
+  async nextMessageSequence(conversationId: string): Promise<number> {
+    const sequences = this.messages
+      .filter((message) => message.conversationId === conversationId)
+      .map((message) => message.sequence);
+    return (sequences.length === 0 ? 0 : Math.max(...sequences)) + 1;
+  }
+}
+
+// Replays a scripted event sequence instead of spawning a CLI. `script` is
+// what a provider turn "did"; `requests` records exactly what was sent, which
+// is how the transcript-is-not-resent rule is asserted.
+class StubAgentTurnRunner implements AgentTurnRunnerPort {
+  public readonly requests: AgentTurnRequest[] = [];
+  public readonly cancelled: string[] = [];
+  public readonly released: string[] = [];
+  public script: AgentTurnEvent[] = [
+    { type: "session-started", nativeSessionId: "session-1" },
+    { type: "assistant-text", text: "Understood." },
+    { type: "turn-completed", status: "completed", providerTurnId: "t-1" },
+  ];
+  public available: AgentRunnerAvailability = {
+    available: true,
+    provider: "codex",
+    model: "gpt-5-codex",
+  };
+  public compactSupported = true;
+
+  availability(): AgentRunnerAvailability {
+    return this.available;
+  }
+
+  async startTurn(
+    request: AgentTurnRequest,
+    onEvent: (event: AgentTurnEvent) => void,
+  ): Promise<void> {
+    this.requests.push(request);
+    for (const event of this.script) {
+      onEvent(event);
+    }
+  }
+
+  async cancelTurn(input: { turnId: string }): Promise<boolean> {
+    this.cancelled.push(input.turnId);
+    return true;
+  }
+
+  async compact(): Promise<boolean> {
+    return this.compactSupported;
+  }
+
+  async release(input: { conversationId: string }): Promise<void> {
+    this.released.push(input.conversationId);
+  }
+}
+
+function upsertById<T extends { id: string }>(items: T[], item: T): void {
+  const index = items.findIndex((candidate) => candidate.id === item.id);
+  if (index === -1) {
+    items.push(item);
+    return;
+  }
+  items[index] = item;
+}
+
 function createDependencies(initial?: {
   users?: User[];
   organizations?: Organization[];
@@ -751,6 +906,8 @@ function createDependencies(initial?: {
   photoAnalysisGeneration: InMemoryPhotoAnalysisGenerationPort;
   storySetupGeneration: InMemoryStorySetupGenerationPort;
   scenes: InMemorySceneRepository;
+  agentConversations: InMemoryAgentConversationRepository;
+  agentTurnRunner: StubAgentTurnRunner;
 } {
   const stores = {
     users: new MemoryStore<User>(initial?.users ?? []),
@@ -812,6 +969,8 @@ function createDependencies(initial?: {
     testGenerationBatches: new InMemoryTestGenerationBatchRepository(
       stores.testGenerationBatches,
     ),
+    agentConversations: new InMemoryAgentConversationRepository(),
+    agentTurnRunner: new StubAgentTurnRunner(),
     userPreferences: new InMemoryUserPreferenceRepository(),
     objectStorage,
     imagePreprocessing,

@@ -327,6 +327,109 @@ export const aiJobs = sqliteTable(
   ],
 );
 
+// M3 embedded chat. `agent_conversations` owns the complete, immutable
+// user-visible transcript; `agent_provider_bindings` owns the disposable link
+// to a provider-native session. Switching providers (or recovering from a
+// dead session) forks a new binding row and repoints `active_binding_id`; the
+// transcript is never forked with it.
+export const agentConversations = sqliteTable(
+  "agent_conversations",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    title: text("title").notNull(),
+    activeBindingId: text("active_binding_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [index("agent_conversations_project_id_idx").on(table.projectId)],
+);
+
+export const agentProviderBindings = sqliteTable(
+  "agent_provider_bindings",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id),
+    provider: text("provider").notNull(),
+    model: text("model"),
+    // Null until the provider reports it (Codex learns its thread id from
+    // `thread/start`'s response; Claude's is client-chosen up front).
+    nativeSessionId: text("native_session_id"),
+    status: text("status").notNull(),
+    compactCount: integer("compact_count").notNull(),
+    lastCompactedAt: text("last_compacted_at"),
+    lastTurnId: text("last_turn_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("agent_provider_bindings_conversation_id_idx").on(
+      table.conversationId,
+    ),
+  ],
+);
+
+export const agentConversationTurns = sqliteTable(
+  "agent_conversation_turns",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id),
+    bindingId: text("binding_id")
+      .notNull()
+      .references(() => agentProviderBindings.id),
+    clientRequestId: text("client_request_id").notNull(),
+    status: text("status").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model"),
+    providerTurnId: text("provider_turn_id"),
+    compacted: integer("compacted").notNull(),
+    errorMessage: text("error_message"),
+    startedAt: text("started_at").notNull(),
+    completedAt: text("completed_at"),
+  },
+  (table) => [
+    index("agent_conversation_turns_conversation_id_idx").on(
+      table.conversationId,
+    ),
+    uniqueIndex("agent_conversation_turns_client_request_unique").on(
+      table.conversationId,
+      table.clientRequestId,
+    ),
+  ],
+);
+
+export const agentConversationMessages = sqliteTable(
+  "agent_conversation_messages",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id),
+    turnId: text("turn_id"),
+    sequence: integer("sequence").notNull(),
+    role: text("role").notNull(),
+    kind: text("kind").notNull(),
+    text: text("text").notNull(),
+    mentionsJson: text("mentions_json").notNull(),
+    dataJson: text("data_json"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    // Also the allocator for the next sequence: the unique index is what
+    // makes two concurrent appends fail loudly instead of colliding silently.
+    uniqueIndex("agent_conversation_messages_sequence_unique").on(
+      table.conversationId,
+      table.sequence,
+    ),
+  ],
+);
+
 // Durable propose -> approve -> apply review unit for agent-authored data
 // changes (M2). Items and choices are stored in child tables and replaced
 // wholesale on every save, mirroring how scene_photo_assets tracks scenes.

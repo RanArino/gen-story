@@ -34,6 +34,22 @@ export class CodexSessionError extends Error {
 const CLIENT_INFO = { name: "gen-story", version: "0.1.0" };
 
 /**
+ * Streamable-HTTP MCP servers to attach to the session, by name. Codex has no
+ * per-thread MCP parameter, so these become `-c mcp_servers.<name>.url=...`
+ * config overrides on the `codex app-server` command line — the same keys the
+ * operator's own `~/.codex/config.toml` would use, set for this process only.
+ */
+export type CodexMcpServers = Record<string, { url: string }>;
+
+function mcpServerArgs(servers: CodexMcpServers | undefined): string[] {
+  if (servers == null) return [];
+  return Object.entries(servers).flatMap(([name, server]) => [
+    "-c",
+    `mcp_servers.${name}.url="${server.url}"`,
+  ]);
+}
+
+/**
  * A single Codex App Server connection bound to one thread. M1 scope only:
  * start/resume, send a turn, interrupt, and explicit compact — enough to
  * prove the provider lifecycle M3 will build conversational chat on top of.
@@ -87,8 +103,10 @@ export class CodexNativeSession {
     cwd: string;
     environment?: NodeJS.ProcessEnv;
     model?: string;
+    mcpServers?: CodexMcpServers;
   }): Promise<CodexNativeSession> {
     const client = new CodexAppServerClient({
+      args: [...mcpServerArgs(input.mcpServers), "app-server"],
       workingDirectory: input.workingDirectory,
       allowedWorkingDirectoryRoot: input.allowedWorkingDirectoryRoot,
       environment: input.environment,
@@ -119,8 +137,10 @@ export class CodexNativeSession {
     workingDirectory: string;
     allowedWorkingDirectoryRoot: string;
     environment?: NodeJS.ProcessEnv;
+    mcpServers?: CodexMcpServers;
   }): Promise<CodexNativeSession> {
     const client = new CodexAppServerClient({
+      args: [...mcpServerArgs(input.mcpServers), "app-server"],
       workingDirectory: input.workingDirectory,
       allowedWorkingDirectoryRoot: input.allowedWorkingDirectoryRoot,
       environment: input.environment,
