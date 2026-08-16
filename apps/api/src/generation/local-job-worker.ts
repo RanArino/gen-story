@@ -13,10 +13,12 @@ import {
   runStorySetupJob,
 } from "@gen-story/application";
 import type {
+  AgentRuntimeSelection,
   ApplicationDependencies,
   UseCaseResult,
 } from "@gen-story/application";
 import type { AiJob } from "@gen-story/domain";
+import { isAgentRuntimeSelection } from "@gen-story/application";
 
 const AI_JOB_RUNNERS: Record<
   AiJob["kind"],
@@ -51,7 +53,17 @@ export class LocalJobWorker {
   private readonly inFlight = new Map<string, string>();
 
   constructor(
-    private readonly deps: ApplicationDependencies,
+    private readonly deps: ApplicationDependencies & {
+      textVisionGenerationPorts?: (
+        selection: AgentRuntimeSelection,
+      ) => Pick<
+        ApplicationDependencies,
+        | "sceneFillGeneration"
+        | "complementSceneProposal"
+        | "photoAnalysisGeneration"
+        | "storySetupGeneration"
+      >;
+    },
     options?: { pollIntervalMs?: number },
   ) {
     this.pollIntervalMs = options?.pollIntervalMs ?? 500;
@@ -146,10 +158,15 @@ export class LocalJobWorker {
     console.log(`[Worker] starting AI job ${job.id} (${job.kind})`);
 
     try {
-      const result = await AI_JOB_RUNNERS[job.kind](
-        this.deps,
-        runningResult.value,
-      );
+      const selected = runningResult.value.inputJson.agentRuntime;
+      const selection: AgentRuntimeSelection = isAgentRuntimeSelection(selected)
+        ? selected
+        : "claude";
+      const runtimeDeps: ApplicationDependencies = {
+        ...this.deps,
+        ...(this.deps.textVisionGenerationPorts?.(selection) ?? {}),
+      };
+      const result = await AI_JOB_RUNNERS[job.kind](runtimeDeps, runningResult.value);
 
       if (!result.ok) {
         await markAiJobFailed(this.deps, {

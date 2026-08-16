@@ -8,6 +8,7 @@ import type {
   PhotoAnalysisGenerationPort,
   SceneFillGenerationPort,
   StorySetupGenerationPort,
+  AgentRuntimeSelection,
 } from "@gen-story/application";
 
 import type { AgentSessionCapabilities } from "../agent-runtime/agent-session-events";
@@ -18,7 +19,6 @@ import {
   resolveAgentRuntimeSelection,
   resolveDeployTarget,
   type AgentRuntimeAvailability,
-  type AgentRuntimeSelection,
 } from "../agent-runtime/runtime-config";
 import { NativeSessionAgentTurnRunner } from "../agent-chat/native-session-runner";
 import { LocalAuthContext } from "../auth/local-auth";
@@ -75,6 +75,14 @@ export type ApiAgentRuntimeInfo = {
   availability: AgentRuntimeAvailability;
 };
 
+export type TextVisionGenerationPorts = Pick<
+  ApplicationDependencies,
+  | "sceneFillGeneration"
+  | "complementSceneProposal"
+  | "photoAnalysisGeneration"
+  | "storySetupGeneration"
+>;
+
 // The router needs the concrete emitter, not just the port, because the SSE
 // route subscribes to it.
 export type ApiDependencies = ApplicationDependencies & {
@@ -83,18 +91,16 @@ export type ApiDependencies = ApplicationDependencies & {
   // MCP tool-call audit. Not an application port: the MCP layer records calls
   // the application layer never sees, including rejected ones.
   mcpToolCallAudits: McpToolCallAuditPort;
+  textVisionGenerationPorts?: (
+    selection: AgentRuntimeSelection,
+  ) => TextVisionGenerationPorts;
 };
 
 function createTextVisionGenerationPorts(
   selection: AgentRuntimeSelection,
   objectStorage: LocalObjectStorage,
   env: NodeJS.ProcessEnv,
-): {
-  sceneFillGeneration: SceneFillGenerationPort;
-  complementSceneProposal: ComplementSceneProposalPort;
-  photoAnalysisGeneration: PhotoAnalysisGenerationPort;
-  storySetupGeneration: StorySetupGenerationPort;
-} {
+): TextVisionGenerationPorts {
   if (selection === "codex") {
     return {
       sceneFillGeneration: new CodexSceneFillGenerationAdapter(objectStorage),
@@ -190,9 +196,9 @@ export function createApiContext(
   // R1.1/R1.2/R2.1: a single env var selects the runtime for every
   // text/vision capability; unknown values and non-local CLI selection fail
   // fast here rather than falling back silently.
-  const agentRuntimeSelection = resolveAgentRuntimeSelection(env);
+  const configuredRuntime = resolveAgentRuntimeSelection(env);
   const deployTarget = resolveDeployTarget(env);
-  assertLocalDeploymentForCliRuntime(agentRuntimeSelection, deployTarget);
+  assertLocalDeploymentForCliRuntime(configuredRuntime, deployTarget);
 
   const characterSheetGeneration = openaiApiKey
     ? new OpenAiCharacterSheetGenerationAdapter(objectStorage, openaiApiKey)
@@ -203,20 +209,16 @@ export function createApiContext(
     complementSceneProposal,
     photoAnalysisGeneration,
     storySetupGeneration,
-  } = createTextVisionGenerationPorts(
-    agentRuntimeSelection,
-    objectStorage,
-    env,
-  );
+  } = createTextVisionGenerationPorts(configuredRuntime, objectStorage, env);
 
   const progressEvents = new LocalProgressEvents();
 
   const agentRuntime = {
-    selection: agentRuntimeSelection,
-    wallet: agentRuntimeWallet(agentRuntimeSelection),
-    capabilities: agentRuntimeCapabilities(agentRuntimeSelection),
+    selection: configuredRuntime,
+    wallet: agentRuntimeWallet(configuredRuntime),
+    capabilities: agentRuntimeCapabilities(configuredRuntime),
     availability:
-      agentRuntimeSelection === "api"
+      configuredRuntime === "api"
         ? ({ status: "not_applicable" } as AgentRuntimeAvailability)
         : ({ status: "unchecked" } as AgentRuntimeAvailability),
   };
@@ -232,7 +234,7 @@ export function createApiContext(
   // Reads `agentRuntime.availability` through the object, not a copy, so the
   // runner sees the real result once server.ts finishes its startup probe.
   const agentTurnRunner = new NativeSessionAgentTurnRunner({
-    selection: agentRuntimeSelection,
+    selection: configuredRuntime,
     availability: () => agentRuntime.availability,
     model: env.GEN_STORY_AGENT_CHAT_MODEL?.trim() || null,
     workingDirectory: agentChatWorkingDirectory,
@@ -258,5 +260,7 @@ export function createApiContext(
     authContext: new LocalAuthContext(repos),
     agentTurnRunner,
     agentRuntime,
+    textVisionGenerationPorts: (selection) =>
+      createTextVisionGenerationPorts(selection, objectStorage, env),
   };
 }

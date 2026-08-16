@@ -815,7 +815,11 @@ export async function createTemplateScenesFromPhotos(
         const { jobId } = await deps.jobQueue.enqueue({
           kind: "scene_ai_fill",
           projectId: input.projectId,
-          payload: { sceneId: scene.id, language },
+          payload: {
+            sceneId: scene.id,
+            language,
+            agentRuntime: await resolvePrincipalAgentRuntime(deps),
+          },
         });
         aiJobIds.push(jobId);
       }
@@ -843,6 +847,15 @@ async function resolvePrincipalLanguage(
     if (pref) return pref.language;
   }
   return DEFAULT_LANGUAGE;
+}
+
+async function resolvePrincipalAgentRuntime(
+  deps: ApplicationDependencies,
+): Promise<AgentRuntimeSelection> {
+  const principal = await deps.authContext.getCurrentPrincipal();
+  if (principal == null) return DEFAULT_AGENT_RUNTIME_SELECTION;
+  const preference = await deps.userPreferences.findByUserId(principal.user.id);
+  return preference?.agentRuntime ?? DEFAULT_AGENT_RUNTIME_SELECTION;
 }
 
 // The language chosen when the job was enqueued, so a queued job is not
@@ -935,7 +948,11 @@ export async function analyzeProjectPhotos(
     const { jobId } = await deps.jobQueue.enqueue({
       kind: "photo_analysis",
       projectId: project.id,
-      payload: { projectId: project.id, language },
+      payload: {
+        projectId: project.id,
+        language,
+        agentRuntime: await resolvePrincipalAgentRuntime(deps),
+      },
     });
 
     return success({ analysis: null, cached: false, jobId });
@@ -1753,7 +1770,11 @@ export async function fillSceneWithAi(
     const { jobId } = await deps.jobQueue.enqueue({
       kind: "scene_ai_fill",
       projectId: context.scene.projectId,
-      payload: { sceneId: input.sceneId, language },
+      payload: {
+        sceneId: input.sceneId,
+        language,
+        agentRuntime: await resolvePrincipalAgentRuntime(deps),
+      },
     });
 
     return success({ scene: null, jobId });
@@ -1918,6 +1939,7 @@ export async function generateStorySetup(
       payload: {
         storyboardId: storyboard.id,
         language,
+        agentRuntime: await resolvePrincipalAgentRuntime(deps),
         ...(storyPurpose ? { storyPurpose } : {}),
       },
     });
@@ -2260,6 +2282,7 @@ export async function proposeComplementScenes(
         fromSceneId: input.fromSceneId,
         toSceneId: input.toSceneId,
         language,
+        agentRuntime: await resolvePrincipalAgentRuntime(deps),
       },
     });
 
