@@ -717,15 +717,31 @@
     "fields": {
       "photoAnalysis": "@photo-analysis",
       "tone": "@tone",
-      "stylePreset": "@style-preset"
+      "stylePreset": "@style-preset",
+      "commonPrompt": "@common-prompt",
+      "story": "@story",
+      "negativePrompt": "@negative-prompt",
+      "characterPolicy": "@characters",
+      "scene": "@scene",
+      "sceneNumbered": "@scene{number} ({title})"
     },
+    "groups": {
+      "analysis": "Photo & style analysis",
+      "storySetup": "Story setup",
+      "scenes": "Scenes"
+    },
+    "untitledScene": "Untitled",
     "meta": {
       "provider": "Provider",
       "model": "Model",
       "wallet": "Billing",
       "session": "Session",
-      "compactions": "Compactions",
       "none": "Not bound yet",
+      "providers": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "api": "API"
+      },
       "providerDefault": "Provider default",
       "notStarted": "Not started",
       "subscription": "Your subscription",
@@ -740,15 +756,29 @@
     "actions": {
       "send": "Send",
       "cancel": "Cancel turn",
-      "compact": "Compact context",
       "fork": "New session",
-      "mention": "Reference a field"
+      "history": "Session history",
+      "mention": "Reference a field",
+      "expandGroup": "Expand {group}",
+      "removeMention": "Remove reference {field}"
+    },
+    "history": {
+      "loading": "Loading sessions…",
+      "empty": "No previous sessions yet.",
+      "untitled": "Untitled session"
     },
     "approval": {
       "cardLabel": "Proposed change",
       "title": "Proposed change",
+      "viewMode": "Diff view",
+      "view": {
+        "preview": "Preview",
+        "raw": "Raw"
+      },
       "before": "Now",
       "after": "Proposed",
+      "unchangedFields": "{count} unchanged: {fields}",
+      "listSeparator": ", ",
       "reason": "Why",
       "impact": "Impact",
       "choiceLabel": "Alternatives",

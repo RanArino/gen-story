@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { AgentChatPanel } from "./agent-chat/AgentChatPanel";
 import styles from "./AppShell.module.css";
 
 type Props = {
@@ -20,8 +21,23 @@ export function AppShell({ children, projectId }: Props) {
     return pathname === href || pathname.startsWith(href + "/");
   }
 
+  const isStoryboardPage =
+    projectId != null && isActive(`/projects/${projectId}/storyboard`);
+  const [chatOpen, setChatOpen] = useState(isStoryboardPage);
+
+  // Chat is a working panel for the storyboard, not a page you navigate to,
+  // so it opens on arrival rather than needing a sidebar button. A manual
+  // close (below) survives until the next arrival at this page.
+  useEffect(() => {
+    if (isStoryboardPage) setChatOpen(true);
+  }, [pathname, isStoryboardPage]);
+
+  const showChatDrawer = isStoryboardPage && chatOpen;
+
   return (
-    <div className={styles.shell}>
+    <div
+      className={`${styles.shell} ${showChatDrawer ? styles.shellWithChat : ""}`}
+    >
       <nav className={styles.sidebar}>
         <div>
           <p className={styles.eyebrow}>{tCommon("appName")}</p>
@@ -49,12 +65,6 @@ export function AppShell({ children, projectId }: Props) {
                 {tNav("stepStoryboard")}
               </Link>
               <Link
-                href={`/projects/${projectId}/chat`}
-                className={`${styles.stepButton} ${isActive(`/projects/${projectId}/chat`) ? styles.stepButtonActive : ""}`}
-              >
-                {tNav("stepChat")}
-              </Link>
-              <Link
                 href={`/projects/${projectId}/generate`}
                 className={`${styles.stepButton} ${isActive(`/projects/${projectId}/generate`) ? styles.stepButtonActive : ""}`}
               >
@@ -79,6 +89,28 @@ export function AppShell({ children, projectId }: Props) {
         </div>
       </nav>
       <main className={styles.content}>{children}</main>
+      {projectId != null && showChatDrawer && (
+        <aside className={styles.chatDrawer} aria-label={tNav("stepChat")}>
+          <button
+            type="button"
+            className={styles.chatDrawerClose}
+            onClick={() => setChatOpen(false)}
+            aria-label={tCommon("close")}
+          >
+            ×
+          </button>
+          <AgentChatPanel projectId={projectId} />
+        </aside>
+      )}
+      {isStoryboardPage && !chatOpen && (
+        <button
+          type="button"
+          className={styles.chatReopenTab}
+          onClick={() => setChatOpen(true)}
+        >
+          {tNav("stepChat")}
+        </button>
+      )}
     </div>
   );
 }

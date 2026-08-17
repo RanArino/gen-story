@@ -1,4 +1,5 @@
 .panel {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -55,9 +56,126 @@
   font-weight: 600;
 }
 
+.providerCell {
+  position: relative;
+}
+
+.providerButton {
+  font: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  color: #152033;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.providerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  text-decoration: none;
+}
+
+/* Same look as the mention list, but anchored downward: this one hangs off
+   the header at the top of the panel. */
+.providerList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  min-width: 140px;
+  box-shadow: 0 6px 18px rgba(21, 32, 51, 0.12);
+}
+
+.providerList button {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.providerList button:hover {
+  background: #f2f5fa;
+}
+
 .sessionActions {
   display: flex;
   gap: 8px;
+}
+
+.historyCell {
+  position: relative;
+}
+
+.historyList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  min-width: 260px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 6px 18px rgba(21, 32, 51, 0.12);
+}
+
+.historyList button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.historyList button:hover {
+  background: #f2f5fa;
+}
+
+.historyList button[data-selected="true"] {
+  background: #eef2f9;
+}
+
+.historyTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #152033;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyMeta {
+  font-size: 11px;
+  color: #7a8699;
+}
+
+.historyEmpty {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #7a8699;
 }
 
 .transcript {
@@ -123,6 +241,30 @@
   color: #666;
 }
 
+.runningLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spinner {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #d7dee9;
+  border-top-color: #152033;
+  animation: agent-chat-spin 0.8s linear infinite;
+}
+
+@keyframes agent-chat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .composer {
   display: flex;
   flex-direction: column;
@@ -137,33 +279,114 @@
   flex-wrap: wrap;
 }
 
+/* Opens upward: the composer sits at the bottom of the panel, and the list
+   is now as long as the storyboard has scenes, so downward would run off
+   the viewport. Capped and scrollable for the same reason. */
 .mentionList {
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   left: 0;
   z-index: 10;
-  list-style: none;
-  margin: 4px 0 0;
+  margin: 0 0 4px;
   padding: 4px;
   background: #fff;
   border: 1px solid #e3e8ef;
   border-radius: 8px;
-  min-width: 200px;
+  min-width: 240px;
+  max-width: 100%;
+  max-height: 320px;
+  overflow-y: auto;
   box-shadow: 0 6px 18px rgba(21, 32, 51, 0.12);
 }
 
 .mentionList button {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mentionGroup + .mentionGroup {
+  border-top: 1px solid #eef2f7;
+}
+
+.mentionGroupHeader {
+  display: flex;
+  align-items: center;
+}
+
+.mentionGroupSelect {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #152033;
+}
+
+.mentionGroupSelect:hover,
+.mentionGroupToggle:hover {
+  background: #f2f5fa;
+}
+
+.mentionGroupCount {
+  font-size: 11px;
+  font-weight: 600;
+  color: #43526b;
+  background: #eef2f9;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.mentionGroupToggle {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #7a8699;
+}
+
+.mentionSubList {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+.mentionSubList button {
   width: 100%;
   text-align: left;
   border: none;
   background: none;
-  padding: 6px 8px;
+  padding: 5px 8px 5px 20px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  color: #43526b;
 }
 
-.mentionList button:hover {
+.mentionSubList button:hover {
   background: #f2f5fa;
+}
+
+/* Fixed-width tick column so labels stay aligned whether or not they are
+   currently referenced — the row must not shift when it is toggled. */
+.mentionCheck {
+  display: inline-block;
+  width: 12px;
+  margin-right: 6px;
+  color: #1f6b3a;
+  font-size: 11px;
+}
+
+.mentionGroupSelect[data-selected="true"],
+.mentionSubList button[data-selected="true"] {
+  color: #1f6b3a;
+  background: #f2f9f4;
 }
 
 .mentionEmpty {
@@ -174,10 +397,18 @@
 
 .mentionChip {
   background: #eef2f9;
+  border: none;
   border-radius: 999px;
   padding: 2px 10px;
+  font: inherit;
   font-size: 12px;
   color: #152033;
+  cursor: pointer;
+}
+
+.mentionChip:hover {
+  background: #e0e7f3;
+  color: #8a2b2b;
 }
 
 .input {
@@ -269,6 +500,90 @@
   color: #43526b;
 }
 
+.viewToggle {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 2px;
+  background: #eef2f9;
+  border-radius: 8px;
+}
+
+.viewToggle button {
+  border: none;
+  background: none;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #43526b;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.viewToggle button[data-selected="true"] {
+  background: #fff;
+  color: #152033;
+  box-shadow: 0 1px 3px rgba(21, 32, 51, 0.15);
+}
+
+.previewFields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.previewField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.previewFieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #152033;
+}
+
+.previewUnchanged {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #a2adbd;
+}
+
+.rawDiff {
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f6f8fb;
+  font-size: 12px;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.rawDiffLine {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rawDiffLine[data-type="add"] {
+  background: #e6ffed;
+  color: #1f6b3a;
+}
+
+.rawDiffLine[data-type="remove"] {
+  background: #ffeef0;
+  color: #a33;
+}
+
+.rawDiffMarker {
+  display: inline-block;
+  width: 14px;
+  color: #a2adbd;
+}
+
 .conflictNotice {
   margin: 8px 0 0;
   font-size: 12px;
@@ -322,6 +637,16 @@
 }
 
 @media (max-width: 720px) {
+  .diff {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The panel also renders inside AppShell's narrower chat drawer, where a
+   viewport-width media query never fires even though the available space
+   is just as tight — so the same stacking is driven by the panel's own
+   inline size instead. */
+@container (max-width: 560px) {
   .diff {
     grid-template-columns: 1fr;
   }

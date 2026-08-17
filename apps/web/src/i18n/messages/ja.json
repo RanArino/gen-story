@@ -717,15 +717,31 @@
     "fields": {
       "photoAnalysis": "@写真分析",
       "tone": "@トーン",
-      "stylePreset": "@スタイルプリセット"
+      "stylePreset": "@スタイルプリセット",
+      "commonPrompt": "@共通プロンプト",
+      "story": "@ストーリー・世界観",
+      "negativePrompt": "@ネガティブプロンプト",
+      "characterPolicy": "@キャラクター",
+      "scene": "@シーン",
+      "sceneNumbered": "@シーン{number}（{title}）"
     },
+    "groups": {
+      "analysis": "写真・スタイル分析",
+      "storySetup": "ストーリー設定",
+      "scenes": "シーン分析"
+    },
+    "untitledScene": "無題",
     "meta": {
       "provider": "プロバイダー",
       "model": "モデル",
       "wallet": "課金",
       "session": "セッション",
-      "compactions": "圧縮回数",
       "none": "未接続",
+      "providers": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "api": "API"
+      },
       "providerDefault": "プロバイダー既定",
       "notStarted": "未開始",
       "subscription": "サブスクリプション",
@@ -740,15 +756,29 @@
     "actions": {
       "send": "送信",
       "cancel": "ターンを中止",
-      "compact": "コンテキストを圧縮",
       "fork": "新しいセッション",
-      "mention": "項目を参照"
+      "history": "セッション履歴",
+      "mention": "項目を参照",
+      "expandGroup": "{group} の小項目を開閉",
+      "removeMention": "{field} の参照を外す"
+    },
+    "history": {
+      "loading": "セッションを読み込み中…",
+      "empty": "過去のセッションはまだありません。",
+      "untitled": "無題のセッション"
     },
     "approval": {
       "cardLabel": "変更提案",
       "title": "変更提案",
+      "viewMode": "表示形式",
+      "view": {
+        "preview": "プレビュー",
+        "raw": "Raw"
+      },
       "before": "現在",
       "after": "提案",
+      "unchangedFields": "変更なし {count} 件: {fields}",
+      "listSeparator": "、",
       "reason": "理由",
       "impact": "影響",
       "choiceLabel": "選択肢",
