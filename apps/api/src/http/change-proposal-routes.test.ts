@@ -174,6 +174,10 @@ describe("creative direction and change proposal routes", () => {
     expect(response.status).toBe(200);
     expect(body.storyboardId).toBe("storyboard_project_a");
     expect(body.fields.map((field) => field.target.field).sort()).toEqual([
+      "characterPolicy",
+      "commonPrompt",
+      "negativePrompt",
+      "story",
       "stylePresetId",
       "tone",
     ]);

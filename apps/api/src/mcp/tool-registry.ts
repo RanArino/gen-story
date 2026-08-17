@@ -74,9 +74,18 @@ function requireProjectProposal(
 }
 
 const SemanticTargetSchema = z.object({
-  entityType: z.enum(["project", "storyboard"]),
+  entityType: z.enum(["project", "storyboard", "scene"]),
   entityId: z.string().min(1),
-  field: z.enum(["photoAnalysis", "tone", "stylePresetId"]),
+  field: z.enum([
+    "photoAnalysis",
+    "tone",
+    "stylePresetId",
+    "commonPrompt",
+    "story",
+    "negativePrompt",
+    "characterPolicy",
+    "scene",
+  ]),
 });
 
 const ChoiceOptionSchema = z.object({
@@ -127,7 +136,7 @@ const getCreativeDirectionTool: McpToolDefinition = {
   name: "get_creative_direction",
   title: "Read creative direction",
   description:
-    "Read this project's current photo analysis, tone, and style preset with the base revision each one must be proposed against, plus the style presets that are valid values for stylePresetId.",
+    'Read this project\'s current creative direction with the base revision each field must be proposed against: photo analysis; the storyboard\'s tone, style preset, common prompt, story/worldview, negative prompt and character policy; and every scene (entityType "scene", field "scene"). Also returns the style presets that are valid values for stylePresetId.',
   inputShape: {},
   readOnly: true,
   handler: async (context) => {

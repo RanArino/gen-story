@@ -336,9 +336,17 @@ export type ProjectPhotoAnalysisDto = {
 // ── Change proposals (agent propose -> approve -> apply) ────────────────────
 
 export type SemanticTargetDto = {
-  entityType: "project" | "storyboard";
+  entityType: "project" | "storyboard" | "scene";
   entityId: string;
-  field: "photoAnalysis" | "tone" | "stylePresetId";
+  field:
+    | "photoAnalysis"
+    | "tone"
+    | "stylePresetId"
+    | "commonPrompt"
+    | "story"
+    | "negativePrompt"
+    | "characterPolicy"
+    | "scene";
 };
 
 // The current value of one addressable creative field plus the revision a

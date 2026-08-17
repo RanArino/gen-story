@@ -221,7 +221,11 @@ describe("Gen Story MCP tool surface", () => {
 
     const fields = body.fields as { target: { field: string } }[];
     expect(fields.map((field) => field.target.field).sort()).toEqual([
+      "characterPolicy",
+      "commonPrompt",
+      "negativePrompt",
       "photoAnalysis",
+      "story",
       "stylePresetId",
       "tone",
     ]);

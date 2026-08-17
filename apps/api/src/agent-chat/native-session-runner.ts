@@ -18,6 +18,13 @@ import { composeSessionPreamble, composeTurnInput } from "./turn-input";
 
 const MCP_SERVER_NAME = "gen_story";
 
+// Claude reports an MCP tool as `mcp__<server>__<tool>`; Codex reports the
+// bare tool name. The transcript shows the bare name for both.
+function bareToolName(toolName: string): string {
+  const prefix = `mcp__${MCP_SERVER_NAME}__`;
+  return toolName.startsWith(prefix) ? toolName.slice(prefix.length) : toolName;
+}
+
 /**
  * Only what this runner uses of a provider session. `CodexNativeSession` and
  * `ClaudeNativeSession` satisfy these structurally; naming the subsets is what
@@ -388,6 +395,13 @@ export class NativeSessionAgentTurnRunner implements AgentTurnRunnerPort {
       const unsubscribe = live.session.onEvent((event) => {
         if (event.type === "assistant-text") {
           onEvent({ type: "assistant-text", text: event.text });
+          return;
+        }
+        if (event.type === "tool-use") {
+          onEvent({
+            type: "tool-activity",
+            toolName: bareToolName(event.toolName),
+          });
         }
       });
       live.activeTurnId = request.turnId;

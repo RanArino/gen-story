@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   AGENT_SESSION_COMPACT_TURN_THRESHOLD,
@@ -4423,6 +4423,59 @@ describe("application use cases", () => {
           revision: "2026-05-02T00:00:10.000Z",
         },
       ]);
+    });
+
+    it("persists each event while the turn is still running, not after it ends", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      // Holds the provider inside startTurn after it has produced a reply, the
+      // way a real agent keeps working after answering. Buffering events until
+      // the turn ended made that reply invisible for the whole wait, which is
+      // what made a working chat look hung.
+      let releaseProvider: () => void = () => {};
+      const providerStillWorking = new Promise<void>((resolve) => {
+        releaseProvider = resolve;
+      });
+      deps.agentTurnRunner.startTurn = async (request, onEvent) => {
+        deps.agentTurnRunner.requests.push(request);
+        onEvent({ type: "session-started", nativeSessionId: "session-1" });
+        onEvent({ type: "assistant-text", text: "Warmer suits these photos." });
+        onEvent({ type: "tool-activity", toolName: "get_creative_direction" });
+        await providerStillWorking;
+        onEvent({ type: "turn-completed", status: "completed" });
+      };
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+
+      const running = runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      // Let the queued writes drain while the provider is still held.
+      await vi.waitFor(async () => {
+        const detail = await getAgentChatConversation(deps, {
+          conversationId: conversation.id,
+        });
+        if (!detail.ok) throw new Error("conversation was not readable");
+        const kinds = detail.value.messages.map((message) => message.kind);
+        expect(kinds).toContain("assistant_text");
+        expect(kinds).toContain("tool_activity");
+      });
+
+      // The turn is genuinely still open: the reply above was visible before it
+      // finished, not because the turn had already completed.
+      const midTurn = await getAgentChatConversation(deps, {
+        conversationId: conversation.id,
+      });
+      if (!midTurn.ok) throw new Error("conversation was not readable");
+      expect(midTurn.value.turns.at(-1)?.status).toBe("running");
+
+      releaseProvider();
+      await running;
     });
 
     it("records the assistant reply, tool activity, and compaction in the transcript", async () => {

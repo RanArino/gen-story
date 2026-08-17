@@ -173,9 +173,18 @@ export const ReviseChangeProposalItemSchema = z.object({
 const SemanticMentionSchema = z.object({
   label: z.string().min(1),
   target: z.object({
-    entityType: z.enum(["project", "storyboard"]),
+    entityType: z.enum(["project", "storyboard", "scene"]),
     entityId: z.string().min(1),
-    field: z.enum(["photoAnalysis", "tone", "stylePresetId"]),
+    field: z.enum([
+      "photoAnalysis",
+      "tone",
+      "stylePresetId",
+      "commonPrompt",
+      "story",
+      "negativePrompt",
+      "characterPolicy",
+      "scene",
+    ]),
   }),
 });
 

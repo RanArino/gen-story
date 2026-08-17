@@ -10,6 +10,7 @@ import {
   finishAgentConversationTurn,
   markAgentConversationTurnCompacted,
   readProjectPhotoAnalysisSemanticTarget,
+  readSceneSemanticTarget,
   readStoryboardSemanticTarget,
   recordAgentProviderBindingCompaction,
   recordAgentProviderBindingSession,
@@ -82,6 +83,12 @@ async function readSemanticTarget(
     return readStoryboardSemanticTarget(storyboard, target.field);
   }
 
+  if (target.entityType === "scene") {
+    const scene = await deps.scenes.findById(target.entityId);
+    if (scene == null) return failure("not_found", "Scene not found.");
+    return readSceneSemanticTarget(scene);
+  }
+
   const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
     target.entityId,
   );
@@ -100,6 +107,17 @@ async function assertTargetBelongsToProject(
 ): Promise<UseCaseResult<never> | undefined> {
   if (target.entityType === "project") {
     return target.entityId === projectId
+      ? undefined
+      : failure(
+          "not_found",
+          "Referenced field does not belong to this project.",
+        );
+  }
+
+  if (target.entityType === "scene") {
+    const scene = await deps.scenes.findById(target.entityId);
+    if (scene == null) return failure("not_found", "Scene not found.");
+    return scene.projectId === projectId
       ? undefined
       : failure(
           "not_found",
@@ -490,13 +508,92 @@ export async function runAgentChatTurn(
     });
   }
 
-  // Collected during the run and written after it: the events arrive on the
-  // provider's callback, which cannot be awaited from inside.
-  const pending: AgentTurnEvent[] = [];
+  let currentBinding = binding;
+  let currentTurn = turn;
   let outcome: Extract<AgentTurnEvent, { type: "turn-completed" }> = {
     type: "turn-completed",
     status: "failed",
     errorMessage: "The provider produced no result.",
+  };
+
+  // Each event is persisted and published the moment it arrives, so the
+  // operator watches the turn happen. Buffering them until the turn ended
+  // made a working provider look hung: a reply produced in seconds stayed
+  // invisible for as long as the agent kept working after it.
+  //
+  // The provider's callback is synchronous, so the writes are chained onto
+  // one promise rather than awaited in it — that keeps them in arrival order
+  // and lets `startTurn` return without racing them.
+  let writes: Promise<void> = Promise.resolve();
+  const write = (handler: () => Promise<void>): void => {
+    writes = writes.then(handler).catch((error: unknown) => {
+      // One unwritable event must not abandon the rest of the turn; the
+      // outcome below still records how the turn ended.
+      console.error("[agent-chat] failed to record a turn event:", error);
+    });
+  };
+
+  const handleEvent = async (
+    event: Exclude<AgentTurnEvent, { type: "turn-completed" }>,
+  ): Promise<void> => {
+    switch (event.type) {
+      case "session-started":
+        currentBinding = recordAgentProviderBindingSession(
+          currentBinding,
+          event.nativeSessionId,
+          now(),
+        );
+        await deps.agentConversations.saveBinding(currentBinding);
+        await publishChatEvent(deps, conversation.projectId, "binding", {
+          conversationId: conversation.id,
+          bindingId: currentBinding.id,
+          status: currentBinding.status,
+          nativeSessionId: currentBinding.nativeSessionId,
+        });
+        return;
+      case "assistant-text":
+        await appendMessage(deps, conversation, {
+          turnId: turn.id,
+          role: "assistant",
+          kind: "assistant_text",
+          text: event.text,
+        });
+        return;
+      case "tool-activity":
+        await appendMessage(deps, conversation, {
+          turnId: turn.id,
+          role: "system",
+          kind: "tool_activity",
+          text: event.toolName,
+          data: {
+            toolName: event.toolName,
+            ...(event.changeProposalId
+              ? { changeProposalId: event.changeProposalId }
+              : {}),
+          },
+        });
+        // A tool call is the only way a proposal can appear, so this is where
+        // the card is reconciled into the transcript — while the agent is
+        // still working, not after it stops.
+        await appendNewProposalMessages(deps, conversation, turn);
+        return;
+      case "compacted": {
+        currentBinding = recordAgentProviderBindingCompaction(
+          currentBinding,
+          now(),
+        );
+        await deps.agentConversations.saveBinding(currentBinding);
+        currentTurn = markAgentConversationTurnCompacted(currentTurn);
+        await appendMessage(deps, conversation, {
+          turnId: turn.id,
+          role: "system",
+          kind: "notice",
+          text: "The provider compacted its context.",
+          data: { compactCount: currentBinding.compactCount },
+        });
+        return;
+      }
+    }
   };
 
   await deps.agentTurnRunner.startTurn(
@@ -517,69 +614,12 @@ export async function runAgentChatTurn(
         outcome = event;
         return;
       }
-      pending.push(event);
+      write(() => handleEvent(event));
     },
   );
 
-  let currentBinding = binding;
-  let currentTurn = turn;
-
-  for (const event of pending) {
-    switch (event.type) {
-      case "session-started":
-        currentBinding = recordAgentProviderBindingSession(
-          currentBinding,
-          event.nativeSessionId,
-          now(),
-        );
-        await deps.agentConversations.saveBinding(currentBinding);
-        await publishChatEvent(deps, conversation.projectId, "binding", {
-          conversationId: conversation.id,
-          bindingId: currentBinding.id,
-          status: currentBinding.status,
-          nativeSessionId: currentBinding.nativeSessionId,
-        });
-        break;
-      case "assistant-text":
-        await appendMessage(deps, conversation, {
-          turnId: turn.id,
-          role: "assistant",
-          kind: "assistant_text",
-          text: event.text,
-        });
-        break;
-      case "tool-activity":
-        await appendMessage(deps, conversation, {
-          turnId: turn.id,
-          role: "system",
-          kind: "tool_activity",
-          text: event.toolName,
-          data: {
-            toolName: event.toolName,
-            ...(event.changeProposalId
-              ? { changeProposalId: event.changeProposalId }
-              : {}),
-          },
-        });
-        break;
-      case "compacted": {
-        currentBinding = recordAgentProviderBindingCompaction(
-          currentBinding,
-          now(),
-        );
-        await deps.agentConversations.saveBinding(currentBinding);
-        currentTurn = markAgentConversationTurnCompacted(currentTurn);
-        await appendMessage(deps, conversation, {
-          turnId: turn.id,
-          role: "system",
-          kind: "notice",
-          text: "The provider compacted its context.",
-          data: { compactCount: currentBinding.compactCount },
-        });
-        break;
-      }
-    }
-  }
+  // Events emitted just before the provider finished may still be queued.
+  await writes;
 
   await appendNewProposalMessages(deps, conversation, turn);
 

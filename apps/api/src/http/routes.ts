@@ -2581,15 +2581,20 @@ export function buildRouter(deps: ApiDependencies): Router {
       return;
     }
 
-    deps.agentRuntime.selection = result.value.agentRuntime;
-    deps.agentRuntime.wallet = agentRuntimeWallet(result.value.agentRuntime);
-    deps.agentRuntime.capabilities = agentRuntimeCapabilities(
-      result.value.agentRuntime,
-    );
-    deps.agentRuntime.availability =
-      result.value.agentRuntime === "api"
-        ? { status: "not_applicable" }
-        : { status: "unchecked" };
+    // Reading the preference must not invalidate a runtime check that already
+    // ran: resetting to "unchecked" here made the chat report "the runtime
+    // check has not run yet" for anyone who had merely opened Settings.
+    // Only a selection that actually changed needs re-checking.
+    const selection = result.value.agentRuntime;
+    if (deps.agentRuntime.selection !== selection) {
+      deps.agentRuntime.selection = selection;
+      deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+      deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+      deps.agentRuntime.availability =
+        selection === "api"
+          ? { status: "not_applicable" }
+          : { status: "unchecked" };
+    }
 
     sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
   });

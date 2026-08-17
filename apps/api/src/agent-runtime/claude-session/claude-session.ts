@@ -8,6 +8,10 @@ import {
 export type ClaudeSessionEvent =
   | { type: "session-ready"; sessionId: string }
   | { type: "assistant-text"; text: string }
+  // A tool the assistant invoked, by its raw name (MCP tools arrive as
+  // `mcp__<server>__<tool>`). Emitted so a long turn shows progress instead
+  // of looking hung while the agent works.
+  | { type: "tool-use"; toolName: string }
   | {
       type: "turn-completed";
       isError: boolean;
@@ -254,13 +258,20 @@ export class ClaudeNativeSession {
     }
     if (type === "assistant") {
       const message = event.message as
-        | { content?: Array<{ type?: string; text?: string }> }
+        | { content?: Array<{ type?: string; text?: string; name?: string }> }
         | undefined;
-      const text = message?.content?.find(
-        (block) => block.type === "text",
-      )?.text;
-      if (typeof text === "string") {
-        this.emit({ type: "assistant-text", text });
+      // Every block, not just the first text one: a single assistant message
+      // can carry thinking, several text blocks, and tool calls, and dropping
+      // all but the first loses reply text the operator was shown nothing of.
+      for (const block of message?.content ?? []) {
+        if (block.type === "text" && typeof block.text === "string") {
+          this.emit({ type: "assistant-text", text: block.text });
+        } else if (
+          block.type === "tool_use" &&
+          typeof block.name === "string"
+        ) {
+          this.emit({ type: "tool-use", toolName: block.name });
+        }
       }
       this.emit({ type: "raw", event });
       return;
@@ -281,10 +292,18 @@ export class ClaudeNativeSession {
     this.emit({ type: "raw", event });
   }
 
-  /** Resolves once the next `result` event arrives, marking this turn done. */
+  /**
+   * Resolves once the next `result` event arrives, marking this turn done.
+   *
+   * The timeout measures *silence*, not the turn's total length: it restarts
+   * on every event. A turn that references several fields legitimately runs
+   * for minutes while streaming tool calls and text, and a wall-clock limit
+   * killed exactly those turns — the agent was working and visibly producing
+   * output right up to the moment it was declared timed out.
+   */
   sendTurn(
     text: string,
-    timeoutMs = DEFAULT_TURN_TIMEOUT_MS,
+    idleTimeoutMs = DEFAULT_TURN_TIMEOUT_MS,
   ): Promise<{ isError: boolean; subtype: string; resultText: string | null }> {
     if (this.closed) {
       return Promise.reject(
@@ -295,22 +314,33 @@ export class ClaudeNativeSession {
     }
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        unsubscribe();
-        reject(new ClaudeSessionError(`Timed out waiting for a turn result.`));
-      }, timeoutMs);
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const armTimeout = () => {
+        timeout = setTimeout(() => {
+          unsubscribe();
+          reject(
+            new ClaudeSessionError(
+              `Timed out after ${idleTimeoutMs}ms with no output from the provider.`,
+            ),
+          );
+        }, idleTimeoutMs);
+      };
 
       const unsubscribe = this.onEvent((event) => {
+        clearTimeout(timeout);
         if (event.type === "turn-completed") {
-          clearTimeout(timeout);
           unsubscribe();
           resolve({
             isError: event.isError,
             subtype: event.subtype,
             resultText: event.resultText,
           });
+          return;
         }
+        armTimeout();
       });
+
+      armTimeout();
 
       try {
         this.process.sendMessage(text);

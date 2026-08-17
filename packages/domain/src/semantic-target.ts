@@ -1,6 +1,8 @@
 import type {
   ProjectId,
   ProjectPhotoAnalysis,
+  Scene,
+  SceneId,
   Storyboard,
   StoryboardId,
 } from "./model";
@@ -10,8 +12,24 @@ import type {
 // mention. It intentionally excludes the DB row shape: agents address product
 // concepts, not storage columns.
 export type ProjectSemanticField = "photoAnalysis";
-export type StorySemanticField = "tone" | "stylePresetId";
-export type SemanticField = ProjectSemanticField | StorySemanticField;
+// The storyboard-level story setup: tone and style preset, plus the four
+// fields the guided setup flow writes (common prompt, story/worldview,
+// negative prompt, and the one-time character decision).
+export type StorySemanticField =
+  | "tone"
+  | "stylePresetId"
+  | "commonPrompt"
+  | "story"
+  | "negativePrompt"
+  | "characterPolicy";
+// A scene is addressed as one unit rather than field by field: the operator
+// refers to "scene 3", and its creative fields (prompt, emotion, camera,
+// lighting, motion) are only meaningful to review together.
+export type SceneSemanticField = "scene";
+export type SemanticField =
+  | ProjectSemanticField
+  | StorySemanticField
+  | SceneSemanticField;
 
 export type SemanticTarget =
   | { entityType: "project"; entityId: ProjectId; field: ProjectSemanticField }
@@ -19,12 +37,22 @@ export type SemanticTarget =
       entityType: "storyboard";
       entityId: StoryboardId;
       field: StorySemanticField;
-    };
+    }
+  | { entityType: "scene"; entityId: SceneId; field: SceneSemanticField };
+
+export const STORY_SEMANTIC_FIELDS: StorySemanticField[] = [
+  "tone",
+  "stylePresetId",
+  "commonPrompt",
+  "story",
+  "negativePrompt",
+  "characterPolicy",
+];
 
 export const SEMANTIC_FIELDS: SemanticField[] = [
   "photoAnalysis",
-  "tone",
-  "stylePresetId",
+  ...STORY_SEMANTIC_FIELDS,
+  "scene",
 ];
 
 export function isSemanticField(value: unknown): value is SemanticField {
@@ -47,6 +75,10 @@ export function storyboardSemanticTarget(
   return { entityType: "storyboard", entityId: storyboardId, field };
 }
 
+export function sceneSemanticTarget(sceneId: SceneId): SemanticTarget {
+  return { entityType: "scene", entityId: sceneId, field: "scene" };
+}
+
 // Validates an untrusted { entityType, entityId, field } tuple (e.g. from an
 // MCP tool call) into a well-formed SemanticTarget. Throws on any
 // entityType/field pair this slice does not support.
@@ -66,9 +98,17 @@ export function createSemanticTarget(input: {
 
   if (
     input.entityType === "storyboard" &&
-    (input.field === "tone" || input.field === "stylePresetId")
+    (STORY_SEMANTIC_FIELDS as string[]).includes(input.field)
   ) {
-    return { entityType: "storyboard", entityId, field: input.field };
+    return {
+      entityType: "storyboard",
+      entityId,
+      field: input.field as StorySemanticField,
+    };
+  }
+
+  if (input.entityType === "scene" && input.field === "scene") {
+    return { entityType: "scene", entityId, field: "scene" };
   }
 
   throw new Error(
@@ -105,6 +145,42 @@ export function readStoryboardSemanticTarget(
     target: storyboardSemanticTarget(storyboard.id, field),
     value: storyboard[field],
     revision: storyboard.updatedAt,
+  };
+}
+
+// The creative content of one scene — deliberately not the whole row: order,
+// status, photo assignments, and the adopted image are workflow state the
+// operator manages in the storyboard UI, not something a chat should rewrite.
+export type SceneSemanticValue = {
+  orderIndex: number;
+  title: string;
+  description: string;
+  imagePrompt: string;
+  emotion: string;
+  cameraDirection: string;
+  lightingDirection: string;
+  motionDirection: string;
+  notes: string;
+  negativePrompt: string;
+};
+
+export function readSceneSemanticTarget(scene: Scene): SemanticTargetSnapshot {
+  const value: SceneSemanticValue = {
+    orderIndex: scene.orderIndex,
+    title: scene.title,
+    description: scene.description,
+    imagePrompt: scene.imagePrompt,
+    emotion: scene.emotion,
+    cameraDirection: scene.cameraDirection,
+    lightingDirection: scene.lightingDirection,
+    motionDirection: scene.motionDirection,
+    notes: scene.notes,
+    negativePrompt: scene.negativePrompt,
+  };
+  return {
+    target: sceneSemanticTarget(scene.id),
+    value,
+    revision: scene.updatedAt,
   };
 }
 

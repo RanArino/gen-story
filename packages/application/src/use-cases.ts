@@ -29,8 +29,10 @@ import {
   markChangeProposalApplied,
   markChangeProposalConflicted,
   readProjectPhotoAnalysisSemanticTarget,
+  readSceneSemanticTarget,
   readStoryboardSemanticTarget,
   replaceScenePhotoAssets,
+  STORY_SEMANTIC_FIELDS,
   retryGenerationRequest,
   reviseChangeProposalItem,
   SCENE_FILL_FIELDS,
@@ -59,6 +61,7 @@ import {
   type ProjectPhotoAnalysis,
   type Scene,
   type SceneFillField,
+  type SceneSemanticValue,
   type SemanticTarget,
   type SemanticTargetSnapshot,
   type StoryboardSetupStatus,
@@ -1094,8 +1097,17 @@ export async function getCreativeDirection(
       fields.push(readProjectPhotoAnalysisSemanticTarget(analysis));
     }
     if (storyboard != null) {
-      fields.push(readStoryboardSemanticTarget(storyboard, "tone"));
-      fields.push(readStoryboardSemanticTarget(storyboard, "stylePresetId"));
+      for (const field of STORY_SEMANTIC_FIELDS) {
+        fields.push(readStoryboardSemanticTarget(storyboard, field));
+      }
+      // Scenes in storyboard order, so "scene 1" means the same thing to the
+      // operator, the agent, and the storyboard screen.
+      const scenes = await deps.scenes.findByStoryboardId(storyboard.id);
+      for (const scene of [...scenes].sort(
+        (left, right) => left.orderIndex - right.orderIndex,
+      )) {
+        fields.push(readSceneSemanticTarget(scene));
+      }
     }
 
     const stylePresets = await deps.stylePresets.findAll();
@@ -1129,6 +1141,17 @@ async function assertTargetBelongsToProject(
 ): Promise<UseCaseResult<never> | undefined> {
   if (target.entityType === "project") {
     return target.entityId === projectId
+      ? undefined
+      : failure(
+          "not_found",
+          "Semantic target does not belong to this project.",
+        );
+  }
+
+  if (target.entityType === "scene") {
+    const scene = await deps.scenes.findById(target.entityId);
+    if (scene == null) return failure("not_found", "Scene not found.");
+    return scene.projectId === projectId
       ? undefined
       : failure(
           "not_found",
@@ -1341,6 +1364,12 @@ async function getSemanticTargetSnapshot(
     return readStoryboardSemanticTarget(storyboard, target.field);
   }
 
+  if (target.entityType === "scene") {
+    const scene = await deps.scenes.findById(target.entityId);
+    if (scene == null) return failure("not_found", "Scene not found.");
+    return readSceneSemanticTarget(scene);
+  }
+
   const analysis = await deps.projectPhotoAnalyses.findLatestByProjectId(
     target.entityId,
   );
@@ -1491,23 +1520,59 @@ async function writeChangeProposalItem(
   projectId: string,
   item: ChangeProposalItem,
 ): Promise<UseCaseResult<never> | undefined> {
-  if (item.target.entityType === "storyboard" && item.target.field === "tone") {
+  if (item.target.entityType === "storyboard") {
+    // Each story-setup field maps to the one `upsertStoryboard` argument that
+    // owns it, so an approved change goes through exactly the validation a
+    // manual edit on the storyboard screen would.
+    const field = item.target.field;
     const result = await upsertStoryboard(deps, {
       storyboardId: item.target.entityId,
       projectId,
-      tone: item.after as string,
+      ...(field === "tone" ? { tone: item.after as string } : {}),
+      ...(field === "stylePresetId"
+        ? { stylePresetId: item.after as string | null }
+        : {}),
+      ...(field === "commonPrompt"
+        ? { commonPrompt: item.after as string }
+        : {}),
+      ...(field === "story" ? { story: item.after as string } : {}),
+      ...(field === "negativePrompt"
+        ? { negativePrompt: item.after as string }
+        : {}),
+      ...(field === "characterPolicy"
+        ? { characterPolicy: item.after as CharacterPolicy }
+        : {}),
     });
     return result.ok ? undefined : result;
   }
 
-  if (
-    item.target.entityType === "storyboard" &&
-    item.target.field === "stylePresetId"
-  ) {
-    const result = await upsertStoryboard(deps, {
-      storyboardId: item.target.entityId,
+  if (item.target.entityType === "scene") {
+    const scene = await deps.scenes.findById(item.target.entityId);
+    if (scene == null) return failure("not_found", "Scene not found.");
+
+    // Only the creative fields are writable; order, status, photos, and the
+    // adopted image stay whatever the storyboard screen last set them to.
+    const after = item.after as Partial<SceneSemanticValue>;
+    const result = await upsertScenes(deps, {
+      storyboardId: scene.storyboardId,
       projectId,
-      stylePresetId: item.after as string | null,
+      scenes: [
+        {
+          sceneId: scene.id,
+          projectId: scene.projectId,
+          storyboardId: scene.storyboardId,
+          orderIndex: scene.orderIndex,
+          title: after.title ?? scene.title,
+          description: after.description ?? scene.description,
+          imagePrompt: after.imagePrompt ?? scene.imagePrompt,
+          emotion: after.emotion ?? scene.emotion,
+          cameraDirection: after.cameraDirection ?? scene.cameraDirection,
+          lightingDirection: after.lightingDirection ?? scene.lightingDirection,
+          motionDirection: after.motionDirection ?? scene.motionDirection,
+          notes: after.notes ?? scene.notes,
+          negativePrompt: after.negativePrompt ?? scene.negativePrompt,
+        },
+      ],
     });
     return result.ok ? undefined : result;
   }

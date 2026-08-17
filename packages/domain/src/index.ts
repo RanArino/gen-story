@@ -111,6 +111,8 @@ export type {
 } from "./rules";
 export type {
   ProjectSemanticField,
+  SceneSemanticField,
+  SceneSemanticValue,
   SemanticField,
   SemanticTarget,
   SemanticTargetRevision,
@@ -122,9 +124,12 @@ export {
   isSemanticField,
   projectSemanticTarget,
   readProjectPhotoAnalysisSemanticTarget,
+  readSceneSemanticTarget,
   readStoryboardSemanticTarget,
+  sceneSemanticTarget,
   SEMANTIC_FIELDS,
   semanticTargetKey,
+  STORY_SEMANTIC_FIELDS,
   storyboardSemanticTarget,
 } from "./semantic-target";
 export type {

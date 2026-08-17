@@ -41,8 +41,13 @@ const fakeCliPath = `${binDir}${delimiter}${dirname(process.execPath)}`;
  * echoes the text back with an `assistant` event followed by a `result`.
  * Captures its own argv to a file under HOME so tests can assert on it.
  */
-function writeFakeClaude(options: { initEagerly?: boolean } = {}): void {
+function writeFakeClaude(
+  options: { initEagerly?: boolean; heartbeats?: number } = {},
+): void {
   const eager = options.initEagerly ?? true;
+  // When set, the fake keeps emitting assistant messages before its result,
+  // standing in for an agent that works for minutes while streaming output.
+  const heartbeats = options.heartbeats ?? 0;
   const path = join(binDir, "claude");
   writeFileSync(
     path,
@@ -65,6 +70,20 @@ function writeFakeClaude(options: { initEagerly?: boolean } = {}): void {
       "  const text = line.message.content[0].text;",
       "  if (text === '/compact') {",
       "    write({ type: 'result', is_error: false, subtype: 'success', result: 'Not enough messages to compact.' });",
+      "    return;",
+      "  }",
+      `  const beats = ${heartbeats};`,
+      "  if (beats > 0) {",
+      "    let sent = 0;",
+      "    const tick = setInterval(() => {",
+      "      sent += 1;",
+      "      if (sent <= beats) {",
+      "        write({ type: 'assistant', message: { content: [{ type: 'text', text: 'working ' + sent }] } });",
+      "        return;",
+      "      }",
+      "      clearInterval(tick);",
+      "      write({ type: 'result', is_error: false, subtype: 'success', result: 'echo:' + text });",
+      "    }, 100);",
       "    return;",
       "  }",
       "  write({ type: 'assistant', message: { content: [{ type: 'text', text: 'echo:' + text }] } });",
@@ -177,6 +196,41 @@ describe("ClaudeNativeSession", () => {
     const result = await session.compact();
 
     expect(result.resultText).toBe("Not enough messages to compact.");
+    await session.close();
+  });
+
+  it("keeps a turn alive while the provider streams, timing out only on silence", async () => {
+    // 20 beats 100ms apart run ~2s, well past the 800ms limit, while never
+    // going quiet for more than ~100ms. A turn that references several fields
+    // behaves this way for minutes, and a wall-clock limit killed exactly
+    // those turns mid-work. The margins are deliberately wide in both
+    // directions so scheduling jitter cannot decide the outcome.
+    writeFakeClaude({ heartbeats: 20 });
+    const session = await ClaudeNativeSession.start(startInput());
+
+    const result = await session.sendTurn("long job", 800);
+
+    expect(result.resultText).toBe("echo:long job");
+    await session.close();
+  });
+
+  it("times out when the provider produces nothing at all", async () => {
+    const path = join(binDir, "claude");
+    writeFileSync(
+      path,
+      [
+        "#!/usr/bin/env node",
+        "process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init' }) + '\\n');",
+        "setInterval(() => {}, 1000);",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    const session = await ClaudeNativeSession.start(startInput());
+
+    await expect(session.sendTurn("silence", 200)).rejects.toThrow(
+      /no output from the provider/,
+    );
+
     await session.close();
   });
 

@@ -15,7 +15,9 @@ export function composeSessionPreamble(input: {
   const language = input.language === "ja" ? "Japanese" : "English";
   return [
     "You are helping the operator of Gen Story refine one project's creative direction:",
-    "AI photo analysis, emotion/tone, and style preset. Nothing else is in scope.",
+    "AI photo analysis; the storyboard's emotion/tone, style preset, common prompt,",
+    "story/worldview, negative prompt and character policy; and individual scenes.",
+    "Nothing else is in scope.",
     "",
     `Project ID: ${input.projectId}. Every Gen Story tool is already scoped to it.`,
     "",
