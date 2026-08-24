@@ -165,35 +165,28 @@ themselves between turns), and **New session** starts a fresh provider session
 while keeping the transcript — that is also how you recover a session the
 provider has lost.
 
-## Refining a Project with Codex or Claude Code (MCP)
+## Refining a Project with AI (MCP, internal)
 
-The API hosts a project-scoped MCP server so an agent can inspect and refine a
-project's creative direction — AI photo analysis, emotion/tone, and style
-preset — without ever touching the database. An agent reads current values,
-records a **change proposal**, and can apply only the items you approved in the
-app. Nothing is written by the act of proposing.
+The **AI refine** chat panel (see above) is how you refine a project's
+creative direction — AI photo analysis, tone, style preset, common prompt,
+story/worldview, negative prompt, character policy, and individual scenes —
+with Codex or Claude Code. Internally the API hosts a project-scoped MCP
+server (`http://localhost:4000/api/mcp/projects/<projectId>`) that the chat's
+CLI session attaches to; you do not need to run or configure this yourself.
+The agent reads current values, records a **change proposal**, and can apply
+only the items you approved in the app. Nothing is written by the act of
+proposing, and a pending proposal is stored in SQLite, so it survives closing
+the browser and restarting the API. If you edit a field after a proposal was
+made, applying it fails with a visible conflict instead of overwriting your
+edit.
 
-With the API running, attach an external agent to one project:
-
-```sh
-# stdio (Codex, Claude Code)
-pnpm --filter @gen-story/api mcp:stdio -- --project <projectId>
-
-# Streamable HTTP
-# http://localhost:4000/api/mcp/projects/<projectId>
-```
-
-The repository ships the workflow as a skill for both clients:
-`.claude/skills/gen-story-creative-refinement/` and
+There is no way to drive this from a separate, standalone Codex/Claude Code
+terminal session today: a proposal only reaches this app's approval UI when
+it is attached to an active chat conversation, so an externally created
+proposal would never appear anywhere for you to review. Use the in-app chat
+panel. The MCP contract is documented for reference (not as a supported
+external attach point) in `.claude/skills/gen-story-creative-refinement/` and
 `.codex/skills/gen-story-creative-refinement/`.
-
-The MCP surface is a fixed allowlist — read creative direction, list/read
-proposals, propose changes, apply an approved proposal. There is no general
-update tool, no SQL, and no shell access, and an agent cannot approve its own
-proposal: approval is your action in the app. A pending proposal is stored in
-SQLite, so it survives closing the browser and restarting the API. If you edit
-a field after a proposal was made, applying it fails with a visible conflict
-instead of overwriting your edit.
 
 ## Maintenance Scripts
 

@@ -3129,9 +3129,7 @@ export function buildRouter(deps: ApiDependencies): Router {
     },
   );
 
-  // POST /api/mcp/projects/:projectId — the embedded client's MCP transport.
-  // The external CLI transport (`pnpm --filter @gen-story/api mcp:stdio`)
-  // serves the identical tool registry over stdio.
+  // POST /api/mcp/projects/:projectId — the embedded chat's MCP transport.
   router.add(
     "POST",
     "/api/mcp/projects/:projectId",

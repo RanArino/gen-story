@@ -28,7 +28,6 @@ import { buildRouter, handleApiRequest } from "../http/routes";
 import { sendJson } from "../http/json";
 import { createInMemoryApplicationDependencies } from "../test-support/in-memory-application";
 import { createProjectMcpServer } from "./project-mcp-server";
-import { resolveStdioProjectId, resolveStdioProvider } from "./stdio-server";
 import { GEN_STORY_MCP_TOOL_NAMES } from "./tool-registry";
 
 const now = "2026-08-14T00:00:00.000Z";
@@ -231,27 +230,6 @@ describe("MCP transports", () => {
   it("rejects non-POST methods on the MCP endpoint", async () => {
     const response = await fetch(`${base}/api/mcp/projects/project_a`);
     expect(response.status).toBe(405);
-  });
-});
-
-describe("stdio MCP entry point", () => {
-  it("resolves the project from --project or the environment", () => {
-    expect(resolveStdioProjectId(["--project", "project_a"], {})).toBe(
-      "project_a",
-    );
-    expect(
-      resolveStdioProjectId([], { GEN_STORY_MCP_PROJECT_ID: "project_b" }),
-    ).toBe("project_b");
-    expect(() => resolveStdioProjectId([], {})).toThrow(
-      /project ID is required/,
-    );
-  });
-
-  it("defaults the provider to codex unless claude is requested", () => {
-    expect(resolveStdioProvider({})).toBe("codex");
-    expect(resolveStdioProvider({ GEN_STORY_MCP_PROVIDER: "claude" })).toBe(
-      "claude",
-    );
   });
 });
 
