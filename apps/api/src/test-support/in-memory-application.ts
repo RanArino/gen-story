@@ -1,6 +1,7 @@
 import type {
   AiJobRepositoryPort,
   ApplicationDependencies,
+  ChangeProposalRepositoryPort,
   ComplementSceneProposal,
   ComplementSceneProposalInput,
   ComplementSceneProposalPort,
@@ -41,8 +42,11 @@ import { createAiJob } from "@gen-story/domain";
 import type { ApiAgentRuntimeInfo } from "../app/create-api-context";
 import { LocalAuthContext } from "../auth/local-auth";
 import { LocalProgressEvents } from "../jobs/local-progress-events";
+import { InMemoryMcpToolCallAudits } from "../mcp/tool-call-audit";
 import type {
   AiJob,
+  ChangeProposal,
+  ChangeProposalStatus,
   GeneratedImage,
   GenerationRequest,
   Organization,
@@ -332,6 +336,47 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
   }
 }
 
+class InMemoryChangeProposalRepository implements ChangeProposalRepositoryPort {
+  constructor(private readonly store: MemoryStore<ChangeProposal>) {}
+
+  async findById(changeProposalId: string): Promise<ChangeProposal | null> {
+    return this.store.findById(changeProposalId);
+  }
+
+  async findByClientRequestId(
+    projectId: string,
+    clientRequestId: string,
+  ): Promise<ChangeProposal | null> {
+    return (
+      this.store
+        .values()
+        .find(
+          (proposal) =>
+            proposal.projectId === projectId &&
+            proposal.clientRequestId === clientRequestId,
+        ) ?? null
+    );
+  }
+
+  async findByProjectId(
+    projectId: string,
+    status?: ChangeProposalStatus,
+  ): Promise<ChangeProposal[]> {
+    return this.store
+      .values()
+      .filter(
+        (proposal) =>
+          proposal.projectId === projectId &&
+          (status == null || proposal.status === status),
+      )
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async save(changeProposal: ChangeProposal): Promise<void> {
+    await this.store.save(changeProposal);
+  }
+}
+
 class InMemoryTestGenerationBatchRepository implements TestGenerationBatchRepositoryPort {
   constructor(private readonly store: MemoryStore<TestGenerationBatch>) {}
 
@@ -596,6 +641,7 @@ export function createInMemoryApplicationDependencies(
     generationRequests?: GenerationRequest[];
     generatedImages?: GeneratedImage[];
     projectPhotoAnalyses?: ProjectPhotoAnalysis[];
+    changeProposals?: ChangeProposal[];
     testGenerationBatches?: TestGenerationBatch[];
     aiJobs?: AiJob[];
   },
@@ -605,6 +651,7 @@ export function createInMemoryApplicationDependencies(
 ): ApplicationDependencies & {
   progressEvents: LocalProgressEvents;
   agentRuntime: ApiAgentRuntimeInfo;
+  mcpToolCallAudits: InMemoryMcpToolCallAudits;
   stores: {
     users: MemoryStore<User>;
     organizations: MemoryStore<Organization>;
@@ -616,6 +663,7 @@ export function createInMemoryApplicationDependencies(
     generationRequests: MemoryStore<GenerationRequest>;
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
+    changeProposals: MemoryStore<ChangeProposal>;
     testGenerationBatches: MemoryStore<TestGenerationBatch>;
     aiJobs: MemoryStore<AiJob>;
   };
@@ -631,6 +679,7 @@ export function createInMemoryApplicationDependencies(
     generationRequests: new MemoryStore(initial?.generationRequests ?? []),
     generatedImages: new MemoryStore(initial?.generatedImages ?? []),
     projectPhotoAnalyses: new MemoryStore(initial?.projectPhotoAnalyses ?? []),
+    changeProposals: new MemoryStore(initial?.changeProposals ?? []),
     testGenerationBatches: new MemoryStore<TestGenerationBatch>(
       initial?.testGenerationBatches ?? [],
     ),
@@ -640,6 +689,7 @@ export function createInMemoryApplicationDependencies(
   const dependencies: ApplicationDependencies & {
     progressEvents: LocalProgressEvents;
     agentRuntime: ApiAgentRuntimeInfo;
+    mcpToolCallAudits: InMemoryMcpToolCallAudits;
   } = {
     users: new InMemoryUserRepository(stores.users),
     organizations: new InMemoryOrganizationRepository(stores.organizations),
@@ -657,6 +707,9 @@ export function createInMemoryApplicationDependencies(
     aiJobs: new InMemoryAiJobRepository(stores.aiJobs),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
+    ),
+    changeProposals: new InMemoryChangeProposalRepository(
+      stores.changeProposals,
     ),
     testGenerationBatches: new InMemoryTestGenerationBatchRepository(
       stores.testGenerationBatches,
@@ -676,6 +729,7 @@ export function createInMemoryApplicationDependencies(
       users: new InMemoryUserRepository(stores.users),
       organizations: new InMemoryOrganizationRepository(stores.organizations),
     }),
+    mcpToolCallAudits: new InMemoryMcpToolCallAudits(),
     agentRuntime: {
       selection: "api",
       wallet: "api_key",

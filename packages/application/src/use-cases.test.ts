@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createAiJob,
+  createChangeProposal,
   createGeneratedImage,
   createGenerationRequest,
   createOrganization,
@@ -14,6 +15,9 @@ import {
   createStylePreset,
   createTestGenerationBatch,
   createUser,
+  storyboardSemanticTarget,
+  type ChangeProposal,
+  type ChangeProposalStatus,
   type TestAdjustmentId,
   type AiJob,
   type AiJobKind,
@@ -34,6 +38,7 @@ import {
 import type {
   AiJobRepositoryPort,
   ApplicationDependencies,
+  ChangeProposalRepositoryPort,
   ComplementSceneProposal,
   ComplementSceneProposalInput,
   ComplementSceneProposalPort,
@@ -68,12 +73,14 @@ import type {
 import {
   analyzeProjectPhotos,
   applyAdjustmentToTestVariant,
+  applyChangeProposal,
   assignPhotosToScene,
   confirmTestGeneration,
   createGenerationRequestUseCase,
   createCustomStyle,
   createTemplateScenesFromPhotos,
   createProjectUseCase,
+  decideChangeProposalItem,
   fillSceneWithAi,
   fillStoryboardScenesWithAi,
   generateStorySetup,
@@ -89,11 +96,13 @@ import {
   reorderPhotos,
   reorderScenes,
   retryFailedGenerationRequest,
+  reviseChangeProposalItemUseCase,
   runComplementSceneProposalsJob,
   runPhotoAnalysisJob,
   runSceneAiFillJob,
   runStorySetupJob,
   runCharacterSheetGenerationJob,
+  selectChangeProposalChoice,
   setUserPreference,
   updatePhotoCuration,
   upsertScenes,
@@ -368,6 +377,47 @@ class InMemoryProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepo
 
   async save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void> {
     await this.store.save(projectPhotoAnalysis);
+  }
+}
+
+class InMemoryChangeProposalRepository implements ChangeProposalRepositoryPort {
+  constructor(private readonly store: MemoryStore<ChangeProposal>) {}
+
+  async findById(changeProposalId: string): Promise<ChangeProposal | null> {
+    return this.store.findById(changeProposalId);
+  }
+
+  async findByClientRequestId(
+    projectId: string,
+    clientRequestId: string,
+  ): Promise<ChangeProposal | null> {
+    return (
+      this.store
+        .values()
+        .find(
+          (proposal) =>
+            proposal.projectId === projectId &&
+            proposal.clientRequestId === clientRequestId,
+        ) ?? null
+    );
+  }
+
+  async findByProjectId(
+    projectId: string,
+    status?: ChangeProposalStatus,
+  ): Promise<ChangeProposal[]> {
+    return this.store
+      .values()
+      .filter(
+        (proposal) =>
+          proposal.projectId === projectId &&
+          (status == null || proposal.status === status),
+      )
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async save(changeProposal: ChangeProposal): Promise<void> {
+    await this.store.save(changeProposal);
   }
 }
 
@@ -671,6 +721,7 @@ function createDependencies(initial?: {
   generationRequests?: GenerationRequest[];
   generatedImages?: GeneratedImage[];
   projectPhotoAnalyses?: ProjectPhotoAnalysis[];
+  changeProposals?: ChangeProposal[];
   testGenerationBatches?: TestGenerationBatch[];
   aiJobs?: AiJob[];
 }): ApplicationDependencies & {
@@ -685,6 +736,7 @@ function createDependencies(initial?: {
     generationRequests: MemoryStore<GenerationRequest>;
     generatedImages: MemoryStore<GeneratedImage>;
     projectPhotoAnalyses: MemoryStore<ProjectPhotoAnalysis>;
+    changeProposals: MemoryStore<ChangeProposal>;
     testGenerationBatches: MemoryStore<TestGenerationBatch>;
     aiJobs: MemoryStore<AiJob>;
   };
@@ -716,6 +768,9 @@ function createDependencies(initial?: {
     ),
     projectPhotoAnalyses: new MemoryStore<ProjectPhotoAnalysis>(
       initial?.projectPhotoAnalyses ?? [],
+    ),
+    changeProposals: new MemoryStore<ChangeProposal>(
+      initial?.changeProposals ?? [],
     ),
     testGenerationBatches: new MemoryStore<TestGenerationBatch>(
       initial?.testGenerationBatches ?? [],
@@ -750,6 +805,9 @@ function createDependencies(initial?: {
     aiJobs: new InMemoryAiJobRepository(stores.aiJobs),
     projectPhotoAnalyses: new InMemoryProjectPhotoAnalysisRepository(
       stores.projectPhotoAnalyses,
+    ),
+    changeProposals: new InMemoryChangeProposalRepository(
+      stores.changeProposals,
     ),
     testGenerationBatches: new InMemoryTestGenerationBatchRepository(
       stores.testGenerationBatches,
@@ -3675,5 +3733,333 @@ describe("application use cases", () => {
     );
     // Enqueue must not call the model.
     expect(withFill.sceneFillGeneration.calls).toHaveLength(0);
+  });
+
+  describe("change proposal approval and apply", () => {
+    const storyboardUpdatedAt = "2026-08-10T00:00:00.000Z";
+
+    function seedChangeProposalFixture() {
+      return createDependencies({
+        users: [
+          createUser({
+            id: "user_1",
+            organizationId: "org_1",
+            displayName: "Ran",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        organizations: [
+          createOrganization({
+            id: "org_1",
+            name: "Family Studio",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        projects: [
+          createProject({
+            id: "project_1",
+            organizationId: "org_1",
+            ownerUserId: "user_1",
+            name: "Family Story",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        storyboards: [
+          createStoryboard({
+            id: "storyboard_1",
+            projectId: "project_1",
+            tone: "Reflective",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: storyboardUpdatedAt,
+          }),
+        ],
+        changeProposals: [
+          createChangeProposal({
+            id: "proposal_1",
+            projectId: "project_1",
+            provenance: {
+              provider: "codex",
+              conversationId: "conversation_1",
+              turnId: "turn_1",
+            },
+            items: [
+              {
+                id: "item_1",
+                target: storyboardSemanticTarget("storyboard_1", "tone"),
+                before: "Reflective",
+                after: "Warm nostalgia",
+                rationale: "Photos lean warmer than the current tone.",
+                baseRevision: storyboardUpdatedAt,
+              },
+            ],
+            rationale: "Shift the tone to match the photos' mood.",
+            clientRequestId: "client_req_1",
+            createdAt: "2026-08-15T00:00:00.000Z",
+            updatedAt: "2026-08-15T00:00:00.000Z",
+          }),
+        ],
+      });
+    }
+
+    function withPrincipal<T extends ApplicationDependencies>(deps: T): T {
+      return {
+        ...deps,
+        authContext: {
+          async getCurrentPrincipal() {
+            return {
+              user: {
+                id: "user_1",
+                organizationId: "org_1",
+                displayName: "Ran",
+                createdAt: "2026-05-02T00:00:00.000Z",
+                updatedAt: "2026-05-02T00:00:00.000Z",
+              },
+              organization: {
+                id: "org_1",
+                name: "Family Studio",
+                createdAt: "2026-05-02T00:00:00.000Z",
+                updatedAt: "2026-05-02T00:00:00.000Z",
+              },
+            };
+          },
+        },
+      };
+    }
+
+    it("rejects a decision without an authenticated principal", async () => {
+      const deps = seedChangeProposalFixture();
+
+      const result = await decideChangeProposalItem(deps, {
+        changeProposalId: "proposal_1",
+        itemId: "item_1",
+        approval: "approved",
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe("invalid_state");
+      }
+    });
+
+    it("approves an item and derives a partially_approved status for a mixed proposal", async () => {
+      const deps = seedChangeProposalFixture();
+      await deps.stores.changeProposals.save(
+        createChangeProposal({
+          id: "proposal_2",
+          projectId: "project_1",
+          provenance: {
+            provider: "codex",
+            conversationId: "conversation_1",
+            turnId: "turn_1",
+          },
+          items: [
+            {
+              id: "item_a",
+              target: storyboardSemanticTarget("storyboard_1", "tone"),
+              before: "Reflective",
+              after: "Warm nostalgia",
+              rationale: "r",
+              baseRevision: storyboardUpdatedAt,
+            },
+            {
+              id: "item_b",
+              target: storyboardSemanticTarget("storyboard_1", "stylePresetId"),
+              before: null,
+              after: "style_1",
+              rationale: "r",
+              baseRevision: storyboardUpdatedAt,
+            },
+          ],
+          rationale: "r",
+          clientRequestId: "client_req_2",
+          createdAt: "2026-08-15T00:00:00.000Z",
+          updatedAt: "2026-08-15T00:00:00.000Z",
+        }),
+      );
+
+      const result = await decideChangeProposalItem(withPrincipal(deps), {
+        changeProposalId: "proposal_2",
+        itemId: "item_a",
+        approval: "approved",
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.status).toBe("partially_approved");
+      }
+
+      const rejected = await decideChangeProposalItem(withPrincipal(deps), {
+        changeProposalId: "proposal_2",
+        itemId: "item_b",
+        approval: "rejected",
+      });
+
+      expect(rejected.ok).toBe(true);
+      if (rejected.ok) {
+        expect(rejected.value.status).toBe("partially_approved");
+        expect(rejected.value.approvedBy).toBe("user_1");
+      }
+    });
+
+    it("selects a choice option and updates the item's after value", async () => {
+      const deps = seedChangeProposalFixture();
+      await deps.stores.changeProposals.save(
+        createChangeProposal({
+          id: "proposal_choice",
+          projectId: "project_1",
+          provenance: {
+            provider: "codex",
+            conversationId: "conversation_1",
+            turnId: "turn_1",
+          },
+          items: [
+            {
+              id: "item_1",
+              target: storyboardSemanticTarget("storyboard_1", "tone"),
+              before: "Reflective",
+              after: "Warm nostalgia",
+              rationale: "r",
+              baseRevision: storyboardUpdatedAt,
+            },
+          ],
+          rationale: "r",
+          choices: [
+            {
+              targetItemId: "item_1",
+              options: [
+                {
+                  id: "opt_warm",
+                  label: "Warm",
+                  value: "Warm nostalgia",
+                  reason: "r",
+                  impact: "i",
+                },
+                {
+                  id: "opt_bright",
+                  label: "Bright",
+                  value: "Bright joy",
+                  reason: "r",
+                  impact: "i",
+                },
+              ],
+            },
+          ],
+          clientRequestId: "client_req_choice",
+          createdAt: "2026-08-15T00:00:00.000Z",
+          updatedAt: "2026-08-15T00:00:00.000Z",
+        }),
+      );
+
+      const result = await selectChangeProposalChoice(withPrincipal(deps), {
+        changeProposalId: "proposal_choice",
+        targetItemId: "item_1",
+        optionId: "opt_bright",
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.choices[0]?.selectedOptionId).toBe("opt_bright");
+        expect(result.value.items[0]?.after).toBe("Bright joy");
+      }
+    });
+
+    it("rebases a revised item onto the storyboard's current revision", async () => {
+      const deps = seedChangeProposalFixture();
+
+      const result = await reviseChangeProposalItemUseCase(deps, {
+        changeProposalId: "proposal_1",
+        itemId: "item_1",
+        after: "Bittersweet",
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.items[0]).toMatchObject({
+          after: "Bittersweet",
+          baseRevision: storyboardUpdatedAt,
+          approval: "pending",
+        });
+      }
+    });
+
+    it("applies an approved item through upsertStoryboard and marks the proposal applied", async () => {
+      const deps = seedChangeProposalFixture();
+
+      const decided = await decideChangeProposalItem(withPrincipal(deps), {
+        changeProposalId: "proposal_1",
+        itemId: "item_1",
+        approval: "approved",
+      });
+      expect(decided.ok).toBe(true);
+
+      const applied = await applyChangeProposal(withPrincipal(deps), {
+        changeProposalId: "proposal_1",
+      });
+
+      expect(applied.ok).toBe(true);
+      if (applied.ok) {
+        expect(applied.value.status).toBe("applied");
+        expect(applied.value.applyOutcome?.appliedItemIds).toEqual(["item_1"]);
+      }
+
+      const storyboard = await deps.storyboards.findById("storyboard_1");
+      expect(storyboard?.tone).toBe("Warm nostalgia");
+
+      // Repeating a successful apply is a no-op that returns the stored result.
+      const reapplied = await applyChangeProposal(withPrincipal(deps), {
+        changeProposalId: "proposal_1",
+      });
+      expect(reapplied).toEqual(applied);
+    });
+
+    it("marks the proposal conflicted when the target changed after the proposal was created", async () => {
+      const deps = seedChangeProposalFixture();
+
+      const decided = await decideChangeProposalItem(withPrincipal(deps), {
+        changeProposalId: "proposal_1",
+        itemId: "item_1",
+        approval: "approved",
+      });
+      expect(decided.ok).toBe(true);
+
+      const storyboard = await deps.storyboards.findById("storyboard_1");
+      await deps.storyboards.save({
+        ...storyboard!,
+        story: "Edited after the proposal was created.",
+        updatedAt: "2026-08-16T00:00:00.000Z",
+      });
+
+      const applied = await applyChangeProposal(withPrincipal(deps), {
+        changeProposalId: "proposal_1",
+      });
+
+      expect(applied.ok).toBe(false);
+      if (!applied.ok) {
+        expect(applied.error.code).toBe("conflict");
+      }
+
+      const proposal = await deps.changeProposals.findById("proposal_1");
+      expect(proposal?.status).toBe("conflicted");
+
+      const untouchedStoryboard =
+        await deps.storyboards.findById("storyboard_1");
+      expect(untouchedStoryboard?.tone).toBe("Reflective");
+    });
+
+    it("rejects applying a proposal with no approved items", async () => {
+      const deps = seedChangeProposalFixture();
+
+      const result = await applyChangeProposal(withPrincipal(deps), {
+        changeProposalId: "proposal_1",
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe("invalid_state");
+      }
+    });
   });
 });

@@ -1,6 +1,8 @@
 import type {
   AiJob,
   AiJobKind,
+  ChangeProposal,
+  ChangeProposalStatus,
   GeneratedImage,
   GenerationRequest,
   GenerationRequestStatus,
@@ -134,6 +136,21 @@ export interface ProjectPhotoAnalysisRepositoryPort {
     projectId: string,
   ): Promise<ProjectPhotoAnalysis | null>;
   save(projectPhotoAnalysis: ProjectPhotoAnalysis): Promise<void>;
+}
+
+export interface ChangeProposalRepositoryPort {
+  findById(changeProposalId: string): Promise<ChangeProposal | null>;
+  // Lets proposal creation be retried with the same client request ID
+  // without duplicating the proposal.
+  findByClientRequestId(
+    projectId: string,
+    clientRequestId: string,
+  ): Promise<ChangeProposal | null>;
+  findByProjectId(
+    projectId: string,
+    status?: ChangeProposalStatus,
+  ): Promise<ChangeProposal[]>;
+  save(changeProposal: ChangeProposal): Promise<void>;
 }
 
 export interface TestGenerationBatchRepositoryPort {
@@ -336,6 +353,7 @@ export interface ApplicationDependencies {
   generatedImages: GeneratedImageRepositoryPort;
   aiJobs: AiJobRepositoryPort;
   projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
+  changeProposals: ChangeProposalRepositoryPort;
   testGenerationBatches: TestGenerationBatchRepositoryPort;
   userPreferences: UserPreferenceRepositoryPort;
   objectStorage: ObjectStoragePort;

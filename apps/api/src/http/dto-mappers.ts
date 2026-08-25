@@ -1,11 +1,13 @@
 import type {
   AiJob,
+  ChangeProposal,
   GeneratedImage,
   GenerationRequest,
   PhotoAsset,
   Project,
   ProjectPhotoAnalysis,
   Scene,
+  SemanticTargetSnapshot,
   Storyboard,
   StylePreset,
   TestGenerationBatch,
@@ -13,6 +15,9 @@ import type {
 import type {
   AiJobDto,
   AiRuntimeInfoDto,
+  ChangeProposalDto,
+  CreativeDirectionDto,
+  SemanticTargetSnapshotDto,
   GeneratedImageDto,
   GenerationRequestDto,
   MeDto,
@@ -30,6 +35,7 @@ import type {
 import type {
   AuthPrincipal,
   ComplementSceneProposal,
+  CreativeDirection,
   StoryboardSetup,
   TestGenerationBatchWithVariants,
   UserPreference,
@@ -316,5 +322,69 @@ export function toGeneratedImageDto(img: GeneratedImage): GeneratedImageDto {
     adoptedAt: img.adoptedAt,
     createdAt: img.createdAt,
     updatedAt: img.updatedAt,
+  };
+}
+
+export function toSemanticTargetSnapshotDto(
+  snapshot: SemanticTargetSnapshot,
+): SemanticTargetSnapshotDto {
+  return {
+    target: { ...snapshot.target },
+    value: snapshot.value,
+    revision: snapshot.revision,
+  };
+}
+
+export function toCreativeDirectionDto(
+  direction: CreativeDirection,
+): CreativeDirectionDto {
+  return {
+    projectId: direction.projectId,
+    projectName: direction.projectName,
+    storyboardId: direction.storyboardId,
+    fields: direction.fields.map(toSemanticTargetSnapshotDto),
+  };
+}
+
+// Flattens provenance onto the DTO the way the other mappers flatten nested
+// value objects, and keeps `before`/`after` as opaque JSON: their shape
+// depends on which semantic field the item targets.
+export function toChangeProposalDto(
+  proposal: ChangeProposal,
+): ChangeProposalDto {
+  return {
+    id: proposal.id,
+    projectId: proposal.projectId,
+    provider: proposal.provenance.provider,
+    conversationId: proposal.provenance.conversationId,
+    turnId: proposal.provenance.turnId,
+    rationale: proposal.rationale,
+    status: proposal.status,
+    items: proposal.items.map((item) => ({
+      id: item.id,
+      target: { ...item.target },
+      before: item.before,
+      after: item.after,
+      rationale: item.rationale,
+      baseRevision: item.baseRevision,
+      approval: item.approval,
+    })),
+    choices: proposal.choices.map((choice) => ({
+      targetItemId: choice.targetItemId,
+      options: choice.options.map((option) => ({
+        id: option.id,
+        label: option.label,
+        value: option.value,
+        reason: option.reason,
+        impact: option.impact,
+      })),
+      selectedOptionId: choice.selectedOptionId,
+    })),
+    clientRequestId: proposal.clientRequestId,
+    approvedBy: proposal.approvedBy,
+    resolvedAt: proposal.resolvedAt,
+    applyOutcome: proposal.applyOutcome,
+    createdAt: proposal.createdAt,
+    updatedAt: proposal.updatedAt,
   };
 }
