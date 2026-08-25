@@ -109,3 +109,21 @@ export type {
   StoryboardSetupStatus,
   StoryboardSetupStep,
 } from "./rules";
+export type {
+  ProjectSemanticField,
+  SemanticField,
+  SemanticTarget,
+  SemanticTargetRevision,
+  SemanticTargetSnapshot,
+  StorySemanticField,
+} from "./semantic-target";
+export {
+  createSemanticTarget,
+  isSemanticField,
+  projectSemanticTarget,
+  readProjectPhotoAnalysisSemanticTarget,
+  readStoryboardSemanticTarget,
+  SEMANTIC_FIELDS,
+  semanticTargetKey,
+  storyboardSemanticTarget,
+} from "./semantic-target";
