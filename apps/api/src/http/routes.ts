@@ -59,6 +59,7 @@ import { composeScenePrompt } from "../generation/compose-scene-prompt";
 import { PhotoAssetIngestionService } from "../photos/photo-asset-ingestion";
 import {
   toAiJobDto,
+  toAiRuntimeInfoDto,
   toGeneratedImageDto,
   toGenerationRequestDto,
   toGenerationRequestWithSceneTitleDto,
@@ -176,6 +177,13 @@ export function buildRouter(deps: ApiDependencies): Router {
     const principal = await requirePrincipal(deps, res);
     if (principal == null) return;
     sendJson(res, 200, toMeDto(principal));
+  });
+
+  // GET /api/ai-runtime
+  router.add("GET", "/api/ai-runtime", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+    sendJson(res, 200, toAiRuntimeInfoDto(deps.agentRuntime));
   });
 
   // GET /api/projects

@@ -125,6 +125,34 @@ describe("GET /api/me", () => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/ai-runtime
+// ---------------------------------------------------------------------------
+
+describe("GET /api/ai-runtime", () => {
+  it("reports the default api runtime and wallet", async () => {
+    const { status, body } = await req(base, "GET", "/api/ai-runtime");
+    expect(status).toBe(200);
+    expect(body).toEqual({
+      runtime: "api",
+      wallet: "api_key",
+      availability: { status: "not_applicable" },
+      capabilities: null,
+    });
+  });
+
+  it("returns 401 without a principal", async () => {
+    const { server: s2 } = makeServer();
+    const b2 = await listen(s2);
+    try {
+      const { status } = await req(b2, "GET", "/api/ai-runtime");
+      expect(status).toBe(401);
+    } finally {
+      await close(s2);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Projects
 // ---------------------------------------------------------------------------
 

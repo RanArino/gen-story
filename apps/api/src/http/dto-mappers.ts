@@ -12,6 +12,7 @@ import type {
 } from "@gen-story/domain";
 import type {
   AiJobDto,
+  AiRuntimeInfoDto,
   GeneratedImageDto,
   GenerationRequestDto,
   MeDto,
@@ -37,6 +38,28 @@ import type {
   ComplementSceneProposalDto,
   UserPreferenceDto,
 } from "@gen-story/shared";
+
+import type { ApiAgentRuntimeInfo } from "../app/create-api-context";
+
+export function toAiRuntimeInfoDto(
+  info: ApiAgentRuntimeInfo,
+): AiRuntimeInfoDto {
+  return {
+    runtime: info.selection,
+    wallet: info.wallet,
+    availability: info.availability,
+    capabilities: info.capabilities
+      ? {
+          supportsExplicitCompact: info.capabilities.supportsExplicitCompact,
+          supportsMidTurnCancellationWithoutEndingSession:
+            info.capabilities.supportsMidTurnCancellationWithoutEndingSession,
+          supportsApprovalRequests: info.capabilities.supportsApprovalRequests,
+          sessionIdKnownBeforeStart:
+            info.capabilities.sessionIdKnownBeforeStart,
+        }
+      : null,
+  };
+}
 
 export function toUserPreferenceDto(
   preference: UserPreference,

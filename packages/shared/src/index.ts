@@ -60,6 +60,31 @@ export type MeDto = {
   email: string | null;
 };
 
+export type AiRuntimeAvailabilityDto =
+  | { status: "not_applicable" }
+  | { status: "unchecked" }
+  | {
+      status: "available";
+      version: string;
+      authMethod: string;
+      subscriptionLabel: string;
+    }
+  | { status: "unavailable"; reason: string; message: string };
+
+export type AiRuntimeCapabilitiesDto = {
+  supportsExplicitCompact: boolean;
+  supportsMidTurnCancellationWithoutEndingSession: boolean;
+  supportsApprovalRequests: boolean;
+  sessionIdKnownBeforeStart: boolean;
+};
+
+export type AiRuntimeInfoDto = {
+  runtime: "api" | "codex" | "claude";
+  wallet: "api_key" | "subscription";
+  availability: AiRuntimeAvailabilityDto;
+  capabilities: AiRuntimeCapabilitiesDto | null;
+};
+
 export type ProjectDto = {
   id: string;
   organizationId: string;

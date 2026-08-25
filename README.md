@@ -41,6 +41,8 @@ cp apps/api/.env.example apps/api/.env
 | `API_PORT`                    | `4000`                  | Port for the API server                                       |
 | `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000` | API base URL used by the web app                              |
 | `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite` | Path to the SQLite database file                              |
+| `GEN_STORY_AGENT_RUNTIME`     | `api`                   | Text/vision AI runtime: `api` (Gemini), `codex`, or `claude` (subscription CLI login, no new API key) |
+| `GEN_STORY_DEPLOY_TARGET`     | `local`                 | Must be `local` (or unset) to select a CLI runtime above       |
 | `OPENAI_API_KEY`              | _(none)_                | Optional. Set it to use real image generation instead of mock |
 | `GEMINI_API_KEY`              | _(none)_                | Optional. Enables real photo analysis for emotion candidates  |
 | `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`      | Gemini model used for project photo analysis                  |
