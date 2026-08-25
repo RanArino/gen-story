@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "mcp:stdio": "tsx src/mcp/stdio-server.ts",
     "db:generate": "cd ../.. && drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx ../../scripts/seed.ts",

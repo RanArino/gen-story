@@ -57,5 +57,7 @@ Default local URLs:
 - Prefer established local patterns over new abstractions or new dependencies.
 - Run the narrowest relevant check first, then broader checks for shared behavior or workspace changes.
 - If a check cannot run, document why and describe the closest verification performed.
+- For user-visible behavior, verify by driving the running app to the user's goal, not just to the changed widget: after a state change, perform the action that state change exists to enable. A green suite is not evidence the feature works.
+- When fixing a bug, first prove the new test fails against the old code.
 - Use an ExecPlan for multi-step, risky, architectural, migration-oriented, or explicitly requested work; follow `/Users/ran/my-app/PLANS.md`.
 - When creating or updating an ExecPlan from `internal/gap-analysis.md`, keep `internal/gap-analysis.md` synchronized before finishing the turn, including status icons, notes, and summary counts. ExecPlans live in `internal/plans/`.

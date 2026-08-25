@@ -37,9 +37,8 @@ function toCallToolResult(outcome: McpToolOutcome): CallToolResult {
 }
 
 // Builds the one MCP surface Gen Story exposes, bound to a single project.
-// Both transports call this, so an embedded client and an external CLI client
-// get byte-identical capabilities. Every call — including failures — is
-// audited before the result goes back to the agent.
+// The embedded chat's HTTP transport calls this. Every call — including
+// failures — is audited before the result goes back to the agent.
 export function createProjectMcpServer(
   options: ProjectMcpServerOptions,
 ): McpServer {

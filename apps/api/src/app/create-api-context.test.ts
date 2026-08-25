@@ -40,6 +40,31 @@ afterEach(() => {
 });
 
 describe("createApiContext runtime selection", () => {
+  // R1.1: one variable selects the runtime for every text/vision capability,
+  // the embedded chat included — there is no chat-only selector.
+  it("puts the chat and the capabilities on the same selected runtime", () => {
+    const deps = createApiContext(withClient(), {
+      GEN_STORY_AGENT_RUNTIME: "codex",
+    });
+
+    expect(deps.agentRuntime.selection).toBe("codex");
+    // The chat runner reads the one runtime's availability, so the startup
+    // probe result reaches it without a second selection to keep in sync.
+    deps.agentRuntime.availability = {
+      status: "available",
+      version: "0.0.0",
+      authMethod: "subscription",
+      subscriptionLabel: "ChatGPT",
+    };
+    expect(deps.agentTurnRunner.availability()).toMatchObject({
+      available: true,
+      provider: "codex",
+    });
+    expect(deps.photoAnalysisGeneration).not.toBeInstanceOf(
+      LocalPhotoAnalysisGenerationAdapter,
+    );
+  });
+
   it("defaults to the Gemini/local adapter graph when unset", () => {
     const deps = createApiContext(withClient(), {});
 

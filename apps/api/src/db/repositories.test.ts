@@ -6,6 +6,10 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import {
+  createAgentConversation,
+  createAgentConversationMessage,
+  createAgentConversationTurn,
+  createAgentProviderBinding,
   createAiJob,
   createChangeProposal,
   createGeneratedImage,
@@ -18,6 +22,7 @@ import {
   createStoryboard,
   createStylePreset,
   createUser,
+  setAgentConversationActiveBinding,
   storyboardSemanticTarget,
   type ScenePhotoAsset,
 } from "@gen-story/domain";
@@ -322,6 +327,167 @@ describe("SQLite persistence", () => {
       await expect(
         repositories.changeProposals.findById(proposal.id),
       ).resolves.toEqual(resolved);
+    });
+  });
+
+  it("round-trips a conversation, its binding, turns, and transcript", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      const repository = repositories.agentConversations;
+
+      const conversation = createAgentConversation({
+        id: "conversation_1",
+        projectId: "project_1",
+        title: "Creative direction",
+        createdAt: now,
+        updatedAt: now,
+      });
+      await repository.save(conversation);
+
+      const binding = createAgentProviderBinding({
+        id: "binding_1",
+        conversationId: conversation.id,
+        provider: "codex",
+        model: "gpt-5-codex",
+        nativeSessionId: "thread_1",
+        compactCount: 2,
+        lastCompactedAt: later,
+        createdAt: now,
+        updatedAt: later,
+      });
+      await repository.saveBinding(binding);
+      await repository.save(
+        setAgentConversationActiveBinding(conversation, binding.id, later),
+      );
+
+      const turn = createAgentConversationTurn({
+        id: "turn_1",
+        conversationId: conversation.id,
+        bindingId: binding.id,
+        clientRequestId: "request_1",
+        provider: "codex",
+        model: "gpt-5-codex",
+        providerTurnId: "provider_turn_1",
+        compacted: true,
+        startedAt: now,
+      });
+      await repository.saveTurn(turn);
+
+      const message = createAgentConversationMessage({
+        id: "message_1",
+        conversationId: conversation.id,
+        turnId: turn.id,
+        sequence: 1,
+        role: "user",
+        kind: "user_text",
+        text: "Warm up @tone",
+        mentions: [
+          {
+            label: "@tone",
+            target: storyboardSemanticTarget("story_1", "tone"),
+          },
+        ],
+        createdAt: now,
+      });
+      await repository.saveMessage(message);
+
+      await expect(repository.findById(conversation.id)).resolves.toMatchObject(
+        { activeBindingId: binding.id },
+      );
+      await expect(repository.findBindingById(binding.id)).resolves.toEqual(
+        binding,
+      );
+      await expect(repository.listBindings(conversation.id)).resolves.toEqual([
+        binding,
+      ]);
+      await expect(repository.findTurnById(turn.id)).resolves.toEqual(turn);
+      await expect(
+        repository.findTurnByClientRequestId(conversation.id, "request_1"),
+      ).resolves.toEqual(turn);
+      await expect(repository.listMessages(conversation.id)).resolves.toEqual([
+        message,
+      ]);
+      await expect(
+        repository.findByProjectId("project_1"),
+      ).resolves.toHaveLength(1);
+    });
+  });
+
+  it("allocates message sequences and replays only what a client has not seen", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      const repository = repositories.agentConversations;
+
+      await repository.save(
+        createAgentConversation({
+          id: "conversation_1",
+          projectId: "project_1",
+          title: "Creative direction",
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+
+      await expect(
+        repository.nextMessageSequence("conversation_1"),
+      ).resolves.toBe(1);
+
+      for (const sequence of [1, 2, 3]) {
+        await repository.saveMessage(
+          createAgentConversationMessage({
+            id: `message_${sequence}`,
+            conversationId: "conversation_1",
+            sequence,
+            role: "assistant",
+            kind: "assistant_text",
+            text: `line ${sequence}`,
+            createdAt: now,
+          }),
+        );
+      }
+
+      await expect(
+        repository.nextMessageSequence("conversation_1"),
+      ).resolves.toBe(4);
+      const resumed = await repository.listMessages("conversation_1", 1);
+      expect(resumed.map((message) => message.sequence)).toEqual([2, 3]);
+    });
+  });
+
+  it("rejects a second message claiming an existing sequence", async () => {
+    await withDatabase(async ({ repositories }) => {
+      await seedBase(repositories);
+      const repository = repositories.agentConversations;
+
+      await repository.save(
+        createAgentConversation({
+          id: "conversation_1",
+          projectId: "project_1",
+          title: "Creative direction",
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+      const message = createAgentConversationMessage({
+        id: "message_1",
+        conversationId: "conversation_1",
+        sequence: 1,
+        role: "assistant",
+        kind: "assistant_text",
+        text: "first",
+        createdAt: now,
+      });
+      await repository.saveMessage(message);
+
+      // Same id: an idempotent re-save of the same message, not an edit.
+      await repository.saveMessage({ ...message, text: "rewritten" });
+      await expect(repository.listMessages("conversation_1")).resolves.toEqual([
+        message,
+      ]);
+
+      await expect(
+        repository.saveMessage({ ...message, id: "message_2" }),
+      ).rejects.toThrow();
     });
   });
 

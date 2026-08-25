@@ -19,7 +19,8 @@
     "stepPhotos": "1 · Photos",
     "stepStoryboard": "2 · Storyboard",
     "stepGenerate": "3 · Generate",
-    "stepReview": "4 · Review"
+    "stepReview": "4 · Review",
+    "stepChat": "AI refine"
   },
   "projects": {
     "title": "Projects",
@@ -624,6 +625,8 @@
     "subtitle": "App preferences",
     "languageLabel": "Language",
     "languageHelp": "The interface, AI-generated text, and exported storyboards will use this language.",
+    "agentRuntimeLabel": "AI runtime",
+    "agentRuntimeHelp": "Claude Code and Codex use your local subscription login. API uses the configured Gemini API key. Existing AI chat sessions must be started again after changing providers.",
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",
@@ -631,6 +634,11 @@
     "language": {
       "en": "English",
       "ja": "日本語"
+    },
+    "agentRuntime": {
+      "claude": "Claude Code (default)",
+      "codex": "Codex",
+      "api": "API"
     }
   },
   "errors": {
@@ -696,5 +704,109 @@
     "note": "Edits are applied to the next generated image.",
     "loading": "Composing preview…",
     "failed": "Failed to load preview"
+  },
+  "agentChat": {
+    "title": "Refine with AI",
+    "subtitle": "Discuss photo analysis, emotion and tone, and the style preset. Nothing changes until you approve it.",
+    "inputLabel": "Message to the agent",
+    "placeholder": "Ask about the tone, the style preset, or the photo analysis…",
+    "running": "The agent is working…",
+    "loadingProposal": "Loading proposal…",
+    "toolActivity": "Used {tool}",
+    "noMentionTargets": "No fields to reference yet. Analyze photos or create a storyboard first.",
+    "fields": {
+      "photoAnalysis": "@photo-analysis",
+      "tone": "@tone",
+      "stylePreset": "@style-preset",
+      "commonPrompt": "@common-prompt",
+      "story": "@story",
+      "negativePrompt": "@negative-prompt",
+      "characterPolicy": "@characters",
+      "scene": "@scene",
+      "sceneNumbered": "@scene{number} ({title})"
+    },
+    "groups": {
+      "analysis": "Photo & style analysis",
+      "storySetup": "Story setup",
+      "scenes": "Scenes"
+    },
+    "untitledScene": "Untitled",
+    "meta": {
+      "provider": "Provider",
+      "model": "Model",
+      "wallet": "Billing",
+      "session": "Session",
+      "none": "Not bound yet",
+      "providers": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "api": "API"
+      },
+      "providerDefault": "Provider default",
+      "notStarted": "Not started",
+      "subscription": "Your subscription",
+      "apiKey": "API key",
+      "status": {
+        "active": "active",
+        "compacting": "compacting",
+        "recoverable": "needs a new session",
+        "closed": "closed"
+      }
+    },
+    "actions": {
+      "send": "Send",
+      "cancel": "Cancel turn",
+      "fork": "New session",
+      "history": "Session history",
+      "mention": "Reference a field",
+      "expandGroup": "Expand {group}",
+      "removeMention": "Remove reference {field}"
+    },
+    "history": {
+      "loading": "Loading sessions…",
+      "empty": "No previous sessions yet.",
+      "untitled": "Untitled session"
+    },
+    "approval": {
+      "cardLabel": "Proposed change",
+      "title": "Proposed change",
+      "viewMode": "Diff view",
+      "view": {
+        "preview": "Preview",
+        "raw": "Raw"
+      },
+      "before": "Now",
+      "after": "Proposed",
+      "unchangedFields": "{count} unchanged: {fields}",
+      "listSeparator": ", ",
+      "reason": "Why",
+      "impact": "Impact",
+      "choiceLabel": "Alternatives",
+      "approveItem": "Approve",
+      "rejectItem": "Reject",
+      "revise": "Revise",
+      "apply": "Apply {count} approved",
+      "continue": "Continue without applying",
+      "conflict": "This project changed after the proposal was made. Ask the agent to revise it, then approve again.",
+      "nothingChangesYet": "Nothing changes in the project until you apply approved items.",
+      "reviseDraft": "Please revise the {field} proposal:",
+      "status": {
+        "pending": "Awaiting your review",
+        "partially_approved": "Partly approved",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "applied": "Applied",
+        "conflicted": "Conflict"
+      },
+      "itemApproval": {
+        "pending": "undecided",
+        "approved": "approved",
+        "rejected": "rejected"
+      }
+    },
+    "disabled": {
+      "title": "The AI chat is turned off.",
+      "hint": "The chat needs a local CLI runtime. Set GEN_STORY_AGENT_RUNTIME=codex (or claude) in apps/api/.env and restart the API. It uses your existing subscription login — no API key."
+    }
   }
 }

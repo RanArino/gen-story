@@ -1,5 +1,28 @@
 export { MAX_CONCURRENT_PER_PROJECT } from "./concurrency-policy";
 export type {
+  AgentChatConversationDetail,
+  CreateAgentChatConversationInput,
+  PostAgentChatTurnInput,
+  PostAgentChatTurnOutput,
+} from "./agent-chat-use-cases";
+export {
+  cancelAgentChatTurn,
+  compactAgentChatConversation,
+  createAgentChatConversation,
+  forkAgentChatProviderSession,
+  getAgentChatConversation,
+  listAgentChatConversations,
+  postAgentChatTurn,
+  runAgentChatTurn,
+} from "./agent-chat-use-cases";
+export type {
+  AgentConversationRepositoryPort,
+  AgentRunnerAvailability,
+  AgentTurnEvent,
+  AgentTurnReference,
+  AgentTurnRequest,
+  AgentTurnRunnerPort,
+  AgentRuntimeSelection,
   AiJobRepositoryPort,
   ApplicationDependencies,
   AuthContextPort,
@@ -41,7 +64,14 @@ export type {
   UserPreferenceRepositoryPort,
   UserRepositoryPort,
 } from "./ports";
-export { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, isLanguage } from "./ports";
+export {
+  AGENT_RUNTIME_SELECTIONS,
+  DEFAULT_AGENT_RUNTIME_SELECTION,
+  DEFAULT_LANGUAGE,
+  SUPPORTED_LANGUAGES,
+  isAgentRuntimeSelection,
+  isLanguage,
+} from "./ports";
 export {
   analyzeProjectPhotos,
   applyAdjustmentToTestVariant,

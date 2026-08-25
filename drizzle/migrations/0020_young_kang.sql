@@ -1,0 +1,1 @@
+ALTER TABLE `user_preferences` ADD `agent_runtime` text DEFAULT 'claude' NOT NULL;

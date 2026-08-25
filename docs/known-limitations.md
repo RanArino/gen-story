@@ -112,6 +112,48 @@ any cloud setup. The following features are deliberately excluded from this vers
   photos are marked and can be picked again; selecting one asks for confirmation
   before the scenes are created.
 
+## In-app agent chat
+
+- The chat requires a locally installed, subscription-logged-in Codex or Claude
+  Code CLI selected in Settings and only runs on a local deployment. On the
+  `api` runtime the chat is visible but disabled,
+  with the reason shown in the panel.
+- One conversation is bound to one provider-native session. Switching providers,
+  or recovering a session the provider no longer has, means starting a new
+  session: the Gen Story transcript is kept, but the new provider session starts
+  with no context. Gen Story never silently replays the transcript to fake that
+  context. Switching the provider from the chat header starts that new session
+  for you (the same thing **New session** does); recovering a dead session is
+  still a deliberate **New session** click.
+- The MCP server is attached to the spawned CLI per process — as
+  `-c mcp_servers.<name>.url=...` config overrides for Codex and as
+  `--mcp-config` with `--strict-mcp-config` for Claude Code. Built-in tools are
+  disabled in both cases, so the Gen Story tools are the only ones a chat
+  session has. Verified end to end on 2026-08-16 against codex-cli 0.147.0 and
+  Claude Code 2.1.224, including real tool calls; if a future CLI changes these
+  flags, the chat's tool calls stop working while ordinary conversation still
+  succeeds.
+- Chat sessions run in an empty directory under the OS temp dir, not in your
+  project, so no repository is exposed to the agent and no project `AGENTS.md`
+  is loaded. Codex still loads the operator's **global** `~/.codex/AGENTS.md`;
+  that file applies to Gen Story chats too, and nothing here can turn it off.
+- Compaction policy is a turn count (20 turns per session), not provider token
+  usage, which Gen Story cannot observe. Compaction is recorded and shown, and
+  can also be triggered manually.
+- The chat covers AI photo analysis; the storyboard's tone, style preset, common
+  prompt, story/worldview, negative prompt and character policy; and individual
+  scenes (referenced one at a time or all at once). A scene is proposed as a
+  whole: its title, description, image prompt, emotion, camera, lighting, motion,
+  notes and negative prompt. Scene order, status, photo assignments and the
+  adopted generated image stay under the storyboard screen's control and cannot
+  be changed from the chat.
+- Assistant replies, tool activity and proposals are written to the transcript as
+  they happen, so a long turn shows progress. Reply text still arrives in whole
+  messages, not token by token: a turn that only thinks before answering shows
+  tool activity, then the finished reply.
+- Image generation is never triggered from the chat; it stays on the OpenAI API
+  behind its own explicitly labelled paid action.
+
 ## Video & audio
 
 - There is **no video rendering or export**. The product builds a storyboard and

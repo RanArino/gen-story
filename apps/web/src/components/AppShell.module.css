@@ -14,6 +14,10 @@
     sans-serif;
 }
 
+.shellWithChat {
+  grid-template-columns: 240px minmax(0, 1fr) 480px;
+}
+
 .sidebar {
   border-right: 1px solid #1e2d42;
   background: #101827;
@@ -76,6 +80,73 @@
 
 .sidebarFooter {
   margin-top: auto;
+}
+
+.chatDrawer {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px;
+  box-sizing: border-box;
+  border-left: 1px solid #e3e8ef;
+  background: #fff;
+  position: relative;
+}
+
+.chatDrawerClose {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #d7dee9;
+  background: #fff;
+  color: #152033;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chatDrawerClose:hover {
+  background: #f0f4fa;
+}
+
+.chatReopenTab {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 2;
+  border: 1px solid #e3e8ef;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  background: #152033;
+  color: #f7f9fc;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: -2px 0 8px rgba(21, 32, 51, 0.15);
+}
+
+.chatReopenTab:hover {
+  background: #1e3a5f;
+}
+
+@media (max-width: 1100px) {
+  .shellWithChat {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .shellWithChat .content {
+    display: none;
+  }
+
+  .chatDrawer {
+    grid-column: 2;
+  }
 }
 
 /* Shared utility classes used by page components */

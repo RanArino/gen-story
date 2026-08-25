@@ -19,7 +19,8 @@
     "stepPhotos": "1 · 写真",
     "stepStoryboard": "2 · 絵コンテ",
     "stepGenerate": "3 · 生成",
-    "stepReview": "4 · 確認"
+    "stepReview": "4 · 確認",
+    "stepChat": "AI相談"
   },
   "projects": {
     "title": "プロジェクト",
@@ -624,6 +625,8 @@
     "subtitle": "アプリの設定",
     "languageLabel": "言語",
     "languageHelp": "インターフェース、AIによって生成されるテキスト、エクスポートされる絵コンテにこの言語が使われます。",
+    "agentRuntimeLabel": "AIランタイム",
+    "agentRuntimeHelp": "Claude Code と Codex はローカルのサブスクリプションログインを使います。API は設定済みの Gemini API キーを使います。既存の AI チャットはプロバイダー変更後に新しいセッションを開始してください。",
     "save": "保存",
     "saving": "保存中…",
     "saved": "保存しました",
@@ -631,6 +634,11 @@
     "language": {
       "en": "English",
       "ja": "日本語"
+    },
+    "agentRuntime": {
+      "claude": "Claude Code（既定）",
+      "codex": "Codex",
+      "api": "API"
     }
   },
   "errors": {
@@ -696,5 +704,109 @@
     "note": "編集内容は次に生成する画像へ反映されます。",
     "loading": "プレビューを作成中…",
     "failed": "プレビューの読み込みに失敗しました"
+  },
+  "agentChat": {
+    "title": "AIと相談する",
+    "subtitle": "写真分析・感情とトーン・スタイルプリセットを相談できます。承認するまで何も変更されません。",
+    "inputLabel": "エージェントへのメッセージ",
+    "placeholder": "トーン、スタイルプリセット、写真分析について質問してください…",
+    "running": "エージェントが作業中です…",
+    "loadingProposal": "提案を読み込み中…",
+    "toolActivity": "{tool} を使用しました",
+    "noMentionTargets": "参照できる項目がまだありません。先に写真分析か絵コンテを作成してください。",
+    "fields": {
+      "photoAnalysis": "@写真分析",
+      "tone": "@トーン",
+      "stylePreset": "@スタイルプリセット",
+      "commonPrompt": "@共通プロンプト",
+      "story": "@ストーリー・世界観",
+      "negativePrompt": "@ネガティブプロンプト",
+      "characterPolicy": "@キャラクター",
+      "scene": "@シーン",
+      "sceneNumbered": "@シーン{number}（{title}）"
+    },
+    "groups": {
+      "analysis": "写真・スタイル分析",
+      "storySetup": "ストーリー設定",
+      "scenes": "シーン分析"
+    },
+    "untitledScene": "無題",
+    "meta": {
+      "provider": "プロバイダー",
+      "model": "モデル",
+      "wallet": "課金",
+      "session": "セッション",
+      "none": "未接続",
+      "providers": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "api": "API"
+      },
+      "providerDefault": "プロバイダー既定",
+      "notStarted": "未開始",
+      "subscription": "サブスクリプション",
+      "apiKey": "APIキー",
+      "status": {
+        "active": "有効",
+        "compacting": "圧縮中",
+        "recoverable": "新しいセッションが必要",
+        "closed": "終了"
+      }
+    },
+    "actions": {
+      "send": "送信",
+      "cancel": "ターンを中止",
+      "fork": "新しいセッション",
+      "history": "セッション履歴",
+      "mention": "項目を参照",
+      "expandGroup": "{group} の小項目を開閉",
+      "removeMention": "{field} の参照を外す"
+    },
+    "history": {
+      "loading": "セッションを読み込み中…",
+      "empty": "過去のセッションはまだありません。",
+      "untitled": "無題のセッション"
+    },
+    "approval": {
+      "cardLabel": "変更提案",
+      "title": "変更提案",
+      "viewMode": "表示形式",
+      "view": {
+        "preview": "プレビュー",
+        "raw": "Raw"
+      },
+      "before": "現在",
+      "after": "提案",
+      "unchangedFields": "変更なし {count} 件: {fields}",
+      "listSeparator": "、",
+      "reason": "理由",
+      "impact": "影響",
+      "choiceLabel": "選択肢",
+      "approveItem": "承認",
+      "rejectItem": "却下",
+      "revise": "修正を依頼",
+      "apply": "承認済み {count} 件を適用",
+      "continue": "適用せずに続ける",
+      "conflict": "提案の作成後にプロジェクトが変更されました。エージェントに修正を依頼してから再度承認してください。",
+      "nothingChangesYet": "承認した項目を適用するまで、プロジェクトは変更されません。",
+      "reviseDraft": "{field} の提案を修正してください:",
+      "status": {
+        "pending": "レビュー待ち",
+        "partially_approved": "一部承認",
+        "approved": "承認済み",
+        "rejected": "却下",
+        "applied": "適用済み",
+        "conflicted": "競合"
+      },
+      "itemApproval": {
+        "pending": "未決定",
+        "approved": "承認",
+        "rejected": "却下"
+      }
+    },
+    "disabled": {
+      "title": "AIチャットは現在オフです。",
+      "hint": "チャットにはローカルのCLIランタイムが必要です。apps/api/.env に GEN_STORY_AGENT_RUNTIME=codex（または claude）を設定し、APIを再起動してください。既存のサブスクリプションのログインを使うためAPIキーは不要です。"
+    }
   }
 }

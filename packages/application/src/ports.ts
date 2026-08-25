@@ -1,8 +1,14 @@
 import type {
+  AgentConversation,
+  AgentConversationMessage,
+  AgentConversationTurn,
+  AgentProvider,
+  AgentProviderBinding,
   AiJob,
   AiJobKind,
   ChangeProposal,
   ChangeProposalStatus,
+  SemanticMention,
   GeneratedImage,
   GenerationRequest,
   GenerationRequestStatus,
@@ -26,6 +32,23 @@ export type Language = "en" | "ja";
 export const SUPPORTED_LANGUAGES: Language[] = ["en", "ja"];
 export const DEFAULT_LANGUAGE: Language = "en";
 
+export type AgentRuntimeSelection = "api" | "codex" | "claude";
+export const AGENT_RUNTIME_SELECTIONS: AgentRuntimeSelection[] = [
+  "claude",
+  "codex",
+  "api",
+];
+export const DEFAULT_AGENT_RUNTIME_SELECTION: AgentRuntimeSelection = "claude";
+
+export function isAgentRuntimeSelection(
+  value: unknown,
+): value is AgentRuntimeSelection {
+  return (
+    typeof value === "string" &&
+    (AGENT_RUNTIME_SELECTIONS as string[]).includes(value)
+  );
+}
+
 export function isLanguage(value: unknown): value is Language {
   return (
     typeof value === "string" &&
@@ -36,6 +59,7 @@ export function isLanguage(value: unknown): value is Language {
 export type UserPreference = {
   userId: string;
   language: Language;
+  agentRuntime: AgentRuntimeSelection;
   updatedAt: string;
 };
 
@@ -151,6 +175,105 @@ export interface ChangeProposalRepositoryPort {
     status?: ChangeProposalStatus,
   ): Promise<ChangeProposal[]>;
   save(changeProposal: ChangeProposal): Promise<void>;
+}
+
+// One port for the whole conversation aggregate (conversation, its provider
+// bindings, its turns, its transcript). They are never loaded independently of
+// a conversation, so splitting them into four ports would only spread one
+// consistency boundary across four injection points.
+export interface AgentConversationRepositoryPort {
+  findById(conversationId: string): Promise<AgentConversation | null>;
+  findByProjectId(projectId: string): Promise<AgentConversation[]>;
+  save(conversation: AgentConversation): Promise<void>;
+
+  findBindingById(bindingId: string): Promise<AgentProviderBinding | null>;
+  listBindings(conversationId: string): Promise<AgentProviderBinding[]>;
+  saveBinding(binding: AgentProviderBinding): Promise<void>;
+
+  findTurnById(turnId: string): Promise<AgentConversationTurn | null>;
+  findTurnByClientRequestId(
+    conversationId: string,
+    clientRequestId: string,
+  ): Promise<AgentConversationTurn | null>;
+  listTurns(conversationId: string): Promise<AgentConversationTurn[]>;
+  saveTurn(turn: AgentConversationTurn): Promise<void>;
+
+  // `afterSequence` is what a reconnecting client passes to resume exactly
+  // where its rendering stopped.
+  listMessages(
+    conversationId: string,
+    afterSequence?: number,
+  ): Promise<AgentConversationMessage[]>;
+  saveMessage(message: AgentConversationMessage): Promise<void>;
+  nextMessageSequence(conversationId: string): Promise<number>;
+}
+
+// What the operator's message means to the provider, resolved by Gen Story
+// rather than trusted from the agent: the current value of every `@`-mentioned
+// field plus the revision the agent must propose against.
+export type AgentTurnReference = {
+  label: string;
+  targetKey: string;
+  value: unknown;
+  revision: string;
+};
+
+export type AgentTurnRequest = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  provider: AgentProvider;
+  model: string | null;
+  // The provider-side session to continue. Null means "start a new one" —
+  // this is also the only place the full history would ever be needed, and
+  // deliberately is not sent even then.
+  nativeSessionId: string | null;
+  text: string;
+  mentions: SemanticMention[];
+  references: AgentTurnReference[];
+  // The operator's UI language. Without it the provider guesses from locale,
+  // which is how a live Codex session answered an English question in
+  // Japanese.
+  language: Language;
+};
+
+export type AgentTurnEvent =
+  | { type: "session-started"; nativeSessionId: string }
+  | { type: "assistant-text"; text: string }
+  | { type: "tool-activity"; toolName: string; changeProposalId?: string }
+  | { type: "compacted" }
+  | {
+      type: "turn-completed";
+      status: "completed" | "interrupted" | "failed";
+      providerTurnId?: string;
+      errorMessage?: string;
+    };
+
+export type AgentRunnerAvailability =
+  | { available: true; provider: AgentProvider; model: string | null }
+  | { available: false; reason: string };
+
+// Drives one provider-native session per conversation. The adapter owns the
+// live CLI process and the resume-after-restart logic; the application layer
+// only supplies the new turn and persists what comes back.
+export interface AgentTurnRunnerPort {
+  availability(): AgentRunnerAvailability;
+  // Resolves when the turn is over. Events arrive through `onEvent` as they
+  // happen so the transcript is persisted incrementally, not at the end.
+  startTurn(
+    request: AgentTurnRequest,
+    onEvent: (event: AgentTurnEvent) => void,
+  ): Promise<void>;
+  // Returns false when there was no in-flight turn to stop.
+  cancelTurn(input: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean>;
+  // Explicit provider compaction. Returns false when the bound provider
+  // cannot compact on request.
+  compact(input: { conversationId: string }): Promise<boolean>;
+  // Drops the in-memory session for a conversation (fork, or shutdown).
+  release(input: { conversationId: string }): Promise<void>;
 }
 
 export interface TestGenerationBatchRepositoryPort {
@@ -354,6 +477,7 @@ export interface ApplicationDependencies {
   aiJobs: AiJobRepositoryPort;
   projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
   changeProposals: ChangeProposalRepositoryPort;
+  agentConversations: AgentConversationRepositoryPort;
   testGenerationBatches: TestGenerationBatchRepositoryPort;
   userPreferences: UserPreferenceRepositoryPort;
   objectStorage: ObjectStoragePort;
@@ -367,6 +491,7 @@ export interface ApplicationDependencies {
   jobQueue: JobQueuePort;
   progressEvents: ProgressEventPort;
   authContext: AuthContextPort;
+  agentTurnRunner: AgentTurnRunnerPort;
 }
 
 export type UseCaseErrorCode =

@@ -8,6 +8,10 @@ import {
 export type ClaudeSessionEvent =
   | { type: "session-ready"; sessionId: string }
   | { type: "assistant-text"; text: string }
+  // A tool the assistant invoked, by its raw name (MCP tools arrive as
+  // `mcp__<server>__<tool>`). Emitted so a long turn shows progress instead
+  // of looking hung while the agent works.
+  | { type: "tool-use"; toolName: string }
   | {
       type: "turn-completed";
       isError: boolean;
@@ -19,6 +23,16 @@ export type ClaudeSessionEvent =
 
 export type ClaudeSessionEventListener = (event: ClaudeSessionEvent) => void;
 
+/**
+ * Which *built-in* tools a session may use. Empty (the default) means none.
+ * `mcpConfig` is the `--mcp-config` document; combined with
+ * `--strict-mcp-config` it is the *only* MCP configuration the process sees.
+ */
+export type ClaudeSessionToolOptions = {
+  tools?: readonly string[];
+  mcpConfig?: Record<string, unknown>;
+};
+
 export class ClaudeSessionError extends Error {
   constructor(message: string) {
     super(message);
@@ -27,7 +41,9 @@ export class ClaudeSessionError extends Error {
 }
 
 const DEFAULT_TURN_TIMEOUT_MS = 180_000;
-const STARTUP_TIMEOUT_MS = 30_000;
+// How long start()/resume() waits to see the process fail before treating it
+// as usable. `system/init` is NOT waited for — see waitUntilStarted.
+const STARTUP_GRACE_MS = 1_500;
 
 /**
  * A single `claude -p` conversational process bound to one session id. M1
@@ -59,6 +75,23 @@ export class ClaudeNativeSession {
     readonly sessionId: string,
   ) {
     process.on("event", (event: ClaudeStreamEvent) => this.handleEvent(event));
+    // A process that dies mid-turn would otherwise leave sendTurn waiting out
+    // its full timeout. Emitting the terminal event the caller is already
+    // listening for turns that hang into a prompt failure.
+    process.once(
+      "exit",
+      (code: number | null, signal: NodeJS.Signals | null) => {
+        const wasDeliberate = this.closed;
+        this.closed = true;
+        if (wasDeliberate) return;
+        this.emit({
+          type: "turn-completed",
+          isError: true,
+          subtype: "process_exited",
+          resultText: `Claude process exited (code=${code ?? "null"}, signal=${signal ?? "null"}).`,
+        });
+      },
+    );
   }
 
   private static spawn(input: {
@@ -70,7 +103,7 @@ export class ClaudeNativeSession {
     return new ClaudeSessionProcess(input);
   }
 
-  private static baseArgs(): string[] {
+  private static baseArgs(options: ClaudeSessionToolOptions = {}): string[] {
     return [
       "-p",
       "--input-format",
@@ -80,12 +113,19 @@ export class ClaudeNativeSession {
       "--verbose",
       "--permission-mode",
       "bypassPermissions",
-      // No built-in tools during M1: there is no approval/handling surface
-      // yet, matching CodexNativeSession's sandbox: "read-only" posture.
+      // Built-in tools only: `--tools` does not govern MCP tools. Empty means
+      // no Read/Bash/Edit at all, matching CodexNativeSession's
+      // sandbox: "read-only" posture, and M3 chat sessions keep it empty —
+      // their tools come from `--mcp-config` instead.
       "--tools",
-      "",
+      (options.tools ?? []).join(","),
       "--setting-sources",
       "",
+      // With --strict-mcp-config only this config is honoured, so the
+      // operator's own MCP servers cannot leak into a Gen Story chat.
+      ...(options.mcpConfig
+        ? ["--mcp-config", JSON.stringify(options.mcpConfig)]
+        : []),
       "--strict-mcp-config",
       // Deliberately NOT --disable-slash-commands: /compact must work.
     ];
@@ -97,11 +137,16 @@ export class ClaudeNativeSession {
     environment?: NodeJS.ProcessEnv;
     model?: string;
     sessionId?: string;
+    tools?: readonly string[];
+    mcpConfig?: Record<string, unknown>;
   }): Promise<ClaudeNativeSession> {
     const sessionId = input.sessionId ?? randomUUID();
     const process = ClaudeNativeSession.spawn({
       args: [
-        ...ClaudeNativeSession.baseArgs(),
+        ...ClaudeNativeSession.baseArgs({
+          tools: input.tools,
+          mcpConfig: input.mcpConfig,
+        }),
         "--session-id",
         sessionId,
         ...(input.model ? ["--model", input.model] : []),
@@ -112,7 +157,7 @@ export class ClaudeNativeSession {
     });
 
     const session = new ClaudeNativeSession(process, sessionId);
-    await session.waitUntilReady();
+    await session.waitUntilStarted();
     return session;
   }
 
@@ -121,30 +166,48 @@ export class ClaudeNativeSession {
     workingDirectory: string;
     allowedWorkingDirectoryRoot: string;
     environment?: NodeJS.ProcessEnv;
+    tools?: readonly string[];
+    mcpConfig?: Record<string, unknown>;
   }): Promise<ClaudeNativeSession> {
     const process = ClaudeNativeSession.spawn({
-      args: [...ClaudeNativeSession.baseArgs(), "--resume", input.sessionId],
+      args: [
+        ...ClaudeNativeSession.baseArgs({
+          tools: input.tools,
+          mcpConfig: input.mcpConfig,
+        }),
+        "--resume",
+        input.sessionId,
+      ],
       workingDirectory: input.workingDirectory,
       allowedWorkingDirectoryRoot: input.allowedWorkingDirectoryRoot,
       environment: input.environment,
     });
 
     const session = new ClaudeNativeSession(process, input.sessionId);
-    await session.waitUntilReady();
+    await session.waitUntilStarted();
     return session;
   }
 
-  /** Resolves on the first `system/init` event; rejects on early exit/error or timeout. */
-  private waitUntilReady(): Promise<void> {
+  /**
+   * Resolves once the process is usable; rejects only if it exits first.
+   *
+   * It deliberately does NOT wait for `system/init`. Under
+   * `--input-format stream-json`, Claude Code emits **nothing at all** until
+   * the first user message arrives (confirmed against 2.1.224), so a start
+   * that blocks on `init` before sending a message deadlocks until the turn
+   * timeout — which is exactly how M3's first live Claude chat failed. The
+   * session id is client-chosen, so there is nothing in `init` that start()
+   * actually needs.
+   *
+   * A CLI that dies immediately (not installed, not logged in, bad flag)
+   * still fails fast: that path exits well inside the grace window.
+   */
+  private waitUntilStarted(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const timer = setTimeout(() => {
         cleanup();
-        reject(
-          new ClaudeSessionError(
-            "Timed out waiting for the Claude process to start.",
-          ),
-        );
-      }, STARTUP_TIMEOUT_MS);
+        resolve();
+      }, STARTUP_GRACE_MS);
 
       const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
         cleanup();
@@ -154,6 +217,8 @@ export class ClaudeNativeSession {
           ),
         );
       };
+      // An early `init` means the process is up; no reason to wait out the
+      // rest of the grace window.
       const unsubscribeEvent = this.onEvent((event) => {
         if (event.type === "session-ready") {
           cleanup();
@@ -161,12 +226,17 @@ export class ClaudeNativeSession {
         }
       });
       const cleanup = () => {
-        clearTimeout(timeout);
+        clearTimeout(timer);
         unsubscribeEvent();
         this.process.off("exit", onExit);
       };
       this.process.once("exit", onExit);
     });
+  }
+
+  /** True once interrupt()/close() killed the process: this instance cannot send further turns. */
+  get isClosed(): boolean {
+    return this.closed;
   }
 
   onEvent(listener: ClaudeSessionEventListener): () => void {
@@ -188,13 +258,20 @@ export class ClaudeNativeSession {
     }
     if (type === "assistant") {
       const message = event.message as
-        | { content?: Array<{ type?: string; text?: string }> }
+        | { content?: Array<{ type?: string; text?: string; name?: string }> }
         | undefined;
-      const text = message?.content?.find(
-        (block) => block.type === "text",
-      )?.text;
-      if (typeof text === "string") {
-        this.emit({ type: "assistant-text", text });
+      // Every block, not just the first text one: a single assistant message
+      // can carry thinking, several text blocks, and tool calls, and dropping
+      // all but the first loses reply text the operator was shown nothing of.
+      for (const block of message?.content ?? []) {
+        if (block.type === "text" && typeof block.text === "string") {
+          this.emit({ type: "assistant-text", text: block.text });
+        } else if (
+          block.type === "tool_use" &&
+          typeof block.name === "string"
+        ) {
+          this.emit({ type: "tool-use", toolName: block.name });
+        }
       }
       this.emit({ type: "raw", event });
       return;
@@ -215,10 +292,18 @@ export class ClaudeNativeSession {
     this.emit({ type: "raw", event });
   }
 
-  /** Resolves once the next `result` event arrives, marking this turn done. */
+  /**
+   * Resolves once the next `result` event arrives, marking this turn done.
+   *
+   * The timeout measures *silence*, not the turn's total length: it restarts
+   * on every event. A turn that references several fields legitimately runs
+   * for minutes while streaming tool calls and text, and a wall-clock limit
+   * killed exactly those turns — the agent was working and visibly producing
+   * output right up to the moment it was declared timed out.
+   */
   sendTurn(
     text: string,
-    timeoutMs = DEFAULT_TURN_TIMEOUT_MS,
+    idleTimeoutMs = DEFAULT_TURN_TIMEOUT_MS,
   ): Promise<{ isError: boolean; subtype: string; resultText: string | null }> {
     if (this.closed) {
       return Promise.reject(
@@ -229,22 +314,33 @@ export class ClaudeNativeSession {
     }
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        unsubscribe();
-        reject(new ClaudeSessionError(`Timed out waiting for a turn result.`));
-      }, timeoutMs);
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const armTimeout = () => {
+        timeout = setTimeout(() => {
+          unsubscribe();
+          reject(
+            new ClaudeSessionError(
+              `Timed out after ${idleTimeoutMs}ms with no output from the provider.`,
+            ),
+          );
+        }, idleTimeoutMs);
+      };
 
       const unsubscribe = this.onEvent((event) => {
+        clearTimeout(timeout);
         if (event.type === "turn-completed") {
-          clearTimeout(timeout);
           unsubscribe();
           resolve({
             isError: event.isError,
             subtype: event.subtype,
             resultText: event.resultText,
           });
+          return;
         }
+        armTimeout();
       });
+
+      armTimeout();
 
       try {
         this.process.sendMessage(text);

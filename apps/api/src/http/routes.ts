@@ -5,6 +5,14 @@ import { resolve, sep } from "node:path";
 import {
   assignPhotosToScene,
   analyzeProjectPhotos,
+  cancelAgentChatTurn,
+  compactAgentChatConversation,
+  createAgentChatConversation,
+  forkAgentChatProviderSession,
+  getAgentChatConversation,
+  listAgentChatConversations,
+  postAgentChatTurn,
+  runAgentChatTurn,
   applyAdjustmentToTestVariant,
   applyChangeProposal,
   cancelAiJob,
@@ -51,7 +59,12 @@ import {
   type AuthPrincipal,
 } from "@gen-story/application";
 import { isLanguage as isLanguageValue } from "@gen-story/application";
-import type { AiJob, ChangeProposal, Project } from "@gen-story/domain";
+import type {
+  AgentConversation,
+  AiJob,
+  ChangeProposal,
+  Project,
+} from "@gen-story/domain";
 import {
   isChangeProposalStatus,
   isVisibleInSceneHistory,
@@ -64,6 +77,11 @@ import {
 } from "@gen-story/shared";
 
 import type { ApiDependencies } from "../app/create-api-context";
+import {
+  agentRuntimeCapabilities,
+  agentRuntimeWallet,
+  resolveAgentRuntimeAvailability,
+} from "../agent-runtime/runtime-config";
 import { exportStoryboardAssetBundle } from "../exports/local-storyboard-asset-export";
 import { composeScenePrompt } from "../generation/compose-scene-prompt";
 import {
@@ -84,6 +102,11 @@ import {
   toProjectDto,
   toProjectPhotoAnalysisDto,
   toSceneDto,
+  toAgentConversationDetailDto,
+  toAgentConversationDto,
+  toAgentConversationMessageDto,
+  toAgentConversationTurnDto,
+  toAgentProviderBindingDto,
   toStoryboardDto,
   toStylePresetDto,
   toTestGenerationBatchDto,
@@ -105,6 +128,8 @@ import { getParam, Router } from "./router";
 import {
   AssignScenePhotosSchema,
   AnalyzeProjectPhotosSchema,
+  CreateAgentConversationSchema,
+  PostAgentChatTurnSchema,
   ComplementSceneBridgeSchema,
   CreateGenerationRequestSchema,
   CreateCustomStyleSchema,
@@ -214,6 +239,23 @@ async function requireOwnedChangeProposal(
   return result.value;
 }
 
+async function requireOwnedConversation(
+  deps: ApiDependencies,
+  res: ServerResponse,
+  conversationId: string,
+): Promise<AgentConversation | null> {
+  const conversation = await deps.agentConversations.findById(conversationId);
+  if (conversation == null) {
+    sendJson(res, 404, notFoundBody("Conversation not found."));
+    return null;
+  }
+
+  const project = await requireOwnedProject(deps, res, conversation.projectId);
+  if (project == null) return null;
+
+  return conversation;
+}
+
 // Body reading shared by the change-proposal decision endpoints; responds with
 // the same 400 the other POST handlers use when the body is not JSON.
 async function readBodyOrRespond(
@@ -266,7 +308,34 @@ export function buildRouter(deps: ApiDependencies): Router {
   router.add("GET", "/api/ai-runtime", async (_req, res) => {
     const principal = await requirePrincipal(deps, res);
     if (principal == null) return;
-    sendJson(res, 200, toAiRuntimeInfoDto(deps.agentRuntime));
+    const preference = await getUserPreference(deps, principal.user.id);
+    if (!preference.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(preference.error.code),
+        errorBody(preference.error.code, preference.error.message),
+      );
+      return;
+    }
+    const selection = preference.value.agentRuntime;
+    deps.agentRuntime.selection = selection;
+    deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+    deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+    deps.agentRuntime.availability =
+      selection === "api"
+        ? { status: "not_applicable" }
+        : await resolveAgentRuntimeAvailability(selection, {
+            workingDirectory: process.cwd(),
+            allowedWorkingDirectoryRoot: process.cwd(),
+          });
+    sendJson(
+      res,
+      200,
+      toAiRuntimeInfoDto(
+        deps.agentRuntime,
+        deps.agentTurnRunner.availability(),
+      ),
+    );
   });
 
   // GET /api/projects
@@ -2512,6 +2581,21 @@ export function buildRouter(deps: ApiDependencies): Router {
       return;
     }
 
+    // Reading the preference must not invalidate a runtime check that already
+    // ran: resetting to "unchecked" here made the chat report "the runtime
+    // check has not run yet" for anyone who had merely opened Settings.
+    // Only a selection that actually changed needs re-checking.
+    const selection = result.value.agentRuntime;
+    if (deps.agentRuntime.selection !== selection) {
+      deps.agentRuntime.selection = selection;
+      deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+      deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+      deps.agentRuntime.availability =
+        selection === "api"
+          ? { status: "not_applicable" }
+          : { status: "unchecked" };
+    }
+
     sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
   });
 
@@ -2541,6 +2625,7 @@ export function buildRouter(deps: ApiDependencies): Router {
     const result = await setUserPreference(deps, {
       userId: principal.user.id,
       language: parsed.data.language,
+      agentRuntime: parsed.data.agentRuntime,
     });
 
     if (!result.ok) {
@@ -2551,6 +2636,18 @@ export function buildRouter(deps: ApiDependencies): Router {
       );
       return;
     }
+
+    const selection = result.value.agentRuntime;
+    deps.agentRuntime.selection = selection;
+    deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+    deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+    deps.agentRuntime.availability =
+      selection === "api"
+        ? { status: "not_applicable" }
+        : await resolveAgentRuntimeAvailability(selection, {
+            workingDirectory: process.cwd(),
+            allowedWorkingDirectoryRoot: process.cwd(),
+          });
 
     sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
   });
@@ -2779,9 +2876,260 @@ export function buildRouter(deps: ApiDependencies): Router {
     },
   );
 
-  // POST /api/mcp/projects/:projectId — the embedded client's MCP transport.
-  // The external CLI transport (`pnpm --filter @gen-story/api mcp:stdio`)
-  // serves the identical tool registry over stdio.
+  // ── Embedded agent chat (M3) ─────────────────────────────────────────────
+
+  // POST /api/projects/:projectId/agent-conversations
+  router.add(
+    "POST",
+    "/api/projects/:projectId/agent-conversations",
+    async (req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const parsed = CreateAgentConversationSchema.safeParse(body.body);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await createAgentChatConversation(deps, {
+        projectId,
+        title: parsed.data.title,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 201, toAgentConversationDto(result.value));
+    },
+  );
+
+  // GET /api/projects/:projectId/agent-conversations
+  router.add(
+    "GET",
+    "/api/projects/:projectId/agent-conversations",
+    async (_req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
+
+      const result = await listAgentChatConversations(deps, { projectId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, {
+        conversations: result.value.map(toAgentConversationDto),
+      });
+    },
+  );
+
+  // GET /api/agent-conversations/:conversationId?afterSequence=N
+  // A reconnecting client passes the last sequence it rendered and gets only
+  // what it missed; omitting it returns the complete transcript.
+  router.add(
+    "GET",
+    "/api/agent-conversations/:conversationId",
+    async (req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
+      );
+      if (conversation == null) return;
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const rawAfter = url.searchParams.get("afterSequence");
+      const afterSequence = rawAfter == null ? undefined : Number(rawAfter);
+      if (
+        afterSequence != null &&
+        (!Number.isInteger(afterSequence) || afterSequence < 0)
+      ) {
+        sendJson(
+          res,
+          422,
+          errorBody(
+            "validation_error",
+            "afterSequence must be a non-negative integer.",
+          ),
+        );
+        return;
+      }
+
+      const result = await getAgentChatConversation(deps, {
+        conversationId: conversation.id,
+        afterSequence,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toAgentConversationDetailDto(result.value));
+    },
+  );
+
+  // POST /api/agent-conversations/:conversationId/turns
+  router.add(
+    "POST",
+    "/api/agent-conversations/:conversationId/turns",
+    async (req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
+      );
+      if (conversation == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const parsed = PostAgentChatTurnSchema.safeParse(body.body);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: parsed.data.clientRequestId,
+        text: parsed.data.text,
+        mentions: parsed.data.mentions,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      // The provider turn runs after the response: it can take minutes, and
+      // everything it produces reaches the client over the project's event
+      // stream and is durable in the transcript either way.
+      if (result.value.turn.status === "running") {
+        void runAgentChatTurn(deps, { turnId: result.value.turn.id }).catch(
+          (error: unknown) => {
+            console.error("[agent-chat] turn failed:", error);
+          },
+        );
+      }
+
+      sendJson(res, 202, {
+        turn: toAgentConversationTurnDto(result.value.turn),
+        message: toAgentConversationMessageDto(result.value.message),
+      });
+    },
+  );
+
+  // POST /api/agent-conversation-turns/:turnId/cancel
+  router.add(
+    "POST",
+    "/api/agent-conversation-turns/:turnId/cancel",
+    async (_req, res, params) => {
+      const turnId = getParam(params, "turnId");
+      const turn = await deps.agentConversations.findTurnById(turnId);
+      if (turn == null) {
+        sendJson(res, 404, notFoundBody("Conversation turn not found."));
+        return;
+      }
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        turn.conversationId,
+      );
+      if (conversation == null) return;
+
+      const result = await cancelAgentChatTurn(deps, { turnId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toAgentConversationTurnDto(result.value));
+    },
+  );
+
+  // POST /api/agent-conversations/:conversationId/fork
+  router.add(
+    "POST",
+    "/api/agent-conversations/:conversationId/fork",
+    async (_req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
+      );
+      if (conversation == null) return;
+
+      const result = await forkAgentChatProviderSession(deps, {
+        conversationId: conversation.id,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 201, toAgentProviderBindingDto(result.value));
+    },
+  );
+
+  // POST /api/agent-conversations/:conversationId/compact
+  router.add(
+    "POST",
+    "/api/agent-conversations/:conversationId/compact",
+    async (_req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
+      );
+      if (conversation == null) return;
+
+      const result = await compactAgentChatConversation(deps, {
+        conversationId: conversation.id,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toAgentProviderBindingDto(result.value));
+    },
+  );
+
+  // POST /api/mcp/projects/:projectId — the embedded chat's MCP transport.
   router.add(
     "POST",
     "/api/mcp/projects/:projectId",

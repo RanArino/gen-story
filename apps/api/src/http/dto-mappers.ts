@@ -1,4 +1,8 @@
 import type {
+  AgentConversation,
+  AgentConversationMessage,
+  AgentConversationTurn,
+  AgentProviderBinding,
   AiJob,
   ChangeProposal,
   GeneratedImage,
@@ -13,6 +17,11 @@ import type {
   TestGenerationBatch,
 } from "@gen-story/domain";
 import type {
+  AgentConversationDetailDto,
+  AgentConversationDto,
+  AgentConversationMessageDto,
+  AgentConversationTurnDto,
+  AgentProviderBindingDto,
   AiJobDto,
   AiRuntimeInfoDto,
   ChangeProposalDto,
@@ -33,6 +42,8 @@ import type {
 } from "@gen-story/shared";
 
 import type {
+  AgentChatConversationDetail,
+  AgentRunnerAvailability,
   AuthPrincipal,
   ComplementSceneProposal,
   CreativeDirection,
@@ -49,11 +60,17 @@ import type { ApiAgentRuntimeInfo } from "../app/create-api-context";
 
 export function toAiRuntimeInfoDto(
   info: ApiAgentRuntimeInfo,
+  chatAvailability: AgentRunnerAvailability,
 ): AiRuntimeInfoDto {
   return {
     runtime: info.selection,
     wallet: info.wallet,
     availability: info.availability,
+    chat: {
+      runtime: info.selection,
+      available: chatAvailability.available,
+      reason: chatAvailability.available ? null : chatAvailability.reason,
+    },
     capabilities: info.capabilities
       ? {
           supportsExplicitCompact: info.capabilities.supportsExplicitCompact,
@@ -73,6 +90,7 @@ export function toUserPreferenceDto(
   return {
     userId: preference.userId,
     language: preference.language,
+    agentRuntime: preference.agentRuntime,
     updatedAt: preference.updatedAt,
   };
 }
@@ -342,6 +360,12 @@ export function toCreativeDirectionDto(
     projectId: direction.projectId,
     projectName: direction.projectName,
     storyboardId: direction.storyboardId,
+    stylePresetOptions: direction.stylePresetOptions.map((option) => ({
+      id: option.id,
+      name: option.name,
+      description: option.description,
+      scope: option.scope,
+    })),
     fields: direction.fields.map(toSemanticTargetSnapshotDto),
   };
 }
@@ -386,5 +410,90 @@ export function toChangeProposalDto(
     applyOutcome: proposal.applyOutcome,
     createdAt: proposal.createdAt,
     updatedAt: proposal.updatedAt,
+  };
+}
+
+// ── Embedded agent chat (M3) ───────────────────────────────────────────────
+
+export function toAgentConversationDto(
+  conversation: AgentConversation,
+): AgentConversationDto {
+  return {
+    id: conversation.id,
+    projectId: conversation.projectId,
+    title: conversation.title,
+    activeBindingId: conversation.activeBindingId,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+  };
+}
+
+// `lastTurnId` is deliberately not exposed: the turn list already carries it,
+// and the binding is shown to the operator as session metadata, not as a
+// pointer into the transcript.
+export function toAgentProviderBindingDto(
+  binding: AgentProviderBinding,
+): AgentProviderBindingDto {
+  return {
+    id: binding.id,
+    conversationId: binding.conversationId,
+    provider: binding.provider,
+    model: binding.model,
+    nativeSessionId: binding.nativeSessionId,
+    status: binding.status,
+    compactCount: binding.compactCount,
+    lastCompactedAt: binding.lastCompactedAt,
+    createdAt: binding.createdAt,
+    updatedAt: binding.updatedAt,
+  };
+}
+
+export function toAgentConversationTurnDto(
+  turn: AgentConversationTurn,
+): AgentConversationTurnDto {
+  return {
+    id: turn.id,
+    conversationId: turn.conversationId,
+    bindingId: turn.bindingId,
+    status: turn.status,
+    provider: turn.provider,
+    model: turn.model,
+    providerTurnId: turn.providerTurnId,
+    compacted: turn.compacted,
+    errorMessage: turn.errorMessage,
+    startedAt: turn.startedAt,
+    completedAt: turn.completedAt,
+  };
+}
+
+export function toAgentConversationMessageDto(
+  message: AgentConversationMessage,
+): AgentConversationMessageDto {
+  return {
+    id: message.id,
+    conversationId: message.conversationId,
+    turnId: message.turnId,
+    sequence: message.sequence,
+    role: message.role,
+    kind: message.kind,
+    text: message.text,
+    mentions: message.mentions.map((mention) => ({
+      label: mention.label,
+      target: { ...mention.target },
+    })),
+    data: message.data,
+    createdAt: message.createdAt,
+  };
+}
+
+export function toAgentConversationDetailDto(
+  detail: AgentChatConversationDetail,
+): AgentConversationDetailDto {
+  return {
+    conversation: toAgentConversationDto(detail.conversation),
+    binding:
+      detail.binding == null ? null : toAgentProviderBindingDto(detail.binding),
+    turns: detail.turns.map(toAgentConversationTurnDto),
+    messages: detail.messages.map(toAgentConversationMessageDto),
   };
 }

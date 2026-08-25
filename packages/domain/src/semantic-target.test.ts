@@ -57,7 +57,15 @@ describe("semantic targets", () => {
 
   it("rejects unknown fields", () => {
     expect(isSemanticField("tone")).toBe(true);
-    expect(isSemanticField("negativePrompt")).toBe(false);
+    // The story setup fields and scenes are addressable too, so an operator
+    // can discuss the whole creative direction, not just tone and style.
+    expect(isSemanticField("commonPrompt")).toBe(true);
+    expect(isSemanticField("story")).toBe(true);
+    expect(isSemanticField("negativePrompt")).toBe(true);
+    expect(isSemanticField("characterPolicy")).toBe(true);
+    expect(isSemanticField("scene")).toBe(true);
+    expect(isSemanticField("orderIndex")).toBe(false);
+    expect(isSemanticField("photoAssets")).toBe(false);
   });
 
   it("builds a stable string key", () => {

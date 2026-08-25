@@ -111,6 +111,8 @@ export type {
 } from "./rules";
 export type {
   ProjectSemanticField,
+  SceneSemanticField,
+  SceneSemanticValue,
   SemanticField,
   SemanticTarget,
   SemanticTargetRevision,
@@ -122,9 +124,12 @@ export {
   isSemanticField,
   projectSemanticTarget,
   readProjectPhotoAnalysisSemanticTarget,
+  readSceneSemanticTarget,
   readStoryboardSemanticTarget,
+  sceneSemanticTarget,
   SEMANTIC_FIELDS,
   semanticTargetKey,
+  STORY_SEMANTIC_FIELDS,
   storyboardSemanticTarget,
 } from "./semantic-target";
 export type {
@@ -144,6 +149,41 @@ export type {
   CreateChangeProposalInput,
   CreateChangeProposalItemInput,
 } from "./change-proposal";
+export type {
+  AgentConversation,
+  AgentConversationId,
+  AgentConversationMessage,
+  AgentConversationMessageId,
+  AgentConversationMessageKind,
+  AgentConversationMessageRole,
+  AgentConversationTurn,
+  AgentConversationTurnId,
+  AgentConversationTurnStatus,
+  AgentProviderBinding,
+  AgentProviderBindingId,
+  AgentProviderBindingStatus,
+  CreateAgentConversationInput,
+  CreateAgentConversationMessageInput,
+  CreateAgentConversationTurnInput,
+  CreateAgentProviderBindingInput,
+  SemanticMention,
+} from "./agent-conversation";
+export {
+  AGENT_SESSION_COMPACT_TURN_THRESHOLD,
+  canSendTurnOnBinding,
+  createAgentConversation,
+  createAgentConversationMessage,
+  createAgentConversationTurn,
+  createAgentProviderBinding,
+  finishAgentConversationTurn,
+  markAgentConversationTurnCompacted,
+  recordAgentProviderBindingCompaction,
+  recordAgentProviderBindingSession,
+  recordAgentProviderBindingTurn,
+  setAgentConversationActiveBinding,
+  setAgentProviderBindingStatus,
+  shouldCompactAgentSession,
+} from "./agent-conversation";
 export {
   applyChangeProposalItemApproval,
   approvedChangeProposalItems,

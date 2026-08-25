@@ -150,6 +150,9 @@ export function normalizeClaudeSessionEvent(
         : "completed";
       return { type: "turn-completed", provider: "claude", status };
     }
+    // Codex's own tool-call lifecycle maps to `provider-event` too; this
+    // neutral layer has no tool-activity variant to map onto faithfully.
+    case "tool-use":
     case "rate-limit":
     case "raw":
       return { type: "provider-event", provider: "claude", raw: event };

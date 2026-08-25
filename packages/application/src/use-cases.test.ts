@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  AGENT_SESSION_COMPACT_TURN_THRESHOLD,
   createAiJob,
   createChangeProposal,
   createGeneratedImage,
@@ -16,6 +17,10 @@ import {
   createTestGenerationBatch,
   createUser,
   storyboardSemanticTarget,
+  type AgentConversation,
+  type AgentConversationMessage,
+  type AgentConversationTurn,
+  type AgentProviderBinding,
   type ChangeProposal,
   type ChangeProposalStatus,
   type TestAdjustmentId,
@@ -36,6 +41,11 @@ import {
 } from "@gen-story/domain";
 
 import type {
+  AgentConversationRepositoryPort,
+  AgentRunnerAvailability,
+  AgentTurnEvent,
+  AgentTurnRequest,
+  AgentTurnRunnerPort,
   AiJobRepositoryPort,
   ApplicationDependencies,
   ChangeProposalRepositoryPort,
@@ -71,7 +81,17 @@ import type {
   UserRepositoryPort,
 } from "./ports";
 import {
+  cancelAgentChatTurn,
+  compactAgentChatConversation,
+  createAgentChatConversation,
+  forkAgentChatProviderSession,
+  getAgentChatConversation,
+  postAgentChatTurn,
+  runAgentChatTurn,
+} from "./agent-chat-use-cases";
+import {
   analyzeProjectPhotos,
+  getCreativeDirection,
   applyAdjustmentToTestVariant,
   applyChangeProposal,
   assignPhotosToScene,
@@ -710,6 +730,152 @@ class InMemoryProgressEventPort implements ProgressEventPort {
   }
 }
 
+class InMemoryAgentConversationRepository implements AgentConversationRepositoryPort {
+  public readonly conversations: AgentConversation[] = [];
+  public readonly bindings: AgentProviderBinding[] = [];
+  public readonly turns: AgentConversationTurn[] = [];
+  public readonly messages: AgentConversationMessage[] = [];
+
+  async findById(conversationId: string): Promise<AgentConversation | null> {
+    return (
+      this.conversations.find(
+        (conversation) => conversation.id === conversationId,
+      ) ?? null
+    );
+  }
+
+  async findByProjectId(projectId: string): Promise<AgentConversation[]> {
+    return this.conversations.filter(
+      (conversation) => conversation.projectId === projectId,
+    );
+  }
+
+  async save(conversation: AgentConversation): Promise<void> {
+    upsertById(this.conversations, conversation);
+  }
+
+  async findBindingById(
+    bindingId: string,
+  ): Promise<AgentProviderBinding | null> {
+    return this.bindings.find((binding) => binding.id === bindingId) ?? null;
+  }
+
+  async listBindings(conversationId: string): Promise<AgentProviderBinding[]> {
+    return this.bindings.filter(
+      (binding) => binding.conversationId === conversationId,
+    );
+  }
+
+  async saveBinding(binding: AgentProviderBinding): Promise<void> {
+    upsertById(this.bindings, binding);
+  }
+
+  async findTurnById(turnId: string): Promise<AgentConversationTurn | null> {
+    return this.turns.find((turn) => turn.id === turnId) ?? null;
+  }
+
+  async findTurnByClientRequestId(
+    conversationId: string,
+    clientRequestId: string,
+  ): Promise<AgentConversationTurn | null> {
+    return (
+      this.turns.find(
+        (turn) =>
+          turn.conversationId === conversationId &&
+          turn.clientRequestId === clientRequestId,
+      ) ?? null
+    );
+  }
+
+  async listTurns(conversationId: string): Promise<AgentConversationTurn[]> {
+    return this.turns.filter((turn) => turn.conversationId === conversationId);
+  }
+
+  async saveTurn(turn: AgentConversationTurn): Promise<void> {
+    upsertById(this.turns, turn);
+  }
+
+  async listMessages(
+    conversationId: string,
+    afterSequence?: number,
+  ): Promise<AgentConversationMessage[]> {
+    return this.messages
+      .filter(
+        (message) =>
+          message.conversationId === conversationId &&
+          (afterSequence == null || message.sequence > afterSequence),
+      )
+      .sort((left, right) => left.sequence - right.sequence);
+  }
+
+  async saveMessage(message: AgentConversationMessage): Promise<void> {
+    upsertById(this.messages, message);
+  }
+
+  async nextMessageSequence(conversationId: string): Promise<number> {
+    const sequences = this.messages
+      .filter((message) => message.conversationId === conversationId)
+      .map((message) => message.sequence);
+    return (sequences.length === 0 ? 0 : Math.max(...sequences)) + 1;
+  }
+}
+
+// Replays a scripted event sequence instead of spawning a CLI. `script` is
+// what a provider turn "did"; `requests` records exactly what was sent, which
+// is how the transcript-is-not-resent rule is asserted.
+class StubAgentTurnRunner implements AgentTurnRunnerPort {
+  public readonly requests: AgentTurnRequest[] = [];
+  public readonly cancelled: string[] = [];
+  public readonly released: string[] = [];
+  public script: AgentTurnEvent[] = [
+    { type: "session-started", nativeSessionId: "session-1" },
+    { type: "assistant-text", text: "Understood." },
+    { type: "turn-completed", status: "completed", providerTurnId: "t-1" },
+  ];
+  public available: AgentRunnerAvailability = {
+    available: true,
+    provider: "codex",
+    model: "gpt-5-codex",
+  };
+  public compactSupported = true;
+
+  availability(): AgentRunnerAvailability {
+    return this.available;
+  }
+
+  async startTurn(
+    request: AgentTurnRequest,
+    onEvent: (event: AgentTurnEvent) => void,
+  ): Promise<void> {
+    this.requests.push(request);
+    for (const event of this.script) {
+      onEvent(event);
+    }
+  }
+
+  async cancelTurn(input: { turnId: string }): Promise<boolean> {
+    this.cancelled.push(input.turnId);
+    return true;
+  }
+
+  async compact(): Promise<boolean> {
+    return this.compactSupported;
+  }
+
+  async release(input: { conversationId: string }): Promise<void> {
+    this.released.push(input.conversationId);
+  }
+}
+
+function upsertById<T extends { id: string }>(items: T[], item: T): void {
+  const index = items.findIndex((candidate) => candidate.id === item.id);
+  if (index === -1) {
+    items.push(item);
+    return;
+  }
+  items[index] = item;
+}
+
 function createDependencies(initial?: {
   users?: User[];
   organizations?: Organization[];
@@ -751,6 +917,8 @@ function createDependencies(initial?: {
   photoAnalysisGeneration: InMemoryPhotoAnalysisGenerationPort;
   storySetupGeneration: InMemoryStorySetupGenerationPort;
   scenes: InMemorySceneRepository;
+  agentConversations: InMemoryAgentConversationRepository;
+  agentTurnRunner: StubAgentTurnRunner;
 } {
   const stores = {
     users: new MemoryStore<User>(initial?.users ?? []),
@@ -812,6 +980,8 @@ function createDependencies(initial?: {
     testGenerationBatches: new InMemoryTestGenerationBatchRepository(
       stores.testGenerationBatches,
     ),
+    agentConversations: new InMemoryAgentConversationRepository(),
+    agentTurnRunner: new StubAgentTurnRunner(),
     userPreferences: new InMemoryUserPreferenceRepository(),
     objectStorage,
     imagePreprocessing,
@@ -842,6 +1012,7 @@ describe("application use cases", () => {
     if (result.ok) {
       expect(result.value.userId).toBe("user_new");
       expect(result.value.language).toBe("en");
+      expect(result.value.agentRuntime).toBe("claude");
     }
   });
 
@@ -851,6 +1022,7 @@ describe("application use cases", () => {
     const setResult = await setUserPreference(deps, {
       userId: "user_1",
       language: "ja",
+      agentRuntime: "codex",
     });
     expect(setResult.ok).toBe(true);
 
@@ -858,6 +1030,7 @@ describe("application use cases", () => {
     expect(getResult.ok).toBe(true);
     if (getResult.ok) {
       expect(getResult.value.language).toBe("ja");
+      expect(getResult.value.agentRuntime).toBe("codex");
     }
   });
 
@@ -4059,6 +4232,601 @@ describe("application use cases", () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error.code).toBe("invalid_state");
+      }
+    });
+  });
+  describe("embedded agent chat", () => {
+    function seedChatDeps() {
+      return createDependencies({
+        users: [
+          createUser({
+            id: "user_1",
+            organizationId: "org_1",
+            displayName: "Ran",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        organizations: [
+          createOrganization({
+            id: "org_1",
+            name: "Family Studio",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        projects: [
+          createProject({
+            id: "project_1",
+            organizationId: "org_1",
+            ownerUserId: "user_1",
+            name: "Family Story",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+          createProject({
+            id: "project_2",
+            organizationId: "org_1",
+            ownerUserId: "user_1",
+            name: "Other Story",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:00.000Z",
+          }),
+        ],
+        storyboards: [
+          createStoryboard({
+            id: "storyboard_1",
+            projectId: "project_1",
+            tone: "Reflective",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:10.000Z",
+          }),
+          createStoryboard({
+            id: "storyboard_2",
+            projectId: "project_2",
+            tone: "Playful",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            updatedAt: "2026-05-02T00:00:10.000Z",
+          }),
+        ],
+      });
+    }
+
+    function buildToneProposal(
+      id: string,
+      conversationId: string,
+      createdAt: string,
+    ) {
+      return createChangeProposal({
+        id,
+        projectId: "project_1",
+        provenance: { provider: "codex", conversationId, turnId: "turn_1" },
+        items: [
+          {
+            id: `${id}_item`,
+            target: storyboardSemanticTarget("storyboard_1", "tone"),
+            before: "Reflective",
+            after: "Warm nostalgia",
+            rationale: "Photos lean warmer.",
+            baseRevision: "2026-05-02T00:00:10.000Z",
+          },
+        ],
+        rationale: "Shift the tone to match the photos.",
+        clientRequestId: `client_req_${id}`,
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
+
+    async function startConversation(
+      deps: ReturnType<typeof createDependencies>,
+    ) {
+      const created = await createAgentChatConversation(deps, {
+        projectId: "project_1",
+      });
+      if (!created.ok) throw new Error("conversation was not created");
+      return created.value;
+    }
+
+    it("persists the operator's message and opens exactly one running turn", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Should the tone be warmer?",
+      });
+
+      expect(posted.ok).toBe(true);
+      if (!posted.ok) return;
+      expect(posted.value.turn.status).toBe("running");
+      expect(posted.value.message.kind).toBe("user_text");
+      // Nothing was sent to the provider yet: posting only makes it durable.
+      expect(deps.agentTurnRunner.requests).toHaveLength(0);
+
+      const second = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_2",
+        text: "And the style?",
+      });
+      expect(second.ok).toBe(false);
+      if (!second.ok) expect(second.error.code).toBe("conflict");
+    });
+
+    it("returns the same turn when a submission is retried with its client request ID", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      const first = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Should the tone be warmer?",
+      });
+      const retried = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Should the tone be warmer?",
+      });
+
+      expect(retried).toEqual(first);
+      expect(deps.agentConversations.turns).toHaveLength(1);
+      expect(
+        deps.agentConversations.messages.filter(
+          (message) => message.kind === "user_text",
+        ),
+      ).toHaveLength(1);
+    });
+
+    it("sends only the new turn and its referenced fields, never the stored transcript", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      const first = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "First question about the story.",
+      });
+      if (!first.ok) throw new Error("first turn was not posted");
+      await runAgentChatTurn(deps, { turnId: first.value.turn.id });
+
+      const second = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_2",
+        text: "Now warm up the tone.",
+        mentions: [
+          {
+            label: "@tone",
+            target: storyboardSemanticTarget("storyboard_1", "tone"),
+          },
+        ],
+      });
+      if (!second.ok) throw new Error("second turn was not posted");
+      await runAgentChatTurn(deps, { turnId: second.value.turn.id });
+
+      expect(deps.agentTurnRunner.requests).toHaveLength(2);
+      const [firstRequest, secondRequest] = deps.agentTurnRunner.requests;
+      if (firstRequest == null || secondRequest == null) {
+        throw new Error("both turns should have reached the provider");
+      }
+      expect(firstRequest.nativeSessionId).toBeNull();
+      // The second turn resumes the session the first one created, and its
+      // payload contains no trace of the first turn or the assistant's reply.
+      expect(secondRequest.nativeSessionId).toBe("session-1");
+      expect(secondRequest.text).toBe("Now warm up the tone.");
+      expect(secondRequest.text).not.toContain("First question");
+      expect(secondRequest.references).toEqual([
+        {
+          label: "@tone",
+          targetKey: "storyboard:storyboard_1#tone",
+          value: "Reflective",
+          revision: "2026-05-02T00:00:10.000Z",
+        },
+      ]);
+    });
+
+    it("persists each event while the turn is still running, not after it ends", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      // Holds the provider inside startTurn after it has produced a reply, the
+      // way a real agent keeps working after answering. Buffering events until
+      // the turn ended made that reply invisible for the whole wait, which is
+      // what made a working chat look hung.
+      let releaseProvider: () => void = () => {};
+      const providerStillWorking = new Promise<void>((resolve) => {
+        releaseProvider = resolve;
+      });
+      deps.agentTurnRunner.startTurn = async (request, onEvent) => {
+        deps.agentTurnRunner.requests.push(request);
+        onEvent({ type: "session-started", nativeSessionId: "session-1" });
+        onEvent({ type: "assistant-text", text: "Warmer suits these photos." });
+        onEvent({ type: "tool-activity", toolName: "get_creative_direction" });
+        await providerStillWorking;
+        onEvent({ type: "turn-completed", status: "completed" });
+      };
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+
+      const running = runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      // Let the queued writes drain while the provider is still held.
+      await vi.waitFor(async () => {
+        const detail = await getAgentChatConversation(deps, {
+          conversationId: conversation.id,
+        });
+        if (!detail.ok) throw new Error("conversation was not readable");
+        const kinds = detail.value.messages.map((message) => message.kind);
+        expect(kinds).toContain("assistant_text");
+        expect(kinds).toContain("tool_activity");
+      });
+
+      // The turn is genuinely still open: the reply above was visible before it
+      // finished, not because the turn had already completed.
+      const midTurn = await getAgentChatConversation(deps, {
+        conversationId: conversation.id,
+      });
+      if (!midTurn.ok) throw new Error("conversation was not readable");
+      expect(midTurn.value.turns.at(-1)?.status).toBe("running");
+
+      releaseProvider();
+      await running;
+    });
+
+    it("records the assistant reply, tool activity, and compaction in the transcript", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+      deps.agentTurnRunner.script = [
+        { type: "session-started", nativeSessionId: "session-1" },
+        { type: "tool-activity", toolName: "get_creative_direction" },
+        { type: "compacted" },
+        { type: "assistant-text", text: "Warmer suits these photos." },
+        { type: "turn-completed", status: "completed", providerTurnId: "t-1" },
+      ];
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+      const finished = await runAgentChatTurn(deps, {
+        turnId: posted.value.turn.id,
+      });
+
+      expect(finished.ok).toBe(true);
+      if (finished.ok) {
+        expect(finished.value.status).toBe("completed");
+        expect(finished.value.compacted).toBe(true);
+        expect(finished.value.providerTurnId).toBe("t-1");
+      }
+
+      const kinds = deps.agentConversations.messages.map(
+        (message) => message.kind,
+      );
+      expect(kinds).toEqual([
+        "user_text",
+        "tool_activity",
+        "notice",
+        "assistant_text",
+      ]);
+
+      expect(deps.agentConversations.bindings[0]).toMatchObject({
+        nativeSessionId: "session-1",
+        compactCount: 1,
+      });
+    });
+
+    it("shows a proposal card for a proposal the agent recorded during the turn", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      deps.agentTurnRunner.script = [
+        { type: "session-started", nativeSessionId: "session-1" },
+        { type: "turn-completed", status: "completed" },
+      ];
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+
+      // Recorded after the turn opened, exactly as an MCP call during the
+      // turn would record it.
+      await deps.changeProposals.save(
+        buildToneProposal(
+          "proposal_1",
+          conversation.id,
+          new Date().toISOString(),
+        ),
+      );
+      await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      const proposalMessages = deps.agentConversations.messages.filter(
+        (message) => message.kind === "proposal",
+      );
+      expect(proposalMessages).toHaveLength(1);
+      expect(proposalMessages[0]?.data).toEqual({
+        changeProposalId: "proposal_1",
+      });
+
+      // No project value changed: the card is a review unit, not a write.
+      const storyboard = await deps.storyboards.findById("storyboard_1");
+      expect(storyboard?.tone).toBe("Reflective");
+    });
+
+    it("does not replay another conversation's proposals into a new conversation", async () => {
+      const deps = seedChatDeps();
+      const first = await startConversation(deps);
+      await deps.changeProposals.save(
+        buildToneProposal("proposal_old", first.id, "2026-08-15T00:00:00.000Z"),
+      );
+
+      const second = await startConversation(deps);
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: second.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+      await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      expect(
+        deps.agentConversations.messages.filter(
+          (message) =>
+            message.conversationId === second.id && message.kind === "proposal",
+        ),
+      ).toHaveLength(0);
+    });
+
+    it("marks the binding recoverable when the provider session cannot be opened", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+      deps.agentTurnRunner.script = [
+        {
+          type: "turn-completed",
+          status: "failed",
+          errorMessage: "codex exited before starting.",
+        },
+      ];
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+      const finished = await runAgentChatTurn(deps, {
+        turnId: posted.value.turn.id,
+      });
+
+      expect(finished.ok).toBe(true);
+      if (finished.ok) expect(finished.value.status).toBe("failed");
+      expect(deps.agentConversations.bindings[0]?.status).toBe("recoverable");
+      expect(deps.agentConversations.messages.at(-1)).toMatchObject({
+        kind: "notice",
+        text: "codex exited before starting.",
+      });
+
+      // A recoverable binding refuses the next turn instead of quietly
+      // starting a session that lost the visible context.
+      const next = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_2",
+        text: "Try again",
+      });
+      expect(next.ok).toBe(false);
+      if (!next.ok) expect(next.error.code).toBe("conflict");
+    });
+
+    it("cancels a running turn while keeping what was already said", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+
+      const cancelled = await cancelAgentChatTurn(deps, {
+        turnId: posted.value.turn.id,
+      });
+
+      expect(cancelled.ok).toBe(true);
+      if (cancelled.ok) expect(cancelled.value.status).toBe("cancelled");
+      expect(deps.agentTurnRunner.cancelled).toEqual([posted.value.turn.id]);
+      expect(
+        deps.agentConversations.messages.some(
+          (message) => message.kind === "user_text",
+        ),
+      ).toBe(true);
+    });
+
+    it("forks a new provider session without forking the transcript", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+      await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      const forked = await forkAgentChatProviderSession(deps, {
+        conversationId: conversation.id,
+      });
+
+      expect(forked.ok).toBe(true);
+      if (!forked.ok) return;
+      expect(deps.agentConversations.bindings).toHaveLength(2);
+      expect(deps.agentConversations.bindings[0]?.status).toBe("closed");
+      expect(forked.value.nativeSessionId).toBeNull();
+      expect(deps.agentTurnRunner.released).toEqual([conversation.id]);
+
+      const detail = await getAgentChatConversation(deps, {
+        conversationId: conversation.id,
+      });
+      expect(detail.ok).toBe(true);
+      if (detail.ok) {
+        expect(detail.value.binding?.id).toBe(forked.value.id);
+        // The transcript is untouched by the fork.
+        expect(
+          detail.value.messages.some((message) => message.kind === "user_text"),
+        ).toBe(true);
+      }
+    });
+
+    it("counts an explicit compaction on the active binding", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+      await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      const compacted = await compactAgentChatConversation(deps, {
+        conversationId: conversation.id,
+      });
+
+      expect(compacted.ok).toBe(true);
+      if (compacted.ok) expect(compacted.value.compactCount).toBe(1);
+    });
+
+    it("offers the style presets an agent may name when proposing stylePresetId", async () => {
+      const deps = seedChatDeps();
+      await deps.stylePresets.save(
+        createStylePreset({
+          id: "preset_film",
+          scope: "system",
+          name: "Film Photo",
+          description: "Grainy 35mm warmth.",
+          prompt: "35mm film grain, halation",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      );
+
+      const direction = await getCreativeDirection(deps, {
+        projectId: "project_1",
+      });
+
+      expect(direction.ok).toBe(true);
+      if (direction.ok) {
+        expect(direction.value.stylePresetOptions).toEqual([
+          {
+            id: "preset_film",
+            name: "Film Photo",
+            description: "Grainy 35mm warmth.",
+            scope: "system",
+          },
+        ]);
+      }
+    });
+
+    it("compacts automatically once a session crosses the turn threshold", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      for (
+        let index = 0;
+        index < AGENT_SESSION_COMPACT_TURN_THRESHOLD;
+        index += 1
+      ) {
+        const posted = await postAgentChatTurn(deps, {
+          conversationId: conversation.id,
+          clientRequestId: `request_${index}`,
+          text: `Question ${index}`,
+        });
+        if (!posted.ok) throw new Error("turn was not posted");
+        await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+      }
+
+      const binding = deps.agentConversations.bindings[0];
+      expect(binding?.compactCount).toBe(1);
+      expect(
+        deps.agentConversations.messages.some(
+          (message) => message.data?.automatic === true,
+        ),
+      ).toBe(true);
+    });
+
+    it("refuses a mention that points at another project's field", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warm up @tone",
+        mentions: [
+          {
+            label: "@tone",
+            target: storyboardSemanticTarget("storyboard_2", "tone"),
+          },
+        ],
+      });
+
+      expect(posted.ok).toBe(false);
+      if (!posted.ok) expect(posted.error.code).toBe("not_found");
+      expect(deps.agentConversations.turns).toHaveLength(0);
+    });
+
+    it("refuses to chat when no CLI runtime is available", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+      deps.agentTurnRunner.available = {
+        available: false,
+        reason: "The codex CLI is not logged in.",
+      };
+
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+
+      expect(posted.ok).toBe(false);
+      if (!posted.ok) {
+        expect(posted.error.code).toBe("invalid_state");
+        expect(posted.error.message).toBe("The codex CLI is not logged in.");
+      }
+    });
+
+    it("replays only the messages a reconnecting client has not seen", async () => {
+      const deps = seedChatDeps();
+      const conversation = await startConversation(deps);
+      const posted = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: "request_1",
+        text: "Warmer?",
+      });
+      if (!posted.ok) throw new Error("turn was not posted");
+      await runAgentChatTurn(deps, { turnId: posted.value.turn.id });
+
+      const resumed = await getAgentChatConversation(deps, {
+        conversationId: conversation.id,
+        afterSequence: 1,
+      });
+
+      expect(resumed.ok).toBe(true);
+      if (resumed.ok) {
+        expect(
+          resumed.value.messages.map((message) => message.sequence),
+        ).toEqual([2]);
       }
     });
   });
