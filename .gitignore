@@ -24,3 +24,7 @@ apps/api/data/uploads/
 
 # Internal strategy, requirements, and planning docs (not for public release)
 internal/
+
+# Python bytecode caches from skill helper scripts
+__pycache__/
+*.pyc
