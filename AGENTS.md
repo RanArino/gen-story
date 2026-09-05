@@ -52,6 +52,7 @@ Default local URLs:
 ## Workflow
 
 - Start by reading the nearest instructions, relevant docs, package manifests, and similar existing code.
+- When the user requests a Discussion or a request meets the Discussion triggers, read and follow `internal/discussion/AGENTS.md` before planning or implementation. Check `internal/discussion/` for an existing relevant record first.
 - Ask before guessing when the request is materially ambiguous or risky.
 - Make only minimal changes tied to the request; do not refactor unrelated code.
 - Prefer established local patterns over new abstractions or new dependencies.
