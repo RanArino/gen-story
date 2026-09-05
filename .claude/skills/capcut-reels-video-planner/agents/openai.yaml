@@ -1,0 +1,4 @@
+interface:
+  display_name: "CapCut Reels Video Planner"
+  short_description: "Plan CapCut-ready Reels videos from AI images."
+  default_prompt: "Use $capcut-reels-video-planner to create a CapCut Reels plan from this storyboard export."
