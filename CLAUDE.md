@@ -76,6 +76,7 @@ data/            Local SQLite DB and uploaded files (gitignored)
 ## Workflow
 
 - Make only minimal changes tied to the request; do not refactor unrelated code.
+- For a user-requested Discussion or an ambiguous, architectural, or cross-cutting proposal, follow `internal/discussion/AGENTS.md` before creating an ExecPlan or implementation plan.
 - Prefer existing local patterns over new abstractions or dependencies.
 - Run narrowest check first (`pnpm typecheck`), then broader checks (`pnpm lint`, `pnpm test`, `pnpm build`).
 - Use an ExecPlan (see `/Users/ran/my-app/PLANS.md`) for multi-step, architectural, or migration work.
