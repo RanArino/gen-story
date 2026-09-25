@@ -8,6 +8,7 @@ import {
   type UseCaseResult,
 } from "@gen-story/application";
 import type { AgentProvider, ChangeProposal } from "@gen-story/domain";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import type { ApiDependencies } from "../app/create-api-context";
@@ -26,7 +27,15 @@ export type McpToolContext = {
 };
 
 export type McpToolOutcome =
-  | { ok: true; data: unknown; changeProposalId?: string }
+  | {
+      ok: true;
+      data: unknown;
+      // A read tool may return source-photo image blocks in addition to its
+      // JSON manifest, so the native vision agent can inspect the actual
+      // uploaded pixels rather than infer them from theme text.
+      content?: CallToolResult["content"];
+      changeProposalId?: string;
+    }
   | { ok: false; code: string; message: string };
 
 export type McpToolDefinition = {
@@ -146,6 +155,83 @@ const getCreativeDirectionTool: McpToolDefinition = {
     return result.ok
       ? { ok: true, data: result.value }
       : toolFailure(result.error);
+  },
+};
+
+const readStoryboardPhotosTool: McpToolDefinition = {
+  name: "read_storyboard_photos",
+  title: "Read storyboard source photos",
+  description:
+    "Read every non-deleted uploaded photo registered as a primary-photo storyboard scene. Returns an ordered manifest and the original image bytes, so inspect these images before making photo-dependent creative recommendations. Read-only.",
+  inputShape: {},
+  readOnly: true,
+  handler: async (context) => {
+    const storyboards = await context.deps.storyboards.findByProjectId(
+      context.projectId,
+    );
+    const storyboard = storyboards[0];
+    if (storyboard == null) {
+      return {
+        ok: false,
+        code: "not_found",
+        message: "Storyboard not found.",
+      };
+    }
+
+    const scenes = await context.deps.scenes.findByStoryboardId(storyboard.id);
+    const orderedScenes = [...scenes].sort(
+      (left, right) => left.orderIndex - right.orderIndex,
+    );
+    const entries: {
+      sceneId: string;
+      orderIndex: number;
+      photoAssetId: string;
+      name: string;
+      notes: string | null;
+    }[] = [];
+    const content: CallToolResult["content"] = [];
+
+    for (const scene of orderedScenes) {
+      const primary = scene.photoAssets.find(
+        (photoAsset) => photoAsset.role === "primary",
+      );
+      if (primary == null) continue;
+      const photo = await context.deps.photoAssets.findById(
+        primary.photoAssetId,
+      );
+      if (photo == null || photo.deletedAt !== null) continue;
+      const body = await context.deps.objectStorage.getObject(photo.storageKey);
+      if (body == null) continue;
+
+      entries.push({
+        sceneId: scene.id,
+        orderIndex: scene.orderIndex,
+        photoAssetId: photo.id,
+        name: photo.name,
+        notes: photo.notes,
+      });
+      content.push({
+        type: "image",
+        data: Buffer.from(body).toString("base64"),
+        mimeType: photo.mimeType,
+      });
+    }
+
+    return {
+      ok: true,
+      data: { storyboardId: storyboard.id, photos: entries },
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            { storyboardId: storyboard.id, photos: entries },
+            null,
+            2,
+          ),
+        },
+        ...content,
+      ],
+    };
   },
 };
 
@@ -281,6 +367,7 @@ const applyApprovedChangeProposalTool: McpToolDefinition = {
 // a first-party action taken by the operator through the REST API/GUI.
 export const GEN_STORY_MCP_TOOLS: McpToolDefinition[] = [
   getCreativeDirectionTool,
+  readStoryboardPhotosTool,
   listChangeProposalsTool,
   getChangeProposalTool,
   proposeCreativeDirectionChangesTool,

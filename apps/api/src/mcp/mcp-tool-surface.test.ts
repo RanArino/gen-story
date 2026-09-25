@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createOrganization,
+  createPhotoAsset,
   createProject,
   createProjectPhotoAnalysis,
+  createScene,
   createStoryboard,
   createUser,
 } from "@gen-story/domain";
@@ -197,6 +199,7 @@ describe("Gen Story MCP tool surface", () => {
       "get_creative_direction",
       "list_change_proposals",
       "propose_creative_direction_changes",
+      "read_storyboard_photos",
     ]);
     // No general mutation, SQL, shell, or approval tool exists.
     for (const forbidden of [
@@ -233,6 +236,62 @@ describe("Gen Story MCP tool surface", () => {
     for (const field of body.fields as { target: { entityId: string } }[]) {
       expect(field.target.entityId).not.toContain("project_b");
     }
+  });
+
+  it("returns each registered storyboard source photo as an image block", async () => {
+    const { deps, fixtures } = makeDeps();
+    const photo = createPhotoAsset({
+      id: "photo_a",
+      projectId: "project_a",
+      name: "walk.jpg",
+      storageKey: "data/uploads/originals/projects/project_a/photo_a.jpg",
+      mimeType: "image/jpeg",
+      size: 3,
+      checksum: "photo_a_checksum",
+      sourceKind: "upload",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await deps.photoAssets.save(photo);
+    await deps.objectStorage.putObject({
+      key: photo.storageKey,
+      body: Buffer.from("jpg"),
+      contentType: photo.mimeType,
+    });
+    await deps.scenes.save(
+      createScene({
+        id: "scene_a",
+        projectId: "project_a",
+        storyboardId: fixtures.storyboards[0]!.id,
+        orderIndex: 0,
+        title: "",
+        description: "",
+        imagePrompt: "",
+        emotion: "",
+        cameraDirection: "",
+        lightingDirection: "",
+        motionDirection: "",
+        photoAssets: [{ photoAssetId: photo.id, role: "primary" }],
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const client = await connectToProjectA(deps);
+
+    const result = await client.callTool({
+      name: "read_storyboard_photos",
+      arguments: {},
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.content).toEqual([
+      expect.objectContaining({ type: "text" }),
+      expect.objectContaining({
+        type: "image",
+        mimeType: "image/jpeg",
+        data: Buffer.from("jpg").toString("base64"),
+      }),
+    ]);
   });
 
   it("refuses a proposal that targets another project's entity", async () => {

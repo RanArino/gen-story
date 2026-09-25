@@ -31,7 +31,10 @@ function toCallToolResult(outcome: McpToolOutcome): CallToolResult {
     : { error: { code: outcome.code, message: outcome.message } };
 
   return {
-    content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+    content:
+      outcome.ok && outcome.content != null
+        ? outcome.content
+        : [{ type: "text", text: JSON.stringify(body, null, 2) }],
     ...(outcome.ok ? {} : { isError: true }),
   };
 }

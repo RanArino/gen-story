@@ -363,6 +363,13 @@ export async function registerPhotoAsset(
     });
 
     await deps.photoAssets.save(photoAsset);
+    // A storyboard is photo-first: newly uploaded photos become their own
+    // primary-photo scenes immediately, rather than waiting for an operator to
+    // reopen the scene picker.
+    const storyboards = await deps.storyboards.findByProjectId(project.id);
+    for (const storyboard of storyboards) {
+      await ensureUploadedPhotosHaveScenes(deps, storyboard);
+    }
     await deps.progressEvents.publish({
       kind: "photo-asset.registered",
       entityType: "photoAsset",
@@ -543,11 +550,74 @@ export async function upsertStoryboard(
     });
 
     await deps.storyboards.save(storyboard);
+    const storyboardWithPhotoScenes = await ensureUploadedPhotosHaveScenes(
+      deps,
+      storyboard,
+    );
 
-    return success(storyboard);
+    return success(storyboardWithPhotoScenes);
   } catch (error) {
     return validationFailure(error);
   }
+}
+
+// The initial storyboard is an inventory of the project's photos: every
+// non-deleted upload gets one primary-photo scene. This also covers uploads
+// that arrive after initialization, while preserving any scenes the operator
+// already created or edited.
+async function ensureUploadedPhotosHaveScenes(
+  deps: ApplicationDependencies,
+  storyboard: Storyboard,
+): Promise<Storyboard> {
+  const [photos, existingScenes] = await Promise.all([
+    deps.photoAssets.findByProjectId(storyboard.projectId),
+    deps.scenes.findByStoryboardId(storyboard.id),
+  ]);
+  const primaryPhotoIds = new Set(
+    existingScenes.flatMap((scene) =>
+      scene.photoAssets
+        .filter((photoAsset) => photoAsset.role === "primary")
+        .map((photoAsset) => photoAsset.photoAssetId),
+    ),
+  );
+  const missingPhotos = photos
+    .filter(
+      (photo) => photo.deletedAt === null && !primaryPhotoIds.has(photo.id),
+    )
+    .sort((left, right) => left.position - right.position);
+
+  if (missingPhotos.length === 0) return storyboard;
+
+  const timestamp = now();
+  const baseOrderIndex =
+    existingScenes.reduce(
+      (highest, scene) => Math.max(highest, scene.orderIndex),
+      -1,
+    ) + 1;
+  const createdScenes = missingPhotos.map((photo, index) =>
+    createTemplateScene({
+      id: randomUUID(),
+      projectId: storyboard.projectId,
+      storyboardId: storyboard.id,
+      orderIndex: baseOrderIndex + index,
+      photoAssetId: photo.id,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }),
+  );
+  for (const scene of createdScenes) await deps.scenes.save(scene);
+
+  const orderedScenes = sortScenesByOrderIndex([
+    ...existingScenes,
+    ...createdScenes,
+  ]);
+  const updatedStoryboard = {
+    ...storyboard,
+    sceneIds: orderedScenes.map((scene) => scene.id),
+    updatedAt: timestamp,
+  };
+  await deps.storyboards.save(updatedStoryboard);
+  return updatedStoryboard;
 }
 
 // ── Storyboard setup flow ────────────────────────────────────────────────────
