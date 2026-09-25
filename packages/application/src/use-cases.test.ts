@@ -3908,6 +3908,64 @@ describe("application use cases", () => {
     expect(withFill.sceneFillGeneration.calls).toHaveLength(0);
   });
 
+  it("creates a primary-photo scene for every upload at initialization and after it", async () => {
+    const deps = createDependencies({
+      projects: [
+        createProject({
+          id: "project_photo_scenes",
+          organizationId: "org_1",
+          ownerUserId: "user_1",
+          name: "Photo-first storyboard",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ],
+      photoAssets: ["photo_a", "photo_b"].map((id, position) =>
+        createPhotoAsset({
+          id,
+          projectId: "project_photo_scenes",
+          name: `${id}.jpg`,
+          storageKey: `photos/${id}.jpg`,
+          mimeType: "image/jpeg",
+          size: 1,
+          checksum: `${id}_checksum`,
+          sourceKind: "upload",
+          position,
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      ),
+    });
+
+    const initialized = await upsertStoryboard(deps, {
+      storyboardId: "storyboard_photo_scenes",
+      projectId: "project_photo_scenes",
+    });
+    expect(initialized.ok).toBe(true);
+    expect(
+      deps.stores.scenes
+        .values()
+        .map((scene) => scene.photoAssets[0]?.photoAssetId),
+    ).toEqual(["photo_a", "photo_b"]);
+
+    const uploaded = await registerPhotoAsset(deps, {
+      photoAssetId: "photo_c",
+      projectId: "project_photo_scenes",
+      name: "photo_c.jpg",
+      storageKey: "photos/photo_c.jpg",
+      mimeType: "image/jpeg",
+      size: 1,
+      checksum: "photo_c_checksum",
+      sourceKind: "upload",
+    });
+    expect(uploaded.ok).toBe(true);
+    expect(
+      deps.stores.scenes
+        .values()
+        .map((scene) => scene.photoAssets[0]?.photoAssetId),
+    ).toEqual(["photo_a", "photo_b", "photo_c"]);
+  });
+
   describe("change proposal approval and apply", () => {
     const storyboardUpdatedAt = "2026-08-10T00:00:00.000Z";
 
