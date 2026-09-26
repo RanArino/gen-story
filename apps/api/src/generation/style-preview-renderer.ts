@@ -1,6 +1,8 @@
 import OpenAI, { toFile } from "openai";
 import sharp from "sharp";
 
+import { DEFAULT_OPENAI_IMAGE_MODEL } from "./image-generation-model";
+
 // Rendering helpers for the storyboard style-preview images.
 // Used by scripts/generate-style-previews.ts.
 //
@@ -16,11 +18,10 @@ import sharp from "sharp";
 // - `quality` is supported (low/medium/high); `high` is used here because the
 //   previews are identity-sensitive close-up portraits.
 // - gpt-image models return base64 by default and reject `response_format`.
-// - `input_fidelity` is disabled for gpt-image-2, so it is not sent.
+// - `input_fidelity` is not needed by the configured model, so it is not sent.
 
 export const STYLE_PREVIEW_WIDTH = 480;
 
-const DEFAULT_MODEL = "gpt-image-2";
 const DEFAULT_QUALITY = "high";
 
 // Text-to-image: produces the full-resolution base image (PNG bytes).
@@ -33,7 +34,7 @@ export async function generateBaseImage(input: {
   const client = new OpenAI({ apiKey: input.apiKey });
 
   const response = await client.images.generate({
-    model: (input.model ?? DEFAULT_MODEL) as Parameters<
+    model: (input.model ?? DEFAULT_OPENAI_IMAGE_MODEL) as Parameters<
       typeof client.images.generate
     >[0]["model"],
     prompt: input.prompt,
@@ -67,7 +68,7 @@ export async function restyleImage(input: {
   });
 
   const response = await client.images.edit({
-    model: (input.model ?? DEFAULT_MODEL) as Parameters<
+    model: (input.model ?? DEFAULT_OPENAI_IMAGE_MODEL) as Parameters<
       typeof client.images.edit
     >[0]["model"],
     image: [imageFile],

@@ -12,8 +12,8 @@
 //   # Verify the generated image exists under data/uploads/generated/images/
 //   # Repeat with a scene whose photoFidelity is "low" or "high" to exercise
 //   # images.edit; compare cost and likeness against the "off" default. Under
-//   # the default model, gpt-image-2, "low" and "high" produce identical
-//   # requests — see supportsInputFidelity below.
+//   # the default model uses prompt instructions to distinguish "low" and
+//   # "high" because input_fidelity is omitted — see supportsInputFidelity.
 
 import { describe, expect, it } from "vitest";
 
@@ -22,6 +22,13 @@ import {
   selectImageGenerationMode,
   supportsInputFidelity,
 } from "./openai-image-generation";
+import { DEFAULT_OPENAI_IMAGE_MODEL } from "./image-generation-model";
+
+describe("image generation model", () => {
+  it("pins the requested GPT Image 2.5 Flare snapshot", () => {
+    expect(DEFAULT_OPENAI_IMAGE_MODEL).toBe("gpt-image-2.5-flare-2026-09-08");
+  });
+});
 
 describe("OpenAiImageGenerationAdapter", () => {
   it("is covered by manual smoke tests only — see file header for instructions", () => {
@@ -120,10 +127,8 @@ describe("selectImageGenerationMode", () => {
   });
 });
 
-// gpt-image-2 (this adapter's default model) returns a 400 if input_fidelity
-// is present at all in the request body — not just an unsupported value, the
-// field itself is rejected. This guard is what stands between a scene's
-// low/high choice and a paid call that fails outright.
+// Some models reject input_fidelity when it is present at all. This guard is
+// what stands between a scene's low/high choice and a paid call that fails.
 describe("supportsInputFidelity", () => {
   it("allows gpt-image-1, confirmed by OpenAI's own cookbook example", () => {
     expect(supportsInputFidelity("gpt-image-1")).toBe(true);

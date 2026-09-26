@@ -131,9 +131,9 @@
       "off": "Off",
       "offHint": "Ignore the photo, generate from the prompt alone.",
       "low": "Low",
-      "lowHint": "Use the photo as reference. Currently identical to High — gpt-image-2 has no lower fidelity setting.",
+      "lowHint": "Use the photo as a loose reference; likeness is guided through the prompt.",
       "high": "High",
-      "highHint": "Follow the photo closely, especially faces. This is gpt-image-2's only fidelity level once a photo is attached."
+      "highHint": "Follow the photo closely, especially faces; likeness is guided through the prompt."
     },
     "selectOption": "Select…",
     "save": "Save scene",
@@ -480,6 +480,7 @@
     "actions": {
       "starting": "Starting…",
       "start": "Start generation",
+      "startUnstarted": "Start all unstarted scenes",
       "retryFailed": "Retry failed scenes",
       "reviewImages": "Review images →"
     },
@@ -562,9 +563,9 @@
         "off": "Off",
         "offHint": "Ignore the photo, generate from the prompt alone.",
         "low": "Low",
-        "lowHint": "Use the photo as reference. Currently identical to High — gpt-image-2 has no lower fidelity setting.",
+        "lowHint": "Use the photo as a loose reference; likeness is guided through the prompt.",
         "high": "High",
-        "highHint": "Follow the photo closely, especially faces. This is gpt-image-2's only fidelity level once a photo is attached."
+        "highHint": "Follow the photo closely, especially faces; likeness is guided through the prompt."
       },
       "cancel": "Cancel",
       "queue": "Queue generation",

@@ -30,15 +30,11 @@ export type ComposeScenePromptOverrides = {
   photoFidelity?: Scene["photoFidelity"];
 };
 
-// gpt-image-2 has no adjustable input_fidelity parameter — attaching a photo
-// to an edit call always applies maximum fidelity at the API level (see
-// supportsInputFidelity in apps/api/src/generation/openai-image-generation.ts,
-// added after a live 400 confirmed the parameter is rejected outright). This
-// directive is the one remaining lever for a "low" vs "high" distinction:
-// explicit prompt language, which is OpenAI's own documented technique for
-// steering how strictly a model follows a reference image when no numeric
-// parameter exists. It is not an enforced setting the way input_fidelity was
-// on gpt-image-1 — it is the model's best effort at following an instruction.
+// The default GPT Image 2.5 adapter does not send input_fidelity. This
+// directive provides the "low" vs "high" distinction through explicit prompt
+// language, which is OpenAI's documented technique for steering how strictly
+// a model follows a reference image. It is the model's best effort at following
+// an instruction rather than an enforced numeric setting.
 // Only applied when the scene actually has a photo to attach; with none
 // (photoFidelity "off", or no photoAssets) there is nothing for the directive
 // to refer to.
