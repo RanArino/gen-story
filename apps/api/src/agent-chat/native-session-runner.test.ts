@@ -234,7 +234,9 @@ describe("NativeSessionAgentTurnRunner codex turns", () => {
     expect(codex.sentTurns).toHaveLength(2);
     expect(codex.sentTurns[0]).toContain("Project ID: project_1");
     expect(codex.sentTurns[1]).toContain("Should the tone be warmer?");
-    expect(codex.sentTurns[1]).toContain("read_storyboard_photos first");
+    expect(codex.sentTurns[1]).toContain(
+      "read_storyboard_photos with offset 0",
+    );
   });
 
   it("resumes the recorded session on a later turn without replaying anything", async () => {
@@ -254,7 +256,9 @@ describe("NativeSessionAgentTurnRunner codex turns", () => {
     expect(calls.resumeCodex[0]?.threadId).toBe("thread-1");
     expect(codex.sentTurns).toHaveLength(1);
     expect(codex.sentTurns[0]).toContain("Now warm up the tone.");
-    expect(codex.sentTurns[0]).toContain("read_storyboard_photos first");
+    expect(codex.sentTurns[0]).toContain(
+      "read_storyboard_photos with offset 0",
+    );
   });
 
   it("reports the assistant reply, MCP tool activity, and compaction", async () => {

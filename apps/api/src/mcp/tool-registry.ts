@@ -13,6 +13,11 @@ import { z } from "zod";
 
 import type { ApiDependencies } from "../app/create-api-context";
 import { toChangeProposalDto } from "../http/dto-mappers";
+import {
+  createPhotoContactSheet,
+  createPreviewImage,
+} from "../images/image-metadata";
+import { buildPhotoPreviewStorageKey } from "../storage/storage-keys";
 
 // One MCP session is bound to exactly one project. No tool accepts a project
 // ID, so a session attached to project A has no way to name project B's data;
@@ -141,6 +146,12 @@ const ListChangeProposalsInputSchema = z.object({
     .optional(),
 });
 
+const ReadStoryboardPhotosInputSchema = z.object({
+  offset: z.number().int().min(0).optional(),
+});
+
+const STORYBOARD_PHOTO_PAGE_SIZE = 6;
+
 const getCreativeDirectionTool: McpToolDefinition = {
   name: "get_creative_direction",
   title: "Read creative direction",
@@ -162,10 +173,11 @@ const readStoryboardPhotosTool: McpToolDefinition = {
   name: "read_storyboard_photos",
   title: "Read storyboard source photos",
   description:
-    "Read every non-deleted uploaded photo registered as a primary-photo storyboard scene. Returns an ordered manifest and the original image bytes, so inspect these images before making photo-dependent creative recommendations. Read-only.",
-  inputShape: {},
+    "Read ordered primary storyboard photos as bounded 640px preview pages. Start at offset 0: it includes a numbered whole-storyboard contact sheet plus the first detail page. Follow nextOffset until null before making any photo-dependent recommendation or proposal. Read-only.",
+  inputShape: ReadStoryboardPhotosInputSchema.shape,
   readOnly: true,
-  handler: async (context) => {
+  handler: async (context, rawInput) => {
+    const { offset = 0 } = ReadStoryboardPhotosInputSchema.parse(rawInput);
     const storyboards = await context.deps.storyboards.findByProjectId(
       context.projectId,
     );
@@ -188,8 +200,9 @@ const readStoryboardPhotosTool: McpToolDefinition = {
       photoAssetId: string;
       name: string;
       notes: string | null;
+      storageKey: string;
+      globalIndex: number;
     }[] = [];
-    const content: CallToolResult["content"] = [];
 
     for (const scene of orderedScenes) {
       const primary = scene.photoAssets.find(
@@ -200,40 +213,129 @@ const readStoryboardPhotosTool: McpToolDefinition = {
         primary.photoAssetId,
       );
       if (photo == null || photo.deletedAt !== null) continue;
-      const body = await context.deps.objectStorage.getObject(photo.storageKey);
-      if (body == null) continue;
-
       entries.push({
         sceneId: scene.id,
         orderIndex: scene.orderIndex,
         photoAssetId: photo.id,
         name: photo.name,
         notes: photo.notes,
-      });
-      content.push({
-        type: "image",
-        data: Buffer.from(body).toString("base64"),
-        mimeType: photo.mimeType,
+        storageKey: photo.storageKey,
+        globalIndex: entries.length + 1,
       });
     }
 
+    if (offset > entries.length) {
+      return {
+        ok: false,
+        code: "validation_error",
+        message: `Photo offset ${offset} is beyond the ${entries.length} available storyboard photos.`,
+      };
+    }
+
+    const pageEntries = entries.slice(
+      offset,
+      offset + STORYBOARD_PHOTO_PAGE_SIZE,
+    );
+    const overviewIncluded = offset === 0 && entries.length > 0;
+    // Load overview images serially. A legacy project may be missing every
+    // derivative; that fallback must never hold all original uploads in memory.
+    const overviewImages = overviewIncluded
+      ? await loadPhotoPreviews(context, entries)
+      : null;
+    const pageImages =
+      overviewImages == null
+        ? await Promise.all(
+            pageEntries.map((entry) => loadPhotoPreview(context, entry)),
+          )
+        : overviewImages
+            .slice(offset, offset + STORYBOARD_PHOTO_PAGE_SIZE)
+            .map((image) => image.body);
+    const overview =
+      overviewImages == null
+        ? null
+        : await createPhotoContactSheet(overviewImages);
+    const nextOffset =
+      offset + pageEntries.length < entries.length
+        ? offset + pageEntries.length
+        : null;
+    const photos = pageEntries.map(
+      ({ storageKey: _storageKey, ...entry }) => entry,
+    );
+    const manifest = {
+      storyboardId: storyboard.id,
+      totalPhotoCount: entries.length,
+      offset,
+      returnedPhotoCount: photos.length,
+      nextOffset,
+      overviewIncluded,
+      photos,
+    };
+
     return {
       ok: true,
-      data: { storyboardId: storyboard.id, photos: entries },
+      data: manifest,
       content: [
         {
           type: "text",
-          text: JSON.stringify(
-            { storyboardId: storyboard.id, photos: entries },
-            null,
-            2,
-          ),
+          text: JSON.stringify(manifest, null, 2),
         },
-        ...content,
+        ...(overview == null
+          ? []
+          : [
+              {
+                type: "image" as const,
+                data: Buffer.from(overview.body).toString("base64"),
+                mimeType: overview.mimeType,
+              },
+            ]),
+        ...pageImages.map((body) => ({
+          type: "image" as const,
+          data: Buffer.from(body).toString("base64"),
+          mimeType: "image/jpeg",
+        })),
       ],
     };
   },
 };
+
+async function loadPhotoPreview(
+  context: McpToolContext,
+  photo: { photoAssetId: string; storageKey: string },
+): Promise<Uint8Array> {
+  const previewKey = buildPhotoPreviewStorageKey({
+    projectId: context.projectId,
+    photoAssetId: photo.photoAssetId,
+  });
+  const preview = await context.deps.objectStorage.getObject(previewKey);
+  if (preview != null) return preview;
+
+  const original = await context.deps.objectStorage.getObject(photo.storageKey);
+  if (original == null) {
+    throw new Error(
+      `Photo preview and original object not found for storyboard photo: ${photo.photoAssetId}`,
+    );
+  }
+
+  return (await createPreviewImage(original)).body;
+}
+
+async function loadPhotoPreviews(
+  context: McpToolContext,
+  photos: readonly {
+    photoAssetId: string;
+    storageKey: string;
+    globalIndex: number;
+  }[],
+): Promise<{ body: Uint8Array; globalIndex: number }[]> {
+  const previews: { body: Uint8Array; globalIndex: number }[] = [];
+  for (const photo of photos) {
+    previews.push({
+      body: await loadPhotoPreview(context, photo),
+      globalIndex: photo.globalIndex,
+    });
+  }
+  return previews;
+}
 
 const listChangeProposalsTool: McpToolDefinition = {
   name: "list_change_proposals",

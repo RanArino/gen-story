@@ -30,7 +30,9 @@ describe("composeSessionPreamble", () => {
     expect(preamble).toContain("Project ID: project_1");
     expect(preamble).toContain("You cannot write project data");
     expect(preamble).toContain("read_storyboard_photos");
-    expect(preamble).toContain("never claim photos are unavailable");
+    expect(preamble).toMatch(/never claim\s+photos are unavailable/);
+    expect(preamble).toContain("Follow nextOffset until it is null");
+    expect(preamble).toContain("global visual anchors");
     expect(preamble).toContain("Reply in English");
     for (const tool of GEN_STORY_MCP_TOOL_NAMES) {
       expect(preamble).toContain(tool);
@@ -50,7 +52,8 @@ describe("composeTurnInput", () => {
   it("adds the photo-reference instruction when nothing was referenced", () => {
     const composed = composeTurnInput(request());
     expect(composed).toContain("Should the tone be warmer?");
-    expect(composed).toContain("call read_storyboard_photos first");
+    expect(composed).toContain("call read_storyboard_photos with offset 0");
+    expect(composed).toContain("follow nextOffset until it is null");
   });
 
   it("appends each referenced field's live value and revision", () => {
