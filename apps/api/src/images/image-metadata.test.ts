@@ -1,7 +1,13 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
-import { ensurePngImage } from "./image-metadata";
+import {
+  CONTACT_SHEET_CELL_HEIGHT,
+  CONTACT_SHEET_CELL_WIDTH,
+  CONTACT_SHEET_COLUMNS,
+  createPhotoContactSheet,
+  ensurePngImage,
+} from "./image-metadata";
 
 async function solidImage(format: "png" | "jpeg"): Promise<Uint8Array> {
   const image = sharp({
@@ -34,5 +40,25 @@ describe("ensurePngImage", () => {
     const result = await ensurePngImage(jpeg);
 
     expect((await sharp(Buffer.from(result)).metadata()).format).toBe("png");
+  });
+});
+
+describe("createPhotoContactSheet", () => {
+  it("uses five contained cells per row and produces a JPEG overview", async () => {
+    const image = await solidImage("jpeg");
+
+    const result = await createPhotoContactSheet(
+      Array.from({ length: 6 }, (_, index) => ({
+        body: image,
+        globalIndex: index + 1,
+      })),
+    );
+
+    expect(result.mimeType).toBe("image/jpeg");
+    expect(await sharp(Buffer.from(result.body)).metadata()).toMatchObject({
+      format: "jpeg",
+      width: CONTACT_SHEET_COLUMNS * CONTACT_SHEET_CELL_WIDTH,
+      height: 2 * (CONTACT_SHEET_CELL_HEIGHT + 24),
+    });
   });
 });

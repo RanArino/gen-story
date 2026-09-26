@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -26,6 +27,7 @@ import {
   type ProjectMcpServerOptions,
 } from "./project-mcp-server";
 import { GEN_STORY_MCP_TOOL_NAMES } from "./tool-registry";
+import { buildPhotoPreviewStorageKey } from "../storage/storage-keys";
 
 const now = "2026-08-14T00:00:00.000Z";
 
@@ -184,6 +186,119 @@ function proposeToneArgs(
   };
 }
 
+async function createTestJpeg(background: {
+  r: number;
+  g: number;
+  b: number;
+}): Promise<Uint8Array> {
+  return new Uint8Array(
+    await sharp({
+      create: { width: 1200, height: 800, channels: 3, background },
+    })
+      .jpeg()
+      .toBuffer(),
+  );
+}
+
+async function addStoryboardPhoto(input: {
+  deps: TestDeps;
+  storyboardId: string;
+  index: number;
+  includeOriginal?: boolean;
+  includePreview?: boolean;
+}): Promise<void> {
+  const photo = createPhotoAsset({
+    id: `photo_${input.index}`,
+    projectId: "project_a",
+    name: `photo-${input.index}.jpg`,
+    storageKey: `data/uploads/originals/projects/project_a/photo_${input.index}.jpg`,
+    mimeType: "image/jpeg",
+    size: 1,
+    checksum: `photo_${input.index}_checksum`,
+    sourceKind: "upload",
+    createdAt: now,
+    updatedAt: now,
+  });
+  await input.deps.photoAssets.save(photo);
+
+  const original = await createTestJpeg({
+    r: 20 + input.index,
+    g: 60 + input.index,
+    b: 100 + input.index,
+  });
+  if (input.includeOriginal !== false) {
+    await input.deps.objectStorage.putObject({
+      key: photo.storageKey,
+      body: original,
+      contentType: photo.mimeType,
+    });
+  }
+  if (input.includePreview !== false) {
+    await input.deps.objectStorage.putObject({
+      key: buildPhotoPreviewStorageKey({
+        projectId: photo.projectId,
+        photoAssetId: photo.id,
+      }),
+      body: await createTestJpeg({
+        r: 120 + input.index,
+        g: 140 + input.index,
+        b: 160 + input.index,
+      }),
+      contentType: "image/jpeg",
+    });
+  }
+  await input.deps.scenes.save(
+    createScene({
+      id: `scene_${input.index}`,
+      projectId: "project_a",
+      storyboardId: input.storyboardId,
+      orderIndex: input.index,
+      title: "",
+      description: "",
+      imagePrompt: "",
+      emotion: "",
+      cameraDirection: "",
+      lightingDirection: "",
+      motionDirection: "",
+      photoAssets: [{ photoAssetId: photo.id, role: "primary" }],
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
+}
+
+type StoryboardPhotoManifest = {
+  nextOffset: number | null;
+  photos: { photoAssetId: string }[];
+};
+
+type StoryboardPhotoToolResult = {
+  isError?: boolean;
+  content: { type: string; text?: string; data?: string; mimeType?: string }[];
+};
+
+async function readStoryboardPhotos(
+  client: Client,
+  offset?: number,
+): Promise<StoryboardPhotoToolResult> {
+  return (await client.callTool({
+    name: "read_storyboard_photos",
+    arguments: offset == null ? {} : { offset },
+  })) as unknown as StoryboardPhotoToolResult;
+}
+
+function readManifest(
+  result: StoryboardPhotoToolResult,
+): StoryboardPhotoManifest {
+  const first = result.content[0];
+  if (first?.text == null) throw new Error("Photo manifest text is missing.");
+  return JSON.parse(first.text) as StoryboardPhotoManifest;
+}
+
+function readPhotoIds(manifest: StoryboardPhotoManifest): string[] {
+  return manifest.photos.map((photo) => photo.photoAssetId);
+}
+
 describe("Gen Story MCP tool surface", () => {
   it("exposes exactly the allowlisted tools and nothing that writes directly", async () => {
     const { deps } = makeDeps();
@@ -238,7 +353,7 @@ describe("Gen Story MCP tool surface", () => {
     }
   });
 
-  it("returns each registered storyboard source photo as an image block", async () => {
+  it("returns a whole-story overview and preview-backed first page", async () => {
     const { deps, fixtures } = makeDeps();
     const photo = createPhotoAsset({
       id: "photo_a",
@@ -246,17 +361,27 @@ describe("Gen Story MCP tool surface", () => {
       name: "walk.jpg",
       storageKey: "data/uploads/originals/projects/project_a/photo_a.jpg",
       mimeType: "image/jpeg",
-      size: 3,
+      size: 1,
       checksum: "photo_a_checksum",
       sourceKind: "upload",
       createdAt: now,
       updatedAt: now,
     });
     await deps.photoAssets.save(photo);
+    const original = await createTestJpeg({ r: 20, g: 40, b: 80 });
+    const preview = await createTestJpeg({ r: 220, g: 180, b: 40 });
     await deps.objectStorage.putObject({
       key: photo.storageKey,
-      body: Buffer.from("jpg"),
+      body: original,
       contentType: photo.mimeType,
+    });
+    await deps.objectStorage.putObject({
+      key: buildPhotoPreviewStorageKey({
+        projectId: photo.projectId,
+        photoAssetId: photo.id,
+      }),
+      body: preview,
+      contentType: "image/jpeg",
     });
     await deps.scenes.save(
       createScene({
@@ -278,20 +403,121 @@ describe("Gen Story MCP tool surface", () => {
     );
     const client = await connectToProjectA(deps);
 
-    const result = await client.callTool({
-      name: "read_storyboard_photos",
-      arguments: {},
-    });
+    const result = await readStoryboardPhotos(client);
 
     expect(result.isError).not.toBe(true);
-    expect(result.content).toEqual([
-      expect.objectContaining({ type: "text" }),
-      expect.objectContaining({
-        type: "image",
-        mimeType: "image/jpeg",
-        data: Buffer.from("jpg").toString("base64"),
-      }),
+    const manifest = JSON.parse(result.content[0]?.text ?? "") as Record<
+      string,
+      unknown
+    >;
+    expect(manifest).toMatchObject({
+      storyboardId: "storyboard_project_a",
+      totalPhotoCount: 1,
+      offset: 0,
+      returnedPhotoCount: 1,
+      nextOffset: null,
+      overviewIncluded: true,
+      photos: [{ photoAssetId: "photo_a", globalIndex: 1 }],
+    });
+    expect(result.content).toHaveLength(3);
+    expect(result.content[1]).toMatchObject({
+      type: "image",
+      mimeType: "image/jpeg",
+    });
+    expect(result.content[2]).toMatchObject({
+      type: "image",
+      mimeType: "image/jpeg",
+      data: Buffer.from(preview).toString("base64"),
+    });
+    expect(
+      await sharp(
+        Buffer.from(result.content[1]?.data ?? "", "base64"),
+      ).metadata(),
+    ).toMatchObject({
+      width: 1000,
+      height: 174,
+      format: "jpeg",
+    });
+  });
+
+  it("pages every storyboard photo without repeating the overview", async () => {
+    const { deps, fixtures } = makeDeps();
+    for (let index = 0; index < 7; index += 1) {
+      await addStoryboardPhoto({
+        deps,
+        storyboardId: fixtures.storyboards[0]!.id,
+        index,
+      });
+    }
+    const client = await connectToProjectA(deps);
+
+    const first = await readStoryboardPhotos(client);
+    const firstManifest = readManifest(first);
+    expect(firstManifest).toMatchObject({
+      totalPhotoCount: 7,
+      offset: 0,
+      returnedPhotoCount: 6,
+      nextOffset: 6,
+      overviewIncluded: true,
+    });
+    expect(first.content).toHaveLength(8);
+
+    const second = await readStoryboardPhotos(
+      client,
+      firstManifest.nextOffset ?? undefined,
+    );
+    const secondManifest = readManifest(second);
+    expect(secondManifest).toMatchObject({
+      totalPhotoCount: 7,
+      offset: 6,
+      returnedPhotoCount: 1,
+      nextOffset: null,
+      overviewIncluded: false,
+    });
+    expect(second.content).toHaveLength(2);
+
+    const photoIds = [
+      ...readPhotoIds(firstManifest),
+      ...readPhotoIds(secondManifest),
+    ];
+    expect(photoIds).toEqual([
+      "photo_0",
+      "photo_1",
+      "photo_2",
+      "photo_3",
+      "photo_4",
+      "photo_5",
+      "photo_6",
     ]);
+  });
+
+  it("derives a missing preview in memory and refuses a missing source photo", async () => {
+    const { deps, fixtures } = makeDeps();
+    await addStoryboardPhoto({
+      deps,
+      storyboardId: fixtures.storyboards[0]!.id,
+      index: 0,
+      includePreview: false,
+    });
+    const client = await connectToProjectA(deps);
+
+    const fallback = await readStoryboardPhotos(client);
+    expect(fallback.isError).not.toBe(true);
+    const fallbackImage = fallback.content[2];
+    expect(
+      await sharp(Buffer.from(fallbackImage?.data ?? "", "base64")).metadata(),
+    ).toMatchObject({ format: "jpeg", width: 640 });
+
+    await addStoryboardPhoto({
+      deps,
+      storyboardId: fixtures.storyboards[0]!.id,
+      index: 1,
+      includeOriginal: false,
+      includePreview: false,
+    });
+    const missing = await readStoryboardPhotos(client);
+    expect(missing.isError).toBe(true);
+    expect(missing.content[0]?.text).toContain("photo_1");
   });
 
   it("refuses a proposal that targets another project's entity", async () => {

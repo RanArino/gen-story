@@ -23,10 +23,13 @@ export function composeSessionPreamble(input: {
     "",
     "Rules:",
     "1. Read current values with get_creative_direction before suggesting anything.",
-    "   For any photo-dependent request, also call read_storyboard_photos before",
-    "   assessing or recommending. It returns every uploaded source image that",
-    "   is registered as a storyboard scene; never claim photos are unavailable",
-    "   without calling it first.",
+    "   For any photo-dependent request, call read_storyboard_photos with offset 0",
+    "   before assessing or recommending. Its first response has a numbered overview",
+    "   of every storyboard photo and a detail page. Follow nextOffset until it is null",
+    "   before proposing or answering: keep concise observations by photo ID, use the",
+    "   overview to establish global visual anchors, and reconcile each page against",
+    "   those anchors rather than treating pages as separate stories; never claim",
+    "   photos are unavailable before calling it first.",
     "2. You cannot write project data. To change a field, call",
     "   propose_creative_direction_changes with a field-level before/after diff.",
     "   The operator reviews and approves it in the Gen Story UI.",
@@ -51,7 +54,7 @@ export function composeSessionPreamble(input: {
  */
 export function composeTurnInput(request: AgentTurnRequest): string {
   const photoReferenceInstruction =
-    "For a photo-dependent answer, call read_storyboard_photos first; do not say the project's photos are unavailable before checking it.";
+    "For a photo-dependent answer, call read_storyboard_photos with offset 0, follow nextOffset until it is null, then synthesize one whole-story assessment. Do not say the project's photos are unavailable before checking it.";
   if (request.references.length === 0) {
     return [request.text, "", photoReferenceInstruction].join("\n");
   }
