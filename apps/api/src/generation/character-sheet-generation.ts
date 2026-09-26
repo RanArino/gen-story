@@ -8,6 +8,7 @@ import OpenAI from "openai";
 import sharp from "sharp";
 
 import { buildCharacterSheetStorageKey } from "../storage/storage-keys";
+import { DEFAULT_OPENAI_IMAGE_MODEL } from "./image-generation-model";
 
 const MOCK_IMAGE = Buffer.from(
   "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAP/EABQBAQAAAAAAAAAAAAAAAAAAAAD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwABmX/9k=",
@@ -67,7 +68,9 @@ export class OpenAiCharacterSheetGenerationAdapter implements CharacterSheetGene
     prompt: string;
   }) {
     const response = await this.client.images.generate({
-      model: "gpt-image-2",
+      model: DEFAULT_OPENAI_IMAGE_MODEL as Parameters<
+        typeof this.client.images.generate
+      >[0]["model"],
       prompt: input.prompt,
       size: "1536x1024",
       quality: "high",

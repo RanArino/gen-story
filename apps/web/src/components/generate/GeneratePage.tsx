@@ -110,17 +110,12 @@ export function GeneratePage({ projectId }: { projectId: string }) {
     return stopPolling;
   }, [loadAndPoll, stopPolling]);
 
-  async function startGeneration() {
+  async function startGeneration(statuses: GenStatus[]) {
     setLaunching(true);
     setError(null);
     try {
       const scenes = progress.map((p) => p.scene);
-      const scenesToQueue = progress.filter(
-        (p) =>
-          p.status === "none" ||
-          p.status === "failed" ||
-          p.status === "canceled",
-      );
+      const scenesToQueue = progress.filter((p) => statuses.includes(p.status));
 
       for (const { scene } of scenesToQueue) {
         await createGenerationRequest(scene.id, {
@@ -189,6 +184,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
     total > 0 &&
     progress.every((p) => isTerminal(p.status) || p.status === "none");
   const anyActive = progress.some((p) => isActive(p.status));
+  const unstarted = progress.filter((p) => p.status === "none").length;
   const noneStarted = progress.every((p) => p.status === "none");
 
   if (loading) {
@@ -242,10 +238,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
             )}
           </div>
           {anyActive && (
-            <div
-              className={styles.spinner}
-              title={t("progress.generating")}
-            />
+            <div className={styles.spinner} title={t("progress.generating")} />
           )}
         </div>
         {total > 0 && (
@@ -260,17 +253,26 @@ export function GeneratePage({ projectId }: { projectId: string }) {
 
       {/* Actions */}
       <div className={styles.actions}>
-        {(noneStarted || progress.some((p) => p.status === "failed")) && (
+        {unstarted > 0 && (
           <button
             className="btn btn-primary"
-            onClick={startGeneration}
-            disabled={launching || anyActive}
+            onClick={() => startGeneration(["none"])}
+            disabled={launching}
           >
             {launching
               ? t("actions.starting")
               : noneStarted
                 ? t("actions.start")
-                : t("actions.retryFailed")}
+                : t("actions.startUnstarted")}
+          </button>
+        )}
+        {failed > 0 && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => startGeneration(["failed", "canceled"])}
+            disabled={launching}
+          >
+            {launching ? t("actions.starting") : t("actions.retryFailed")}
           </button>
         )}
         {allDone && succeeded > 0 && (

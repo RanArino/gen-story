@@ -8,6 +8,7 @@ import OpenAI, { toFile } from "openai";
 
 import { ensurePngImage } from "../images/image-metadata";
 import { buildGeneratedImageStorageKey } from "../storage/storage-keys";
+import { DEFAULT_OPENAI_IMAGE_MODEL } from "./image-generation-model";
 
 type NormalizedInputImageRef = { storageKey: string };
 
@@ -87,19 +88,9 @@ export function selectImageGenerationMode(input: {
   return { kind: "generate" };
 }
 
-// Verified against a live 400 from the API ("The model 'gpt-image-2' does not
-// support the 'input_fidelity' parameter") and against OpenAI's image
-// generation guide: "For gpt-image-2, omit this parameter; the API doesn't
-// allow changing it because the model processes every image input at high
-// fidelity automatically." gpt-image-2 is this adapter's default and, absent
-// a way to configure a different model, its only model in practice — every
-// edit call therefore already runs at maximum fidelity, with no lower setting
-// exposed by the API, regardless of what the scene's photoFidelity is set to.
-//
-// Only gpt-image-1 is confirmed (via OpenAI's own cookbook) to accept
-// input_fidelity. gpt-image-1.5's support is inconsistently documented across
-// secondary sources, so it is treated as unsupported rather than guessed —
-// the failure mode of guessing wrong here is a paid call that 400s.
+// Only send input_fidelity to models whose support is confirmed. The default
+// GPT Image 2.5 model uses prompt instructions to distinguish low/high source
+// adherence, so the API parameter is intentionally omitted for it.
 const MODELS_SUPPORTING_INPUT_FIDELITY = new Set(["gpt-image-1"]);
 
 export function supportsInputFidelity(model: string): boolean {
@@ -134,7 +125,7 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
   }> {
     const {
       prompt = "A cinematic still image.",
-      model = "gpt-image-2",
+      model = DEFAULT_OPENAI_IMAGE_MODEL,
       size = "1024x1024",
       quality = "auto",
       projectId = "unknown-project",
@@ -179,7 +170,7 @@ export class OpenAiImageGenerationAdapter implements ImageGenerationPort {
         prompt: String(prompt),
         size: size as Parameters<typeof this.client.images.edit>[0]["size"],
         // Omitted entirely (not sent as undefined) for models that reject it —
-        // gpt-image-2 400s on the mere presence of this field.
+        // Unsupported models can reject the mere presence of this field.
         ...(supportsInputFidelity(model)
           ? { input_fidelity: mode.inputFidelity }
           : {}),
