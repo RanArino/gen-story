@@ -62,11 +62,11 @@ describe("domain factories", () => {
       status: "draft",
       photoAssets: [],
       adoptedGeneratedImageId: null,
-      photoFidelity: "off",
+      photoFidelity: "high",
     });
   });
 
-  it("defaults a scene's photoFidelity to off and accepts an explicit value", () => {
+  it("defaults a scene's photoFidelity to high and accepts an explicit value", () => {
     const base = {
       id: "scene_1",
       projectId: "project_1",
@@ -83,7 +83,7 @@ describe("domain factories", () => {
       updatedAt: "2026-05-02T00:00:00.000Z",
     };
 
-    expect(createScene(base).photoFidelity).toBe("off");
+    expect(createScene(base).photoFidelity).toBe("high");
     expect(createScene({ ...base, photoFidelity: "high" }).photoFidelity).toBe(
       "high",
     );

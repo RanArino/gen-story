@@ -676,7 +676,7 @@ function RegenModal({
     cameraDirection: scene.cameraDirection ?? "",
     lightingDirection: scene.lightingDirection ?? "",
     motionDirection: scene.motionDirection ?? "",
-    photoFidelity: scene.photoFidelity ?? "off",
+    photoFidelity: scene.photoFidelity ?? "high",
   });
   const [submitting, setSubmitting] = useState(false);
 

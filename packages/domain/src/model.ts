@@ -595,7 +595,7 @@ export function createScene(input: CreateSceneInput): Scene {
     motionDirection: trimOptionalText(input.motionDirection),
     notes: trimOptionalText(input.notes),
     negativePrompt: trimOptionalText(input.negativePrompt),
-    photoFidelity: input.photoFidelity ?? "off",
+    photoFidelity: input.photoFidelity ?? "high",
     photoAssets: [...(input.photoAssets ?? [])],
     adoptedGeneratedImageId: input.adoptedGeneratedImageId ?? null,
     createdAt: input.createdAt,
@@ -631,7 +631,7 @@ export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
     motionDirection: "",
     notes: "",
     negativePrompt: "",
-    photoFidelity: "off",
+    photoFidelity: "high",
     photoAssets: input.photoAssetId
       ? [{ photoAssetId: input.photoAssetId, role: "primary" }]
       : [],
@@ -680,7 +680,7 @@ export function createComplementScene(
     motionDirection: "",
     notes: "",
     negativePrompt: "",
-    photoFidelity: "off",
+    photoFidelity: "high",
     photoAssets: [],
     adoptedGeneratedImageId: null,
     createdAt: input.createdAt,

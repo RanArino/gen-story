@@ -157,7 +157,7 @@ export const scenes = sqliteTable(
     motionDirection: text("motion_direction").notNull(),
     notes: text("notes").notNull(),
     negativePrompt: text("negative_prompt").notNull().default(""),
-    photoFidelity: text("photo_fidelity").notNull().default("off"),
+    photoFidelity: text("photo_fidelity").notNull().default("high"),
     adoptedGeneratedImageId: text("adopted_generated_image_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),

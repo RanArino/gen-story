@@ -285,7 +285,7 @@ function mapScene(row: SceneRow, photos: ScenePhotoAsset[]): Scene {
     negativePrompt: row.negativePrompt,
     photoFidelity: isPhotoFidelity(row.photoFidelity)
       ? row.photoFidelity
-      : "off",
+      : "high",
     photoAssets: photos,
     adoptedGeneratedImageId: row.adoptedGeneratedImageId,
     createdAt: row.createdAt,

@@ -119,7 +119,7 @@ const DEFAULT_SCENE_FIXED = {
   lightingDirection: "Natural",
   motionDirection: "Slow pan",
   notes: "",
-  photoFidelity: "off",
+  photoFidelity: "high",
 } as const;
 
 const PHOTO_FIDELITY_OPTIONS = ["off", "low", "high"] as const;
@@ -2655,7 +2655,7 @@ function SceneCard({
                 key={option}
                 type="button"
                 className={`${styles.photoFidelityOption} ${
-                  (scene.photoFidelity ?? "off") === option
+                  (scene.photoFidelity ?? "high") === option
                     ? styles.photoFidelityOptionActive
                     : ""
                 }`}
