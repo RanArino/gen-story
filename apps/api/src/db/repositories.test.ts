@@ -274,6 +274,26 @@ describe("SQLite persistence", () => {
     });
   });
 
+  it("upgrades legacy off photo fidelity values to high", async () => {
+    await withDatabase(async ({ client, db, repositories }) => {
+      await seedBase(repositories);
+      await repositories.storyboards.save(buildStoryboard());
+      await repositories.scenes.save({
+        ...buildScene("scene_legacy", 0),
+        photoFidelity: "off",
+      });
+
+      client.sqlite
+        .prepare("delete from __drizzle_migrations where created_at = ?")
+        .run(1790402616000);
+      migrateDatabase(db);
+
+      await expect(
+        repositories.scenes.findById("scene_legacy"),
+      ).resolves.toMatchObject({ photoFidelity: "high" });
+    });
+  });
+
   it("round-trips a change proposal with items and a choice card", async () => {
     await withDatabase(async ({ repositories }) => {
       await seedBase(repositories);

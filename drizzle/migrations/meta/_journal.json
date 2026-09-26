@@ -162,6 +162,13 @@
       "when": 1790395715395,
       "tag": "0022_calm_human_fly",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1790402616000,
+      "tag": "0023_normalize_legacy_photo_fidelity",
+      "breakpoints": true
     }
   ]
 }
