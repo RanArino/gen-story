@@ -423,11 +423,13 @@ export type UpsertStoryboardInput = {
   // story does not have to know what the tone is. An explicit empty string is
   // a deliberate reset back to undecided.
   tone?: string;
+  toneDescription?: string;
   stylePresetId?: string | null;
   commonPrompt?: string;
   story?: string;
   negativePrompt?: string;
   characterPolicy?: CharacterPolicy;
+  characterPrompt?: string;
   sceneIds?: string[];
 };
 
@@ -534,6 +536,8 @@ export async function upsertStoryboard(
       projectId: input.projectId,
       status: input.status ?? existingStoryboard?.status,
       tone,
+      toneDescription:
+        input.toneDescription ?? existingStoryboard?.toneDescription ?? "",
       stylePresetId: effectiveStylePresetId,
       commonPrompt,
       story,
@@ -543,6 +547,8 @@ export async function upsertStoryboard(
         input.characterPolicy ??
         existingStoryboard?.characterPolicy ??
         "background_only",
+      characterPrompt:
+        input.characterPrompt ?? existingStoryboard?.characterPrompt ?? "",
       sceneIds: input.sceneIds ?? existingStoryboard?.sceneIds ?? [],
       setupCompletedAt: existingStoryboard?.setupCompletedAt ?? null,
       createdAt: existingStoryboard?.createdAt ?? now(),
@@ -1595,10 +1601,23 @@ async function writeChangeProposalItem(
     // owns it, so an approved change goes through exactly the validation a
     // manual edit on the storyboard screen would.
     const field = item.target.field;
+    const toneAfter = item.after as
+      | string
+      | { title: string; description: string };
+    const characterAfter = item.after as
+      | CharacterPolicy
+      | { mode: CharacterPolicy; prompt: string };
     const result = await upsertStoryboard(deps, {
       storyboardId: item.target.entityId,
       projectId,
-      ...(field === "tone" ? { tone: item.after as string } : {}),
+      ...(field === "tone"
+        ? typeof toneAfter === "string"
+          ? { tone: toneAfter }
+          : {
+              tone: toneAfter.title,
+              toneDescription: toneAfter.description,
+            }
+        : {}),
       ...(field === "stylePresetId"
         ? { stylePresetId: item.after as string | null }
         : {}),
@@ -1610,7 +1629,12 @@ async function writeChangeProposalItem(
         ? { negativePrompt: item.after as string }
         : {}),
       ...(field === "characterPolicy"
-        ? { characterPolicy: item.after as CharacterPolicy }
+        ? typeof characterAfter === "string"
+          ? { characterPolicy: characterAfter }
+          : {
+              characterPolicy: characterAfter.mode,
+              characterPrompt: characterAfter.prompt,
+            }
         : {}),
     });
     return result.ok ? undefined : result;

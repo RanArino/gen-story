@@ -4477,7 +4477,7 @@ describe("application use cases", () => {
         {
           label: "@tone",
           targetKey: "storyboard:storyboard_1#tone",
-          value: "Reflective",
+          value: { title: "Reflective", description: "" },
           revision: "2026-05-02T00:00:10.000Z",
         },
       ]);

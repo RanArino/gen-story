@@ -256,7 +256,7 @@ describe("SQLite persistence", () => {
     });
   });
 
-  it("round-trips a scene's photoFidelity through SQLite, defaulting to off", async () => {
+  it("round-trips a scene's photoFidelity through SQLite, defaulting to high", async () => {
     await withDatabase(async ({ repositories }) => {
       await seedBase(repositories);
       await repositories.storyboards.save(buildStoryboard());
@@ -269,7 +269,7 @@ describe("SQLite persistence", () => {
       const defaultScene = await repositories.scenes.findById("scene_default");
       const highScene = await repositories.scenes.findById("scene_high");
 
-      expect(defaultScene?.photoFidelity).toBe("off");
+      expect(defaultScene?.photoFidelity).toBe("high");
       expect(highScene?.photoFidelity).toBe("high");
     });
   });

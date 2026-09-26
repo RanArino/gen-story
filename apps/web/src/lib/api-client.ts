@@ -479,12 +479,14 @@ export async function upsertStoryboard(
   input: {
     projectId: string;
     tone?: string;
+    toneDescription?: string;
     stylePresetId?: string | null;
     status?: string;
     commonPrompt?: string;
     story?: string;
     negativePrompt?: string;
     characterPolicy?: "featured" | "background_only" | "none";
+    characterPrompt?: string;
   },
 ): Promise<StoryboardDto> {
   return request<StoryboardDto>(

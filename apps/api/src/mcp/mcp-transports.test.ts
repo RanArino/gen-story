@@ -81,7 +81,10 @@ function proposeArgs(storyboardId: string): Record<string, unknown> {
           entityId: storyboardId,
           field: "tone",
         },
-        after: "quiet and reflective",
+        after: {
+          title: "quiet and reflective",
+          description: "Calm evening light with measured pacing.",
+        },
         rationale: "The evening photos are calm rather than celebratory.",
       },
     ],
@@ -288,7 +291,10 @@ describe("proposal durability across a restart", () => {
 
     const stored = await restarted.changeProposals.findById(proposal.id);
     expect(stored?.status).toBe("pending");
-    expect(stored?.items[0]?.after).toBe("quiet and reflective");
+    expect(stored?.items[0]?.after).toEqual({
+      title: "quiet and reflective",
+      description: "Calm evening light with measured pacing.",
+    });
 
     const audits =
       await restarted.mcpToolCallAudits.listByProjectId("project_a");

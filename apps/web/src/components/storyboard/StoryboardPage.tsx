@@ -119,7 +119,7 @@ const DEFAULT_SCENE_FIXED = {
   lightingDirection: "Natural",
   motionDirection: "Slow pan",
   notes: "",
-  photoFidelity: "off",
+  photoFidelity: "high",
 } as const;
 
 const PHOTO_FIDELITY_OPTIONS = ["off", "low", "high"] as const;
@@ -230,6 +230,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   const [negativePromptDraft, setNegativePromptDraft] = useState("");
   const [savingNegativePrompt, setSavingNegativePrompt] = useState(false);
   const [savingCharacterPolicy, setSavingCharacterPolicy] = useState(false);
+  const [characterPromptDraft, setCharacterPromptDraft] = useState("");
   const [characterSheet, setCharacterSheet] =
     useState<CharacterReferenceSheetDto | null>(null);
   const [generatingCharacterSheet, setGeneratingCharacterSheet] =
@@ -350,6 +351,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   }, [storyboard?.negativePrompt]);
 
   useEffect(() => {
+    setCharacterPromptDraft(storyboard?.characterPrompt ?? "");
+  }, [storyboard?.characterPrompt]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const storedMode = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
     setSceneViewMode(isSceneViewMode(storedMode) ? storedMode : "split");
@@ -454,6 +459,24 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       .finally(() => setLoading(false));
   }, [load]);
 
+  useEffect(() => {
+    const refreshAppliedDirection = (event: Event) => {
+      const applied = event as CustomEvent<{ projectId?: string }>;
+      if (applied.detail?.projectId === projectId) {
+        void load().catch((error: Error) => setError(error.message));
+      }
+    };
+    window.addEventListener(
+      "gen-story:creative-direction-applied",
+      refreshAppliedDirection,
+    );
+    return () =>
+      window.removeEventListener(
+        "gen-story:creative-direction-applied",
+        refreshAppliedDirection,
+      );
+  }, [load, projectId]);
+
   async function initStoryboard() {
     const id = crypto.randomUUID();
     try {
@@ -475,12 +498,16 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     if (refreshed) setStoryboard(refreshed);
   }, [projectId]);
 
-  async function handleToneChange(tone: string) {
+  async function handleToneChange(tone: string, toneDescription: string) {
     if (!sbId) return;
     const prev = storyboard!;
-    setStoryboard({ ...prev, tone });
+    setStoryboard({ ...prev, tone, toneDescription });
     try {
-      const updated = await upsertStoryboard(sbId, { projectId, tone });
+      const updated = await upsertStoryboard(sbId, {
+        projectId,
+        tone,
+        toneDescription,
+      });
       setStoryboard(updated);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("scenes.failedTone"));
@@ -633,6 +660,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
 
   async function saveCharacterPolicy(
     characterPolicy: "featured" | "background_only" | "none",
+    characterPrompt = characterPromptDraft,
   ) {
     if (!sbId) return;
     setSavingCharacterPolicy(true);
@@ -641,6 +669,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
       const updated = await upsertStoryboard(sbId, {
         projectId,
         characterPolicy,
+        characterPrompt,
       });
       setStoryboard(updated);
       setSaveMsg(t("characterPolicy.savedMsg"));
@@ -1127,13 +1156,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
     );
   }
 
-  const fixedToneSelected = TONES.some(
-    (tone) => tone.value === storyboard.tone,
-  );
+  const fixedTone = TONES.find((tone) => tone.value === storyboard.tone);
+  const fixedToneSelected = fixedTone != null;
   const selectedAnalysisTone = photoAnalysis?.emotionCandidates.find(
     (candidate) => candidate.value === storyboard.tone,
   );
-  const fixedTone = TONES.find((tn) => tn.value === storyboard.tone);
   const selectedToneLabel = fixedTone
     ? t(`tones.${fixedTone.value}.label`)
     : (selectedAnalysisTone?.label ?? storyboard.tone);
@@ -1260,7 +1287,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   <button
                     key={candidate.value}
                     className={`${styles.analysisCandidate} ${storyboard.tone === candidate.value ? styles.analysisCandidateActive : ""}`}
-                    onClick={() => handleToneChange(candidate.value)}
+                    onClick={() =>
+                      handleToneChange(candidate.value, candidate.description)
+                    }
                   >
                     <strong>{candidate.label}</strong>
                     <span>{candidate.description}</span>
@@ -1310,8 +1339,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                 {TONES.map((tn) => (
                   <button
                     key={tn.value}
-                    className={`${styles.toneBtn} ${storyboard.tone === tn.value ? styles.toneBtnActive : ""}`}
-                    onClick={() => handleToneChange(tn.value)}
+                    className={`${styles.toneBtn} ${fixedTone?.value === tn.value ? styles.toneBtnActive : ""}`}
+                    onClick={() =>
+                      handleToneChange(tn.value, t(`tones.${tn.value}.desc`))
+                    }
                   >
                     <strong>{t(`tones.${tn.value}.label`)}</strong>
                     <span>{t(`tones.${tn.value}.desc`)}</span>
@@ -1320,10 +1351,29 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                 {!fixedToneSelected && selectedAnalysisTone && (
                   <button
                     className={`${styles.toneBtn} ${styles.toneBtnActive}`}
-                    onClick={() => handleToneChange(selectedAnalysisTone.value)}
+                    onClick={() =>
+                      handleToneChange(
+                        selectedAnalysisTone.label,
+                        selectedAnalysisTone.description,
+                      )
+                    }
                   >
                     <strong>{selectedAnalysisTone.label}</strong>
                     <span>{selectedAnalysisTone.description}</span>
+                  </button>
+                )}
+                {!fixedToneSelected && !selectedAnalysisTone && (
+                  <button
+                    className={`${styles.toneBtn} ${styles.toneBtnActive}`}
+                    onClick={() =>
+                      handleToneChange(
+                        storyboard.tone,
+                        storyboard.toneDescription,
+                      )
+                    }
+                  >
+                    <strong>{storyboard.tone}</strong>
+                    <span>{storyboard.toneDescription}</span>
                   </button>
                 )}
               </div>
@@ -1564,6 +1614,38 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                     </label>
                   ),
                 )}
+              </div>
+              <label className={styles.fieldLabel}>
+                {t("characterPolicy.promptLabel")}
+                <textarea
+                  className={styles.fieldInput}
+                  rows={5}
+                  value={characterPromptDraft}
+                  onChange={(event) =>
+                    setCharacterPromptDraft(event.target.value)
+                  }
+                  placeholder={t("characterPolicy.promptPlaceholder")}
+                />
+              </label>
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={
+                    savingCharacterPolicy ||
+                    characterPromptDraft === storyboard.characterPrompt
+                  }
+                  onClick={() =>
+                    saveCharacterPolicy(
+                      storyboard.characterPolicy,
+                      characterPromptDraft,
+                    )
+                  }
+                >
+                  {savingCharacterPolicy
+                    ? t("characterPolicy.saving")
+                    : t("characterPolicy.savePrompt")}
+                </button>
               </div>
               {storyboard.characterPolicy === "featured" && (
                 <div className={styles.inlineActions}>
@@ -2573,7 +2655,7 @@ function SceneCard({
                 key={option}
                 type="button"
                 className={`${styles.photoFidelityOption} ${
-                  (scene.photoFidelity ?? "off") === option
+                  (scene.photoFidelity ?? "high") === option
                     ? styles.photoFidelityOptionActive
                     : ""
                 }`}

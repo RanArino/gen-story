@@ -803,12 +803,14 @@ export function buildRouter(deps: ApiDependencies): Router {
         storyboardId,
         projectId: parsed.data.projectId,
         tone: parsed.data.tone,
+        toneDescription: parsed.data.toneDescription,
         status: parsed.data.status,
         stylePresetId: parsed.data.stylePresetId,
         commonPrompt: parsed.data.commonPrompt,
         story: parsed.data.story,
         negativePrompt: parsed.data.negativePrompt,
         characterPolicy: parsed.data.characterPolicy,
+        characterPrompt: parsed.data.characterPrompt,
       });
 
       if (!result.ok) {

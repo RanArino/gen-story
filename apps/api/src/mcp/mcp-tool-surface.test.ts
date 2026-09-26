@@ -178,7 +178,10 @@ function proposeToneArgs(
           entityId: "storyboard_project_a",
           field: "tone",
         },
-        after: "quiet and reflective",
+        after: {
+          title: "quiet and reflective",
+          description: "Calm evening light with measured pacing.",
+        },
         rationale: "The evening photos are calm rather than celebratory.",
       },
     ],
@@ -535,7 +538,10 @@ describe("Gen Story MCP tool surface", () => {
               entityId: "storyboard_project_b",
               field: "tone",
             },
-            after: "borrowed tone",
+            after: {
+              title: "borrowed tone",
+              description: "A value targeting the wrong storyboard.",
+            },
             rationale: "Cross-project write attempt.",
           },
         ],
@@ -567,7 +573,10 @@ describe("Gen Story MCP tool surface", () => {
               entityId: "storyboard_project_b",
               field: "tone",
             },
-            after: "quiet and reflective",
+            after: {
+              title: "quiet and reflective",
+              description: "Calm evening light with measured pacing.",
+            },
             rationale: "Project B's own proposal.",
           },
         ],
@@ -604,8 +613,14 @@ describe("Gen Story MCP tool surface", () => {
     expect(proposal.status).toBe("pending");
     expect(proposal.provider).toBe("codex");
     expect(proposal.items).toHaveLength(1);
-    expect(proposal.items[0]!.before).toBe("warm and nostalgic");
-    expect(proposal.items[0]!.after).toBe("quiet and reflective");
+    expect(proposal.items[0]!.before).toEqual({
+      title: "warm and nostalgic",
+      description: "",
+    });
+    expect(proposal.items[0]!.after).toEqual({
+      title: "quiet and reflective",
+      description: "Calm evening light with measured pacing.",
+    });
     expect(proposal.items[0]!.approval).toBe("pending");
 
     const storyboard = await deps.storyboards.findById("storyboard_project_a");
@@ -653,21 +668,30 @@ describe("Gen Story MCP tool surface", () => {
               entityId: "storyboard_project_a",
               field: "tone",
             },
-            after: "quiet and reflective",
+            after: {
+              title: "quiet and reflective",
+              description: "Calm evening light with measured pacing.",
+            },
             rationale: "Two credible directions for this set.",
             choice: {
               options: [
                 {
                   id: "quiet",
                   label: "Quiet and reflective",
-                  value: "quiet and reflective",
+                  value: {
+                    title: "quiet and reflective",
+                    description: "Calm evening light with measured pacing.",
+                  },
                   reason: "Matches the evening light",
                   impact: "Slower pacing across every scene",
                 },
                 {
                   id: "celebratory",
                   label: "Celebratory",
-                  value: "bright and celebratory",
+                  value: {
+                    title: "bright and celebratory",
+                    description: "Lively group energy with a quicker rhythm.",
+                  },
                   reason: "Matches the group photos",
                   impact: "Brighter palette, faster cuts",
                 },
@@ -700,7 +724,10 @@ describe("Gen Story MCP tool surface", () => {
               entityId: "storyboard_project_a",
               field: "tone",
             },
-            after: "quiet and reflective",
+            after: {
+              title: "quiet and reflective",
+              description: "Calm evening light with measured pacing.",
+            },
             rationale: "Approved half.",
           },
           {
@@ -765,6 +792,46 @@ describe("Gen Story MCP tool surface", () => {
     const analysis =
       await deps.projectPhotoAnalyses.findLatestByProjectId("project_a");
     expect(analysis?.storySummary).toBe("An anniversary dinner at home.");
+  });
+
+  it("applies a structured character mode and visible prompt together", async () => {
+    const { deps } = makeDeps();
+    const client = await connectToProjectA(deps);
+    const guidance =
+      "Show the same traveler only on route scenes, in dark clothing, never facing camera.";
+    const created = await callTool(
+      client,
+      "propose_creative_direction_changes",
+      proposeToneArgs({
+        items: [
+          {
+            target: {
+              entityType: "storyboard",
+              entityId: "storyboard_project_a",
+              field: "characterPolicy",
+            },
+            after: { mode: "background_only", prompt: guidance },
+            rationale: "Make the conditional character direction explicit.",
+          },
+        ],
+      }),
+    );
+    const proposal = created.body as unknown as ChangeProposalDto;
+    await decideChangeProposalItem(deps, {
+      changeProposalId: proposal.id,
+      itemId: proposal.items[0]!.id,
+      approval: "approved",
+    });
+
+    const applied = await callTool(client, "apply_approved_change_proposal", {
+      changeProposalId: proposal.id,
+    });
+    const storyboard = await deps.storyboards.findById("storyboard_project_a");
+
+    expect(applied.isError).toBe(false);
+    expect(storyboard?.characterPolicy).toBe("background_only");
+    expect(storyboard?.characterPrompt).toBe(guidance);
+    await client.close();
   });
 
   it("fails apply with a visible conflict when the target changed after the proposal", async () => {
@@ -903,5 +970,35 @@ describe("Gen Story MCP tool surface", () => {
     expect(
       await deps.changeProposals.findByProjectId("project_a"),
     ).toHaveLength(0);
+  });
+
+  it("rejects scalar tone output before creating a proposal", async () => {
+    const { deps } = makeDeps();
+    const client = await connectToProjectA(deps);
+
+    const result = await callTool(
+      client,
+      "propose_creative_direction_changes",
+      proposeToneArgs({
+        items: [
+          {
+            target: {
+              entityType: "storyboard",
+              entityId: "storyboard_project_a",
+              field: "tone",
+            },
+            after: "description only",
+            rationale: "This deliberately uses the old invalid shape.",
+          },
+        ],
+      }),
+    );
+
+    expect(result.isError).toBe(true);
+    expect((result.body.error as { message: string }).message).toContain(
+      "Tone values require",
+    );
+    expect(await deps.changeProposals.findByProjectId("project_a")).toEqual([]);
+    await client.close();
   });
 });

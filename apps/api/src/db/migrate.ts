@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { sql } from "drizzle-orm";
 
 import { openDatabase, type GenStoryDatabase } from "./client";
 
@@ -14,7 +15,16 @@ const repoRoot = resolve(
 export const migrationsFolder = resolve(repoRoot, "drizzle/migrations");
 
 export function migrateDatabase(db: GenStoryDatabase) {
-  migrate(db, { migrationsFolder });
+  // Drizzle runs every migration in a transaction. SQLite cannot change this
+  // pragma from inside that transaction, but table-rebuild migrations need it
+  // disabled while replacing a referenced table.
+  db.run(sql.raw("PRAGMA foreign_keys = OFF"));
+
+  try {
+    migrate(db, { migrationsFolder });
+  } finally {
+    db.run(sql.raw("PRAGMA foreign_keys = ON"));
+  }
 }
 
 if (

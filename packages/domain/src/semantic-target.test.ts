@@ -79,13 +79,17 @@ describe("semantic targets", () => {
       id: "storyboard_1",
       projectId: "project_1",
       tone: "warm nostalgia",
+      toneDescription: "Soft warmth grounded in the source photos.",
       createdAt: "2026-08-01T00:00:00.000Z",
       updatedAt: "2026-08-10T00:00:00.000Z",
     });
 
     expect(readStoryboardSemanticTarget(storyboard, "tone")).toEqual({
       target: storyboardSemanticTarget("storyboard_1", "tone"),
-      value: "warm nostalgia",
+      value: {
+        title: "warm nostalgia",
+        description: "Soft warmth grounded in the source photos.",
+      },
       revision: "2026-08-10T00:00:00.000Z",
     });
   });

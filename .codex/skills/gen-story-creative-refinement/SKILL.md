@@ -66,12 +66,12 @@ Address fields by target object, not by column name or UI label. Call
 | Reference | Target field | Notes |
 | --- | --- | --- |
 | `@photo-analysis` | `{ entityType: "project", field: "photoAnalysis" }` | |
-| `@tone` | `{ entityType: "storyboard", field: "tone" }` | The operator-committed emotional direction. Emotion candidates from photo analysis are read-only input, not a separate writable field. |
+| `@tone` | `{ entityType: "storyboard", field: "tone" }` | The operator-committed emotional direction. Read and propose it as `{ "title": string, "description": string }`. Emotion candidates from photo analysis are read-only input, not a separate writable field. |
 | `@style-preset` | `{ entityType: "storyboard", field: "stylePresetId" }` | `get_creative_direction` also returns the valid style preset IDs; never invent one. |
 | `@common-prompt` | `{ entityType: "storyboard", field: "commonPrompt" }` | Shared prompt text applied across every scene. |
 | `@story` | `{ entityType: "storyboard", field: "story" }` | The story/worldview text. |
 | `@negative-prompt` | `{ entityType: "storyboard", field: "negativePrompt" }` | |
-| `@character-policy` | `{ entityType: "storyboard", field: "characterPolicy" }` | The one-time character decision (e.g. consistent character sheet vs. none). |
+| `@character-policy` | `{ entityType: "storyboard", field: "characterPolicy" }` | The one-time character decision. Read and propose it as `{ "mode": "featured" | "background_only" | "none", "prompt": string }`; the prompt is visible in the GUI and is sent to image generation. |
 | `@scene` (per scene) | `{ entityType: "scene", field: "scene" }` | A scene is addressed as one unit — prompt, emotion, camera, lighting, motion are only meaningful reviewed together, not as separate targets. |
 
 Every read returns a `revision` for its target. A proposal is bound to the

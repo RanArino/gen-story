@@ -197,12 +197,14 @@ export type Storyboard = {
   // undecided storyboard from one where the user deliberately chose a tone,
   // which a default value would make impossible.
   tone: string;
+  toneDescription: string;
   stylePresetId: StylePresetId | null;
   commonPrompt: string;
   story: string;
   negativePrompt: string;
   // Decided once for the whole storyboard; see `CharacterPolicy`.
   characterPolicy: CharacterPolicy;
+  characterPrompt: string;
   sceneIds: SceneId[];
   // When set, the storyboard has been through all five setup steps and is
   // freely editable. Null means the guided flow is still gating it.
@@ -362,11 +364,13 @@ export type CreateStoryboardInput = {
   projectId: ProjectId;
   status?: StoryboardStatus;
   tone?: string;
+  toneDescription?: string;
   stylePresetId?: StylePresetId | null;
   commonPrompt?: string;
   story?: string;
   negativePrompt?: string;
   characterPolicy?: CharacterPolicy;
+  characterPrompt?: string;
   sceneIds?: SceneId[];
   setupCompletedAt?: Timestamp | null;
   createdAt: Timestamp;
@@ -559,11 +563,13 @@ export function createStoryboard(input: CreateStoryboardInput): Storyboard {
     // Optional on purpose: a blank tone is the "undecided" state the guided
     // setup flow gates on, not a validation error.
     tone: trimOptionalText(input.tone),
+    toneDescription: trimOptionalText(input.toneDescription),
     stylePresetId: input.stylePresetId ?? null,
     commonPrompt: (input.commonPrompt ?? "").trim(),
     story: (input.story ?? "").trim(),
     negativePrompt: (input.negativePrompt ?? "").trim(),
     characterPolicy: input.characterPolicy ?? "background_only",
+    characterPrompt: trimOptionalText(input.characterPrompt),
     sceneIds: [...(input.sceneIds ?? [])],
     setupCompletedAt: input.setupCompletedAt ?? null,
     createdAt: input.createdAt,
@@ -589,7 +595,7 @@ export function createScene(input: CreateSceneInput): Scene {
     motionDirection: trimOptionalText(input.motionDirection),
     notes: trimOptionalText(input.notes),
     negativePrompt: trimOptionalText(input.negativePrompt),
-    photoFidelity: input.photoFidelity ?? "off",
+    photoFidelity: input.photoFidelity ?? "high",
     photoAssets: [...(input.photoAssets ?? [])],
     adoptedGeneratedImageId: input.adoptedGeneratedImageId ?? null,
     createdAt: input.createdAt,
@@ -625,7 +631,7 @@ export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
     motionDirection: "",
     notes: "",
     negativePrompt: "",
-    photoFidelity: "off",
+    photoFidelity: "high",
     photoAssets: input.photoAssetId
       ? [{ photoAssetId: input.photoAssetId, role: "primary" }]
       : [],
@@ -674,7 +680,7 @@ export function createComplementScene(
     motionDirection: "",
     notes: "",
     negativePrompt: "",
-    photoFidelity: "off",
+    photoFidelity: "high",
     photoAssets: [],
     adoptedGeneratedImageId: null,
     createdAt: input.createdAt,
