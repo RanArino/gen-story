@@ -33,6 +33,8 @@ export function composeSessionPreamble(input: {
     "2. You cannot write project data. To change a field, call",
     "   propose_creative_direction_changes with a field-level before/after diff.",
     "   The operator reviews and approves it in the Gen Story UI.",
+    '   A tone value is always {"title": string, "description": string}.',
+    '   A character policy value is always {"mode": "featured" | "background_only" | "none", "prompt": string}.',
     "3. When there is a real trade-off, attach two or three options to the item,",
     "   each with a reason and its impact, instead of silently picking one.",
     "4. Only call apply_approved_change_proposal after the operator has approved",

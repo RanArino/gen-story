@@ -141,9 +141,21 @@ export function readStoryboardSemanticTarget(
   storyboard: Storyboard,
   field: StorySemanticField,
 ): SemanticTargetSnapshot {
+  const value =
+    field === "tone"
+      ? {
+          title: storyboard.tone,
+          description: storyboard.toneDescription,
+        }
+      : field === "characterPolicy"
+        ? {
+            mode: storyboard.characterPolicy,
+            prompt: storyboard.characterPrompt,
+          }
+        : storyboard[field];
   return {
     target: storyboardSemanticTarget(storyboard.id, field),
-    value: storyboard[field],
+    value,
     revision: storyboard.updatedAt,
   };
 }

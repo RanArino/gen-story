@@ -147,11 +147,13 @@ export type StoryboardDto = {
   status: string;
   // Empty means the tone has not been decided yet.
   tone: string;
+  toneDescription: string;
   stylePresetId: string | null;
   commonPrompt: string;
   story: string;
   negativePrompt: string;
   characterPolicy: "featured" | "background_only" | "none";
+  characterPrompt: string;
   sceneIds: string[];
   setupStep: StoryboardSetupStepDto;
   // Set once the storyboard has been through all five steps; from then on the

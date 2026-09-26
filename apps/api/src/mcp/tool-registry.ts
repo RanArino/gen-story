@@ -110,7 +110,7 @@ const ChoiceOptionSchema = z.object({
   impact: z.string().min(1),
 });
 
-const ProposeInputSchema = z.object({
+const ProposeInputBaseSchema = z.object({
   clientRequestId: z.string().min(1),
   conversationId: z.string().min(1),
   turnId: z.string().min(1),
@@ -128,6 +128,56 @@ const ProposeInputSchema = z.object({
     )
     .min(1),
 });
+
+const ProposeInputSchema = ProposeInputBaseSchema.superRefine(
+  (input, context) => {
+    const valid = (field: string, value: unknown) => {
+      if (field === "tone") {
+        const tone = value as { title?: unknown; description?: unknown } | null;
+        return (
+          typeof tone === "object" &&
+          tone !== null &&
+          typeof tone.title === "string" &&
+          tone.title.trim() !== "" &&
+          typeof tone.description === "string" &&
+          tone.description.trim() !== ""
+        );
+      }
+      if (field === "characterPolicy") {
+        const character = value as { mode?: unknown; prompt?: unknown } | null;
+        return (
+          typeof character === "object" &&
+          character !== null &&
+          ["featured", "background_only", "none"].includes(
+            String(character.mode),
+          ) &&
+          typeof character.prompt === "string" &&
+          character.prompt.trim() !== ""
+        );
+      }
+      return true;
+    };
+
+    input.items.forEach((item, itemIndex) => {
+      const values = [
+        item.after,
+        ...(item.choice?.options.map((option) => option.value) ?? []),
+      ];
+      values.forEach((value, valueIndex) => {
+        if (!valid(item.target.field, value)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["items", itemIndex, valueIndex === 0 ? "after" : "choice"],
+            message:
+              item.target.field === "tone"
+                ? 'Tone values require {"title", "description"}.'
+                : 'Character values require {"mode", "prompt"}.',
+          });
+        }
+      });
+    });
+  },
+);
 
 const GetChangeProposalInputSchema = z.object({
   changeProposalId: z.string().min(1),
@@ -387,8 +437,8 @@ const proposeCreativeDirectionChangesTool: McpToolDefinition = {
   name: "propose_creative_direction_changes",
   title: "Propose creative direction changes",
   description:
-    "Record a reviewable proposal for one or more of this project's creative fields. This changes no project data: the operator must approve items before apply_approved_change_proposal can write them. Retrying with the same clientRequestId returns the proposal already created.",
-  inputShape: ProposeInputSchema.shape,
+    'Record a reviewable proposal for one or more creative fields. Tone after/choice values must be {"title": string, "description": string}; characterPolicy values must be {"mode": "featured" | "background_only" | "none", "prompt": string}. This changes no project data: the operator must approve items before apply_approved_change_proposal can write them. Retrying with the same clientRequestId returns the proposal already created.',
+  inputShape: ProposeInputBaseSchema.shape,
   readOnly: false,
   handler: async (context, rawInput) => {
     const input = ProposeInputSchema.parse(rawInput);

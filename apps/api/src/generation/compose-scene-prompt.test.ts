@@ -19,6 +19,7 @@ function baseFixture(
   photoFidelity: "off" | "low" | "high",
   hasPhoto: boolean,
   characterPolicy: CharacterPolicy = "background_only",
+  characterPrompt = "",
 ) {
   return createInMemoryApplicationDependencies({
     users: [
@@ -54,6 +55,7 @@ function baseFixture(
         projectId: "project_1",
         tone: "warm",
         characterPolicy,
+        characterPrompt,
         createdAt: now,
         updatedAt: now,
       }),
@@ -162,5 +164,13 @@ describe("composeScenePrompt — character policy directive", () => {
     const { prompt } = await composeScenePrompt(deps, { sceneId: "scene_1" });
     expect(prompt).toContain("incidental");
     expect(prompt).toContain("do not invent a new prominent");
+  });
+
+  it("includes the visible custom character prompt", async () => {
+    const guidance =
+      "Only show the traveler on route scenes, in the same dark clothing.";
+    const deps = baseFixture("off", false, "background_only", guidance);
+    const { prompt } = await composeScenePrompt(deps, { sceneId: "scene_1" });
+    expect(prompt).toContain(guidance);
   });
 });

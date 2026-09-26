@@ -23,12 +23,14 @@ export const UpsertStoryboardSchema = z.object({
   // yet", which is exactly what the guided setup flow gates step 2 on. Omitting
   // it leaves the stored tone alone.
   tone: z.string().optional(),
+  toneDescription: z.string().optional(),
   status: z.enum(["draft", "editing", "ready", "completed"]).optional(),
   stylePresetId: z.string().nullable().optional(),
   commonPrompt: z.string().optional(),
   story: z.string().optional(),
   negativePrompt: z.string().optional(),
   characterPolicy: z.enum(["featured", "background_only", "none"]).optional(),
+  characterPrompt: z.string().optional(),
 });
 
 // The AI-fillable fields accept the empty string on purpose: blank means "not

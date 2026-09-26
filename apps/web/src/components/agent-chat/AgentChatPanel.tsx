@@ -662,6 +662,11 @@ export function AgentChatPanel({ projectId }: Props) {
                     ...current,
                     [updated.id]: updated,
                   }));
+                  window.dispatchEvent(
+                    new CustomEvent("gen-story:creative-direction-applied", {
+                      detail: { projectId },
+                    }),
+                  );
                 })
               }
               onRevise={reviseHint}

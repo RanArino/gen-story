@@ -208,7 +208,7 @@ describe("agent chat routes", () => {
       {
         label: "@tone",
         targetKey: "storyboard:storyboard_project_a#tone",
-        value: "warm and nostalgic",
+        value: { title: "warm and nostalgic", description: "" },
         revision: now,
       },
     ]);

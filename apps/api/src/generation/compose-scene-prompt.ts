@@ -132,7 +132,12 @@ export async function composeScenePrompt(
   const characterDirective = characterPolicyDirective(
     storyboard.characterPolicy,
   );
-  const prompt = [basePrompt, fidelityDirective, characterDirective]
+  const prompt = [
+    basePrompt,
+    fidelityDirective,
+    characterDirective,
+    storyboard.characterPrompt,
+  ]
     .filter((part): part is string => part != null && part !== "")
     .join(". ");
 

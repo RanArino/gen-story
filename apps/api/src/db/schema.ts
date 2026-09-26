@@ -110,6 +110,7 @@ export const storyboards = sqliteTable(
       .references(() => projects.id),
     status: text("status").notNull(),
     tone: text("tone").notNull(),
+    toneDescription: text("tone_description").notNull().default(""),
     stylePresetId: text("style_preset_id").references(() => stylePresets.id),
     commonPrompt: text("common_prompt").notNull().default(""),
     story: text("story").notNull().default(""),
@@ -117,6 +118,7 @@ export const storyboards = sqliteTable(
     characterPolicy: text("character_policy")
       .notNull()
       .default("background_only"),
+    characterPrompt: text("character_prompt").notNull().default(""),
     // Null while the guided five-step setup is still gating this storyboard.
     // Stamped once it has been through all five steps, after which every
     // section is freely editable.

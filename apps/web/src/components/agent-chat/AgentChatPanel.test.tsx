@@ -17,6 +17,8 @@ const listAgentConversations = vi.fn();
 const createAgentConversation = vi.fn();
 const getAgentConversation = vi.fn();
 const getCreativeDirection = vi.fn();
+const getChangeProposal = vi.fn();
+const applyChangeProposal = vi.fn();
 const setUserLanguagePreference = vi.fn();
 
 vi.mock("../../lib/api-client", () => ({
@@ -30,8 +32,8 @@ vi.mock("../../lib/api-client", () => ({
   getCreativeDirection: (projectId: string) => getCreativeDirection(projectId),
   setUserLanguagePreference: (language: string, agentRuntime?: string) =>
     setUserLanguagePreference(language, agentRuntime),
-  getChangeProposal: vi.fn(),
-  applyChangeProposal: vi.fn(),
+  getChangeProposal: (id: string) => getChangeProposal(id),
+  applyChangeProposal: (id: string) => applyChangeProposal(id),
   cancelAgentChatTurn: vi.fn(),
   compactAgentChatSession: vi.fn(),
   decideChangeProposalItem: vi.fn(),
@@ -373,5 +375,81 @@ describe("AgentChatPanel session history", () => {
     await waitFor(() => {
       expect(getAgentConversation).toHaveBeenCalledWith("conversation_2");
     });
+  });
+});
+
+describe("AgentChatPanel proposal apply synchronization", () => {
+  it("notifies the mounted project view immediately after apply", async () => {
+    const appliedProposal = {
+      id: "proposal_1",
+      projectId: "project_1",
+      provider: "codex",
+      conversationId: "conversation_1",
+      turnId: "turn_1",
+      rationale: "Refine the tone.",
+      status: "approved",
+      items: [
+        {
+          id: "item_1",
+          target: {
+            entityType: "storyboard",
+            entityId: "storyboard_1",
+            field: "tone",
+          },
+          before: { title: "Quiet", description: "Still and reflective." },
+          after: { title: "Warm", description: "Gentle and welcoming." },
+          rationale: "Match the photos.",
+          approval: "approved",
+          baseRevision: "r1",
+        },
+      ],
+      choices: [],
+      clientRequestId: "request_1",
+      approvedBy: "user_1",
+      resolvedAt: new Date().toISOString(),
+      applyOutcome: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    getAiRuntimeInfo.mockResolvedValue(
+      runtimeInfo({ runtime: "codex", available: true, reason: null }),
+    );
+    listAgentConversations.mockResolvedValue([{ id: "conversation_1" }]);
+    getAgentConversation.mockResolvedValue({
+      conversation: { id: "conversation_1" },
+      binding: null,
+      turns: [],
+      messages: [
+        {
+          id: "message_1",
+          role: "assistant",
+          kind: "proposal",
+          text: "Proposal ready",
+          data: { changeProposalId: "proposal_1" },
+        },
+      ],
+    });
+    getCreativeDirection.mockResolvedValue({ fields: [] });
+    getChangeProposal.mockResolvedValue(appliedProposal);
+    applyChangeProposal.mockResolvedValue({
+      ...appliedProposal,
+      status: "applied",
+    });
+    const listener = vi.fn();
+    window.addEventListener("gen-story:creative-direction-applied", listener);
+
+    renderPanel();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Apply 1 approved/ }),
+    );
+
+    await waitFor(() => expect(listener).toHaveBeenCalledOnce());
+    expect((listener.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({
+      projectId: "project_1",
+    });
+    window.removeEventListener(
+      "gen-story:creative-direction-applied",
+      listener,
+    );
   });
 });
