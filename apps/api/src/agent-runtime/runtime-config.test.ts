@@ -39,17 +39,23 @@ describe("resolveDeployTarget", () => {
     expect(resolveDeployTarget({})).toBe("local");
   });
 
-  it("treats any non-local value as other", () => {
+  it("selects the explicit cloud target", () => {
     expect(resolveDeployTarget({ GEN_STORY_DEPLOY_TARGET: "cloud" })).toBe(
-      "other",
+      "cloud",
     );
+  });
+
+  it("rejects an unknown deployment target", () => {
+    expect(() =>
+      resolveDeployTarget({ GEN_STORY_DEPLOY_TARGET: "production" }),
+    ).toThrow(/Unknown GEN_STORY_DEPLOY_TARGET/);
   });
 });
 
 describe("assertLocalDeploymentForCliRuntime", () => {
   it("allows api runtime regardless of deploy target", () => {
     expect(() =>
-      assertLocalDeploymentForCliRuntime("api", "other"),
+      assertLocalDeploymentForCliRuntime("api", "cloud"),
     ).not.toThrow();
   });
 
@@ -60,7 +66,7 @@ describe("assertLocalDeploymentForCliRuntime", () => {
   });
 
   it("rejects a CLI runtime on a non-local deployment", () => {
-    expect(() => assertLocalDeploymentForCliRuntime("codex", "other")).toThrow(
+    expect(() => assertLocalDeploymentForCliRuntime("codex", "cloud")).toThrow(
       RuntimeConfigError,
     );
   });

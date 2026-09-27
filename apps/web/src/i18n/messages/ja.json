@@ -22,6 +22,21 @@
     "stepReview": "4 · 確認",
     "stepChat": "AI相談"
   },
+  "auth": {
+    "loading": "安全なセッションを復元しています…",
+    "title": "Gen Storyにログイン",
+    "subtitle": "プロジェクトはアカウントごとに分離されます。",
+    "google": "Googleで続行",
+    "or": "または",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "emailSignIn": "メールアドレスでログイン",
+    "signOut": "ログアウト",
+    "signInFailed": "ログインできませんでした。認証情報を確認してください。",
+    "signOutFailed": "ログアウトできませんでした。もう一度お試しください。",
+    "sessionFailed": "安全なサーバーセッションを作成できませんでした。",
+    "configurationFailed": "ホスト環境の認証設定が不足しています。"
+  },
   "projects": {
     "title": "プロジェクト",
     "subtitle": "あなたのストーリープロジェクト",

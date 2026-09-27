@@ -28,6 +28,8 @@ import type {
   UserPreferenceDto,
 } from "@gen-story/shared";
 
+import { getCsrfToken } from "./auth/session-client";
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -48,12 +50,18 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
+  const hosted = process.env.NEXT_PUBLIC_GEN_STORY_DEPLOY_TARGET === "cloud";
+  const mutation = !["GET", "HEAD", "OPTIONS"].includes(method);
+  const csrfToken = hosted && mutation ? await getCsrfToken() : null;
   let res: Response;
   try {
     res = await fetch(`${apiBase()}${path}`, {
       method,
-      headers:
-        body != null ? { "Content-Type": "application/json" } : undefined,
+      credentials: "include",
+      headers: {
+        ...(body != null ? { "Content-Type": "application/json" } : {}),
+        ...(csrfToken != null ? { "X-CSRF-Token": csrfToken } : {}),
+      },
       body: body != null ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -160,9 +168,9 @@ export function subscribeToProjectEvents(
 
   if (stream == null) {
     const handlers = new Set<(event: ProjectEvent) => void>();
-    const source = new EventSource(
-      `${apiBase()}/api/projects/${projectId}/events`,
-    );
+    const source = new EventSource(`${apiBase()}/api/projects/${projectId}/events`, {
+      withCredentials: true,
+    });
     const onMessage = (message: MessageEvent<string>) => {
       let event: ProjectEvent;
       try {
