@@ -36,21 +36,37 @@ Copy the example env file and edit as needed:
 cp apps/api/.env.example apps/api/.env
 ```
 
-| Variable                      | Default                 | Description                                                   |
-| ----------------------------- | ----------------------- | ------------------------------------------------------------- |
-| `API_PORT`                    | `4000`                  | Port for the API server                                       |
-| `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000` | API base URL used by the web app                              |
-| `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite` | Path to the SQLite database file                              |
-| `GEN_STORY_DEPLOY_TARGET`     | `local`                 | CLI runtimes selected in Settings require local deployment      |
-| `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_    | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`) |
-| `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint |
-| `OPENAI_API_KEY`              | _(none)_                | Optional. Set it to use real image generation instead of mock |
-| `GEMINI_API_KEY`              | _(none)_                | Optional. Enables real photo analysis for emotion candidates  |
-| `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`      | Gemini model used for project photo analysis                  |
-| `GEMINI_STORY_SETUP_MODEL`    | `gemini-2.5-flash`      | Gemini model used for storyboard story setup (step 4)         |
+| Variable                      | Default                      | Description                                                                                                         |
+| ----------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `API_PORT`                    | `4000`                       | Port for the API server                                                                                             |
+| `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000`      | API base URL used by the web app                                                                                    |
+| `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite`      | Path to the SQLite database file                                                                                    |
+| `GEN_STORY_DEPLOY_TARGET`     | `local`                      | CLI runtimes selected in Settings require local deployment                                                          |
+| `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_         | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`)                                             |
+| `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint                                                    |
+| `OPENAI_API_KEY`              | _(none)_                     | Optional. Real image generation with GPT Image instead of mock                                                      |
+| `GEMINI_API_KEY`              | _(none)_                     | Optional. Real photo analysis, and real image generation with Nano Banana (the default image model) instead of mock |
+| `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`           | Gemini model used for project photo analysis                                                                        |
+| `GEMINI_STORY_SETUP_MODEL`    | `gemini-2.5-flash`           | Gemini model used for storyboard story setup (step 4)                                                               |
 
 The app works without an OpenAI key — it uses a mock adapter that generates placeholder images.
 The app works without a Gemini key; photo analysis and story setup use deterministic local fallbacks.
+
+## Google Cloud project
+
+All Google Cloud infrastructure for this repository uses
+`gen-story-496911`. Run GCP commands through the repository wrapper so the
+project is specified for that command only and your global `gcloud` default
+for other repositories is not changed:
+
+```sh
+pnpm gcloud run services list
+pnpm gcloud projects describe gen-story-496911
+```
+
+The wrapper rejects a different `--project` value. Authenticate normally with
+`gcloud auth login` (or your organization-approved service-account flow); it
+does not call `gcloud config set project`.
 
 ## Apply Database Migrations
 
@@ -229,7 +245,7 @@ API terminal logs each request in structured format:
 
 **HEIC conversion fails** — `sharp` requires `libvips`. On macOS: `brew install vips`. On Linux: `apt install libvips-dev`.
 
-**Missing OpenAI key** — Set `OPENAI_API_KEY` in `apps/api/.env`. Its presence alone selects the real adapter. Without a key the mock adapter produces gray placeholder images.
+**Placeholder images instead of real ones** — The selected image model's key is missing. Nano Banana (the default) needs `GEMINI_API_KEY` on a paid tier, or Vertex AI via `GEMINI_USE_VERTEXAI=true` (see `apps/api/.env.example`); GPT Image needs `OPENAI_API_KEY`, both in `apps/api/.env`. Without the key, that provider's mock adapter produces gray placeholder images.
 
 ## Workspace Layout
 

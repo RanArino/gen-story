@@ -27,13 +27,23 @@ any cloud setup. The following features are deliberately excluded from this vers
   `GET /api/ai-jobs/:aiJobId` instead.
 - Jobs left `running` by a killed API process are marked `failed` with
   `interrupted by restart` on the next startup; they are not resumed.
-- Image generation defaults to a **mock adapter** that returns placeholder
-  images. Real generation requires an `OPENAI_API_KEY`; its presence alone
-  selects the OpenAI adapter.
+- The image model is chosen per run with the "Image model" selector on the
+  Generate screen, the test-generation modal and the Review regenerate modal
+  (the choice is remembered in the browser). The default is Nano Banana 2
+  (`gemini-3.1-flash-image`), which uses `GEMINI_API_KEY`, or Vertex AI when
+  `GEMINI_USE_VERTEXAI=true`. The Gemini API free tier allows zero image
+  requests, so a free key fails with a rate-limit error; Vertex AI bills the
+  GCP project instead. GPT Image 2.5 (`gpt-image-2.5-flare-2026-09-08`, uses
+  `OPENAI_API_KEY`) is the alternative. When the selected provider's key is
+  unset, that provider falls back to a **mock adapter** that returns
+  placeholder images. Requests created before the selector existed carry no
+  model, so retrying one uses the Nano Banana default. Character reference
+  sheets and style previews still always use OpenAI.
 - Each scene has a "Follow source photo" control (Off / Low / High), default
   Off, on its card in the storyboard. Off is the long-standing behavior:
   prompt-only, the photo is never sent to the image model. Low and High send
-  the scene's primary and reference photos to OpenAI's `images.edit`. **Under
+  the scene's primary and reference photos to the image model (OpenAI's
+  `images.edit`, or as inline images to Nano Banana). **Under
   the pinned default model, `gpt-image-2.5-flare-2026-09-08`, the adapter does
   not send an API-level `input_fidelity` parameter.** To give Low and High a
   real distinction, the composed prompt sent alongside the photo carries an
@@ -146,8 +156,8 @@ any cloud setup. The following features are deliberately excluded from this vers
   they happen, so a long turn shows progress. Reply text still arrives in whole
   messages, not token by token: a turn that only thinks before answering shows
   tool activity, then the finished reply.
-- Image generation is never triggered from the chat; it stays on the OpenAI API
-  behind its own explicitly labelled paid action.
+- Image generation is never triggered from the chat; it stays behind its own
+  explicitly labelled paid action on the Generate screen.
 
 ## Video & audio
 

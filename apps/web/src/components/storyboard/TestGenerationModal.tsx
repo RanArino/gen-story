@@ -13,6 +13,7 @@ import {
   requestTestGenerationBatch,
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
+import { ImageModelSelect, useImageModel } from "../common/ImageModelSelect";
 import { AdjustmentChips } from "./AdjustmentChips";
 
 type Props = {
@@ -54,6 +55,7 @@ export function TestGenerationModal({
   const [starting, setStarting] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [imageModel, setImageModel] = useImageModel();
   const [pendingAdjustments, setPendingAdjustments] = useState<
     Record<string, TestAdjustmentId[]>
   >({});
@@ -94,7 +96,11 @@ export function TestGenerationModal({
     setStarting(true);
     setError(null);
     try {
-      const result = await requestTestGenerationBatch(storyboardId, sceneId);
+      const result = await requestTestGenerationBatch(
+        storyboardId,
+        sceneId,
+        imageModel,
+      );
       const next = await refresh();
       setSelectedBatchId(
         next.some((entry) => entry.batch.id === result.batch.id)
@@ -218,6 +224,14 @@ export function TestGenerationModal({
             {error}
           </div>
         )}
+
+        <div style={{ marginBottom: 16 }}>
+          <ImageModelSelect
+            value={imageModel}
+            onChange={setImageModel}
+            disabled={starting}
+          />
+        </div>
 
         {loading && <p style={{ color: "#888" }}>{t("loadingHistory")}</p>}
 

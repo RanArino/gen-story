@@ -24,6 +24,7 @@ import {
 } from "../../lib/api-client";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
+import { ImageModelSelect, useImageModel } from "../common/ImageModelSelect";
 import { ComposedPromptPreview } from "../common/ComposedPromptPreview";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./ReviewPage.module.css";
@@ -188,6 +189,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
         sceneId: scene.id,
         storyboardId,
         projectId,
+        model: overrides.model,
         ...(overrides.promptOverride != null
           ? { promptOverride: overrides.promptOverride }
           : {}),
@@ -601,6 +603,7 @@ type RegenFields = {
   lightingDirection: string;
   motionDirection: string;
   photoFidelity: "off" | "low" | "high";
+  model: string;
   promptOverride?: string;
   negativePromptOverride?: string;
 };
@@ -670,7 +673,8 @@ function RegenModal({
 }) {
   const t = useTranslations("review.regenModal");
   const tSel = useTranslations("selections");
-  const [fields, setFields] = useState<RegenFields>({
+  const [imageModel, setImageModel] = useImageModel();
+  const [fields, setFields] = useState<Omit<RegenFields, "model">>({
     imagePrompt: scene.imagePrompt ?? "",
     emotion: scene.emotion ?? "",
     cameraDirection: scene.cameraDirection ?? "",
@@ -680,13 +684,16 @@ function RegenModal({
   });
   const [submitting, setSubmitting] = useState(false);
 
-  function set<K extends keyof RegenFields>(key: K, value: RegenFields[K]) {
+  function set<K extends keyof Omit<RegenFields, "model">>(
+    key: K,
+    value: RegenFields[K],
+  ) {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
   async function handleSubmit() {
     setSubmitting(true);
-    await onConfirm(fields);
+    await onConfirm({ ...fields, model: imageModel });
     setSubmitting(false);
   }
 
@@ -804,6 +811,12 @@ function RegenModal({
               ))}
             </div>
           </label>
+
+          <ImageModelSelect
+            value={imageModel}
+            onChange={setImageModel}
+            disabled={submitting}
+          />
         </div>
 
         <ComposedPromptPreview

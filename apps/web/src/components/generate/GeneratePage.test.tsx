@@ -105,11 +105,13 @@ describe("GeneratePage bulk start", () => {
       sceneId: unstartedA.id,
       storyboardId: unstartedA.storyboardId,
       projectId: unstartedA.projectId,
+      model: "gemini-3.1-flash-image",
     });
     expect(createGenerationRequest).toHaveBeenNthCalledWith(2, unstartedB.id, {
       sceneId: unstartedB.id,
       storyboardId: unstartedB.storyboardId,
       projectId: unstartedB.projectId,
+      model: "gemini-3.1-flash-image",
     });
   });
 

@@ -13,6 +13,7 @@ import {
   retryGenerationRequest,
 } from "../../lib/api-client";
 import { AppShell } from "../AppShell";
+import { ImageModelSelect, useImageModel } from "../common/ImageModelSelect";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./GeneratePage.module.css";
 
@@ -59,6 +60,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageModel, setImageModel] = useImageModel();
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -122,6 +124,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
           sceneId: scene.id,
           storyboardId: scene.storyboardId,
           projectId: scene.projectId,
+          model: imageModel,
         });
       }
 
@@ -253,6 +256,11 @@ export function GeneratePage({ projectId }: { projectId: string }) {
 
       {/* Actions */}
       <div className={styles.actions}>
+        <ImageModelSelect
+          value={imageModel}
+          onChange={setImageModel}
+          disabled={launching}
+        />
         {unstarted > 0 && (
           <button
             className="btn btn-primary"
