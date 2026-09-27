@@ -20,7 +20,10 @@ import { GeminiComplementSceneProposalAdapter } from "../complement-scenes/gemin
 import { CodexComplementSceneProposalAdapter } from "../complement-scenes/codex-complement-scene-proposal";
 import { ClaudeComplementSceneProposalAdapter } from "../complement-scenes/claude-complement-scene-proposal";
 
-import { createApiContext } from "./create-api-context";
+import {
+  createApiContext,
+  createGeminiImageClient,
+} from "./create-api-context";
 
 let directory: string | null = null;
 let client: GenStorySqliteClient | null = null;
@@ -169,5 +172,29 @@ describe("createApiContext runtime selection", () => {
         GEN_STORY_DEPLOY_TARGET: "cloud",
       }),
     ).toThrow(/local deployment/);
+  });
+});
+
+describe("createGeminiImageClient", () => {
+  it("uses Vertex AI with the configured project when enabled", () => {
+    const client = createGeminiImageClient({
+      GEMINI_USE_VERTEXAI: "true",
+      GOOGLE_CLOUD_PROJECT: "test-project",
+      GEMINI_API_KEY: "ignored-key",
+    });
+    expect(client?.vertexai).toBe(true);
+  });
+
+  it("requires a project when Vertex AI is enabled", () => {
+    expect(() =>
+      createGeminiImageClient({ GEMINI_USE_VERTEXAI: "true" }),
+    ).toThrow(/GOOGLE_CLOUD_PROJECT/);
+  });
+
+  it("uses the API key otherwise, and nothing without one", () => {
+    expect(createGeminiImageClient({ GEMINI_API_KEY: "key" })?.vertexai).toBe(
+      false,
+    );
+    expect(createGeminiImageClient({})).toBeNull();
   });
 });

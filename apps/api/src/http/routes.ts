@@ -2298,6 +2298,9 @@ export function buildRouter(deps: ApiDependencies): Router {
       const result = await requestTestGeneration(deps, {
         storyboardId,
         sceneId: body.sceneId,
+        ...("model" in body && typeof body.model === "string"
+          ? { model: body.model }
+          : {}),
       });
 
       if (!result.ok) {

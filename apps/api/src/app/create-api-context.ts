@@ -2,6 +2,8 @@ import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { GoogleGenAI } from "@google/genai";
+
 import type {
   ApplicationDependencies,
   AgentRuntimeSelection,
@@ -24,7 +26,9 @@ import type { GenStorySqliteClient } from "../db/client";
 import { createSqliteRepositories } from "../db/repositories";
 import { LocalProgressEvents } from "../jobs/local-progress-events";
 import { SqliteJobQueue } from "../jobs/sqlite-job-queue";
+import { GeminiImageGenerationAdapter } from "../generation/gemini-image-generation";
 import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
+import { RoutingImageGenerationAdapter } from "../generation/routing-image-generation";
 import {
   MockCharacterSheetGenerationAdapter,
   OpenAiCharacterSheetGenerationAdapter,
@@ -159,6 +163,30 @@ function createTextVisionGenerationPorts(
   };
 }
 
+// Vertex AI bills image generation to a GCP project and authenticates with
+// Application Default Credentials (`gcloud auth application-default login`);
+// the Developer API key's free tier allows zero image requests.
+export function createGeminiImageClient(
+  env: NodeJS.ProcessEnv,
+): GoogleGenAI | null {
+  if (env.GEMINI_USE_VERTEXAI === "true") {
+    const project = env.GOOGLE_CLOUD_PROJECT;
+    if (!project) {
+      throw new Error(
+        "GOOGLE_CLOUD_PROJECT is required when GEMINI_USE_VERTEXAI=true.",
+      );
+    }
+    return new GoogleGenAI({
+      vertexai: true,
+      project,
+      location: env.GOOGLE_CLOUD_LOCATION || "global",
+    });
+  }
+  return env.GEMINI_API_KEY
+    ? new GoogleGenAI({ apiKey: env.GEMINI_API_KEY })
+    : null;
+}
+
 export function createApiContext(
   client: GenStorySqliteClient,
   env: NodeJS.ProcessEnv = process.env,
@@ -183,11 +211,20 @@ export function createApiContext(
     configuredImageGenerationIntervalMs > 0
       ? configuredImageGenerationIntervalMs
       : DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS;
-  const imageGeneration = openaiApiKey
-    ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey, {
-        requestIntervalMs: imageGenerationIntervalMs,
-      })
-    : new MockImageGenerationAdapter(objectStorage);
+  // Each provider falls back to the mock adapter when it has no credentials,
+  // so a setup with only one provider still generates (placeholders) for the
+  // other.
+  const geminiImageClient = createGeminiImageClient(env);
+  const imageGeneration = new RoutingImageGenerationAdapter(
+    geminiImageClient
+      ? new GeminiImageGenerationAdapter(objectStorage, geminiImageClient)
+      : new MockImageGenerationAdapter(objectStorage),
+    openaiApiKey
+      ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey, {
+          requestIntervalMs: imageGenerationIntervalMs,
+        })
+      : new MockImageGenerationAdapter(objectStorage),
+  );
 
   // R1.1/R1.2/R2.1: a single env var selects the runtime for every
   // text/vision capability; unknown values and non-local CLI selection fail

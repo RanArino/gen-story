@@ -17,8 +17,20 @@ Run commands from the repository root.
 - Format check: `pnpm format`
 - Type check: `pnpm typecheck`
 - Architecture boundary check: `rg "from ['\\\"](next|drizzle|openai|@workos|@google|aws-sdk|zod|express|fastify|hono|\\.\\./\\.\\./apps)" packages/domain packages/application`
+- Google Cloud: `pnpm gcloud <command>`
 
 There is no `lint:fix` script yet. Use `pnpm lint`, then make minimal manual fixes.
+
+## Google Cloud project isolation
+
+- The only Google Cloud infrastructure project for this repository is `gen-story-496911`.
+- Run all project-scoped Google Cloud CLI operations through `pnpm gcloud <command>`.
+  The wrapper supplies `--project=gen-story-496911` per invocation and rejects
+  a caller-supplied `--project`; it does not alter the operator's global gcloud
+  configuration used by other repositories.
+- Do not run `gcloud config set project` for this repository. Authentication may
+  be performed separately with `gcloud auth login` or an approved
+  service-account flow.
 
 Default local URLs:
 

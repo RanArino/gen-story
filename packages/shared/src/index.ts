@@ -497,3 +497,10 @@ export type AgentConversationDetailDto = {
   turns: AgentConversationTurnDto[];
   messages: AgentConversationMessageDto[];
 };
+
+export {
+  IMAGE_GENERATION_MODELS,
+  DEFAULT_IMAGE_GENERATION_MODEL,
+  isGeminiImageModel,
+} from "./image-generation-models";
+export type { ImageGenerationModelOption } from "./image-generation-models";

@@ -7,6 +7,7 @@
     "dev": "pnpm --parallel --filter @gen-story/web --filter @gen-story/api dev",
     "dev:web": "pnpm --filter @gen-story/web dev",
     "dev:api": "pnpm --filter @gen-story/api dev",
+    "gcloud": "./scripts/gcloud-gen-story.sh",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --check package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.mjs \"apps/**/*.{json,ts,tsx,js,mjs}\" \"packages/**/*.{json,ts,tsx,js,mjs}\"",

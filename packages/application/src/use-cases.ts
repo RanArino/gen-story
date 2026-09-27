@@ -3449,6 +3449,8 @@ export async function markGenerationRequestFailed(
 export type RequestTestGenerationInput = {
   storyboardId: string;
   sceneId: string;
+  // Image model id for every variant; omitted means the adapter's default.
+  model?: string;
 };
 
 export async function requestTestGeneration(
@@ -3510,7 +3512,10 @@ export async function requestTestGeneration(
       projectId: storyboard.projectId,
       storyboardId: input.storyboardId,
       sceneId: input.sceneId,
-      inputJson: { testBatchId: batch.id },
+      inputJson: {
+        testBatchId: batch.id,
+        ...(input.model ? { model: input.model } : {}),
+      },
     });
 
     const requests: GenerationRequest[] = [];

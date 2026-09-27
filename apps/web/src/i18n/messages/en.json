@@ -467,6 +467,9 @@
     "batchInFlight": "Samples are still generating. Wait for them to finish.",
     "olderBatchNotice": "These are earlier samples. Adjustments apply to the newest run only, but you can confirm one of these and continue to generation."
   },
+  "imageModel": {
+    "label": "Image model"
+  },
   "generate": {
     "title": "Generate",
     "subtitle": "Generate AI images for each scene in your storyboard.",

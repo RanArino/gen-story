@@ -10,7 +10,7 @@ import { ensurePngImage } from "../images/image-metadata";
 import { buildGeneratedImageStorageKey } from "../storage/storage-keys";
 import { DEFAULT_OPENAI_IMAGE_MODEL } from "./image-generation-model";
 
-type NormalizedInputImageRef = { storageKey: string };
+export type NormalizedInputImageRef = { storageKey: string };
 
 export const DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS = 12_000;
 

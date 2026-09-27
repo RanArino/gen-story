@@ -859,6 +859,7 @@ export async function getTestGenerationBatch(
 export async function requestTestGenerationBatch(
   storyboardId: string,
   sceneId: string,
+  model?: string,
 ): Promise<{
   batch: TestGenerationBatchDto;
   generationRequests: GenerationRequestDto[];
@@ -866,7 +867,10 @@ export async function requestTestGenerationBatch(
   return request<{
     batch: TestGenerationBatchDto;
     generationRequests: GenerationRequestDto[];
-  }>("POST", `/api/storyboards/${storyboardId}/test-generation`, { sceneId });
+  }>("POST", `/api/storyboards/${storyboardId}/test-generation`, {
+    sceneId,
+    model,
+  });
 }
 
 export async function confirmTestGenerationBatch(
