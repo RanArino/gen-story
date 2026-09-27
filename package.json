@@ -3,11 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "packageManager": "pnpm@10.11.0",
+  "pnpm": {
+    "overrides": {
+      "gaxios>uuid": "11.1.1"
+    }
+  },
   "scripts": {
     "dev": "pnpm --parallel --filter @gen-story/web --filter @gen-story/api dev",
     "dev:web": "pnpm --filter @gen-story/web dev",
     "dev:api": "pnpm --filter @gen-story/api dev",
     "gcloud": "./scripts/gcloud-gen-story.sh",
+    "security:sbom": "node scripts/generate-sbom.mjs",
+    "test:firestore:contract": "pnpm --filter @gen-story/api exec vitest run src/firestore/repositories.contract.test.ts",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --check package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.mjs \"apps/**/*.{json,ts,tsx,js,mjs}\" \"packages/**/*.{json,ts,tsx,js,mjs}\"",
@@ -21,8 +28,8 @@
     "globals": "^16.0.0",
     "prettier": "^3.0.0",
     "tsx": "^4.0.0",
-    "typescript-eslint": "^8.0.0",
     "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^3.0.0"
   }
 }

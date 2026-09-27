@@ -1,8 +1,43 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
+
+import type { AuthPrincipal } from "@gen-story/application";
+
+import type { ApiDependencies } from "../app/create-api-context";
+import { PrincipalAuthContext } from "../auth/principal-auth-context";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type RouteParams = { readonly _params: Map<string, string> };
+
+export type HttpRequestContext = {
+  requestId: string;
+  routeIdentity: string;
+  principal: AuthPrincipal | null;
+  dependencies: ApiDependencies;
+};
+
+export type HttpRequestContextFactory = (
+  req: IncomingMessage,
+  routeIdentity: string,
+) => Promise<HttpRequestContext>;
+
+export function createHttpRequestContextFactory(
+  baseDependencies: ApiDependencies,
+): HttpRequestContextFactory {
+  return async (_req, routeIdentity) => {
+    const principal = await baseDependencies.authContext.getCurrentPrincipal();
+    return {
+      requestId: randomUUID(),
+      routeIdentity,
+      principal,
+      dependencies: {
+        ...baseDependencies,
+        authContext: new PrincipalAuthContext(principal),
+      },
+    };
+  };
+}
 
 export function getParam(params: RouteParams, key: string): string {
   const value = params._params.get(key);
@@ -16,6 +51,7 @@ export type RouteHandler = (
   req: IncomingMessage,
   res: ServerResponse,
   params: RouteParams,
+  context: HttpRequestContext,
 ) => Promise<void>;
 
 type RouteSegment =
@@ -25,6 +61,7 @@ type RouteSegment =
 
 type Route = {
   method: HttpMethod;
+  pattern: string;
   segments: RouteSegment[];
   handler: RouteHandler;
 };
@@ -53,15 +90,26 @@ function parsePath(url: string): string[] {
 export class Router {
   private readonly routes: Route[] = [];
 
+  constructor(private readonly contextFactory?: HttpRequestContextFactory) {}
+
   add(method: HttpMethod, pattern: string, handler: RouteHandler): this {
-    this.routes.push({ method, segments: parsePattern(pattern), handler });
+    this.routes.push({
+      method,
+      pattern,
+      segments: parsePattern(pattern),
+      handler,
+    });
     return this;
   }
 
   private match(
     method: string,
     url: string,
-  ): { handler: RouteHandler; params: RouteParams } | null {
+  ): {
+    handler: RouteHandler;
+    params: RouteParams;
+    routeIdentity: string;
+  } | null {
     const pathSegments = parsePath(url);
 
     for (const route of this.routes) {
@@ -103,7 +151,11 @@ export class Router {
           const tail = pathSegments.slice(fixedSegments.length).join("/");
           map.set("*", tail);
         }
-        return { handler: route.handler, params: { _params: map } };
+        return {
+          handler: route.handler,
+          params: { _params: map },
+          routeIdentity: route.pattern,
+        };
       }
     }
 
@@ -119,7 +171,11 @@ export class Router {
       return false;
     }
 
-    await result.handler(req, res, result.params);
+    if (this.contextFactory === undefined) {
+      throw new Error("Matched route has no HTTP request context factory.");
+    }
+    const context = await this.contextFactory(req, result.routeIdentity);
+    await result.handler(req, res, result.params, context);
     return true;
   }
 }

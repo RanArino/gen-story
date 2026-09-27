@@ -39,9 +39,10 @@ cp apps/api/.env.example apps/api/.env
 | Variable                      | Default                      | Description                                                                                                         |
 | ----------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `API_PORT`                    | `4000`                       | Port for the API server                                                                                             |
+| `CORS_ORIGINS`                | `http://localhost:3000`      | Exact comma-separated browser origins accepted by the API                                                           |
 | `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000`      | API base URL used by the web app                                                                                    |
 | `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite`      | Path to the SQLite database file                                                                                    |
-| `GEN_STORY_DEPLOY_TARGET`     | `local`                      | CLI runtimes selected in Settings require local deployment                                                          |
+| `GEN_STORY_DEPLOY_TARGET`     | `local`                      | Selects `local` or `cloud`; cloud fails closed until its hosted adapters are configured                             |
 | `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_         | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`)                                             |
 | `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint                                                    |
 | `OPENAI_API_KEY`              | _(none)_                     | Optional. Real image generation with GPT Image instead of mock                                                      |
@@ -142,6 +143,11 @@ pnpm lint
 pnpm test
 pnpm build
 ```
+
+The Firestore repository contract runs against the Firebase Firestore Emulator
+in GitHub Actions. CI installs its own temporary JDK; local development and the
+deployed Node services do not require Java. The contract never connects to the
+live staging or production database.
 
 ## Exporting Images and Prompts for Coding Agents
 
