@@ -247,7 +247,7 @@ describe.runIf(process.env.FIRESTORE_EMULATOR_HOST != null)(
           turn.clientRequestId,
         ),
       ).resolves.toEqual(turn);
-    });
+    }, 30_000);
   },
 );
 

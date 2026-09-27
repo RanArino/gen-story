@@ -30,6 +30,7 @@ jobs:
       - name: Run Firestore contracts in the emulator
         run: >-
           npx -y firebase-tools@15.31.0 emulators:exec
+          --config firebase.emulator.json
           --only firestore
           --project demo-gen-story
           "pnpm test:firestore:contract"
