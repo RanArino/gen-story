@@ -2,7 +2,7 @@
 
 Status: Approved for staged implementation; control implementation remains in progress
 Source: `internal/requirements/agent-security-cheetsheet.md`
-Last updated: 2026-09-27
+Last updated: 2026-10-08
 
 ## How to read this matrix
 
@@ -58,9 +58,9 @@ revisited if that boundary changes.
 
 ## Implemented evidence in this milestone
 
-- Production dependency audit: `pnpm audit --prod --audit-level=moderate`
-  reports no known vulnerability after updating direct supported packages and
-  their compatible transitive graph.
+- Production dependency audit: `pnpm audit --prod --audit-level=high`
+  reports no known vulnerability on 2026-10-08 after the post-merge remediation
+  below. This is dated evidence, not a guarantee about future advisories.
 - HTTP JSON inputs require a JSON media type, use a 256 KiB standard limit or
   an explicit 16 MiB local-photo limit, stop processing on overflow, and return
   distinct `400`, `413`, and `415` responses.
@@ -74,12 +74,35 @@ revisited if that boundary changes.
 
 ## Dependency baseline
 
-| Direct package | Resolved requirement | Security reason |
-| --- | --- | --- |
-| `next` | `^16.3.6` | Includes fixes for the reported Critical and High advisories |
-| `sharp` | `^0.35.4` | Includes the patched libheif line |
-| `@google/genai` | `^2.24.0` | Allows patched `ws` and `protobufjs` transitive versions |
-| `@modelcontextprotocol/sdk` | `^1.30.1` | Allows patched `hono`, `qs`, and `fast-uri` transitive versions |
+| Direct package              | Resolved requirement           | Security reason                                                                                                 |
+| --------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `next`                      | `^16.3.8` (locked to `16.3.8`) | Fixes image-optimization SSRF, GHSA-cjq9-62q9-8jv4                                                              |
+| `sharp`                     | `^0.35.5` (locked to `0.35.5`) | Includes the patched librsvg line, GHSA-wq5f-xc86-pv6w                                                          |
+| `@google/genai`             | `^2.24.0`                      | Allows patched `ws` and `protobufjs` transitive versions                                                        |
+| `@modelcontextprotocol/sdk` | `^1.31.0` (locked to `1.32.1`) | Fixes OAuth credential forwarding, GHSA-6qxp-vccf-f47h, and resolves compatible patched transitive dependencies |
+
+### Post-merge audit remediation (2026-10-08)
+
+[Security baseline run 37752771520](https://github.com/RanArino/gen-story/actions/runs/37752771520)
+failed after PR #52 merged because the locked production graph had one Critical
+and five High advisories (16 findings in total). The same failure was reproduced
+locally before changes. CI's audit threshold and workflow remain unchanged.
+
+In addition to the direct upgrades above, the lockfile resolves `proxy-addr`
+`2.0.8` (GHSA-jqcg-44mw-7w3h) and `source-map-js` `1.2.2`
+(GHSA-68fv-2mgg-jv7q). A parent-scoped root override selects
+`@firebase/firestore>@grpc/grpc-js: 1.14.5` to address GHSA-m9gg-hp2v-232j.
+The latest published Firestore browser SDK still declares `~1.9.0`, so an
+in-range refresh cannot reach a patched version. Remove this override after an
+upstream release declares a patched range and passes the same regression checks.
+The existing `gaxios>uuid` override is preserved; unrelated direct dependencies
+remain at their previous locked versions.
+
+`pnpm install --frozen-lockfile` and `pnpm audit --prod --audit-level=high`
+both exit zero locally. The latter reports no known vulnerabilities across all
+severities. Remote CI still requires publishing the updated manifests and
+lockfile; rerunning the original commit is not remediation. Hosted deployment
+and the remaining security controls are not completed by this dependency fix.
 
 There is no accepted Critical or High exception. Any future exception must name
 the advisory, reachable path, compensating control, human owner, and expiry;
