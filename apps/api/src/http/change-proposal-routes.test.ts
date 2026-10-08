@@ -193,8 +193,8 @@ describe("creative direction and change proposal routes", () => {
       "/api/projects/project_foreign/change-proposals",
     );
 
-    expect(direction.status).toBe(403);
-    expect(proposals.status).toBe(403);
+    expect(direction.status).toBe(404);
+    expect(proposals.status).toBe(404);
   });
 
   it("lists and reads a project's proposals", async () => {

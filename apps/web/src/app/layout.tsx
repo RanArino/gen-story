@@ -3,6 +3,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import type { ReactNode } from "react";
 
+import { AuthGate } from "../components/auth/AuthGate";
+
 export const metadata: Metadata = {
   title: "Gen Story",
   description: "Clickable UI mock for Gen Story",
@@ -20,7 +22,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
     <html lang={locale}>
       <body style={{ margin: 0 }}>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
+          <AuthGate>{children}</AuthGate>
         </NextIntlClientProvider>
       </body>
     </html>

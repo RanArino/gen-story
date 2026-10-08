@@ -10,6 +10,7 @@ import {
   createPreviewImage,
   detectSupportedImageType,
   readOriginalImageMetadata,
+  validateImageResourceLimits,
 } from "../images/image-metadata";
 import {
   buildOriginalPhotoStorageKey,
@@ -36,6 +37,10 @@ export class PhotoAssetIngestionService {
 
     try {
       const imageType = await detectSupportedImageType(input.body);
+
+      if (imageType.extension !== "heic" && imageType.extension !== "heif") {
+        await validateImageResourceLimits(input.body);
+      }
 
       let workingBody = input.body;
       let workingType = imageType;

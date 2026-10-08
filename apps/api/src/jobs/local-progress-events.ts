@@ -1,13 +1,8 @@
 import type { ProgressEventPort } from "@gen-story/application";
 
-export type ProgressEvent = {
-  kind: string;
-  entityType: string;
-  entityId: string;
-  payload?: Record<string, unknown>;
-};
+import type { ProgressEvent, ProgressEventListener } from "./progress-events";
 
-export type ProgressEventListener = (event: ProgressEvent) => void;
+export type { ProgressEvent, ProgressEventListener } from "./progress-events";
 
 // Resolve the project a subscriber cares about. Events that carry no project
 // reference are not fanned out: correctness never depends on the stream, and
