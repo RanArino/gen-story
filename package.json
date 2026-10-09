@@ -15,7 +15,7 @@
     "dev:api": "pnpm --filter @gen-story/api dev",
     "gcloud": "./scripts/gcloud-gen-story.sh",
     "security:sbom": "node scripts/generate-sbom.mjs",
-    "test:firestore:contract": "pnpm --filter @gen-story/api exec vitest run src/firestore/repositories.contract.test.ts",
+    "test:firestore:contract": "pnpm --filter @gen-story/api exec vitest run --fileParallelism=false src/firestore/repositories.contract.test.ts src/firestore/security-rules.test.ts src/firestore/hosted-http.test.ts",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --check package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.mjs \"apps/**/*.{json,ts,tsx,js,mjs}\" \"packages/**/*.{json,ts,tsx,js,mjs}\"",
