@@ -40,6 +40,19 @@ export {
   composeNegativePrompt,
 } from "./negative-prompt";
 
+export {
+  EDIT_PLAN_SCHEMA_VERSION,
+  MAX_EDIT_PLAN_DURATION_SECONDS,
+  validateEditPlan,
+} from "./edit-plan";
+export type {
+  EditPlan,
+  EditPlanScene,
+  EditPlanText,
+  EditPlanTransition,
+  EditPlanTransitionName,
+} from "./edit-plan";
+
 import type { TestAdjustmentId } from "./adjustments";
 
 export type ApiHealthDto = {
