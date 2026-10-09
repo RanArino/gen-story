@@ -17,6 +17,7 @@ import {
   createStoryboard,
   createStylePreset,
   createUser,
+  createTestGenerationBatch,
   setAgentConversationActiveBinding,
   storyboardSemanticTarget,
   type ScenePhotoAsset,
@@ -54,6 +55,473 @@ export function repositoryContracts(
   ) => Promise<void>,
 ) {
   describe(name, () => {
+    it("limits deleted photo listings to the seven-day recovery window", async () => {
+      await withDatabase(async ({ repositories }) => {
+        await seedBase(repositories);
+        const photo = buildPhotoAsset("photo_1");
+        await repositories.photoAssets.save(photo);
+        await repositories.photoAssets.softDelete(photo.id, later);
+        await expect(
+          repositories.photoAssets.findByProjectId(photo.projectId, true),
+        ).resolves.toEqual([]);
+        await repositories.photoAssets.softDelete(
+          photo.id,
+          new Date().toISOString(),
+        );
+        await expect(
+          repositories.photoAssets.findByProjectId(photo.projectId, true),
+        ).resolves.toHaveLength(1);
+        await expect(
+          repositories.photoAssets.findByProjectId(photo.projectId),
+        ).resolves.toEqual([]);
+        await repositories.photoAssets.restore(photo.id, later);
+        await expect(
+          repositories.photoAssets.findByProjectId(photo.projectId),
+        ).resolves.toEqual([{ ...photo, updatedAt: later }]);
+      });
+    });
+    it("preserves creation timestamps and domain shapes on re-save", async () => {
+      await withDatabase(async ({ repositories }) => {
+        const { organization, user, project } = await seedBase(repositories);
+        await seedGenerationFixture(repositories);
+        const photo = buildPhotoAsset("photo_1");
+        const style = createStylePreset({
+          id: "style_1",
+          scope: "user",
+          name: "Style",
+          description: "Style",
+          prompt: "Style",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const image = buildGeneratedImage("image_1");
+        await repositories.photoAssets.save(photo);
+        await repositories.stylePresets.save(style);
+        await repositories.generatedImages.save(image);
+        await repositories.users.save({
+          ...user,
+          displayName: "Renamed",
+          createdAt: later,
+          updatedAt: later,
+        });
+        await repositories.organizations.save({
+          ...organization,
+          name: "Renamed",
+          createdAt: later,
+          updatedAt: later,
+        });
+        await repositories.projects.save({
+          ...project,
+          name: "Renamed",
+          createdAt: later,
+          updatedAt: later,
+        });
+        await repositories.photoAssets.save({
+          ...photo,
+          name: "Renamed",
+          createdAt: later,
+          updatedAt: later,
+        });
+        await repositories.stylePresets.save({
+          ...style,
+          prompt: "Updated",
+          createdAt: later,
+          updatedAt: later,
+        });
+        await repositories.generatedImages.save({
+          ...image,
+          createdAt: later,
+          updatedAt: later,
+        });
+        await expect(repositories.users.findById(user.id)).resolves.toEqual({
+          ...user,
+          displayName: "Renamed",
+          updatedAt: later,
+        });
+        await expect(
+          repositories.organizations.findById(organization.id),
+        ).resolves.toEqual({
+          ...organization,
+          name: "Renamed",
+          updatedAt: later,
+        });
+        await expect(
+          repositories.projects.findById(project.id),
+        ).resolves.toEqual({ ...project, name: "Renamed", updatedAt: later });
+        await expect(
+          repositories.photoAssets.findById(photo.id),
+        ).resolves.toEqual({ ...photo, name: "Renamed", updatedAt: later });
+        await expect(
+          repositories.stylePresets.findById(style.id),
+        ).resolves.toEqual({ ...style, prompt: "Updated", updatedAt: later });
+        await expect(
+          repositories.generatedImages.findById(image.id),
+        ).resolves.toEqual({ ...image, updatedAt: later });
+      });
+    });
+
+    it("derives active scene IDs after deletion and restores saved scenes", async () => {
+      await withDatabase(async ({ repositories }) => {
+        await seedGenerationFixture(repositories);
+        const scene = buildScene("scene_1", 0);
+        await repositories.scenes.softDelete(scene.id, later);
+        await expect(
+          repositories.scenes.findById(scene.id),
+        ).resolves.toBeNull();
+        await expect(
+          repositories.scenes.findByStoryboardId(scene.storyboardId),
+        ).resolves.toEqual([]);
+        await expect(
+          repositories.storyboards.findByProjectId(scene.projectId),
+        ).resolves.toMatchObject([{ sceneIds: [] }]);
+        await repositories.scenes.save({ ...scene, updatedAt: later });
+        await expect(repositories.scenes.findById(scene.id)).resolves.toEqual({
+          ...scene,
+          updatedAt: later,
+        });
+        await expect(
+          repositories.storyboards.findByProjectId(scene.projectId),
+        ).resolves.toMatchObject([{ sceneIds: [scene.id] }]);
+      });
+    });
+
+    it("rejects a duplicate conversation turn request ID without replacing the original", async () => {
+      await withDatabase(async ({ repositories }) => {
+        await seedBase(repositories);
+        const conversation = createAgentConversation({
+          id: "conversation_1",
+          projectId: "project_1",
+          title: "Refine",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const binding = createAgentProviderBinding({
+          id: "binding_1",
+          conversationId: conversation.id,
+          provider: "codex",
+          createdAt: now,
+          updatedAt: now,
+        });
+        const turn = createAgentConversationTurn({
+          id: "turn_1",
+          conversationId: conversation.id,
+          bindingId: binding.id,
+          clientRequestId: "request_1",
+          provider: "codex",
+          startedAt: now,
+        });
+        await repositories.agentConversations.save(conversation);
+        await repositories.agentConversations.saveBinding(binding);
+        await repositories.agentConversations.saveTurn(turn);
+        await expect(
+          repositories.agentConversations.saveTurn({ ...turn, id: "turn_2" }),
+        ).rejects.toThrow();
+        await expect(
+          repositories.agentConversations.findTurnByClientRequestId(
+            conversation.id,
+            turn.clientRequestId,
+          ),
+        ).resolves.toEqual(turn);
+        await expect(
+          repositories.agentConversations.listTurns(conversation.id),
+        ).resolves.toEqual([turn]);
+      });
+    });
+    it("persists proposals and preferences after reopening repositories", async () => {
+      await withDatabase(async ({ repositories, reopen }) => {
+        await seedGenerationFixture(repositories);
+        const proposal = buildChangeProposal();
+        const preference = {
+          userId: "user_1",
+          language: "ja" as const,
+          agentRuntime: "codex" as const,
+          updatedAt: later,
+        };
+        await repositories.changeProposals.save(proposal);
+        await repositories.userPreferences.upsert(preference);
+        const restarted = await reopen();
+        await expect(
+          restarted.changeProposals.findById(proposal.id),
+        ).resolves.toEqual(proposal);
+        await expect(
+          restarted.userPreferences.findByUserId("user_1"),
+        ).resolves.toEqual(preference);
+        await expect(
+          restarted.projects.findById("project_1"),
+        ).resolves.toMatchObject({ name: "Anniversary Story" });
+      });
+    });
+
+    it("round-trips batches and replaces preferences without duplicates", async () => {
+      await withDatabase(async ({ repositories }) => {
+        await seedGenerationFixture(repositories);
+        const first = createTestGenerationBatch({
+          id: "batch_1",
+          storyboardId: "storyboard_1",
+          createdAt: now,
+        });
+        const second = createTestGenerationBatch({
+          id: "batch_2",
+          storyboardId: "storyboard_1",
+          createdAt: later,
+        });
+        await repositories.testGenerationBatches.save(second);
+        await repositories.testGenerationBatches.save(first);
+        await repositories.testGenerationBatches.save(first);
+        await expect(
+          repositories.testGenerationBatches.listByStoryboardId("storyboard_1"),
+        ).resolves.toEqual([second, first]);
+        await expect(
+          repositories.testGenerationBatches.findLatestByStoryboardId(
+            "storyboard_1",
+          ),
+        ).resolves.toEqual(second);
+        await expect(
+          repositories.testGenerationBatches.findLatestByStoryboardId("other"),
+        ).resolves.toBeNull();
+        const preference = {
+          userId: "user_1",
+          language: "en" as const,
+          agentRuntime: "api" as const,
+          updatedAt: now,
+        };
+        await expect(
+          repositories.userPreferences.findByUserId("other"),
+        ).resolves.toBeNull();
+        await repositories.userPreferences.upsert(preference);
+        await repositories.userPreferences.upsert({
+          ...preference,
+          language: "ja",
+          updatedAt: later,
+        });
+        await expect(
+          repositories.userPreferences.findByUserId("user_1"),
+        ).resolves.toEqual({ ...preference, language: "ja", updatedAt: later });
+      });
+    });
+
+    it("orders projects, photos, proposals and style presets deterministically", async () => {
+      await withDatabase(async ({ repositories }) => {
+        const { project } = await seedBase(repositories);
+        await repositories.projects.save({
+          ...project,
+          id: "project_2",
+          createdAt: later,
+          updatedAt: now,
+        });
+        await repositories.projects.save({ ...project, updatedAt: later });
+        await expect(
+          repositories.projects.findByOrganizationId(project.organizationId),
+        ).resolves.toMatchObject([{ id: "project_1" }, { id: "project_2" }]);
+        await repositories.projects.softDelete(project.id, later);
+        await expect(
+          repositories.projects.findById(project.id),
+        ).resolves.toBeNull();
+        await expect(
+          repositories.projects.findByOrganizationId(project.organizationId),
+        ).resolves.toHaveLength(1);
+        await expect(
+          repositories.projects.findByOrganizationId(
+            project.organizationId,
+            true,
+          ),
+        ).resolves.toHaveLength(1);
+        await repositories.projects.softDelete(
+          project.id,
+          new Date().toISOString(),
+        );
+        await expect(
+          repositories.projects.findByOrganizationId(
+            project.organizationId,
+            true,
+          ),
+        ).resolves.toHaveLength(2);
+        await repositories.projects.restore(project.id, later);
+        await repositories.storyboards.save(buildStoryboard());
+        await repositories.photoAssets.save({
+          ...buildPhotoAsset("photo_1"),
+          position: 2,
+        });
+        await repositories.photoAssets.save({
+          ...buildPhotoAsset("photo_2"),
+          position: 1,
+          createdAt: later,
+        });
+        await expect(
+          repositories.photoAssets.findByProjectId(project.id),
+        ).resolves.toMatchObject([{ id: "photo_2" }, { id: "photo_1" }]);
+        const proposal = buildChangeProposal();
+        await repositories.changeProposals.save({
+          ...proposal,
+          id: "proposal_2",
+          clientRequestId: "request_2",
+          createdAt: later,
+          choices: [],
+          items: proposal.items.map((i) => ({ ...i, id: `${i.id}_2` })),
+        });
+        await repositories.changeProposals.save(proposal);
+        await expect(
+          repositories.changeProposals.findByProjectId(project.id),
+        ).resolves.toMatchObject([{ id: "proposal_1" }, { id: "proposal_2" }]);
+        for (const [id, name] of [
+          ["style_z", "Zebra"],
+          ["style_a", "Amber"],
+        ] as const) {
+          await repositories.stylePresets.save(
+            createStylePreset({
+              id,
+              name,
+              scope: "user",
+              description: "Style",
+              prompt: "Style",
+              createdAt: now,
+              updatedAt: now,
+            }),
+          );
+        }
+        await expect(
+          repositories.stylePresets.findAll(),
+        ).resolves.toMatchObject([{ id: "style_a" }, { id: "style_z" }]);
+      });
+    });
+
+    it("rejects competing proposal IDs for one project request ID", async () => {
+      await withDatabase(async ({ repositories }) => {
+        await seedBase(repositories);
+        await repositories.storyboards.save(buildStoryboard());
+        const proposal = buildChangeProposal();
+        const competing = {
+          ...proposal,
+          id: "proposal_2",
+          choices: [],
+          items: proposal.items.map((i) => ({ ...i, id: `${i.id}_2` })),
+        };
+        const results = await Promise.allSettled([
+          repositories.changeProposals.save(proposal),
+          repositories.changeProposals.save(competing),
+        ]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        await expect(
+          repositories.changeProposals.findByProjectId(proposal.projectId),
+        ).resolves.toHaveLength(1);
+      });
+    }, 30_000);
+
+    it("adopts images through save and keeps exactly one scene adoption", async () => {
+      await withDatabase(async ({ repositories }) => {
+        await seedGenerationFixture(repositories);
+        const first = { ...buildGeneratedImage("image_1"), adoptedAt: now };
+        const second = {
+          ...buildGeneratedImage("image_2"),
+          adoptedAt: later,
+          updatedAt: later,
+        };
+        await repositories.generatedImages.save(first);
+        await repositories.generatedImages.save(second);
+        await expect(
+          repositories.scenes.findById("scene_1"),
+        ).resolves.toMatchObject({ adoptedGeneratedImageId: second.id });
+        await expect(
+          repositories.generatedImages.findById(first.id),
+        ).resolves.toMatchObject({ adoptedAt: null });
+        await expect(
+          repositories.generatedImages.findById(second.id),
+        ).resolves.toMatchObject({ adoptedAt: later });
+        await repositories.generatedImages.save({ ...second, adoptedAt: null });
+        await expect(
+          repositories.scenes.findById("scene_1"),
+        ).resolves.toMatchObject({ adoptedGeneratedImageId: null });
+      });
+    });
+
+    it("filters generation work and replaces the project's latest analysis", async () => {
+      await withDatabase(async ({ repositories }) => {
+        await seedGenerationFixture(repositories);
+        const request = createGenerationRequest({
+          id: "request_2",
+          projectId: "project_1",
+          storyboardId: "storyboard_1",
+          sceneId: "scene_1",
+          status: "running",
+          inputJson: {},
+          testGenerationBatchId: "batch_1",
+          createdAt: later,
+          updatedAt: later,
+        });
+        await repositories.testGenerationBatches.save(
+          createTestGenerationBatch({
+            id: "batch_1",
+            storyboardId: "storyboard_1",
+            createdAt: now,
+          }),
+        );
+        await repositories.generationRequests.save(request);
+        await expect(
+          repositories.generationRequests.findRecent(1),
+        ).resolves.toMatchObject([{ id: "request_1" }]);
+        await expect(
+          repositories.generationRequests.findBySceneId("scene_1"),
+        ).resolves.toMatchObject([{ id: "request_1" }, { id: "request_2" }]);
+        await expect(
+          repositories.generationRequests.findByStoryboardId("storyboard_1"),
+        ).resolves.toMatchObject([{ id: "request_2" }, { id: "request_1" }]);
+        await expect(
+          repositories.generationRequests.findByTestBatchId("batch_1"),
+        ).resolves.toEqual([request]);
+        await expect(
+          repositories.generationRequests.findByProjectIdAndStatus(
+            "project_1",
+            "running",
+          ),
+        ).resolves.toEqual([request]);
+        await expect(
+          repositories.generationRequests.findRunningCountByProjectId(
+            "project_1",
+          ),
+        ).resolves.toBe(1);
+        await repositories.generationRequests.softDelete(request.id, later);
+        await expect(
+          repositories.generationRequests.findById(request.id),
+        ).resolves.toBeNull();
+        await expect(
+          repositories.generationRequests.findRunningCountByProjectId(
+            "project_1",
+          ),
+        ).resolves.toBe(0);
+        const analysis = createProjectPhotoAnalysis({
+          id: "analysis_1",
+          projectId: "project_1",
+          storySummary: "Story",
+          emotionCandidates: [
+            {
+              value: "warm_nostalgia",
+              label: "Warm",
+              description: "Warm story",
+              reason: "Warm photos",
+            },
+          ],
+          photoInsights: [
+            {
+              photoAssetId: "photo_1",
+              summary: "Moment",
+              people: "Family",
+              setting: "Home",
+              event: "Memory",
+              atmosphere: "Warm",
+            },
+          ],
+          model: "test",
+          createdAt: now,
+          updatedAt: later,
+        });
+        await repositories.projectPhotoAnalyses.save(analysis);
+        const replacement = { ...analysis, id: "analysis_2", updatedAt: now };
+        await repositories.projectPhotoAnalyses.save(replacement);
+        await expect(
+          repositories.projectPhotoAnalyses.findLatestByProjectId("project_1"),
+        ).resolves.toEqual(replacement);
+      });
+    });
     it("round-trips the Phase 2 entities through repositories", async () => {
       await withDatabase(async ({ repositories }) => {
         const base = await seedBase(repositories);
