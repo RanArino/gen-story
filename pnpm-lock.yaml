@@ -85,6 +85,9 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
     devDependencies:
+      '@firebase/rules-unit-testing':
+        specifier: ^5.0.2
+        version: 5.0.2(firebase@12.19.0)
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
@@ -94,6 +97,9 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+      firebase:
+        specifier: 12.19.0
+        version: 12.19.0
 
   apps/web:
     dependencies:
@@ -922,6 +928,12 @@ packages:
     resolution: {integrity: sha512-Rii93DkXjM+RE/ytHdYa7EIiQLJbdBr+W8EEiqd/vbLCOC+1FdkDuRiumJBp6t3yewHGbdqbpjB3fk3z0cZ+8g==}
     peerDependencies:
       '@firebase/app': 0.x
+
+  '@firebase/rules-unit-testing@5.0.2':
+    resolution: {integrity: sha512-g053AaFcuf4gpAQbwRK/GIIGfPHhpomW3qkIYLi4xnaTUrf65yGP+0TPdojoXfB/ejrfevkXmMs5qXOTSwdN6A==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      firebase: ^12.0.0
 
   '@firebase/storage-compat@0.4.5':
     resolution: {integrity: sha512-vO0tFPxXbKDKdlTu8tYT08S9t9ezUTJYEdLCULpWxWq2aq6zojwN1QmAB+1a50AI/g47GlWUJn1XPncm/PDZsw==}
@@ -4511,6 +4523,10 @@ snapshots:
       '@firebase/logger': 0.5.2
       '@firebase/util': 1.15.3
       tslib: 2.8.1
+
+  '@firebase/rules-unit-testing@5.0.2(firebase@12.19.0)':
+    dependencies:
+      firebase: 12.19.0
 
   '@firebase/storage-compat@0.4.5(@firebase/app-compat@0.5.18)(@firebase/app-types@0.9.6)(@firebase/app@0.16.2)':
     dependencies:
