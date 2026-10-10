@@ -150,11 +150,15 @@ deployed Node services do not require Java. The contract never connects to the
 live staging or production database.
 
 `pnpm test:firestore:contract` runs the shared repository contracts, deny-all
-Security Rules tests, and isolated two-user HTTP authorization harness serially.
+Security Rules tests, isolated two-user HTTP authorization, and private-media
+upload/deletion/orphan contracts serially. It requires a loopback demo Emulator.
 See [Firestore persistence contracts](docs/firestore-contracts.md) for coverage,
 safe Emulator setup, storage/index inventory, and the remaining hosted gates.
 Hosted Firebase/Firestore persistence preparation is implemented, but cloud
-startup still rejects missing R2 and Cloud Tasks adapters. Project restoration
+startup remains disabled pending Cloud Tasks and hosted acceptance. Private R2
+adapters and direct execution are verified in isolated fixtures; see
+[Private R2 media](docs/r2-media.md) for APIs, configuration, Linux decoder and
+browser checks, recovery policy, and the separately authorized live probe. Project restoration
 checks ownership, and an existing storyboard cannot be reassigned through an
 update to another project.
 
@@ -282,3 +286,8 @@ See [docs/known-limitations.md](docs/known-limitations.md) for features intentio
 ## License
 
 Released under the [MIT License](LICENSE).
+
+The separate private deletion worker and its staging acceptance gate are documented
+in [Hosted deletion](docs/hosted-deletion.md); its Docker acceptance runs with
+`pnpm test:deletion:docker` and real-cloud acceptance is deferred. Full hosted startup
+remains disabled.

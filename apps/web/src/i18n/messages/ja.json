@@ -99,6 +99,7 @@
       "setExcluded": "除外に設定",
       "deleteSelected": "選択を削除"
     },
+    "processing": "写真を処理しています…",
     "uploading": "アップロード中…",
     "deletedSectionTitle": "最近削除したもの",
     "deletedSectionHint": "削除された写真は7日間保存されます。",

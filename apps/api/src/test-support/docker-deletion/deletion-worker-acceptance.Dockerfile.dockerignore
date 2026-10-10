@@ -1,0 +1,4 @@
+**
+!apps/api/src/test-support/docker-deletion/worker-entry.ts
+!apps/api/src/test-support/docker-deletion/local-task-queue.ts
+!apps/api/src/test-support/docker-deletion/task-tokens.ts

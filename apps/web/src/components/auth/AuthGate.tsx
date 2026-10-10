@@ -11,6 +11,7 @@ import {
   signOutFromFirebase,
 } from "../../lib/auth/firebase-client";
 import { endSession, establishSession } from "../../lib/auth/session-client";
+import { clearMediaUrls, setMediaAccount } from "../../lib/private-media";
 import styles from "./AuthGate.module.css";
 
 type Props = { children: ReactNode };
@@ -36,6 +37,7 @@ export function AuthGate({ children }: Props) {
       .then((auth) => {
         unsubscribe = onAuthStateChanged(auth, async (user) => {
           if (!active) return;
+          setMediaAccount(user?.uid ?? null);
           if (user == null) {
             setState("signed-out");
             return;
@@ -85,6 +87,7 @@ export function AuthGate({ children }: Props) {
     setBusy(true);
     setError(null);
     try {
+      clearMediaUrls();
       await endSession();
       await signOutFromFirebase();
       setState("signed-out");

@@ -23,6 +23,16 @@ describe.runIf(process.env.FIRESTORE_EMULATOR_HOST != null)(
 
     it("reserves concurrent sequences without collisions", async () => {
       await withRepositories(async ({ repositories }) => {
+        await seedGenerationFixture(repositories);
+        await repositories.agentConversations.save(
+          createAgentConversation({
+            id: "conversation_1",
+            projectId: "project_1",
+            title: "Refine",
+            createdAt: now,
+            updatedAt: now,
+          }),
+        );
         const sequences = await Promise.all(
           Array.from({ length: 8 }, () =>
             repositories.agentConversations.nextMessageSequence(

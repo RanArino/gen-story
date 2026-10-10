@@ -1,3 +1,4 @@
+import { guardDeletionWrite } from "./deletion-write-guard";
 import { createHash } from "node:crypto";
 import {
   Firestore,
@@ -89,6 +90,13 @@ class CollectionStore<T extends Entity> {
     const reference = this.collection.doc(value.id);
     await this.collection.firestore.runTransaction(async (transaction) => {
       const previous = await transaction.get(reference);
+      await guardDeletionWrite(
+        this.collection.firestore,
+        transaction,
+        this.collection.id,
+        value as unknown as Record<string, unknown>,
+        previous.data(),
+      );
       transaction.set(reference, {
         ...value,
         ...(previous.exists && "createdAt" in value
@@ -107,7 +115,22 @@ class CollectionStore<T extends Entity> {
   }
 
   async patch(id: string, value: Record<string, unknown>): Promise<void> {
-    await this.collection.doc(id).update(value);
+    const reference = this.collection.doc(id);
+    await this.collection.firestore.runTransaction(async (tx) => {
+      const previous = await tx.get(reference);
+      if (!previous.exists) throw new Error("Record not found.");
+      await guardDeletionWrite(
+        this.collection.firestore,
+        tx,
+        this.collection.id,
+        { ...previous.data(), ...value, id },
+        previous.data(),
+        value.deletedAt === null ||
+          (this.collection.id === "projects" &&
+            typeof value.deletedAt === "string"),
+      );
+      tx.update(reference, value);
+    });
   }
 }
 
@@ -426,6 +449,13 @@ class FirestoreGeneratedImageRepository implements GeneratedImageRepositoryPort 
       if (scene == null || scene.deletedAt != null)
         throw new Error("Scene not found.");
       const existing = await transaction.get(reference);
+      await guardDeletionWrite(
+        this.db,
+        transaction,
+        "generated_images",
+        value as unknown as Record<string, unknown>,
+        existing.data(),
+      );
       const images =
         value.adoptedAt == null
           ? null
@@ -480,6 +510,13 @@ class FirestoreProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRep
       .doc(value.projectId);
     await this.db.runTransaction(async (transaction) => {
       const previous = await transaction.get(reference);
+      await guardDeletionWrite(
+        this.db,
+        transaction,
+        "project_photo_analyses",
+        value as unknown as Record<string, unknown>,
+        previous.data(),
+      );
       transaction.set(reference, {
         ...value,
         createdAt: previous.data()?.createdAt ?? value.createdAt,
@@ -529,6 +566,13 @@ class FirestoreChangeProposalRepository implements ChangeProposalRepositoryPort 
         .collection("change_proposal_request_keys")
         .doc(compoundKey(record.projectId, record.clientRequestId));
       const reservation = await transaction.get(key);
+      await guardDeletionWrite(
+        this.db,
+        transaction,
+        "change_proposals",
+        record as unknown as Record<string, unknown>,
+        snapshot.data(),
+      );
       if (reservation.exists && reservation.data()?.proposalId !== value.id)
         throw new Error("Proposal request ID unique constraint violated.");
       transaction.set(key, { proposalId: value.id });
@@ -566,7 +610,15 @@ class FirestoreUserPreferenceRepository implements UserPreferenceRepositoryPort 
     return snapshot.exists ? (snapshot.data() as UserPreference) : null;
   }
   async upsert(value: UserPreference): Promise<void> {
-    await this.db.collection("user_preferences").doc(value.userId).set(value);
+    await this.db.runTransaction(async (tx) => {
+      await guardDeletionWrite(
+        this.db,
+        tx,
+        "user_preferences",
+        value as unknown as Record<string, unknown>,
+      );
+      tx.set(this.db.collection("user_preferences").doc(value.userId), value);
+    });
   }
 }
 
@@ -647,6 +699,13 @@ class FirestoreAgentConversationRepository implements AgentConversationRepositor
         .collection("agent_turn_request_keys")
         .doc(compoundKey(record.conversationId, record.clientRequestId));
       const reservation = await transaction.get(key);
+      await guardDeletionWrite(
+        this.db,
+        transaction,
+        "agent_conversation_turns",
+        record as unknown as Record<string, unknown>,
+        snapshot.data(),
+      );
       if (reservation.exists && reservation.data()?.turnId !== value.id)
         throw new Error("Turn request ID unique constraint violated.");
       transaction.set(key, { turnId: value.id });
@@ -677,6 +736,12 @@ class FirestoreAgentConversationRepository implements AgentConversationRepositor
         .collection("agent_conversation_counters")
         .doc(value.conversationId);
       const snapshot = await transaction.get(counter);
+      await guardDeletionWrite(
+        this.db,
+        transaction,
+        "agent_conversation_messages",
+        value as unknown as Record<string, unknown>,
+      );
       transaction.create(reference, value);
       transaction.set(sequenceKey, { messageId: value.id });
       transaction.set(counter, {
@@ -693,6 +758,12 @@ class FirestoreAgentConversationRepository implements AgentConversationRepositor
       .doc(conversationId);
     return this.db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(reference);
+      await guardDeletionWrite(
+        this.db,
+        transaction,
+        "agent_conversation_counters",
+        { conversationId },
+      );
       const next =
         ((snapshot.data()?.lastSequence as number | undefined) ?? 0) + 1;
       transaction.set(reference, { lastSequence: next });

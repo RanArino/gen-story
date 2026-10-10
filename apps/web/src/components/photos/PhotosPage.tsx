@@ -13,7 +13,8 @@ import {
   restorePhotoAsset,
   uploadPhotoAsset,
 } from "../../lib/api-client";
-import { storageKeyToUrl } from "../../lib/image-url";
+import { MediaImage } from "../MediaImage";
+import type { UploadPhase } from "../../lib/private-media";
 import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./PhotosPage.module.css";
@@ -21,7 +22,7 @@ import styles from "./PhotosPage.module.css";
 type UsageValue = PhotoUsage;
 type ViewSize = "small" | "medium" | "large";
 
-const ACCEPTED = "image/jpeg,image/jpg,image/png,image/heic,image/webp";
+const ACCEPTED = "image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp";
 const MAX_PHOTOS = 30;
 
 export function PhotosPage({ projectId }: { projectId: string }) {
@@ -30,6 +31,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
   const [photos, setPhotos] = useState<PhotoAssetDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploadPhases, setUploadPhases] = useState<Record<string, UploadPhase>>({});
   const [uploading, setUploading] = useState<string[]>([]);
   const [tab, setTab] = useState<"upload" | "manage">("upload");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,8 +71,9 @@ export function PhotosPage({ projectId }: { projectId: string }) {
     for (const file of toUpload) {
       const tempId = `uploading-${file.name}-${Date.now()}`;
       setUploading((prev) => [...prev, tempId]);
+      setTab("manage");
       try {
-        const asset = await uploadPhotoAsset(projectId, file);
+        const asset = await uploadPhotoAsset(projectId, file, undefined, (phase) => setUploadPhases(prev => ({...prev, [tempId]: phase})));
         setPhotos((prev) => [...prev, asset]);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : t("errors.uploadFailed"));
@@ -367,7 +370,7 @@ export function PhotosPage({ projectId }: { projectId: string }) {
               {uploading.map((id) => (
                 <div key={id} className={`card ${styles.uploadingCard}`}>
                   <div className={styles.uploadingSpinner} />
-                  <p className={styles.hint}>{t("uploading")}</p>
+                  <p className={styles.hint}>{uploadPhases[id] === "processing" ? t("processing") : t("uploading")}</p>
                 </div>
               ))}
             </div>
@@ -437,7 +440,6 @@ function PhotoCard({
   onDelete: (id: string) => void;
 }) {
   const t = useTranslations("photos");
-  const imgUrl = storageKeyToUrl(photo.storageKey);
 
   return (
     <div
@@ -454,7 +456,7 @@ function PhotoCard({
       title={t("dragHint", { index: index + 1 })}
     >
       <div className={styles.photoThumb}>
-        <img src={imgUrl} alt={photo.name} className={styles.thumbImg} />
+        <MediaImage entity="photo-assets" entityId={photo.id} storageKey={photo.storageKey} alt={photo.name} className={styles.thumbImg} />
         <label
           className={styles.cardCheckbox}
           onClick={(e) => e.stopPropagation()}
@@ -498,7 +500,6 @@ function DeletedPhotoCard({
   onRestore: (id: string) => void;
 }) {
   const t = useTranslations("photos");
-  const imgUrl = storageKeyToUrl(photo.storageKey);
   const deletedDate = photo.deletedAt
     ? new Date(photo.deletedAt).toLocaleDateString()
     : "";
@@ -506,8 +507,8 @@ function DeletedPhotoCard({
   return (
     <div className={`card ${styles.photoCard} ${styles.photoCardDeleted}`}>
       <div className={styles.photoThumb}>
-        <img
-          src={imgUrl}
+        <MediaImage
+          entity="photo-assets" entityId={photo.id} storageKey={photo.storageKey}
           alt={photo.name}
           className={`${styles.thumbImg} ${styles.thumbDeleted}`}
         />

@@ -22,7 +22,7 @@ import {
   retryGenerationRequest,
   upsertScenes,
 } from "../../lib/api-client";
-import { storageKeyToUrl } from "../../lib/image-url";
+import { MediaImage } from "../MediaImage";
 import { AppShell } from "../AppShell";
 import { ImageModelSelect, useImageModel } from "../common/ImageModelSelect";
 import { ComposedPromptPreview } from "../common/ComposedPromptPreview";
@@ -424,8 +424,8 @@ function SceneReviewCard({
             <p className={styles.colLabel}>{t("card.sourcePhoto")}</p>
             <div className={styles.imgBox}>
               {primaryPhoto ? (
-                <img
-                  src={storageKeyToUrl(primaryPhoto.storageKey)}
+                <MediaImage
+                  entity="photo-assets" entityId={primaryPhoto.id} storageKey={primaryPhoto.storageKey}
                   alt={primaryPhoto.name}
                   className={styles.img}
                 />
@@ -444,8 +444,8 @@ function SceneReviewCard({
             <p className={styles.colLabel}>{t("card.generatedImage")}</p>
             <div className={styles.imgBox}>
               {adoptedImage ? (
-                <img
-                  src={storageKeyToUrl(adoptedImage.storageKey)}
+                <MediaImage
+                  entity="generated-images" entityId={adoptedImage.id} storageKey={adoptedImage.storageKey}
                   alt="Generated"
                   className={styles.img}
                 />
@@ -512,8 +512,8 @@ function SceneReviewCard({
                   <div key={req.id} className={styles.historyItem}>
                     <div className={styles.historyThumbBox}>
                       {img ? (
-                        <img
-                          src={storageKeyToUrl(img.storageKey)}
+                        <MediaImage
+                          entity="generated-images" entityId={img.id} storageKey={img.storageKey}
                           alt="Generated"
                           className={styles.historyThumb}
                         />
@@ -889,8 +889,8 @@ function TimelineView({
                 {filter !== "generated" && (
                   <div className={styles.imgBox}>
                     {r.primaryPhoto ? (
-                      <img
-                        src={storageKeyToUrl(r.primaryPhoto.storageKey)}
+                      <MediaImage
+                        entity="photo-assets" entityId={r.primaryPhoto.id} storageKey={r.primaryPhoto.storageKey}
                         alt={r.primaryPhoto.name}
                         className={styles.img}
                       />
@@ -906,8 +906,8 @@ function TimelineView({
                 {filter !== "original" && (
                   <div className={styles.imgBox}>
                     {generated ? (
-                      <img
-                        src={storageKeyToUrl(generated.storageKey)}
+                      <MediaImage
+                        entity="generated-images" entityId={generated.id} storageKey={generated.storageKey}
                         alt="Generated"
                         className={styles.img}
                       />
@@ -960,8 +960,8 @@ function TableView({
                 {filter !== "generated" && (
                   <td>
                     {r.primaryPhoto ? (
-                      <img
-                        src={storageKeyToUrl(r.primaryPhoto.storageKey)}
+                      <MediaImage
+                        entity="photo-assets" entityId={r.primaryPhoto.id} storageKey={r.primaryPhoto.storageKey}
                         alt={r.primaryPhoto.name}
                         className={styles.tableThumb}
                       />
@@ -973,8 +973,8 @@ function TableView({
                 {filter !== "original" && (
                   <td>
                     {generated ? (
-                      <img
-                        src={storageKeyToUrl(generated.storageKey)}
+                      <MediaImage
+                        entity="generated-images" entityId={generated.id} storageKey={generated.storageKey}
                         alt="Generated"
                         className={styles.tableThumb}
                       />
