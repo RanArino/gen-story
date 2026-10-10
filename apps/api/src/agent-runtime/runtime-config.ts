@@ -37,17 +37,13 @@ export function resolveAgentRuntimeSelection(
   return raw as AgentRuntimeSelection;
 }
 
-export type DeployTarget = "local" | "cloud";
+export type DeployTarget = "local" | "other";
 
 export function resolveDeployTarget(
   env: NodeJS.ProcessEnv = process.env,
 ): DeployTarget {
   const raw = env.GEN_STORY_DEPLOY_TARGET?.trim();
-  if (raw == null || raw.length === 0 || raw === "local") return "local";
-  if (raw === "cloud") return "cloud";
-  throw new RuntimeConfigError(
-    `Unknown GEN_STORY_DEPLOY_TARGET value "${raw}". Supported values: local, cloud.`,
-  );
+  return raw == null || raw.length === 0 || raw === "local" ? "local" : "other";
 }
 
 // R2.1: CLI runtimes are local-only, enforced at startup rather than by

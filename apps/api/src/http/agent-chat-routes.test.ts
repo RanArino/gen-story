@@ -323,7 +323,7 @@ describe("agent chat routes", () => {
       {},
     );
 
-    expect(foreign.status).toBe(404);
+    expect(foreign.status).toBe(403);
   });
 
   it("refuses a turn when no CLI runtime is available", async () => {

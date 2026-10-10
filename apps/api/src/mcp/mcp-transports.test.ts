@@ -214,7 +214,7 @@ describe("MCP transports", () => {
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
     });
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(403);
   });
 
   it("returns 404 for an MCP session on an unknown project", async () => {

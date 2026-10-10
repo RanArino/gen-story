@@ -8,8 +8,7 @@ import {
 } from "../auth/local-auth";
 import type { StubAgentTurnRunner } from "../test-support/in-memory-application";
 import { createInMemoryApplicationDependencies } from "../test-support/in-memory-application";
-import { buildHostedRouter, buildRouter, handleApiRequest } from "./routes";
-import { createHttpRequestContextFactory } from "./router";
+import { buildRouter, handleApiRequest } from "./routes";
 import { buildHealthResponse } from "../server";
 import { sendJson } from "./json";
 
@@ -96,27 +95,6 @@ describe("unknown route", () => {
     const { status, body } = await req(base, "GET", "/api/unknown-endpoint");
     expect(status).toBe(404);
     expect(body).toMatchObject({ error: { code: "not_found" } });
-  });
-});
-
-describe("hosted route registry", () => {
-  it.each([
-    ["GET", "/files/private.png"],
-    ["GET", "/api/debug/generation-requests"],
-    ["GET", "/api/ai-runtime"],
-    ["POST", "/api/mcp/projects/project-a"],
-    ["POST", "/api/projects/project-a/agent-conversations"],
-  ])("does not register the local-only %s %s route", async (method, url) => {
-    const hostedRouter = buildHostedRouter(
-      deps,
-      createHttpRequestContextFactory(deps),
-    );
-    const handled = await hostedRouter.handle(
-      { method, url } as Parameters<typeof hostedRouter.handle>[0],
-      {} as Parameters<typeof hostedRouter.handle>[1],
-    );
-
-    expect(handled).toBe(false);
   });
 });
 
@@ -235,25 +213,6 @@ describe("POST /api/projects", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 415 when a JSON route receives another media type", async () => {
-    const res = await fetch(`${base}/api/projects`, {
-      method: "POST",
-      headers: { "content-type": "text/plain" },
-      body: '{"name":"wrong media type"}',
-    });
-    expect(res.status).toBe(415);
-  });
-
-  it("returns 413 before parsing an oversized JSON body", async () => {
-    const res = await fetch(`${base}/api/projects`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "x".repeat(300 * 1024) }),
-    });
-    expect(res.status).toBe(413);
-    expect(res.headers.get("connection")).toBe("close");
-  });
-
   it("returns 409 on duplicate project ID", async () => {
     await req(base, "POST", "/api/projects", {
       projectId: "proj-1",
@@ -284,7 +243,7 @@ describe("GET /api/projects/:projectId", () => {
     expect(status).toBe(404);
   });
 
-  it("returns 404 for project in different org", async () => {
+  it("returns 403 for project in different org", async () => {
     const { createProject } = await import("@gen-story/domain");
     await deps.projects.save(
       createProject({
@@ -298,7 +257,7 @@ describe("GET /api/projects/:projectId", () => {
     );
 
     const { status } = await req(base, "GET", "/api/projects/foreign-proj");
-    expect(status).toBe(404);
+    expect(status).toBe(403);
   });
 });
 
@@ -363,7 +322,7 @@ describe("PATCH /api/photo-assets/:photoAssetId", () => {
     expect(status).toBe(422);
   });
 
-  it("returns 404 for photo asset in different org", async () => {
+  it("returns 403 for photo asset in different org", async () => {
     const { createPhotoAsset, createProject } =
       await import("@gen-story/domain");
     const now = new Date().toISOString();
@@ -401,7 +360,7 @@ describe("PATCH /api/photo-assets/:photoAssetId", () => {
         usage: "candidate",
       },
     );
-    expect(status).toBe(404);
+    expect(status).toBe(403);
   });
 });
 
@@ -870,7 +829,7 @@ describe("POST /api/scenes/:sceneId/ai-fill", () => {
     });
   });
 
-  it("returns 404 for a scene in another organization", async () => {
+  it("returns 403 for a scene in another organization", async () => {
     const { createProject, createTemplateScene, createStoryboard } =
       await import("@gen-story/domain");
     const now = new Date().toISOString();
@@ -912,7 +871,7 @@ describe("POST /api/scenes/:sceneId/ai-fill", () => {
       {},
     );
 
-    expect(status).toBe(404);
+    expect(status).toBe(403);
   });
 
   it("returns 422 when the scene has no primary photo", async () => {
@@ -1092,7 +1051,7 @@ describe("guided storyboard setup routes", () => {
     expect(status).toBe(422);
   });
 
-  it("returns 404 for story setup on a storyboard in another organization", async () => {
+  it("returns 403 for story setup on a storyboard in another organization", async () => {
     const prefix = await seedSetupStoryboard({
       idPrefix: "story-foreign",
       organizationId: "other-org",
@@ -1106,7 +1065,7 @@ describe("guided storyboard setup routes", () => {
       {},
     );
 
-    expect(status).toBe(404);
+    expect(status).toBe(403);
   });
 
   it("returns 202 with one bulk fill job per blank scene", async () => {
@@ -1131,7 +1090,7 @@ describe("guided storyboard setup routes", () => {
     expect(job?.kind).toBe("scene_ai_fill");
   });
 
-  it("returns 404 for bulk fill on a storyboard in another organization", async () => {
+  it("returns 403 for bulk fill on a storyboard in another organization", async () => {
     const prefix = await seedSetupStoryboard({
       idPrefix: "bulk-foreign",
       organizationId: "other-org",
@@ -1145,7 +1104,7 @@ describe("guided storyboard setup routes", () => {
       {},
     );
 
-    expect(status).toBe(404);
+    expect(status).toBe(403);
   });
 
   it("reports the derived setup step on the storyboard DTO", async () => {
@@ -1294,7 +1253,7 @@ describe("POST /api/scenes/:sceneId/preview-prompt", () => {
     expect(status).toBe(404);
   });
 
-  it("returns 404 for a scene in another organization", async () => {
+  it("returns 403 for a scene in another organization", async () => {
     const sceneId = await seedPreviewScene({
       organizationId: "other-org",
       ownerUserId: "other-user",
@@ -1308,7 +1267,7 @@ describe("POST /api/scenes/:sceneId/preview-prompt", () => {
       {},
     );
 
-    expect(status).toBe(404);
+    expect(status).toBe(403);
   });
 });
 
@@ -1698,7 +1657,7 @@ describe("project photo analysis routes", () => {
     expect(status).toBe(422);
   });
 
-  it("returns 404 for another organization's analysis project", async () => {
+  it("returns 403 for another organization's analysis project", async () => {
     const { createProject } = await import("@gen-story/domain");
     const now = new Date().toISOString();
     await deps.projects.save(
@@ -1718,7 +1677,7 @@ describe("project photo analysis routes", () => {
       "/api/projects/foreign-analysis-proj/photo-analysis",
     );
 
-    expect(status).toBe(404);
+    expect(status).toBe(403);
   });
 
   it("returns 401 without principal", async () => {

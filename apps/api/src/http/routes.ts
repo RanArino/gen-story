@@ -116,15 +116,15 @@ import {
 import {
   badRequestBody,
   errorBody,
+  forbiddenBody,
   internalErrorBody,
   notFoundBody,
   unauthorizedBody,
   useCaseErrorToStatus,
 } from "./errors";
-import { bodyErrorStatus, HttpBodyError, readJsonBody, sendJson } from "./json";
+import { readJsonBody, sendJson } from "./json";
 import { logRequest } from "./request-logger";
 import { getParam, Router } from "./router";
-import { HTTP_BODY_LIMITS } from "./security-policy";
 import {
   AssignScenePhotosSchema,
   AnalyzeProjectPhotosSchema,
@@ -152,8 +152,7 @@ import {
   UpsertStoryboardSchema,
 } from "./schemas";
 
-import { createHttpRequestContextFactory } from "./router";
-import type { HttpRequestContextFactory, RouteParams } from "./router";
+import type { RouteParams } from "./router";
 
 async function requirePrincipal(
   deps: ApplicationDependencies,
@@ -187,7 +186,7 @@ async function requireOwnedAiJob(
 
   const project = await deps.projects.findById(job.projectId);
   if (project == null || project.organizationId !== principal.organization.id) {
-    sendJson(res, 404, notFoundBody());
+    sendJson(res, 403, forbiddenBody());
     return null;
   }
 
@@ -212,7 +211,7 @@ async function requireOwnedProject(
   }
 
   if (project.organizationId !== principal.organization.id) {
-    sendJson(res, 404, notFoundBody());
+    sendJson(res, 403, forbiddenBody());
     return null;
   }
 
@@ -266,21 +265,13 @@ async function readBodyOrRespond(
   try {
     return { body: await readJsonBody(req) };
   } catch (err) {
-    sendBodyReadError(res, err);
+    sendJson(
+      res,
+      400,
+      badRequestBody(err instanceof Error ? err.message : "Bad request."),
+    );
     return null;
   }
-}
-
-function sendBodyReadError(res: ServerResponse, error: unknown): void {
-  const status = bodyErrorStatus(error);
-  if (status === 413) {
-    res.setHeader("Connection", "close");
-  }
-  sendJson(
-    res,
-    status,
-    badRequestBody(error instanceof Error ? error.message : "Bad request."),
-  );
 }
 
 // The ids of the samples a storyboard's operator picked, one per completed
@@ -303,179 +294,132 @@ async function confirmedTestRequestIds(
   return ids;
 }
 
-export function buildRouter(
-  deps: ApiDependencies,
-  contextFactory: HttpRequestContextFactory = createHttpRequestContextFactory(
-    deps,
-  ),
-): Router {
-  return buildLocalRouter(deps, contextFactory);
-}
-
-export function buildLocalRouter(
-  deps: ApiDependencies,
-  contextFactory: HttpRequestContextFactory = createHttpRequestContextFactory(
-    deps,
-  ),
-): Router {
-  return buildRouterForTarget(deps, contextFactory, "local");
-}
-
-export function buildHostedRouter(
-  deps: ApiDependencies,
-  contextFactory: HttpRequestContextFactory,
-): Router {
-  return buildRouterForTarget(deps, contextFactory, "cloud");
-}
-
-function buildRouterForTarget(
-  deps: ApiDependencies,
-  contextFactory: HttpRequestContextFactory,
-  target: "local" | "cloud",
-): Router {
-  const router = new Router(contextFactory);
+export function buildRouter(deps: ApiDependencies): Router {
+  const router = new Router();
 
   // GET /api/me
-  router.add(
-    "GET",
-    "/api/me",
-    async (_req, res, _params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
-      sendJson(res, 200, toMeDto(principal));
-    },
-  );
+  router.add("GET", "/api/me", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+    sendJson(res, 200, toMeDto(principal));
+  });
 
-  if (target === "local") {
-    // GET /api/ai-runtime
-    router.add(
-      "GET",
-      "/api/ai-runtime",
-      async (_req, res, _params, { dependencies: deps }) => {
-        const principal = await requirePrincipal(deps, res);
-        if (principal == null) return;
-        const preference = await getUserPreference(deps, principal.user.id);
-        if (!preference.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(preference.error.code),
-            errorBody(preference.error.code, preference.error.message),
-          );
-          return;
-        }
-        const selection = preference.value.agentRuntime;
-        deps.agentRuntime.selection = selection;
-        deps.agentRuntime.wallet = agentRuntimeWallet(selection);
-        deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
-        deps.agentRuntime.availability =
-          selection === "api"
-            ? { status: "not_applicable" }
-            : await resolveAgentRuntimeAvailability(selection, {
-                workingDirectory: process.cwd(),
-                allowedWorkingDirectoryRoot: process.cwd(),
-              });
-        sendJson(
-          res,
-          200,
-          toAiRuntimeInfoDto(
-            deps.agentRuntime,
-            deps.agentTurnRunner.availability(),
-          ),
-        );
-      },
+  // GET /api/ai-runtime
+  router.add("GET", "/api/ai-runtime", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
+    const preference = await getUserPreference(deps, principal.user.id);
+    if (!preference.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(preference.error.code),
+        errorBody(preference.error.code, preference.error.message),
+      );
+      return;
+    }
+    const selection = preference.value.agentRuntime;
+    deps.agentRuntime.selection = selection;
+    deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+    deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+    deps.agentRuntime.availability =
+      selection === "api"
+        ? { status: "not_applicable" }
+        : await resolveAgentRuntimeAvailability(selection, {
+            workingDirectory: process.cwd(),
+            allowedWorkingDirectoryRoot: process.cwd(),
+          });
+    sendJson(
+      res,
+      200,
+      toAiRuntimeInfoDto(
+        deps.agentRuntime,
+        deps.agentTurnRunner.availability(),
+      ),
     );
-  }
+  });
 
   // GET /api/projects
-  router.add(
-    "GET",
-    "/api/projects",
-    async (req, res, _params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
+  router.add("GET", "/api/projects", async (req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-      const url = new URL(req.url ?? "/", "http://localhost");
-      const includeDeleted = url.searchParams.get("includeDeleted") === "true";
-      const projects = await deps.projects.findByOrganizationId(
-        principal.organization.id,
-        includeDeleted,
-      );
-      sendJson(res, 200, { projects: projects.map(toProjectDto) });
-    },
-  );
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const includeDeleted = url.searchParams.get("includeDeleted") === "true";
+    const projects = await deps.projects.findByOrganizationId(
+      principal.organization.id,
+      includeDeleted,
+    );
+    sendJson(res, 200, { projects: projects.map(toProjectDto) });
+  });
 
   // POST /api/projects
-  router.add(
-    "POST",
-    "/api/projects",
-    async (req, res, _params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
+  router.add("POST", "/api/projects", async (req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-      let rawBody: unknown;
-      try {
-        rawBody = await readJsonBody(req);
-      } catch (err) {
-        sendBodyReadError(res, err);
-        return;
-      }
+    let rawBody: unknown;
+    try {
+      rawBody = await readJsonBody(req);
+    } catch (err) {
+      sendJson(
+        res,
+        400,
+        badRequestBody(err instanceof Error ? err.message : "Bad request."),
+      );
+      return;
+    }
 
-      const parsed = CreateProjectSchema.safeParse(rawBody);
-      if (!parsed.success) {
-        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
-        return;
-      }
+    const parsed = CreateProjectSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+      return;
+    }
 
-      const projectId = parsed.data.projectId ?? crypto.randomUUID();
-      const result = await createProjectUseCase(deps, {
-        projectId,
-        organizationId: principal.organization.id,
-        ownerUserId: principal.user.id,
-        name: parsed.data.name,
-      });
+    const projectId = parsed.data.projectId ?? crypto.randomUUID();
+    const result = await createProjectUseCase(deps, {
+      projectId,
+      organizationId: principal.organization.id,
+      ownerUserId: principal.user.id,
+      name: parsed.data.name,
+    });
 
-      if (!result.ok) {
-        sendJson(
-          res,
-          useCaseErrorToStatus(result.error.code),
-          errorBody(result.error.code, result.error.message),
-        );
-        return;
-      }
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
 
-      sendJson(res, 201, toProjectDto(result.value));
-    },
-  );
+    sendJson(res, 201, toProjectDto(result.value));
+  });
 
   // GET /api/projects/:projectId
-  router.add(
-    "GET",
-    "/api/projects/:projectId",
-    async (_req, res, params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
+  router.add("GET", "/api/projects/:projectId", async (_req, res, params) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-      const projectId = getParam(params, "projectId");
-      const project = await deps.projects.findById(projectId);
-      if (project == null) {
-        sendJson(res, 404, notFoundBody("Project not found."));
-        return;
-      }
+    const projectId = getParam(params, "projectId");
+    const project = await deps.projects.findById(projectId);
+    if (project == null) {
+      sendJson(res, 404, notFoundBody("Project not found."));
+      return;
+    }
 
-      if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
-        return;
-      }
+    if (project.organizationId !== principal.organization.id) {
+      sendJson(res, 403, forbiddenBody());
+      return;
+    }
 
-      sendJson(res, 200, toProjectDto(project));
-    },
-  );
+    sendJson(res, 200, toProjectDto(project));
+  });
 
   // GET /api/projects/:projectId/photo-assets
   router.add(
     "GET",
     "/api/projects/:projectId/photo-assets",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -487,7 +431,7 @@ function buildRouterForTarget(
       }
 
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -505,7 +449,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/export-assets",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -513,7 +457,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
       const parsed = ExportStoryboardAssetsSchema.safeParse(rawBody);
@@ -533,7 +481,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -560,7 +508,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/projects/:projectId/photo-analysis",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -572,7 +520,7 @@ function buildRouterForTarget(
       }
 
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -597,7 +545,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/projects/:projectId/photo-analysis",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -609,7 +557,7 @@ function buildRouterForTarget(
       }
 
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -617,7 +565,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -653,7 +605,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/projects/:projectId/photo-assets",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -665,15 +617,19 @@ function buildRouterForTarget(
       }
 
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
       let rawBody: unknown;
       try {
-        rawBody = await readJsonBody(req, HTTP_BODY_LIMITS.localPhotoJsonBytes);
+        rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -714,7 +670,7 @@ function buildRouterForTarget(
   router.add(
     "PATCH",
     "/api/photo-assets/:photoAssetId",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -730,7 +686,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -738,7 +694,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -770,7 +730,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/projects/:projectId/storyboards",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -782,7 +742,7 @@ function buildRouterForTarget(
       }
 
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -804,7 +764,7 @@ function buildRouterForTarget(
   router.add(
     "PUT",
     "/api/storyboards/:storyboardId",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -814,7 +774,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -831,7 +795,7 @@ function buildRouterForTarget(
       }
 
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -873,7 +837,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/storyboards/:storyboardId/character-reference-sheet",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
       const storyboardId = getParam(params, "storyboardId");
@@ -884,7 +848,7 @@ function buildRouterForTarget(
       }
       const project = await deps.projects.findById(storyboard.projectId);
       if (project?.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
       const result = await getCharacterReferenceSheet(deps, storyboardId);
@@ -903,7 +867,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/character-reference-sheet",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
       const storyboardId = getParam(params, "storyboardId");
@@ -914,7 +878,7 @@ function buildRouterForTarget(
       }
       const project = await deps.projects.findById(storyboard.projectId);
       if (project?.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
       const result = await generateCharacterReferenceSheet(deps, {
@@ -936,7 +900,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/story-setup",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -952,7 +916,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -960,7 +924,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -991,7 +959,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/scenes/ai-fill",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1007,7 +975,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1015,7 +983,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1047,7 +1019,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/storyboards/:storyboardId/scenes",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1063,7 +1035,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1076,7 +1048,7 @@ function buildRouterForTarget(
   router.add(
     "PUT",
     "/api/storyboards/:storyboardId/scenes",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1092,7 +1064,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1100,7 +1072,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1153,7 +1129,7 @@ function buildRouterForTarget(
   router.add(
     "DELETE",
     "/api/storyboards/:storyboardId/scenes",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1169,7 +1145,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1205,7 +1181,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/template-scenes",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1221,7 +1197,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1229,7 +1205,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1266,7 +1246,7 @@ function buildRouterForTarget(
   router.add(
     "PUT",
     "/api/scenes/:sceneId/photo-assets",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1282,7 +1262,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1290,7 +1270,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1319,49 +1303,45 @@ function buildRouterForTarget(
   );
 
   // DELETE /api/scenes/:sceneId
-  router.add(
-    "DELETE",
-    "/api/scenes/:sceneId",
-    async (_req, res, params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
+  router.add("DELETE", "/api/scenes/:sceneId", async (_req, res, params) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-      const sceneId = getParam(params, "sceneId");
-      const scene = await deps.scenes.findById(sceneId);
-      if (scene == null) {
-        sendJson(res, 404, notFoundBody("Scene not found."));
-        return;
-      }
+    const sceneId = getParam(params, "sceneId");
+    const scene = await deps.scenes.findById(sceneId);
+    if (scene == null) {
+      sendJson(res, 404, notFoundBody("Scene not found."));
+      return;
+    }
 
-      const project = await deps.projects.findById(scene.projectId);
-      if (
-        project == null ||
-        project.organizationId !== principal.organization.id
-      ) {
-        sendJson(res, 404, notFoundBody());
-        return;
-      }
+    const project = await deps.projects.findById(scene.projectId);
+    if (
+      project == null ||
+      project.organizationId !== principal.organization.id
+    ) {
+      sendJson(res, 403, forbiddenBody());
+      return;
+    }
 
-      const result = await deleteScene(deps, sceneId);
-      if (!result.ok) {
-        sendJson(
-          res,
-          useCaseErrorToStatus(result.error.code),
-          errorBody(result.error.code, result.error.message),
-        );
-        return;
-      }
+    const result = await deleteScene(deps, sceneId);
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
 
-      res.writeHead(204);
-      res.end();
-    },
-  );
+    res.writeHead(204);
+    res.end();
+  });
 
   // POST /api/scenes/:sceneId/ai-fill
   router.add(
     "POST",
     "/api/scenes/:sceneId/ai-fill",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1377,7 +1357,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1385,7 +1365,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1421,7 +1405,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/scenes/:sceneId/preview-prompt",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1437,7 +1421,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1445,7 +1429,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1468,7 +1456,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/complement-scenes",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1484,7 +1472,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1492,7 +1480,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1525,7 +1517,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/complement-scenes/proposals",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1541,7 +1533,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1549,7 +1541,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1582,7 +1578,7 @@ function buildRouterForTarget(
   router.add(
     "PATCH",
     "/api/projects/:projectId/photos/order",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1593,7 +1589,7 @@ function buildRouterForTarget(
         return;
       }
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1601,7 +1597,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1633,7 +1633,7 @@ function buildRouterForTarget(
   router.add(
     "PUT",
     "/api/storyboards/:storyboardId/scene-order",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1649,7 +1649,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1657,7 +1657,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1686,59 +1690,55 @@ function buildRouterForTarget(
   );
 
   // GET /api/style-presets
-  router.add(
-    "GET",
-    "/api/style-presets",
-    async (_req, res, _params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
+  router.add("GET", "/api/style-presets", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-      const stylePresets = await deps.stylePresets.findAll();
-      sendJson(res, 200, { stylePresets: stylePresets.map(toStylePresetDto) });
-    },
-  );
+    const stylePresets = await deps.stylePresets.findAll();
+    sendJson(res, 200, { stylePresets: stylePresets.map(toStylePresetDto) });
+  });
 
   // POST /api/style-presets
-  router.add(
-    "POST",
-    "/api/style-presets",
-    async (req, res, _params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
+  router.add("POST", "/api/style-presets", async (req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-      let rawBody: unknown;
-      try {
-        rawBody = await readJsonBody(req);
-      } catch (err) {
-        sendBodyReadError(res, err);
-        return;
-      }
+    let rawBody: unknown;
+    try {
+      rawBody = await readJsonBody(req);
+    } catch (err) {
+      sendJson(
+        res,
+        400,
+        badRequestBody(err instanceof Error ? err.message : "Bad request."),
+      );
+      return;
+    }
 
-      const parsed = CreateCustomStyleSchema.safeParse(rawBody);
-      if (!parsed.success) {
-        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
-        return;
-      }
+    const parsed = CreateCustomStyleSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+      return;
+    }
 
-      const result = await createCustomStyle(deps, parsed.data);
-      if (!result.ok) {
-        sendJson(
-          res,
-          useCaseErrorToStatus(result.error.code),
-          errorBody(result.error.code, result.error.message),
-        );
-        return;
-      }
+    const result = await createCustomStyle(deps, parsed.data);
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
 
-      sendJson(res, 201, { stylePreset: toStylePresetDto(result.value) });
-    },
-  );
+    sendJson(res, 201, { stylePreset: toStylePresetDto(result.value) });
+  });
 
   // GET /api/scenes/:sceneId/generation-requests
   router.add(
     "GET",
     "/api/scenes/:sceneId/generation-requests",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1754,7 +1754,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1775,7 +1775,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/scenes/:sceneId/generation-requests",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1791,7 +1791,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1799,7 +1799,11 @@ function buildRouterForTarget(
       try {
         rawBody = await readJsonBody(req);
       } catch (err) {
-        sendBodyReadError(res, err);
+        sendJson(
+          res,
+          400,
+          badRequestBody(err instanceof Error ? err.message : "Bad request."),
+        );
         return;
       }
 
@@ -1836,7 +1840,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/generation-requests/:generationRequestId/retry",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1853,7 +1857,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1880,7 +1884,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/generation-requests/:generationRequestId/cancel",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1897,7 +1901,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -1919,26 +1923,18 @@ function buildRouterForTarget(
   );
 
   // GET /api/ai-jobs/:aiJobId
-  router.add(
-    "GET",
-    "/api/ai-jobs/:aiJobId",
-    async (_req, res, params, { dependencies: deps }) => {
-      const job = await requireOwnedAiJob(
-        deps,
-        res,
-        getParam(params, "aiJobId"),
-      );
-      if (job == null) return;
+  router.add("GET", "/api/ai-jobs/:aiJobId", async (_req, res, params) => {
+    const job = await requireOwnedAiJob(deps, res, getParam(params, "aiJobId"));
+    if (job == null) return;
 
-      sendJson(res, 200, toAiJobDto(job));
-    },
-  );
+    sendJson(res, 200, toAiJobDto(job));
+  });
 
   // POST /api/ai-jobs/:aiJobId/cancel
   router.add(
     "POST",
     "/api/ai-jobs/:aiJobId/cancel",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const aiJobId = getParam(params, "aiJobId");
       const job = await requireOwnedAiJob(deps, res, aiJobId);
       if (job == null) return;
@@ -1964,7 +1960,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/projects/:projectId/events",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -1976,7 +1972,7 @@ function buildRouterForTarget(
       }
 
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -2011,7 +2007,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/scenes/:sceneId/generated-images",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2027,7 +2023,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -2058,7 +2054,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/scenes/:sceneId/generated-images/:generatedImageId/adopt",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2076,7 +2072,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -2117,38 +2113,32 @@ function buildRouterForTarget(
     },
   );
 
-  if (target === "local") {
-    // GET /api/debug/generation-requests
-    router.add(
-      "GET",
-      "/api/debug/generation-requests",
-      async (_req, res, _params, { dependencies: deps }) => {
-        const principal = await requirePrincipal(deps, res);
-        if (principal == null) return;
+  // GET /api/debug/generation-requests
+  router.add("GET", "/api/debug/generation-requests", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-        const recent = await deps.generationRequests.findRecent(50);
-        sendJson(res, 200, {
-          generationRequests: recent.map((r) => ({
-            id: r.id,
-            sceneId: r.sceneId,
-            projectId: r.projectId,
-            storyboardId: r.storyboardId,
-            status: r.status,
-            errorMessage: r.errorMessage ?? null,
-            startedAt: r.startedAt ?? null,
-            completedAt: r.completedAt ?? null,
-            createdAt: r.createdAt,
-          })),
-        });
-      },
-    );
-  }
+    const recent = await deps.generationRequests.findRecent(50);
+    sendJson(res, 200, {
+      generationRequests: recent.map((r) => ({
+        id: r.id,
+        sceneId: r.sceneId,
+        projectId: r.projectId,
+        storyboardId: r.storyboardId,
+        status: r.status,
+        errorMessage: r.errorMessage ?? null,
+        startedAt: r.startedAt ?? null,
+        completedAt: r.completedAt ?? null,
+        createdAt: r.createdAt,
+      })),
+    });
+  });
 
   // DELETE /api/photo-assets/:photoAssetId
   router.add(
     "DELETE",
     "/api/photo-assets/:photoAssetId",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2163,7 +2153,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
       const result = await deletePhotoAsset(deps, photoAssetId);
@@ -2184,7 +2174,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/photo-assets/:photoAssetId/restore",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2219,7 +2209,7 @@ function buildRouterForTarget(
   router.add(
     "DELETE",
     "/api/projects/:projectId",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2230,7 +2220,7 @@ function buildRouterForTarget(
         return;
       }
       if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
       const result = await deleteProject(deps, projectId);
@@ -2251,7 +2241,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/projects/:projectId/restore",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2289,7 +2279,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/test-generation",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2335,7 +2325,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/storyboards/:storyboardId/test-generation/current",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2353,7 +2343,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/test-generation/confirm",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2403,7 +2393,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/storyboards/:storyboardId/test-generation/batches",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2429,7 +2419,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/storyboards/:storyboardId/test-generation/variants/:variantId/adjustments",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2493,7 +2483,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/storyboards/:storyboardId/generation-requests",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2509,7 +2499,7 @@ function buildRouterForTarget(
         project == null ||
         project.organizationId !== principal.organization.id
       ) {
-        sendJson(res, 404, notFoundBody());
+        sendJson(res, 403, forbiddenBody());
         return;
       }
 
@@ -2543,7 +2533,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/storyboards/:storyboardId/export.json",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const principal = await requirePrincipal(deps, res);
       if (principal == null) return;
 
@@ -2581,101 +2571,91 @@ function buildRouterForTarget(
     },
   );
 
-  if (target === "local") {
-    // GET /api/user/preferences
-    router.add(
-      "GET",
-      "/api/user/preferences",
-      async (_req, res, _params, { dependencies: deps }) => {
-        const principal = await requirePrincipal(deps, res);
-        if (principal == null) return;
+  // GET /api/user/preferences
+  router.add("GET", "/api/user/preferences", async (_req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-        const result = await getUserPreference(deps, principal.user.id);
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
+    const result = await getUserPreference(deps, principal.user.id);
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
 
-        // Reading the preference must not invalidate a runtime check that already
-        // ran: resetting to "unchecked" here made the chat report "the runtime
-        // check has not run yet" for anyone who had merely opened Settings.
-        // Only a selection that actually changed needs re-checking.
-        const selection = result.value.agentRuntime;
-        if (deps.agentRuntime.selection !== selection) {
-          deps.agentRuntime.selection = selection;
-          deps.agentRuntime.wallet = agentRuntimeWallet(selection);
-          deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
-          deps.agentRuntime.availability =
-            selection === "api"
-              ? { status: "not_applicable" }
-              : { status: "unchecked" };
-        }
+    // Reading the preference must not invalidate a runtime check that already
+    // ran: resetting to "unchecked" here made the chat report "the runtime
+    // check has not run yet" for anyone who had merely opened Settings.
+    // Only a selection that actually changed needs re-checking.
+    const selection = result.value.agentRuntime;
+    if (deps.agentRuntime.selection !== selection) {
+      deps.agentRuntime.selection = selection;
+      deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+      deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+      deps.agentRuntime.availability =
+        selection === "api"
+          ? { status: "not_applicable" }
+          : { status: "unchecked" };
+    }
 
-        sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
-      },
-    );
+    sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
+  });
 
-    // PUT /api/user/preferences
-    router.add(
-      "PUT",
-      "/api/user/preferences",
-      async (req, res, _params, { dependencies: deps }) => {
-        const principal = await requirePrincipal(deps, res);
-        if (principal == null) return;
+  // PUT /api/user/preferences
+  router.add("PUT", "/api/user/preferences", async (req, res) => {
+    const principal = await requirePrincipal(deps, res);
+    if (principal == null) return;
 
-        let rawBody: unknown;
-        try {
-          rawBody = await readJsonBody(req);
-        } catch (err) {
-          sendBodyReadError(res, err);
-          return;
-        }
+    let rawBody: unknown;
+    try {
+      rawBody = await readJsonBody(req);
+    } catch (err) {
+      sendJson(
+        res,
+        400,
+        badRequestBody(err instanceof Error ? err.message : "Bad request."),
+      );
+      return;
+    }
 
-        const parsed = SetUserPreferenceSchema.safeParse(rawBody);
-        if (!parsed.success) {
-          sendJson(
-            res,
-            422,
-            errorBody("validation_error", parsed.error.message),
-          );
-          return;
-        }
+    const parsed = SetUserPreferenceSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+      return;
+    }
 
-        const result = await setUserPreference(deps, {
-          userId: principal.user.id,
-          language: parsed.data.language,
-          agentRuntime: parsed.data.agentRuntime,
-        });
+    const result = await setUserPreference(deps, {
+      userId: principal.user.id,
+      language: parsed.data.language,
+      agentRuntime: parsed.data.agentRuntime,
+    });
 
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
+    if (!result.ok) {
+      sendJson(
+        res,
+        useCaseErrorToStatus(result.error.code),
+        errorBody(result.error.code, result.error.message),
+      );
+      return;
+    }
 
-        const selection = result.value.agentRuntime;
-        deps.agentRuntime.selection = selection;
-        deps.agentRuntime.wallet = agentRuntimeWallet(selection);
-        deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
-        deps.agentRuntime.availability =
-          selection === "api"
-            ? { status: "not_applicable" }
-            : await resolveAgentRuntimeAvailability(selection, {
-                workingDirectory: process.cwd(),
-                allowedWorkingDirectoryRoot: process.cwd(),
-              });
+    const selection = result.value.agentRuntime;
+    deps.agentRuntime.selection = selection;
+    deps.agentRuntime.wallet = agentRuntimeWallet(selection);
+    deps.agentRuntime.capabilities = agentRuntimeCapabilities(selection);
+    deps.agentRuntime.availability =
+      selection === "api"
+        ? { status: "not_applicable" }
+        : await resolveAgentRuntimeAvailability(selection, {
+            workingDirectory: process.cwd(),
+            allowedWorkingDirectoryRoot: process.cwd(),
+          });
 
-        sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
-      },
-    );
-  }
+    sendJson(res, 200, { preference: toUserPreferenceDto(result.value) });
+  });
 
   // ── Creative direction and change proposals ───────────────────────────────
 
@@ -2683,7 +2663,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/projects/:projectId/creative-direction",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const projectId = getParam(params, "projectId");
       const project = await requireOwnedProject(deps, res, projectId);
       if (project == null) return;
@@ -2706,7 +2686,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/projects/:projectId/change-proposals",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const projectId = getParam(params, "projectId");
       const project = await requireOwnedProject(deps, res, projectId);
       if (project == null) return;
@@ -2741,7 +2721,7 @@ function buildRouterForTarget(
   router.add(
     "GET",
     "/api/change-proposals/:changeProposalId",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const proposal = await requireOwnedChangeProposal(
         deps,
         res,
@@ -2757,7 +2737,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/change-proposals/:changeProposalId/items/:itemId/decision",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const changeProposalId = getParam(params, "changeProposalId");
       const proposal = await requireOwnedChangeProposal(
         deps,
@@ -2797,7 +2777,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/change-proposals/:changeProposalId/items/:itemId/choice",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const changeProposalId = getParam(params, "changeProposalId");
       const proposal = await requireOwnedChangeProposal(
         deps,
@@ -2837,7 +2817,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/change-proposals/:changeProposalId/items/:itemId/revision",
-    async (req, res, params, { dependencies: deps }) => {
+    async (req, res, params) => {
       const changeProposalId = getParam(params, "changeProposalId");
       const proposal = await requireOwnedChangeProposal(
         deps,
@@ -2878,7 +2858,7 @@ function buildRouterForTarget(
   router.add(
     "POST",
     "/api/change-proposals/:changeProposalId/apply",
-    async (_req, res, params, { dependencies: deps }) => {
+    async (_req, res, params) => {
       const changeProposalId = getParam(params, "changeProposalId");
       const proposal = await requireOwnedChangeProposal(
         deps,
@@ -2901,333 +2881,319 @@ function buildRouterForTarget(
     },
   );
 
-  if (target === "local") {
-    // ── Embedded agent chat (M3) ───────────────────────────────────────────
+  // ── Embedded agent chat (M3) ─────────────────────────────────────────────
 
-    // POST /api/projects/:projectId/agent-conversations
-    router.add(
-      "POST",
-      "/api/projects/:projectId/agent-conversations",
-      async (req, res, params, { dependencies: deps }) => {
-        const projectId = getParam(params, "projectId");
-        const project = await requireOwnedProject(deps, res, projectId);
-        if (project == null) return;
+  // POST /api/projects/:projectId/agent-conversations
+  router.add(
+    "POST",
+    "/api/projects/:projectId/agent-conversations",
+    async (req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
 
-        const body = await readBodyOrRespond(req, res);
-        if (body == null) return;
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
 
-        const parsed = CreateAgentConversationSchema.safeParse(body.body);
-        if (!parsed.success) {
-          sendJson(
-            res,
-            422,
-            errorBody("validation_error", parsed.error.message),
-          );
-          return;
-        }
+      const parsed = CreateAgentConversationSchema.safeParse(body.body);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
 
-        const result = await createAgentChatConversation(deps, {
-          projectId,
-          title: parsed.data.title,
-        });
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
-
-        sendJson(res, 201, toAgentConversationDto(result.value));
-      },
-    );
-
-    // GET /api/projects/:projectId/agent-conversations
-    router.add(
-      "GET",
-      "/api/projects/:projectId/agent-conversations",
-      async (_req, res, params, { dependencies: deps }) => {
-        const projectId = getParam(params, "projectId");
-        const project = await requireOwnedProject(deps, res, projectId);
-        if (project == null) return;
-
-        const result = await listAgentChatConversations(deps, { projectId });
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
-
-        sendJson(res, 200, {
-          conversations: result.value.map(toAgentConversationDto),
-        });
-      },
-    );
-
-    // GET /api/agent-conversations/:conversationId?afterSequence=N
-    // A reconnecting client passes the last sequence it rendered and gets only
-    // what it missed; omitting it returns the complete transcript.
-    router.add(
-      "GET",
-      "/api/agent-conversations/:conversationId",
-      async (req, res, params, { dependencies: deps }) => {
-        const conversation = await requireOwnedConversation(
-          deps,
+      const result = await createAgentChatConversation(deps, {
+        projectId,
+        title: parsed.data.title,
+      });
+      if (!result.ok) {
+        sendJson(
           res,
-          getParam(params, "conversationId"),
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
         );
-        if (conversation == null) return;
+        return;
+      }
 
-        const url = new URL(req.url ?? "/", "http://localhost");
-        const rawAfter = url.searchParams.get("afterSequence");
-        const afterSequence = rawAfter == null ? undefined : Number(rawAfter);
-        if (
-          afterSequence != null &&
-          (!Number.isInteger(afterSequence) || afterSequence < 0)
-        ) {
-          sendJson(
-            res,
-            422,
-            errorBody(
-              "validation_error",
-              "afterSequence must be a non-negative integer.",
-            ),
-          );
-          return;
-        }
+      sendJson(res, 201, toAgentConversationDto(result.value));
+    },
+  );
 
-        const result = await getAgentChatConversation(deps, {
-          conversationId: conversation.id,
-          afterSequence,
-        });
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
+  // GET /api/projects/:projectId/agent-conversations
+  router.add(
+    "GET",
+    "/api/projects/:projectId/agent-conversations",
+    async (_req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
 
-        sendJson(res, 200, toAgentConversationDetailDto(result.value));
-      },
-    );
-
-    // POST /api/agent-conversations/:conversationId/turns
-    router.add(
-      "POST",
-      "/api/agent-conversations/:conversationId/turns",
-      async (req, res, params, { dependencies: deps }) => {
-        const conversation = await requireOwnedConversation(
-          deps,
+      const result = await listAgentChatConversations(deps, { projectId });
+      if (!result.ok) {
+        sendJson(
           res,
-          getParam(params, "conversationId"),
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
         );
-        if (conversation == null) return;
+        return;
+      }
 
-        const body = await readBodyOrRespond(req, res);
-        if (body == null) return;
+      sendJson(res, 200, {
+        conversations: result.value.map(toAgentConversationDto),
+      });
+    },
+  );
 
-        const parsed = PostAgentChatTurnSchema.safeParse(body.body);
-        if (!parsed.success) {
-          sendJson(
-            res,
-            422,
-            errorBody("validation_error", parsed.error.message),
-          );
-          return;
-        }
-
-        const result = await postAgentChatTurn(deps, {
-          conversationId: conversation.id,
-          clientRequestId: parsed.data.clientRequestId,
-          text: parsed.data.text,
-          mentions: parsed.data.mentions,
-        });
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
-
-        // The provider turn runs after the response: it can take minutes, and
-        // everything it produces reaches the client over the project's event
-        // stream and is durable in the transcript either way.
-        if (result.value.turn.status === "running") {
-          void runAgentChatTurn(deps, { turnId: result.value.turn.id }).catch(
-            (error: unknown) => {
-              console.error("[agent-chat] turn failed:", error);
-            },
-          );
-        }
-
-        sendJson(res, 202, {
-          turn: toAgentConversationTurnDto(result.value.turn),
-          message: toAgentConversationMessageDto(result.value.message),
-        });
-      },
-    );
-
-    // POST /api/agent-conversation-turns/:turnId/cancel
-    router.add(
-      "POST",
-      "/api/agent-conversation-turns/:turnId/cancel",
-      async (_req, res, params, { dependencies: deps }) => {
-        const turnId = getParam(params, "turnId");
-        const turn = await deps.agentConversations.findTurnById(turnId);
-        if (turn == null) {
-          sendJson(res, 404, notFoundBody("Conversation turn not found."));
-          return;
-        }
-        const conversation = await requireOwnedConversation(
-          deps,
-          res,
-          turn.conversationId,
-        );
-        if (conversation == null) return;
-
-        const result = await cancelAgentChatTurn(deps, { turnId });
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
-
-        sendJson(res, 200, toAgentConversationTurnDto(result.value));
-      },
-    );
-
-    // POST /api/agent-conversations/:conversationId/fork
-    router.add(
-      "POST",
-      "/api/agent-conversations/:conversationId/fork",
-      async (_req, res, params, { dependencies: deps }) => {
-        const conversation = await requireOwnedConversation(
-          deps,
-          res,
-          getParam(params, "conversationId"),
-        );
-        if (conversation == null) return;
-
-        const result = await forkAgentChatProviderSession(deps, {
-          conversationId: conversation.id,
-        });
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
-
-        sendJson(res, 201, toAgentProviderBindingDto(result.value));
-      },
-    );
-
-    // POST /api/agent-conversations/:conversationId/compact
-    router.add(
-      "POST",
-      "/api/agent-conversations/:conversationId/compact",
-      async (_req, res, params, { dependencies: deps }) => {
-        const conversation = await requireOwnedConversation(
-          deps,
-          res,
-          getParam(params, "conversationId"),
-        );
-        if (conversation == null) return;
-
-        const result = await compactAgentChatConversation(deps, {
-          conversationId: conversation.id,
-        });
-        if (!result.ok) {
-          sendJson(
-            res,
-            useCaseErrorToStatus(result.error.code),
-            errorBody(result.error.code, result.error.message),
-          );
-          return;
-        }
-
-        sendJson(res, 200, toAgentProviderBindingDto(result.value));
-      },
-    );
-
-    // POST /api/mcp/projects/:projectId — the embedded chat's MCP transport.
-    router.add(
-      "POST",
-      "/api/mcp/projects/:projectId",
-      async (req, res, params, { dependencies: deps }) => {
-        const projectId = getParam(params, "projectId");
-        const project = await requireOwnedProject(deps, res, projectId);
-        if (project == null) return;
-
-        const body = await readBodyOrRespond(req, res);
-        if (body == null) return;
-
-        const url = new URL(req.url ?? "/", "http://localhost");
-        await handleProjectMcpHttpRequest({
-          deps,
-          projectId,
-          provider: resolveMcpProvider(url.searchParams.get("provider"), deps),
-          req,
-          res,
-          body: body.body,
-        });
-      },
-    );
-
-    // The transport is stateless, so there is no session to resume or delete.
-    for (const method of ["GET", "DELETE"] as const) {
-      router.add(
-        method,
-        "/api/mcp/projects/:projectId",
-        async (_req, res, _params, _context) => {
-          sendJson(
-            res,
-            405,
-            errorBody(
-              "method_not_allowed",
-              "The Gen Story MCP endpoint accepts POST only.",
-            ),
-          );
-        },
+  // GET /api/agent-conversations/:conversationId?afterSequence=N
+  // A reconnecting client passes the last sequence it rendered and gets only
+  // what it missed; omitting it returns the complete transcript.
+  router.add(
+    "GET",
+    "/api/agent-conversations/:conversationId",
+    async (req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
       );
-    }
+      if (conversation == null) return;
 
-    router.add("GET", "/files/*", async (_req, res, params, _context) => {
-      const tail = getParam(params, "*");
-      const safePath = resolve(repoRoot, ...tail.split("/").filter(Boolean));
-
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const rawAfter = url.searchParams.get("afterSequence");
+      const afterSequence = rawAfter == null ? undefined : Number(rawAfter);
       if (
-        safePath !== uploadsRoot &&
-        !safePath.startsWith(`${uploadsRoot}${sep}`)
+        afterSequence != null &&
+        (!Number.isInteger(afterSequence) || afterSequence < 0)
       ) {
-        sendJson(res, 403, errorBody("FORBIDDEN", "Access denied"));
+        sendJson(
+          res,
+          422,
+          errorBody(
+            "validation_error",
+            "afterSequence must be a non-negative integer.",
+          ),
+        );
         return;
       }
 
-      if (!existsSync(safePath)) {
-        sendJson(res, 404, notFoundBody("File not found"));
+      const result = await getAgentChatConversation(deps, {
+        conversationId: conversation.id,
+        afterSequence,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
         return;
       }
 
-      const ext = safePath.slice(safePath.lastIndexOf(".")).toLowerCase();
-      const contentType = MIME_MAP[ext] ?? "application/octet-stream";
-      res.writeHead(200, { "Content-Type": contentType });
-      createReadStream(safePath).pipe(res);
+      sendJson(res, 200, toAgentConversationDetailDto(result.value));
+    },
+  );
+
+  // POST /api/agent-conversations/:conversationId/turns
+  router.add(
+    "POST",
+    "/api/agent-conversations/:conversationId/turns",
+    async (req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
+      );
+      if (conversation == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const parsed = PostAgentChatTurnSchema.safeParse(body.body);
+      if (!parsed.success) {
+        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
+        return;
+      }
+
+      const result = await postAgentChatTurn(deps, {
+        conversationId: conversation.id,
+        clientRequestId: parsed.data.clientRequestId,
+        text: parsed.data.text,
+        mentions: parsed.data.mentions,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      // The provider turn runs after the response: it can take minutes, and
+      // everything it produces reaches the client over the project's event
+      // stream and is durable in the transcript either way.
+      if (result.value.turn.status === "running") {
+        void runAgentChatTurn(deps, { turnId: result.value.turn.id }).catch(
+          (error: unknown) => {
+            console.error("[agent-chat] turn failed:", error);
+          },
+        );
+      }
+
+      sendJson(res, 202, {
+        turn: toAgentConversationTurnDto(result.value.turn),
+        message: toAgentConversationMessageDto(result.value.message),
+      });
+    },
+  );
+
+  // POST /api/agent-conversation-turns/:turnId/cancel
+  router.add(
+    "POST",
+    "/api/agent-conversation-turns/:turnId/cancel",
+    async (_req, res, params) => {
+      const turnId = getParam(params, "turnId");
+      const turn = await deps.agentConversations.findTurnById(turnId);
+      if (turn == null) {
+        sendJson(res, 404, notFoundBody("Conversation turn not found."));
+        return;
+      }
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        turn.conversationId,
+      );
+      if (conversation == null) return;
+
+      const result = await cancelAgentChatTurn(deps, { turnId });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toAgentConversationTurnDto(result.value));
+    },
+  );
+
+  // POST /api/agent-conversations/:conversationId/fork
+  router.add(
+    "POST",
+    "/api/agent-conversations/:conversationId/fork",
+    async (_req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
+      );
+      if (conversation == null) return;
+
+      const result = await forkAgentChatProviderSession(deps, {
+        conversationId: conversation.id,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 201, toAgentProviderBindingDto(result.value));
+    },
+  );
+
+  // POST /api/agent-conversations/:conversationId/compact
+  router.add(
+    "POST",
+    "/api/agent-conversations/:conversationId/compact",
+    async (_req, res, params) => {
+      const conversation = await requireOwnedConversation(
+        deps,
+        res,
+        getParam(params, "conversationId"),
+      );
+      if (conversation == null) return;
+
+      const result = await compactAgentChatConversation(deps, {
+        conversationId: conversation.id,
+      });
+      if (!result.ok) {
+        sendJson(
+          res,
+          useCaseErrorToStatus(result.error.code),
+          errorBody(result.error.code, result.error.message),
+        );
+        return;
+      }
+
+      sendJson(res, 200, toAgentProviderBindingDto(result.value));
+    },
+  );
+
+  // POST /api/mcp/projects/:projectId — the embedded chat's MCP transport.
+  router.add(
+    "POST",
+    "/api/mcp/projects/:projectId",
+    async (req, res, params) => {
+      const projectId = getParam(params, "projectId");
+      const project = await requireOwnedProject(deps, res, projectId);
+      if (project == null) return;
+
+      const body = await readBodyOrRespond(req, res);
+      if (body == null) return;
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      await handleProjectMcpHttpRequest({
+        deps,
+        projectId,
+        provider: resolveMcpProvider(url.searchParams.get("provider"), deps),
+        req,
+        res,
+        body: body.body,
+      });
+    },
+  );
+
+  // The transport is stateless, so there is no session to resume or delete.
+  for (const method of ["GET", "DELETE"] as const) {
+    router.add(method, "/api/mcp/projects/:projectId", async (_req, res) => {
+      sendJson(
+        res,
+        405,
+        errorBody(
+          "method_not_allowed",
+          "The Gen Story MCP endpoint accepts POST only.",
+        ),
+      );
     });
   }
+
+  router.add("GET", "/files/*", async (_req, res, params) => {
+    const tail = getParam(params, "*");
+    const safePath = resolve(repoRoot, ...tail.split("/").filter(Boolean));
+
+    if (
+      safePath !== uploadsRoot &&
+      !safePath.startsWith(`${uploadsRoot}${sep}`)
+    ) {
+      sendJson(res, 403, errorBody("FORBIDDEN", "Access denied"));
+      return;
+    }
+
+    if (!existsSync(safePath)) {
+      sendJson(res, 404, notFoundBody("File not found"));
+      return;
+    }
+
+    const ext = safePath.slice(safePath.lastIndexOf(".")).toLowerCase();
+    const contentType = MIME_MAP[ext] ?? "application/octet-stream";
+    res.writeHead(200, { "Content-Type": contentType });
+    createReadStream(safePath).pipe(res);
+  });
 
   return router;
 }
@@ -3250,16 +3216,6 @@ export async function handleApiRequest(
     }
     return handled;
   } catch (err) {
-    if (err instanceof HttpBodyError) {
-      sendBodyReadError(res, err);
-      logRequest(
-        req.method ?? "GET",
-        req.url ?? "/",
-        err.statusCode,
-        Date.now() - startMs,
-      );
-      return true;
-    }
     console.error("Unhandled route error:", err);
     sendJson(res, 500, internalErrorBody());
     logRequest(req.method ?? "GET", req.url ?? "/", 500, Date.now() - startMs);
