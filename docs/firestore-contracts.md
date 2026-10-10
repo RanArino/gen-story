@@ -2,7 +2,8 @@
 
 The hosted persistence bootstrap connects the existing tenant-bound Firebase
 verifier to all 15 application repository ports. The full hosted API still
-refuses startup until R2 media and Cloud Tasks dispatch adapters exist. The
+refuses startup pending Cloud Tasks dispatch and hosted acceptance. Private R2
+media is available only through extracted composition and isolated fixtures. The
 bootstrap is exercised through an isolated HTTP harness; it does not enable a
 deployed service or claim live authentication acceptance.
 
@@ -99,3 +100,19 @@ rejected identities, and exclusion of local-only routes. It proves that foreign
 project restoration and storyboard reassignment are refused before mutation.
 Real Identity Platform users and deployed browser acceptance remain a later
 hosting gate.
+
+## Private-media persistence
+
+M4 adds `upload_sessions`, `media_deletions`, `media_deletion_items`, and
+`account_deletion_guards`, plus per-user `media_deletion_locks`. All inherit deny-all direct-client Rules and are covered
+by mandatory Emulator tests. These are API-level transactional adapters, not new
+application repository ports. See [Private R2 media](r2-media.md) for DTOs,
+claim/fencing semantics, atomic photo/session/scene publication, and durable purge
+inventory. Project documents serialize competing publication; storage operations
+never run inside retryable Firestore transaction callbacks.
+
+Hosted user presets now record `ownerUserId` and use a principal-scoped repository.
+System presets remain shared. Legacy ownerless private presets are excluded from
+hosted private access and preserved during account purge because ownership cannot
+be established safely. The principal bootstrap checks account deletion guards in
+the same transaction as auto-provisioning. No local-data migration is introduced.

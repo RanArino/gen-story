@@ -168,9 +168,14 @@ any cloud setup. The following features are deliberately excluded from this vers
 
 ## Infrastructure
 
-- Storage is the local filesystem (`data/uploads/...`) and the database is a
-  local SQLite file. No object storage, no managed database, no external queue.
-- No production cloud deployment, containerization, or billing/payments.
+- The default runtime uses local filesystem storage (`data/uploads/...`) and
+  SQLite. Firestore and private R2 adapters are verified in isolated fixtures;
+  hosted startup remains disabled pending task dispatch and hosted acceptance.
+  See [Private R2 media](r2-media.md) and [Hosted deletion](hosted-deletion.md).
+  A separate deletion worker and dispatch repair are implemented locally; staging
+  delivery acceptance remains open.
+- No production cloud deployment or billing/payments. Private-media decoding
+  uses an isolated, resource-constrained Linux container in opt-in verification.
 - Structured request logs print to the terminal; there is no external
   observability, metrics, or alerting.
 

@@ -114,3 +114,19 @@ Rows marked `Planned` or `Partially implemented` are not waived. Their named
 milestones must add executable evidence before the staged production gate can
 pass. The operator and external reviewer must sign off on the final residual
 risk; this document does not self-approve a release.
+
+## M4 isolated media evidence (2026-10-10)
+
+Private R2 adapters, signed upload grants, durable sessions, bounded Linux image
+processing, atomic publication, and browser URL isolation are implemented and
+verified in isolated fixtures. Recoverable project/account purge and read-only
+orphan reporting are directly exercised against the flat Firestore inventory.
+The decoder enforces 512 MiB hard memory, no additional swap, one CPU, one frame,
+40 million pixels, 10 MiB input/derivatives, and a 15-second termination deadline.
+Owner/deletion checks and account provisioning guards prevent new access or
+publication during recovery. Existing bearer read URLs last until expiry/deletion.
+See [Private R2 media](../r2-media.md) for evidence boundaries and exact APIs.
+
+This does not satisfy live R2 compatibility, real two-user hosted authentication,
+HP-5.2a deletion-task delivery, HP-5.3 hosted preprocessing, or deployment approval.
+Hosted startup remains disabled. No release control is waived by fixture success.
