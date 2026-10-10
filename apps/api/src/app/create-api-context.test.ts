@@ -165,20 +165,13 @@ describe("createApiContext runtime selection", () => {
     ).toThrow(/Unknown GEN_STORY_AGENT_RUNTIME/);
   });
 
-  it("fails closed before local dependencies can back a cloud deployment", () => {
+  it("rejects a CLI runtime on a non-local deployment", () => {
     expect(() =>
       createApiContext(withClient(), {
+        GEN_STORY_AGENT_RUNTIME: "codex",
         GEN_STORY_DEPLOY_TARGET: "cloud",
       }),
-    ).toThrow(/Hosted API context is not configured/);
-  });
-
-  it("rejects an unknown deployment target", () => {
-    expect(() =>
-      createApiContext(withClient(), {
-        GEN_STORY_DEPLOY_TARGET: "production",
-      }),
-    ).toThrow(/Unknown GEN_STORY_DEPLOY_TARGET/);
+    ).toThrow(/local deployment/);
   });
 });
 

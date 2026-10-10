@@ -9,27 +9,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { failInterruptedAiJobs } from "@gen-story/application";
 
-import {
-  resolveAgentRuntimeAvailability,
-  resolveDeployTarget,
-} from "./agent-runtime/runtime-config";
-import { createHostedApiContext } from "./app/create-hosted-api-context";
-import { createLocalApiContext } from "./app/create-local-api-context";
+import { resolveAgentRuntimeAvailability } from "./agent-runtime/runtime-config";
+import { createApiContext } from "./app/create-api-context";
 import { seedLocalPrincipal } from "./auth/local-auth";
-import {
-  hasValidCsrfToken,
-  requiresCookieCsrf,
-} from "./auth/firebase-session";
 import { openDatabase, migrateDatabase } from "./db";
 import { LocalJobWorker } from "./generation/local-job-worker";
-import { buildLocalRouter, handleApiRequest } from "./http/routes";
+import { buildRouter, handleApiRequest } from "./http/routes";
 import { sendJson } from "./http/json";
 import { logRequest } from "./http/request-logger";
-import {
-  HTTP_SERVER_TIMEOUTS,
-  isAllowedOrigin,
-  parseAllowedOrigins,
-} from "./http/security-policy";
 
 import type { Router } from "./http/router";
 
@@ -94,65 +81,24 @@ function stripEnvValueQuotes(value: string) {
   return value;
 }
 
-export type AuthHttpHandler = (
-  request: IncomingMessage,
-  response: ServerResponse,
-) => Promise<boolean>;
-
-export function makeHandleRequest(
-  router: Router,
-  authHttpHandler?: AuthHttpHandler,
-) {
+export function makeHandleRequest(router: Router) {
   return async function handleRequest(
     request: IncomingMessage,
     response: ServerResponse,
   ) {
     const startMs = Date.now();
-    const allowedOrigins = parseAllowedOrigins(process.env);
-    const requestOrigin = request.headers.origin;
-    response.setHeader("Vary", "Origin");
-
-    if (!isAllowedOrigin(requestOrigin, allowedOrigins)) {
-      sendJson(response, 403, {
-        error: { code: "forbidden", message: "Origin is not allowed." },
-      });
-      logRequest(
-        request.method ?? "GET",
-        request.url ?? "/",
-        403,
-        Date.now() - startMs,
-      );
-      return;
-    }
-
-    if (requestOrigin !== undefined) {
-      response.setHeader("Access-Control-Allow-Origin", requestOrigin);
-      response.setHeader("Access-Control-Allow-Credentials", "true");
-    }
+    const corsOrigin = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+    response.setHeader("Access-Control-Allow-Origin", corsOrigin);
     response.setHeader(
       "Access-Control-Allow-Methods",
       "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     );
-    response.setHeader(
-      "Access-Control-Allow-Headers",
-      "Authorization, Content-Type, X-CSRF-Token",
-    );
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
     if (request.method === "OPTIONS") {
       response.writeHead(204);
       response.end();
       logRequest("OPTIONS", request.url ?? "/", 204, Date.now() - startMs);
-      return;
-    }
-
-    if (requiresCookieCsrf(request) && !hasValidCsrfToken(request)) {
-      sendJson(response, 403, {
-        error: { code: "forbidden", message: "Invalid CSRF token." },
-      });
-      return;
-    }
-
-    if (authHttpHandler != null && (await authHttpHandler(request, response))) {
       return;
     }
 
@@ -177,17 +123,10 @@ export function makeHandleRequest(
 }
 
 export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
-  if (resolveDeployTarget(process.env) === "cloud") {
-    createHostedApiContext(process.env);
-    throw new Error(
-      "Hosted server startup is unavailable until its runtime adapters are configured.",
-    );
-  }
-
   const client = openDatabase();
   migrateDatabase(client.db);
 
-  const deps = createLocalApiContext(client);
+  const deps = createApiContext(client);
 
   // R2.2/R4.7: fail fast if a selected CLI runtime is not installed or not
   // logged in with a subscription account, instead of only discovering it
@@ -228,11 +167,8 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 
-  const router = buildLocalRouter(deps);
+  const router = buildRouter(deps);
   const server = createServer(makeHandleRequest(router));
-  server.headersTimeout = HTTP_SERVER_TIMEOUTS.headersMs;
-  server.requestTimeout = HTTP_SERVER_TIMEOUTS.requestMs;
-  server.keepAliveTimeout = HTTP_SERVER_TIMEOUTS.keepAliveMs;
 
   // Without a listener for this, Node rethrows the 'error' event and the API
   // dies in a wall of stack trace while `pnpm dev` keeps the web server up — so

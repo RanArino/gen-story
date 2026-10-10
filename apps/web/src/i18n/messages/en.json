@@ -22,21 +22,6 @@
     "stepReview": "4 · Review",
     "stepChat": "AI refine"
   },
-  "auth": {
-    "loading": "Restoring your secure session…",
-    "title": "Sign in to Gen Story",
-    "subtitle": "Your projects are isolated under your account.",
-    "google": "Continue with Google",
-    "or": "or",
-    "email": "Email",
-    "password": "Password",
-    "emailSignIn": "Sign in with email",
-    "signOut": "Sign out",
-    "signInFailed": "Sign-in failed. Check your credentials and try again.",
-    "signOutFailed": "Sign-out failed. Please try again.",
-    "sessionFailed": "A secure server session could not be created.",
-    "configurationFailed": "Hosted authentication is not configured."
-  },
   "projects": {
     "title": "Projects",
     "subtitle": "Your story projects",

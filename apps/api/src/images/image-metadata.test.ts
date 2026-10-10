@@ -7,9 +7,7 @@ import {
   CONTACT_SHEET_COLUMNS,
   createPhotoContactSheet,
   ensurePngImage,
-  validateImageResourceLimits,
 } from "./image-metadata";
-import { IMAGE_RESOURCE_LIMITS } from "../http/security-policy";
 
 async function solidImage(format: "png" | "jpeg"): Promise<Uint8Array> {
   const image = sharp({
@@ -62,22 +60,5 @@ describe("createPhotoContactSheet", () => {
       width: CONTACT_SHEET_COLUMNS * CONTACT_SHEET_CELL_WIDTH,
       height: 2 * (CONTACT_SHEET_CELL_HEIGHT + 24),
     });
-  });
-});
-
-describe("validateImageResourceLimits", () => {
-  it("rejects encoded input before decoding when it exceeds the byte ceiling", async () => {
-    await expect(
-      validateImageResourceLimits(
-        new Uint8Array(IMAGE_RESOURCE_LIMITS.encodedBytes + 1),
-      ),
-    ).rejects.toThrow("encoded size");
-  });
-
-  it("rejects an image whose declared pixel count exceeds the ceiling", async () => {
-    const oversizedSvg = new TextEncoder().encode(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="10000" height="10000"/>',
-    );
-    await expect(validateImageResourceLimits(oversizedSvg)).rejects.toThrow();
   });
 });

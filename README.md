@@ -9,6 +9,27 @@ machine (local SQLite + local file storage) and needs no cloud setup. See
 [docs/known-limitations.md](docs/known-limitations.md) for what is intentionally
 out of scope in this version.
 
+## Development branches
+
+`main` is the local application development branch. `hackathon-hosted` preserves
+PRs #52 and #53 and is the integration branch for hackathon hosting work. Target
+local features and fixes at `main`; target hosted authentication, Firestore,
+private media, queues, and deployment changes at `hackathon-hosted`.
+
+The local baseline is commit `cdf0e455790d1cc150ea01dcb5d4fe5ac310daaa`
+(before PR #52). Restoration uses revert commits and preserves published history.
+The original unfinished private-media changes remain uncommitted in the hosted
+checkout and must be reviewed separately before publication.
+
+Before the first merge of restored `main` into the hosted branch, use a clean
+hosted feature branch to record an `ours` strategy merge of the final restoration
+revert commit (the commit immediately before the branch documentation commit).
+That merge records only the rollback history as integrated while retaining the
+hosted tree. Then merge `main` normally and verify the hosted behavior. Do not
+use the `ours` strategy for later feature changes. Individual local commits can
+also be cherry-picked before that first integration.
+Do not merge the hosted branch back into `main` as part of hackathon delivery.
+
 ## Prerequisites
 
 - Node.js ≥ 22
@@ -39,10 +60,9 @@ cp apps/api/.env.example apps/api/.env
 | Variable                      | Default                      | Description                                                                                                         |
 | ----------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `API_PORT`                    | `4000`                       | Port for the API server                                                                                             |
-| `CORS_ORIGINS`                | `http://localhost:3000`      | Exact comma-separated browser origins accepted by the API                                                           |
 | `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000`      | API base URL used by the web app                                                                                    |
 | `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite`      | Path to the SQLite database file                                                                                    |
-| `GEN_STORY_DEPLOY_TARGET`     | `local`                      | Selects `local` or `cloud`; cloud fails closed until its hosted adapters are configured                             |
+| `GEN_STORY_DEPLOY_TARGET`     | `local`                      | CLI runtimes selected in Settings require local deployment                                                          |
 | `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_         | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`)                                             |
 | `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint                                                    |
 | `OPENAI_API_KEY`              | _(none)_                     | Optional. Real image generation with GPT Image instead of mock                                                      |
@@ -143,20 +163,6 @@ pnpm lint
 pnpm test
 pnpm build
 ```
-
-The Firestore repository contract runs against the Firebase Firestore Emulator
-in GitHub Actions. CI installs its own temporary JDK; local development and the
-deployed Node services do not require Java. The contract never connects to the
-live staging or production database.
-
-`pnpm test:firestore:contract` runs the shared repository contracts, deny-all
-Security Rules tests, and isolated two-user HTTP authorization harness serially.
-See [Firestore persistence contracts](docs/firestore-contracts.md) for coverage,
-safe Emulator setup, storage/index inventory, and the remaining hosted gates.
-Hosted Firebase/Firestore persistence preparation is implemented, but cloud
-startup still rejects missing R2 and Cloud Tasks adapters. Project restoration
-checks ownership, and an existing storyboard cannot be reassigned through an
-update to another project.
 
 ## Exporting Images and Prompts for Coding Agents
 
