@@ -15,7 +15,7 @@
     "dev:api": "pnpm --filter @gen-story/api dev",
     "gcloud": "./scripts/gcloud-gen-story.sh",
     "security:sbom": "node scripts/generate-sbom.mjs",
-    "test:firestore:contract": "node scripts/require-firestore-emulator.mjs && pnpm --filter @gen-story/api exec vitest run --fileParallelism=false --testTimeout=30000 src/firestore/repositories.contract.test.ts src/firestore/security-rules.test.ts src/firestore/hosted-http.test.ts src/firestore/upload-session-repository.test.ts src/firestore/firebase-principal-provisioner.test.ts src/firestore/media-deletion-repository.test.ts src/photos/complete-upload.test.ts src/firestore/media-deletion-safety.test.ts",
+    "test:firestore:contract": "node scripts/require-firestore-emulator.mjs && pnpm --filter @gen-story/api exec vitest run --fileParallelism=false --testTimeout=30000 src/firestore/repositories.contract.test.ts src/firestore/security-rules.test.ts src/firestore/hosted-http.test.ts src/firestore/upload-session-repository.test.ts src/firestore/firebase-principal-provisioner.test.ts src/firestore/media-deletion-repository.test.ts src/photos/complete-upload.test.ts src/media/detect-media-orphans.test.ts src/firestore/media-deletion-safety.test.ts",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --check package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.mjs \"apps/**/*.{json,ts,tsx,js,mjs}\" \"packages/**/*.{json,ts,tsx,js,mjs}\"",

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { readHostedPersistenceConfig } from "./hosted-persistence";
+import {
+  readHostedDatabaseConfig,
+  readHostedPersistenceConfig,
+} from "./hosted-persistence";
 import { createHostedApiContext } from "./create-hosted-api-context";
 import { startServer } from "../server";
 
@@ -31,6 +34,16 @@ describe("hosted persistence configuration", () => {
     ]) {
       expect(() => readHostedPersistenceConfig(invalid)).toThrow();
     }
+  });
+
+  it("does not require a browser tenant for database-only commands", () => {
+    const database: Partial<typeof env> = { ...env };
+    delete database.FIREBASE_TENANT_ID;
+    expect(readHostedDatabaseConfig(database)).toEqual({
+      projectId: "gen-story-496911",
+      databaseId: "gen-story-staging",
+    });
+    expect(() => readHostedPersistenceConfig(database)).toThrow();
   });
 
   it("rejects startup despite valid identity and persistence configuration", async () => {
