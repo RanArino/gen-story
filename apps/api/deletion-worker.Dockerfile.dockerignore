@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/*.test.ts
+apps/api/src/test-support
+.git
+internal
+.DS_Store
+apps/web
