@@ -12,7 +12,7 @@ import {
   listTestGenerationBatches,
   requestTestGenerationBatch,
 } from "../../lib/api-client";
-import { storageKeyToUrl } from "../../lib/image-url";
+import { MediaImage } from "../MediaImage";
 import { ImageModelSelect, useImageModel } from "../common/ImageModelSelect";
 import { AdjustmentChips } from "./AdjustmentChips";
 
@@ -368,10 +368,6 @@ export function TestGenerationModal({
                 const isApplying = applyingVariantId === req.id;
                 const variantInFlight = IN_FLIGHT_STATUSES.includes(req.status);
                 const canAdjust = canAdjustBatch && !isConfirmed && !isApplying;
-                const imageUrl =
-                  variant.generatedImage != null
-                    ? storageKeyToUrl(variant.generatedImage.storageKey)
-                    : null;
                 return (
                   <div
                     key={req.id}
@@ -392,9 +388,11 @@ export function TestGenerationModal({
                         status: req.status,
                       })}
                     </div>
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
+                    {variant.generatedImage ? (
+                      <MediaImage
+                        entity="generated-images"
+                        entityId={variant.generatedImage.id}
+                        storageKey={variant.generatedImage.storageKey}
                         alt={t("variantAlt", { index: i + 1 })}
                         style={{
                           width: "100%",

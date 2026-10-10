@@ -99,6 +99,7 @@
       "setExcluded": "Set excluded",
       "deleteSelected": "Delete selected"
     },
+    "processing": "Processing photo…",
     "uploading": "Uploading…",
     "deletedSectionTitle": "Recently deleted",
     "deletedSectionHint": "Deleted photos are kept for 7 days.",

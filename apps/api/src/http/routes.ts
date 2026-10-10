@@ -1,3 +1,5 @@
+import type { PrivateMediaService } from "../media/media-service";
+import { addMediaRoutes } from "./media-routes";
 import { createReadStream, existsSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve, sep } from "node:path";
@@ -324,16 +326,19 @@ export function buildLocalRouter(
 export function buildHostedRouter(
   deps: ApiDependencies,
   contextFactory: HttpRequestContextFactory,
+  media?: PrivateMediaService,
 ): Router {
-  return buildRouterForTarget(deps, contextFactory, "cloud");
+  return buildRouterForTarget(deps, contextFactory, "cloud", media);
 }
 
 function buildRouterForTarget(
   deps: ApiDependencies,
   contextFactory: HttpRequestContextFactory,
   target: "local" | "cloud",
+  media?: PrivateMediaService,
 ): Router {
   const router = new Router(contextFactory);
+  if (target === "cloud" && media) addMediaRoutes(router, media);
 
   // GET /api/me
   router.add(
@@ -649,66 +654,75 @@ function buildRouterForTarget(
     },
   );
 
-  // POST /api/projects/:projectId/photo-assets
-  router.add(
-    "POST",
-    "/api/projects/:projectId/photo-assets",
-    async (req, res, params, { dependencies: deps }) => {
-      const principal = await requirePrincipal(deps, res);
-      if (principal == null) return;
+  if (target === "local") {
+    // POST /api/projects/:projectId/photo-assets
+    router.add(
+      "POST",
+      "/api/projects/:projectId/photo-assets",
+      async (req, res, params, { dependencies: deps }) => {
+        const principal = await requirePrincipal(deps, res);
+        if (principal == null) return;
 
-      const projectId = getParam(params, "projectId");
-      const project = await deps.projects.findById(projectId);
-      if (project == null) {
-        sendJson(res, 404, notFoundBody("Project not found."));
-        return;
-      }
+        const projectId = getParam(params, "projectId");
+        const project = await deps.projects.findById(projectId);
+        if (project == null) {
+          sendJson(res, 404, notFoundBody("Project not found."));
+          return;
+        }
 
-      if (project.organizationId !== principal.organization.id) {
-        sendJson(res, 404, notFoundBody());
-        return;
-      }
+        if (project.organizationId !== principal.organization.id) {
+          sendJson(res, 404, notFoundBody());
+          return;
+        }
 
-      let rawBody: unknown;
-      try {
-        rawBody = await readJsonBody(req, HTTP_BODY_LIMITS.localPhotoJsonBytes);
-      } catch (err) {
-        sendBodyReadError(res, err);
-        return;
-      }
+        let rawBody: unknown;
+        try {
+          rawBody = await readJsonBody(
+            req,
+            HTTP_BODY_LIMITS.localPhotoJsonBytes,
+          );
+        } catch (err) {
+          sendBodyReadError(res, err);
+          return;
+        }
 
-      const parsed = UploadPhotoAssetSchema.safeParse(rawBody);
-      if (!parsed.success) {
-        sendJson(res, 422, errorBody("validation_error", parsed.error.message));
-        return;
-      }
+        const parsed = UploadPhotoAssetSchema.safeParse(rawBody);
+        if (!parsed.success) {
+          sendJson(
+            res,
+            422,
+            errorBody("validation_error", parsed.error.message),
+          );
+          return;
+        }
 
-      const photoAssetId = crypto.randomUUID();
-      const body = Buffer.from(parsed.data.contentBase64, "base64");
+        const photoAssetId = crypto.randomUUID();
+        const body = Buffer.from(parsed.data.contentBase64, "base64");
 
-      const service = new PhotoAssetIngestionService(deps);
-      const result = await service.ingest({
-        projectId,
-        photoAssetId,
-        fileName: parsed.data.name,
-        body,
-        mimeTypeHint: parsed.data.mimeType,
-        notes: parsed.data.notes ?? null,
-        usage: parsed.data.usage,
-      });
+        const service = new PhotoAssetIngestionService(deps);
+        const result = await service.ingest({
+          projectId,
+          photoAssetId,
+          fileName: parsed.data.name,
+          body,
+          mimeTypeHint: parsed.data.mimeType,
+          notes: parsed.data.notes ?? null,
+          usage: parsed.data.usage,
+        });
 
-      if (!result.ok) {
-        sendJson(
-          res,
-          useCaseErrorToStatus(result.error.code),
-          errorBody(result.error.code, result.error.message),
-        );
-        return;
-      }
+        if (!result.ok) {
+          sendJson(
+            res,
+            useCaseErrorToStatus(result.error.code),
+            errorBody(result.error.code, result.error.message),
+          );
+          return;
+        }
 
-      sendJson(res, 201, toPhotoAssetDto(result.value));
-    },
-  );
+        sendJson(res, 201, toPhotoAssetDto(result.value));
+      },
+    );
+  }
 
   // PATCH /api/photo-assets/:photoAssetId
   router.add(

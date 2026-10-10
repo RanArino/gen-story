@@ -53,7 +53,7 @@ import {
 } from "../../lib/api-client";
 import { StorySetupAiModal } from "./StorySetupAiModal";
 import { TestGenerationModal } from "./TestGenerationModal";
-import { storageKeyToUrl } from "../../lib/image-url";
+import { MediaImage } from "../MediaImage";
 import { AppShell } from "../AppShell";
 import { ComposedPromptPreview } from "../common/ComposedPromptPreview";
 import { ErrorAlert } from "../ErrorAlert";
@@ -1663,9 +1663,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   </button>
                   {characterSheet?.status === "succeeded" &&
                     characterSheet.storageKey && (
-                      <img
+                      <MediaImage
                         className={styles.characterSheetPreview}
-                        src={storageKeyToUrl(characterSheet.storageKey)}
+                        entity="character-sheets"
+                        entityId={characterSheet.jobId}
+                        storageKey={characterSheet.storageKey}
                         alt={t("characterPolicy.sheetAlt")}
                       />
                     )}
@@ -1876,8 +1878,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                       onClick={() => setGalleryEditingIndex(idx)}
                     >
                       {primaryPhoto ? (
-                        <img
-                          src={storageKeyToUrl(primaryPhoto.storageKey)}
+                        <MediaImage
+                          entity="photo-assets"
+                          entityId={primaryPhoto.id}
+                          storageKey={primaryPhoto.storageKey}
                           alt={primaryPhoto.name}
                         />
                       ) : (
@@ -1965,11 +1969,6 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                           : ""
                       }`}
                       style={{
-                        ...(primaryPhoto
-                          ? {
-                              backgroundImage: `url(${storageKeyToUrl(primaryPhoto.storageKey)})`,
-                            }
-                          : {}),
                         opacity: sceneDragIndex === idx ? 0.4 : 1,
                       }}
                       draggable
@@ -2004,6 +2003,15 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                         })
                       }
                     >
+                      {primaryPhoto && (
+                        <MediaImage
+                          entity="photo-assets"
+                          entityId={primaryPhoto.id}
+                          storageKey={primaryPhoto.storageKey}
+                          alt=""
+                          className={styles.filmstripImage}
+                        />
+                      )}
                       <span>{idx + 1}</span>
                       <strong>{scene.title || t("nav.untitled")}</strong>
                     </button>
@@ -2244,8 +2252,10 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                           });
                         }}
                       />
-                      <img
-                        src={storageKeyToUrl(photo.storageKey)}
+                      <MediaImage
+                        entity="photo-assets"
+                        entityId={photo.id}
+                        storageKey={photo.storageKey}
                         alt={photo.name}
                       />
                       <span>{photo.name}</span>
@@ -2633,9 +2643,11 @@ function SceneCard({
     <div className={styles.scenePhotoPanel}>
       <div className={styles.primaryPhotoHero}>
         {primaryPhoto ? (
-          <img
+          <MediaImage
             className={styles.primaryPhotoImage}
-            src={storageKeyToUrl(primaryPhoto.storageKey)}
+            entity="photo-assets"
+            entityId={primaryPhoto.id}
+            storageKey={primaryPhoto.storageKey}
             alt={primaryPhoto.name}
           />
         ) : (
@@ -2693,8 +2705,10 @@ function SceneCard({
                     disabled={assigningPhoto !== null}
                     title={photo.name}
                   >
-                    <img
-                      src={storageKeyToUrl(photo.storageKey)}
+                    <MediaImage
+                      entity="photo-assets"
+                      entityId={photo.id}
+                      storageKey={photo.storageKey}
                       alt={photo.name}
                     />
                     <span>{photo.name}</span>

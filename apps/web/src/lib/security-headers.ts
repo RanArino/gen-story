@@ -6,8 +6,19 @@ export type SecurityHeader = {
 export function buildSecurityHeaders(
   isProduction: boolean,
   apiBaseUrl?: string,
+  r2EndpointOrigin?: string,
 ): SecurityHeader[] {
   const apiOrigin = configuredApiOrigin(apiBaseUrl);
+  let mediaOrigin = "";
+  if (r2EndpointOrigin != null) {
+    if (
+      !/^https:\/\/[a-f0-9]{32}\.r2\.cloudflarestorage\.com$/.test(
+        r2EndpointOrigin,
+      )
+    )
+      throw new Error("An exact R2 endpoint origin is required.");
+    mediaOrigin = ` ${r2EndpointOrigin}`;
+  }
   const contentSecurityPolicy = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -16,9 +27,9 @@ export function buildSecurityHeaders(
     "object-src 'none'",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob:${mediaOrigin}`,
     "font-src 'self' data:",
-    `connect-src 'self'${apiOrigin === null ? "" : ` ${apiOrigin}`}`,
+    `connect-src 'self'${apiOrigin === null ? "" : ` ${apiOrigin}`}${mediaOrigin}`,
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
   ].join("; ");

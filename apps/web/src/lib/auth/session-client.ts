@@ -1,3 +1,4 @@
+import { clearMediaUrls } from "../private-media";
 let csrfToken: string | null = null;
 
 function apiBase(): string {
@@ -35,6 +36,7 @@ export async function establishSession(idToken: string): Promise<void> {
 }
 
 export async function endSession(): Promise<void> {
+  clearMediaUrls();
   const token = await getCsrfToken();
   const response = await fetch(`${apiBase()}/api/auth/logout`, {
     method: "POST",

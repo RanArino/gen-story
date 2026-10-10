@@ -1,3 +1,5 @@
+import { uploadPrivatePhoto, resolveMediaUrl, type MediaEntity, type UploadPhase } from "./private-media";
+import type { MediaVariant } from "@gen-story/shared";
 import type {
   AgentConversationDetailDto,
   AgentConversationDto,
@@ -388,7 +390,9 @@ export async function uploadPhotoAsset(
   projectId: string,
   file: File,
   notes?: string,
+  onPhase?: (phase: UploadPhase) => void,
 ): Promise<PhotoAssetDto> {
+  if (process.env.NEXT_PUBLIC_GEN_STORY_DEPLOY_TARGET === "cloud") return uploadPrivatePhoto(request, projectId, file, notes, onPhase);
   const contentBase64 = await fileToBase64(file);
   return request<PhotoAssetDto>(
     "POST",
@@ -1095,4 +1099,8 @@ export async function compactAgentChatSession(
     "POST",
     `/api/agent-conversations/${conversationId}/compact`,
   );
+}
+
+export function getMediaUrl(entity: MediaEntity, id: string, variant: MediaVariant = "preview", fresh = false) {
+  return resolveMediaUrl(request, entity, id, variant, fresh);
 }

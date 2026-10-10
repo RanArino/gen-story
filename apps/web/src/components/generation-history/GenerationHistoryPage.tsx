@@ -12,7 +12,7 @@ import {
   listStoryboards,
   listTestGenerationBatches,
 } from "../../lib/api-client";
-import { storageKeyToUrl } from "../../lib/image-url";
+import { MediaImage } from "../MediaImage";
 import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./GenerationHistoryPage.module.css";
@@ -160,10 +160,10 @@ export function GenerationHistoryPage({ projectId }: { projectId: string }) {
                         }
                       >
                         {variant.generatedImage ? (
-                          <img
-                            src={storageKeyToUrl(
-                              variant.generatedImage.storageKey,
-                            )}
+                          <MediaImage
+                            entity="generated-images"
+                            entityId={variant.generatedImage.id}
+                            storageKey={variant.generatedImage.storageKey}
                             alt={t("testGeneration.sampleAlt")}
                             style={{
                               width: "100%",
