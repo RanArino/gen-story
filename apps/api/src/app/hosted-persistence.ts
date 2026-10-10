@@ -1,3 +1,5 @@
+import { createFirestorePrincipalProvisioner } from "../firestore/firebase-principal-provisioner";
+import { createOwnedStylePresetRepository } from "../firestore/owned-style-presets";
 import {
   createFirebaseRequestContextFactory,
   FirebaseTenantTokenVerifier,
@@ -40,12 +42,23 @@ export function createHostedPersistenceContext(env: NodeJS.ProcessEnv) {
     config.tenantId,
   );
   return {
+    db,
     repositories,
     sessions,
     createRequestContextFactory(dependencies: ApiDependencies) {
       return createFirebaseRequestContextFactory(
         { ...dependencies, ...repositories },
         sessions,
+        {
+          provision: createFirestorePrincipalProvisioner(db),
+          scope: (principal, dependencies) => ({
+            ...dependencies,
+            stylePresets: createOwnedStylePresetRepository(
+              db,
+              principal.user.id,
+            ),
+          }),
+        },
       );
     },
     close: () => db.terminate(),

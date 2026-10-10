@@ -48,20 +48,30 @@ type PrincipalRepositories = Pick<
 export function createFirebaseRequestContextFactory(
   baseDependencies: ApiDependencies,
   verifier: FirebaseTokenVerifier,
+  options?: {
+    provision?: (identity: FirebaseIdentity) => Promise<AuthPrincipal | null>;
+    scope?: (
+      principal: AuthPrincipal,
+      dependencies: ApiDependencies,
+    ) => ApiDependencies;
+  },
 ): HttpRequestContextFactory {
   return async (request, routeIdentity): Promise<HttpRequestContext> => {
     const identity = await authenticateFirebaseRequest(request, verifier);
     const principal =
       identity == null
         ? null
-        : await provisionFirebasePrincipal(baseDependencies, identity);
+        : await (options?.provision?.(identity) ??
+            provisionFirebasePrincipal(baseDependencies, identity));
 
     return {
       requestId: randomUUID(),
       routeIdentity,
       principal,
       dependencies: {
-        ...baseDependencies,
+        ...(principal != null && options?.scope
+          ? options.scope(principal, baseDependencies)
+          : baseDependencies),
         authContext: new PrincipalAuthContext(principal),
       },
     };
