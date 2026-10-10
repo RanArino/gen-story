@@ -11,10 +11,10 @@ out of scope in this version.
 
 ## Development branches
 
-`main` is the local application development branch. `hackathon-hosted` preserves
+`main` is the local application development branch. `prod` preserves
 PRs #52 and #53 and is the integration branch for hackathon hosting work. Target
 local features and fixes at `main`; target hosted authentication, Firestore,
-private media, queues, and deployment changes at `hackathon-hosted`.
+private media, queues, and deployment changes at `prod`.
 
 The local baseline is commit `cdf0e455790d1cc150ea01dcb5d4fe5ac310daaa`
 (before PR #52). Restoration uses revert commits and preserves published history.
