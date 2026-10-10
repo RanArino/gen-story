@@ -15,12 +15,13 @@
     "dev:api": "pnpm --filter @gen-story/api dev",
     "gcloud": "./scripts/gcloud-gen-story.sh",
     "security:sbom": "node scripts/generate-sbom.mjs",
-    "test:firestore:contract": "node scripts/require-firestore-emulator.mjs && pnpm --filter @gen-story/api exec vitest run --fileParallelism=false --testTimeout=30000 src/firestore/repositories.contract.test.ts src/firestore/security-rules.test.ts src/firestore/hosted-http.test.ts src/firestore/upload-session-repository.test.ts src/firestore/firebase-principal-provisioner.test.ts",
+    "test:firestore:contract": "node scripts/require-firestore-emulator.mjs && pnpm --filter @gen-story/api exec vitest run --fileParallelism=false --testTimeout=30000 src/firestore/repositories.contract.test.ts src/firestore/security-rules.test.ts src/firestore/hosted-http.test.ts src/firestore/upload-session-repository.test.ts src/firestore/firebase-principal-provisioner.test.ts src/photos/complete-upload.test.ts",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "format": "prettier --check package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.mjs \"apps/**/*.{json,ts,tsx,js,mjs}\" \"packages/**/*.{json,ts,tsx,js,mjs}\"",
     "test": "pnpm -r test",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "test:media:linux": "GEN_STORY_MEDIA_LINUX_TEST=1 pnpm --filter @gen-story/api exec vitest run --fileParallelism=false src/photos/bounded-image-decoder.test.ts src/photos/complete-upload-linux.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

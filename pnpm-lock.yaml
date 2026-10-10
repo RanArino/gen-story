@@ -81,6 +81,9 @@ importers:
       heic-convert:
         specifier: ^2.1.0
         version: 2.1.0
+      heic-decode:
+        specifier: ^2.1.0
+        version: 2.1.0
       openai:
         specifier: ^6.35.0
         version: 6.35.0(ws@8.22.0)(zod@3.25.76)
