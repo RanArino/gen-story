@@ -208,11 +208,14 @@ and cleanup. Do not run it as ordinary CI. Local fixture success does not prove
 live R2 compatibility or browser CORS configuration.
 
 HP-4.0 execution defaults and HP-4.1–HP-4.3 isolated acceptance are complete.
-HP-4.4 direct execution is verified; its hosted deletion-task acceptance remains
-open until HP-5.2a. M4 is **4/5**, not 5/5. HP-5.3 hosted preprocessing delivery,
-real authentication acceptance, deployment, operator account/origins, and live R2
+HP-4.4 and HP-5.2a are complete against a Docker simulation (Emulator, S3-compatible
+container, containerized worker, local queue, signed test tokens); real-cloud
+acceptance was not performed and is deferred to the deployment milestone. M4 is
+**5/5** on that basis. HP-5.2 generation, HP-5.3 hosted preprocessing delivery, real
+authentication acceptance, deployment, operator account/origins, and live R2
 compatibility remain open. Hosted startup remains fail closed.
 
 Deletion-only Cloud Tasks dispatch, OIDC verification, bounded repair and the private
 worker are implemented locally. See [Hosted deletion](hosted-deletion.md) for
-contracts and staging acceptance. Live acceptance remains required.
+contracts, the Docker acceptance command (`pnpm test:deletion:docker`), and the
+deferred, unverified real-cloud checks.

@@ -1,6 +1,6 @@
 # Private hosted deletion worker
 
-HP-4.4 has local implementation evidence. **HP-5.2a staging acceptance is still open; M4 remains 4/5.** This runbook is a deployment proposal, not deployment authorization. Obtain separate approval for provisioning, IAM changes, image publication, deployment, and irreversible deletion of the synthetic fixtures described below. Production is outside this procedure.
+HP-4.4 and HP-5.2a are complete against a **Docker simulation**: the Firestore Emulator, an S3-compatible container standing in for R2, the deletion worker running as a container, a local delivery/retry queue standing in for Cloud Tasks, repair invoked directly in place of Cloud Scheduler, and RS256-signed test tokens. **Real-cloud acceptance has not been performed.** It is deferred to the deployment milestone and listed below as unverified. This runbook's cloud sections are a deployment proposal, not deployment authorization; obtain separate approval for provisioning, IAM changes, image publication, deployment, and irreversible deletion of synthetic fixtures. Production is outside this procedure.
 
 ## Execution contract
 
@@ -112,6 +112,8 @@ Manual exhausted retry resets the bounded generation budget only for an existing
 
 ## Approval package (staging, prepared 2026-10-10)
 
+> **Not part of the current completion criteria.** This package is the starting point for the deployment milestone's real-cloud acceptance. Nothing in it has been executed.
+
 Read-only inventory of `gen-story-496911` (project number `1000015687935`): the Cloud Run, Cloud Tasks, Artifact Registry, Secret Manager, Cloud Build and IAM APIs are enabled; **Cloud Scheduler is not enabled**. No Cloud Run service, queue, Artifact Registry repository, secret, or worker/caller/Scheduler service account exists. Firestore contains `gen-story-staging` and `gen-story-production`. Nothing below has been executed.
 
 Fixed values once approved:
@@ -142,9 +144,32 @@ Worker interruption uses a separate `deletion-worker-fault` image containing a p
 
 Rollback: pause the Scheduler job and the queue, then `pnpm gcloud run services update-traffic gen-story-staging-deletion-worker --region=asia-northeast1 --to-revisions=<recorded previous revision>=100`. Only fixture resources created under `m4-<runId>`, the fault image, and the contract's synthetic data may be cleaned up; shared resources, manifests, guards and the other owner's fixture stay.
 
-## HP-5.2a acceptance record
+## Docker acceptance (completion criteria)
 
-Run only after approving the exact synthetic fixture namespace and operations. Keep existing staging user data out of the test. Use fresh users/projects with a unique run ID, record all created document paths and owned object prefixes, and preserve a second owner's fixture for comparison. Do not reset the staging database. Seed more than 100 inventory records and at least 201 objects below one owned prefix, including every applicable entity/auxiliary/media collection, nested manifests and linked children without projectId. This proves Firestore and R2 page boundaries. Use genuinely expired synthetic records or historical synthetic timestamps; never shorten the production seven-day policy.
+Run the Firestore Emulator, then the serial acceptance suite. The suite builds the production worker image and an acceptance layer, starts an S3-compatible container (SeaweedFS; MinIO's public images are no longer available) and the worker, and removes both afterwards. Docker, the Emulator on loopback with `GCLOUD_PROJECT=demo-gen-story`, and no skipped cases are required.
+
+```sh
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=demo-gen-story pnpm test:deletion:docker
+```
+
+The test-only worker entry (`apps/api/src/test-support/docker-deletion/`) reuses the production task handler, authenticator, dispatch, repository and executor. It replaces only the Google verifier with an RS256 public-key verifier, Cloud Tasks with a local queue, and the R2 endpoint with the S3 container. It can exit once after a chosen number of object deletes. The acceptance layer is never part of the normal image.
+
+| Scenario         | Evidence                                                                                                                                                                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recovery period  | Early delivery returns 503 with no data or object change; after restoration, replay returns 204 and nothing is deleted.                                                                                                                                   |
+| Delivery deletes | The local queue delivers the due task; project records and objects are removed and foreign fixtures are unchanged.                                                                                                                                        |
+| Scale            | 105 flat records plus a linked child without `projectId` and 201 objects under one prefix (a full 200-key page plus one).                                                                                                                                 |
+| Interruption     | The container exits after a persisted checkpoint; restart and redelivery resume and complete.                                                                                                                                                             |
+| Repair           | A removed task is recreated by the repair endpoint using the Scheduler identity.                                                                                                                                                                          |
+| Exhaustion       | Three generations are used, repair then stops, and the trusted retry creates the next generation and completes.                                                                                                                                           |
+| Competing purges | Account and project purges for one user both complete; the other owner is unchanged.                                                                                                                                                                      |
+| Account guard    | Writes and reprovisioning are rejected before and after the purge; the guard document remains.                                                                                                                                                            |
+| Authentication   | Absent, malformed, tampered, other-key, wrong audience/subject/email, unverified, expired, mis-scoped, queue-header-only, extra-field and wrong-path requests are rejected with the Firestore and object state unchanged; the exact identity is accepted. |
+| Orphan report    | Firestore documents and object metadata are identical before and after the report.                                                                                                                                                                        |
+
+## Deferred real-cloud acceptance (unverified)
+
+These checks are **not verified** and are not part of the HP-4.4/HP-5.2a completion criteria. They move to the deployment milestone: real Cloud Tasks delivery and retry, real Cloud Scheduler invocation, Google-signed identity tokens, real IAM and Cloud Run ingress, and R2 page boundaries (more than 200 objects) on the real service. Run them only after approving the exact synthetic fixture namespace and operations. Keep existing staging user data out of the test, preserve a second owner's fixture for comparison, do not reset the staging database, and never shorten the production seven-day policy.
 
 1. Schedule project deletion through the repository with the dispatch adapter. Confirm persisted intent and the real queue task. Before the recovery boundary, submit authenticated work and prove zero record/object deletions; restore, edit and save a scene, then replay the old task and confirm cancellation.
 2. Reject absent, expired, tampered, wrong-audience, wrong-subject and wrong-email tokens, the Scheduler identity on the work endpoint, the task identity on the repair endpoint, arbitrary queue headers and extra body fields. Demonstrate no database changes. Test both Cloud Run IAM and application OIDC; a mocked verifier is insufficient evidence.
@@ -153,7 +178,7 @@ Run only after approving the exact synthetic fixture namespace and operations. K
 5. Schedule account deletion with multiple projects and overlapping project work. Verify serialization, uploaded capability/processing settlement, account guard rejection of new writes and principal provisioning, every owned prefix/document removed, shared/system and other owner's fixtures unchanged, and minimal `{ state: "purged" }` guard retained.
 6. Snapshot all fixture documents and object metadata, run the readonly orphan command across more than one page, and compare snapshots exactly. Include missing references, expired temporaries, unreferenced finalized objects, recoverable and actively purging work. No mutations are permitted.
 
-Save redacted evidence: image digest/revision, effective IAM and resource configuration, fixture path manifest, actual task names/generations, sanitized task/repair outcomes, before/after counts and preserved foreign fixtures, restoration browser evidence, and nonmutation comparisons. Close HP-5.2a and HP-4.4 only when all checks pass; then M4 becomes 5/5. HP-5.2 generation and HP-5.3 preprocessing remain separate.
+Save redacted evidence: image digest/revision, effective IAM and resource configuration, fixture path manifest, actual task names/generations, sanitized task/repair outcomes, before/after counts and preserved foreign fixtures, restoration browser evidence, and nonmutation comparisons. These checks close the deployment milestone's deletion acceptance. HP-5.2 generation and HP-5.3 preprocessing remain separate.
 
 ## Monitoring and rollback
 

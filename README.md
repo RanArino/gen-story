@@ -288,4 +288,6 @@ See [docs/known-limitations.md](docs/known-limitations.md) for features intentio
 Released under the [MIT License](LICENSE).
 
 The separate private deletion worker and its staging acceptance gate are documented
-in [Hosted deletion](docs/hosted-deletion.md). Full hosted startup remains disabled.
+in [Hosted deletion](docs/hosted-deletion.md); its Docker acceptance runs with
+`pnpm test:deletion:docker` and real-cloud acceptance is deferred. Full hosted startup
+remains disabled.
