@@ -91,6 +91,11 @@ describe.runIf(process.env.FIRESTORE_EMULATOR_HOST != null)(
           "projects/project-a",
           "users/user-a",
           "projects/missing/scenes/orphan",
+          "upload_sessions/private",
+          "media_deletions/private",
+          "media_deletion_items/private",
+          "account_deletion_guards/private",
+          "media_deletion_locks/private",
         ]) {
           await assertFails(getDoc(doc(db, path)));
           await assertFails(
@@ -100,6 +105,18 @@ describe.runIf(process.env.FIRESTORE_EMULATOR_HOST != null)(
             }),
           );
           await assertFails(deleteDoc(doc(db, path)));
+        }
+        for (const name of [
+          "upload_sessions",
+          "media_deletions",
+          "media_deletion_items",
+          "account_deletion_guards",
+          "media_deletion_locks",
+        ]) {
+          await assertFails(getDocs(collection(db, name)));
+          await assertFails(
+            setDoc(doc(db, `${name}/private`), { ownerUserId: "user-a" }),
+          );
         }
         await assertFails(getDocs(collection(db, "projects")));
         await assertFails(
