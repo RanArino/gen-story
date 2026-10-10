@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   Firestore,
   type CollectionReference,
@@ -48,24 +47,6 @@ import type {
 type Entity = { id: string };
 type SoftDeletable = Entity & { deletedAt: string | null };
 
-export type FirestoreRepositories = {
-  users: UserRepositoryPort;
-  organizations: OrganizationRepositoryPort;
-  projects: ProjectRepositoryPort;
-  photoAssets: PhotoAssetRepositoryPort;
-  storyboards: StoryboardRepositoryPort;
-  scenes: SceneRepositoryPort;
-  stylePresets: StylePresetRepositoryPort;
-  generationRequests: GenerationRequestRepositoryPort;
-  generatedImages: GeneratedImageRepositoryPort;
-  aiJobs: AiJobRepositoryPort;
-  projectPhotoAnalyses: ProjectPhotoAnalysisRepositoryPort;
-  changeProposals: ChangeProposalRepositoryPort;
-  agentConversations: AgentConversationRepositoryPort;
-  testGenerationBatches: TestGenerationBatchRepositoryPort;
-  userPreferences: UserPreferenceRepositoryPort;
-};
-
 export function createFirestoreClient(input: {
   projectId: string;
   databaseId: string;
@@ -86,16 +67,7 @@ class CollectionStore<T extends Entity> {
   }
 
   async save(value: T): Promise<void> {
-    const reference = this.collection.doc(value.id);
-    await this.collection.firestore.runTransaction(async (transaction) => {
-      const previous = await transaction.get(reference);
-      transaction.set(reference, {
-        ...value,
-        ...(previous.exists && "createdAt" in value
-          ? { createdAt: previous.data()?.createdAt }
-          : {}),
-      });
-    });
+    await this.collection.doc(value.id).set(value);
   }
 
   async where(field: string, value: unknown): Promise<T[]> {
@@ -146,8 +118,13 @@ class FirestoreProjectRepository implements ProjectRepositoryPort {
     return active(await this.store.findById(id));
   }
   async findByOrganizationId(organizationId: string, includeDeleted = false) {
-    const values = await this.store.where("organizationId", organizationId);
-    return sortAsc(filterDeleted(values, includeDeleted), "createdAt");
+    return sortDesc(
+      filterDeleted(
+        await this.store.where("organizationId", organizationId),
+        includeDeleted,
+      ),
+      "updatedAt",
+    );
   }
   save(value: Project) {
     return this.store.save(value);
@@ -169,14 +146,12 @@ class FirestorePhotoAssetRepository implements PhotoAssetRepositoryPort {
     return active(await this.store.findById(id));
   }
   async findByProjectId(projectId: string, includeDeleted = false) {
-    return filterDeleted(
-      await this.store.where("projectId", projectId),
-      includeDeleted,
-    ).sort(
-      (left, right) =>
-        left.position - right.position ||
-        compare(left.createdAt, right.createdAt) ||
-        compare(left.id, right.id),
+    return sortAsc(
+      filterDeleted(
+        await this.store.where("projectId", projectId),
+        includeDeleted,
+      ),
+      "createdAt",
     );
   }
   async findByProjectIdAndChecksum(projectId: string, checksum: string) {
@@ -199,31 +174,17 @@ class FirestorePhotoAssetRepository implements PhotoAssetRepositoryPort {
 
 class FirestoreStoryboardRepository implements StoryboardRepositoryPort {
   private readonly store: CollectionStore<Storyboard>;
-  constructor(private readonly db: Firestore) {
+  constructor(db: Firestore) {
     this.store = store(db, "storyboards");
   }
   async findById(id: string) {
-    const value = active(await this.store.findById(id));
-    return value == null ? null : this.withSceneIds(value);
+    return active(await this.store.findById(id));
   }
   async findByProjectId(projectId: string) {
-    return Promise.all(
-      sortAsc(
-        filterDeleted(await this.store.where("projectId", projectId)),
-        "createdAt",
-      ).map((value) => this.withSceneIds(value)),
+    return sortAsc(
+      filterDeleted(await this.store.where("projectId", projectId)),
+      "createdAt",
     );
-  }
-  private async withSceneIds(value: Storyboard): Promise<Storyboard> {
-    const scenes = await readQuery<Scene>(
-      this.db.collection("scenes").where("storyboardId", "==", value.id),
-    );
-    return {
-      ...value,
-      sceneIds: sortNumber(filterDeleted(scenes), "orderIndex").map(
-        (scene) => scene.id,
-      ),
-    };
   }
   save(value: Storyboard) {
     return this.store.save(value);
@@ -244,14 +205,7 @@ class FirestoreSceneRepository implements SceneRepositoryPort {
       "orderIndex",
     );
   }
-  async save(value: Scene) {
-    if (
-      new Set(value.photoAssets.map((photo) => photo.photoAssetId)).size !==
-        value.photoAssets.length ||
-      value.photoAssets.filter((photo) => photo.role === "primary").length > 1
-    ) {
-      throw new Error("Scene photo unique constraint violated.");
-    }
+  save(value: Scene) {
     return this.store.save(value);
   }
   softDelete(id: string, deletedAt: string) {
@@ -261,40 +215,17 @@ class FirestoreSceneRepository implements SceneRepositoryPort {
 
 class FirestoreStylePresetRepository implements StylePresetRepositoryPort {
   private readonly store: CollectionStore<StylePreset>;
-  constructor(private readonly db: Firestore) {
+  constructor(db: Firestore) {
     this.store = store(db, "style_presets");
   }
   async findById(id: string) {
-    return stripDeletedAt(active(await this.store.findById(id)));
+    return active(await this.store.findById(id));
   }
   async findAll() {
-    return stripDeletedAtList(filterDeleted(await this.store.all())).sort(
-      (left, right) =>
-        compare(left.scope, right.scope) ||
-        compare(left.name, right.name) ||
-        compare(left.id, right.id),
-    );
+    return sortAsc(filterDeleted(await this.store.all()), "createdAt");
   }
-  async save(value: StylePreset) {
-    const reference = this.db.collection("style_presets").doc(value.id);
-    await this.db.runTransaction(async (transaction) => {
-      const snapshot = await transaction.get(reference);
-      const existing = snapshot.data() as StylePreset | undefined;
-      if (
-        existing?.scope === "system" &&
-        (value.scope !== existing.scope ||
-          value.name !== existing.name ||
-          value.description !== existing.description ||
-          value.prompt !== existing.prompt)
-      ) {
-        throw new Error("System style presets cannot be edited directly.");
-      }
-      transaction.set(reference, {
-        ...value,
-        createdAt: existing?.createdAt ?? value.createdAt,
-        deletedAt: null,
-      });
-    });
+  save(value: StylePreset) {
+    return this.store.save(value);
   }
 }
 
@@ -342,12 +273,15 @@ class FirestoreGenerationRequestRepository implements GenerationRequestRepositor
   }
   async findRecent(limit: number) {
     return stripDeletedAtList(
-      sortAsc(await this.store.all(), "createdAt").slice(0, limit),
+      sortAsc(filterDeleted(await this.store.all()), "createdAt").slice(
+        0,
+        limit,
+      ),
     );
   }
   async findByStoryboardId(storyboardId: string) {
     return stripDeletedAtList(
-      sortDesc(
+      sortAsc(
         filterDeleted(await this.store.where("storyboardId", storyboardId)),
         "createdAt",
       ),
@@ -403,94 +337,44 @@ class FirestoreAiJobRepository implements AiJobRepositoryPort {
 
 class FirestoreGeneratedImageRepository implements GeneratedImageRepositoryPort {
   private readonly store: CollectionStore<GeneratedImage>;
-  constructor(private readonly db: Firestore) {
+  constructor(db: Firestore) {
     this.store = store(db, "generated_images");
   }
   async findById(id: string) {
-    return stripDeletedAt(active(await this.store.findById(id)));
+    return active(await this.store.findById(id));
   }
   async findBySceneId(sceneId: string) {
-    return stripDeletedAtList(
-      sortAsc(
-        filterDeleted(await this.store.where("sceneId", sceneId)),
-        "createdAt",
-      ),
+    return sortAsc(
+      filterDeleted(await this.store.where("sceneId", sceneId)),
+      "createdAt",
     );
   }
-  async save(value: GeneratedImage) {
-    const reference = this.db.collection("generated_images").doc(value.id);
-    const sceneReference = this.db.collection("scenes").doc(value.sceneId);
-    await this.db.runTransaction(async (transaction) => {
-      const sceneSnapshot = await transaction.get(sceneReference);
-      const scene = sceneSnapshot.data() as (Scene & SoftDeletable) | undefined;
-      if (scene == null || scene.deletedAt != null)
-        throw new Error("Scene not found.");
-      const existing = await transaction.get(reference);
-      const images =
-        value.adoptedAt == null
-          ? null
-          : await transaction.get(
-              this.db
-                .collection("generated_images")
-                .where("sceneId", "==", value.sceneId),
-            );
-      if (images != null) {
-        for (const image of images.docs) {
-          if (image.id !== value.id && image.data().deletedAt == null)
-            transaction.update(image.ref, {
-              adoptedAt: null,
-              updatedAt: value.adoptedAt,
-            });
-        }
-      }
-      transaction.set(reference, {
-        ...value,
-        createdAt: existing.data()?.createdAt ?? value.createdAt,
-        deletedAt: null,
-      });
-      if (
-        value.adoptedAt != null ||
-        scene.adoptedGeneratedImageId === value.id
-      ) {
-        transaction.update(sceneReference, {
-          adoptedGeneratedImageId: value.adoptedAt == null ? null : value.id,
-          updatedAt: value.adoptedAt ?? value.updatedAt,
-        });
-      }
-    });
+  save(value: GeneratedImage) {
+    return this.store.save(value);
   }
 }
 
 class FirestoreProjectPhotoAnalysisRepository implements ProjectPhotoAnalysisRepositoryPort {
   private readonly store: CollectionStore<ProjectPhotoAnalysis>;
-  constructor(private readonly db: Firestore) {
+  constructor(db: Firestore) {
     this.store = store(db, "project_photo_analyses");
   }
   async findLatestByProjectId(projectId: string) {
     return (
       sortDesc(
-        filterDeleted(await this.store.where("projectId", projectId)),
-        "updatedAt",
+        await this.store.where("projectId", projectId),
+        "createdAt",
       )[0] ?? null
     );
   }
-  async save(value: ProjectPhotoAnalysis) {
-    const reference = this.db
-      .collection("project_photo_analyses")
-      .doc(value.projectId);
-    await this.db.runTransaction(async (transaction) => {
-      const previous = await transaction.get(reference);
-      transaction.set(reference, {
-        ...value,
-        createdAt: previous.data()?.createdAt ?? value.createdAt,
-      });
-    });
+  save(value: ProjectPhotoAnalysis) {
+    return this.store.save(value);
   }
 }
 
 class FirestoreChangeProposalRepository implements ChangeProposalRepositoryPort {
   private readonly store: CollectionStore<ChangeProposal>;
-  constructor(private readonly db: Firestore) {
+  constructor(db: Firestore) {
     this.store = store(db, "change_proposals");
   }
   findById(id: string) {
@@ -505,35 +389,13 @@ class FirestoreChangeProposalRepository implements ChangeProposalRepositoryPort 
   }
   async findByProjectId(projectId: string, status?: ChangeProposalStatus) {
     const values = await this.store.where("projectId", projectId);
-    return sortAsc(
+    return sortDesc(
       status == null ? values : values.filter((item) => item.status === status),
       "createdAt",
     );
   }
-  async save(value: ChangeProposal) {
-    const reference = this.db.collection("change_proposals").doc(value.id);
-    await this.db.runTransaction(async (transaction) => {
-      const snapshot = await transaction.get(reference);
-      const existing = snapshot.data() as ChangeProposal | undefined;
-      const record =
-        existing == null
-          ? value
-          : {
-              ...value,
-              projectId: existing.projectId,
-              provenance: existing.provenance,
-              clientRequestId: existing.clientRequestId,
-              createdAt: existing.createdAt,
-            };
-      const key = this.db
-        .collection("change_proposal_request_keys")
-        .doc(compoundKey(record.projectId, record.clientRequestId));
-      const reservation = await transaction.get(key);
-      if (reservation.exists && reservation.data()?.proposalId !== value.id)
-        throw new Error("Proposal request ID unique constraint violated.");
-      transaction.set(key, { proposalId: value.id });
-      transaction.set(reference, record);
-    });
+  save(value: ChangeProposal) {
+    return this.store.save(value);
   }
 }
 
@@ -585,9 +447,9 @@ class FirestoreAgentConversationRepository implements AgentConversationRepositor
     return this.conversations.findById(id);
   }
   async findByProjectId(projectId: string) {
-    return (await this.conversations.where("projectId", projectId)).sort(
-      (left, right) =>
-        compare(right.createdAt, left.createdAt) || compare(left.id, right.id),
+    return sortDesc(
+      await this.conversations.where("projectId", projectId),
+      "updatedAt",
     );
   }
   save(value: AgentConversation) {
@@ -624,34 +486,8 @@ class FirestoreAgentConversationRepository implements AgentConversationRepositor
       "startedAt",
     );
   }
-  async saveTurn(value: AgentConversationTurn) {
-    const reference = this.db
-      .collection("agent_conversation_turns")
-      .doc(value.id);
-    await this.db.runTransaction(async (transaction) => {
-      const snapshot = await transaction.get(reference);
-      const existing = snapshot.data() as AgentConversationTurn | undefined;
-      const record =
-        existing == null
-          ? value
-          : {
-              ...existing,
-              status: value.status,
-              model: value.model,
-              providerTurnId: value.providerTurnId,
-              compacted: value.compacted,
-              errorMessage: value.errorMessage,
-              completedAt: value.completedAt,
-            };
-      const key = this.db
-        .collection("agent_turn_request_keys")
-        .doc(compoundKey(record.conversationId, record.clientRequestId));
-      const reservation = await transaction.get(key);
-      if (reservation.exists && reservation.data()?.turnId !== value.id)
-        throw new Error("Turn request ID unique constraint violated.");
-      transaction.set(key, { turnId: value.id });
-      transaction.set(reference, record);
-    });
+  saveTurn(value: AgentConversationTurn) {
+    return this.turns.save(value);
   }
   async listMessages(conversationId: string, afterSequence = 0) {
     return sortNumber(
@@ -666,25 +502,8 @@ class FirestoreAgentConversationRepository implements AgentConversationRepositor
       .collection("agent_conversation_messages")
       .doc(value.id);
     await this.db.runTransaction(async (transaction) => {
-      if ((await transaction.get(reference)).exists) return;
-      const sequenceKey = this.db
-        .collection("agent_message_sequence_keys")
-        .doc(compoundKey(value.conversationId, String(value.sequence)));
-      const collision = await transaction.get(sequenceKey);
-      if (collision.exists)
-        throw new Error("Message sequence unique constraint violated.");
-      const counter = this.db
-        .collection("agent_conversation_counters")
-        .doc(value.conversationId);
-      const snapshot = await transaction.get(counter);
-      transaction.create(reference, value);
-      transaction.set(sequenceKey, { messageId: value.id });
-      transaction.set(counter, {
-        lastSequence: Math.max(
-          (snapshot.data()?.lastSequence as number | undefined) ?? 0,
-          value.sequence,
-        ),
-      });
+      if (!(await transaction.get(reference)).exists)
+        transaction.create(reference, value);
     });
   }
   async nextMessageSequence(conversationId: string): Promise<number> {
@@ -701,9 +520,7 @@ class FirestoreAgentConversationRepository implements AgentConversationRepositor
   }
 }
 
-export function createFirestoreRepositories(
-  db: Firestore,
-): FirestoreRepositories {
+export function createFirestoreRepositories(db: Firestore) {
   return {
     users: new FirestoreUserRepository(db),
     organizations: new FirestoreOrganizationRepository(db),
@@ -745,41 +562,27 @@ function filterDeleted<T extends Entity>(
   values: T[],
   includeDeleted = false,
 ): T[] {
-  const cutoff = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  return values.filter((value) => {
-    const deletedAt = (value as Partial<SoftDeletable>).deletedAt;
-    return deletedAt == null || (includeDeleted && deletedAt >= cutoff);
-  });
+  return includeDeleted
+    ? values
+    : values.filter(
+        (value) => (value as Partial<SoftDeletable>).deletedAt == null,
+      );
 }
 
-function sortAsc<T extends Entity>(values: T[], field: keyof T): T[] {
-  return [...values].sort(
-    (left, right) =>
-      compare(left[field], right[field]) || compare(left.id, right.id),
+function sortAsc<T>(values: T[], field: keyof T): T[] {
+  return [...values].sort((left, right) =>
+    String(left[field]).localeCompare(String(right[field])),
   );
 }
 
-function sortDesc<T extends Entity>(values: T[], field: keyof T): T[] {
+function sortDesc<T>(values: T[], field: keyof T): T[] {
   return sortAsc(values, field).reverse();
 }
 
-function sortNumber<T extends Entity>(values: T[], field: keyof T): T[] {
+function sortNumber<T>(values: T[], field: keyof T): T[] {
   return [...values].sort(
-    (left, right) =>
-      Number(left[field]) - Number(right[field]) || compare(left.id, right.id),
+    (left, right) => Number(left[field]) - Number(right[field]),
   );
-}
-
-function compare(left: unknown, right: unknown): number {
-  return String(left) < String(right)
-    ? -1
-    : String(left) > String(right)
-      ? 1
-      : 0;
-}
-
-function compoundKey(...parts: string[]): string {
-  return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 }
 
 function stripDeletedAt<T extends Entity>(value: T | null): T | null {

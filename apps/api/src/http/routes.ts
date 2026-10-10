@@ -835,15 +835,6 @@ function buildRouterForTarget(
         return;
       }
 
-      const existingStoryboard = await deps.storyboards.findById(storyboardId);
-      if (
-        existingStoryboard != null &&
-        existingStoryboard.projectId !== project.id
-      ) {
-        sendJson(res, 404, notFoundBody());
-        return;
-      }
-
       const result = await upsertStoryboard(deps, {
         storyboardId,
         projectId: parsed.data.projectId,
@@ -2265,14 +2256,6 @@ function buildRouterForTarget(
       if (principal == null) return;
 
       const projectId = getParam(params, "projectId");
-      const ownedProjects = await deps.projects.findByOrganizationId(
-        principal.organization.id,
-        true,
-      );
-      if (!ownedProjects.some((project) => project.id === projectId)) {
-        sendJson(res, 404, notFoundBody());
-        return;
-      }
       const result = await restoreProject(deps, projectId);
       if (!result.ok) {
         sendJson(

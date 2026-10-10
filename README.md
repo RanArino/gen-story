@@ -149,15 +149,6 @@ in GitHub Actions. CI installs its own temporary JDK; local development and the
 deployed Node services do not require Java. The contract never connects to the
 live staging or production database.
 
-`pnpm test:firestore:contract` runs the shared repository contracts, deny-all
-Security Rules tests, and isolated two-user HTTP authorization harness serially.
-See [Firestore persistence contracts](docs/firestore-contracts.md) for coverage,
-safe Emulator setup, storage/index inventory, and the remaining hosted gates.
-Hosted Firebase/Firestore persistence preparation is implemented, but cloud
-startup still rejects missing R2 and Cloud Tasks adapters. Project restoration
-checks ownership, and an existing storyboard cannot be reassigned through an
-update to another project.
-
 ## Exporting Images and Prompts for Coding Agents
 
 On the review screen, **Export images and prompts locally** creates a

@@ -179,9 +179,6 @@ export function makeHandleRequest(
 export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
   if (resolveDeployTarget(process.env) === "cloud") {
     createHostedApiContext(process.env);
-    throw new Error(
-      "Hosted server startup is unavailable until its runtime adapters are configured.",
-    );
   }
 
   const client = openDatabase();
