@@ -21,6 +21,7 @@
     "format": "prettier --check package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.mjs \"apps/**/*.{json,ts,tsx,js,mjs}\" \"packages/**/*.{json,ts,tsx,js,mjs}\"",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
+    "test:deletion:docker": "node scripts/require-firestore-emulator.mjs && GEN_STORY_DOCKER_ACCEPTANCE=1 pnpm --filter @gen-story/api exec vitest run --fileParallelism=false --testTimeout=240000 --hookTimeout=600000 src/test-support/docker-deletion/docker-deletion-acceptance.test.ts",
     "test:media:linux": "GEN_STORY_MEDIA_LINUX_TEST=1 pnpm --filter @gen-story/api exec vitest run --fileParallelism=false src/photos/bounded-image-decoder.test.ts src/photos/complete-upload-linux.test.ts"
   },
   "devDependencies": {
