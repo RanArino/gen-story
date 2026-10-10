@@ -504,3 +504,42 @@ export {
   isGeminiImageModel,
 } from "./image-generation-models";
 export type { ImageGenerationModelOption } from "./image-generation-models";
+
+export type UploadSessionState =
+  | "issued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "expired";
+export type UploadGrantRequestDto = {
+  name: string;
+  mimeType:
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp"
+    | "image/heic"
+    | "image/heif";
+  size: number;
+  sha256: string;
+  notes?: string | null;
+  usage?: "candidate" | "reference" | "excluded";
+};
+export type UploadGrantDto = {
+  uploadId: string;
+  method: "PUT";
+  url: string;
+  headers: Record<string, string>;
+  expiresAt: string;
+};
+export type UploadSessionDto = {
+  uploadId: string;
+  status: UploadSessionState;
+  failureCode: string | null;
+  photo: PhotoAssetDto | null;
+};
+export type MediaVariant = "preview" | "agent-preview" | "original";
+export type MediaUrlDto = {
+  url: string;
+  method: "GET" | "HEAD";
+  expiresAt: string;
+};
