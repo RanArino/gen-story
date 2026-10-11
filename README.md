@@ -54,13 +54,13 @@ The app works without a Gemini key; photo analysis and story setup use determini
 
 ## Google Cloud project
 
-All Google Cloud infrastructure for this repository uses
+All Google Cloud usage for this repository targets
 `gen-story-496911`. Run GCP commands through the repository wrapper so the
 project is specified for that command only and your global `gcloud` default
 for other repositories is not changed:
 
 ```sh
-pnpm gcloud run services list
+pnpm gcloud services list --enabled
 pnpm gcloud projects describe gen-story-496911
 ```
 
