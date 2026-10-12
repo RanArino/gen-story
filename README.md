@@ -9,27 +9,6 @@ machine (local SQLite + local file storage) and needs no cloud setup. See
 [docs/known-limitations.md](docs/known-limitations.md) for what is intentionally
 out of scope in this version.
 
-## Development branches
-
-`main` is the local application development branch. `prod` preserves
-PRs #52 and #53 and is the integration branch for hackathon hosting work. Target
-local features and fixes at `main`; target hosted authentication, Firestore,
-private media, queues, and deployment changes at `prod`.
-
-The local baseline is commit `cdf0e455790d1cc150ea01dcb5d4fe5ac310daaa`
-(before PR #52). Restoration uses revert commits and preserves published history.
-The original unfinished private-media changes remain uncommitted in the hosted
-checkout and must be reviewed separately before publication.
-
-Before the first merge of restored `main` into the hosted branch, use a clean
-hosted feature branch to record an `ours` strategy merge of the final restoration
-revert commit (the commit immediately before the branch documentation commit).
-That merge records only the rollback history as integrated while retaining the
-hosted tree. Then merge `main` normally and verify the hosted behavior. Do not
-use the `ours` strategy for later feature changes. Individual local commits can
-also be cherry-picked before that first integration.
-Do not merge the hosted branch back into `main` as part of hackathon delivery.
-
 ## Prerequisites
 
 - Node.js ≥ 22
@@ -75,13 +54,13 @@ The app works without a Gemini key; photo analysis and story setup use determini
 
 ## Google Cloud project
 
-All Google Cloud infrastructure for this repository uses
+All Google Cloud usage for this repository targets
 `gen-story-496911`. Run GCP commands through the repository wrapper so the
 project is specified for that command only and your global `gcloud` default
 for other repositories is not changed:
 
 ```sh
-pnpm gcloud run services list
+pnpm gcloud services list --enabled
 pnpm gcloud projects describe gen-story-496911
 ```
 
