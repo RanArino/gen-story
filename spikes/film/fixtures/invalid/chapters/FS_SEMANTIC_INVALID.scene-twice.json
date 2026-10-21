@@ -1,0 +1,55 @@
+{
+  "expect": {
+    "path": "/chapters/1/scenes/0/sceneId"
+  },
+  "document": {
+    "schema": "film.chapters@1",
+    "storyGraph": {
+      "id": "sando-walk",
+      "revision": 1
+    },
+    "chapters": [
+      {
+        "id": "c1",
+        "title": "朝 / Morning",
+        "limitMs": 60000,
+        "scenes": [
+          {
+            "sceneId": "s1"
+          },
+          {
+            "sceneId": "s2",
+            "durationMs": 9000
+          },
+          {
+            "sceneId": "s3"
+          },
+          {
+            "sceneId": "s4",
+            "durationMs": 4250
+          },
+          {
+            "sceneId": "s5"
+          }
+        ]
+      },
+      {
+        "id": "c2",
+        "title": "夕暮れ / Dusk",
+        "limitMs": 40000,
+        "scenes": [
+          {
+            "sceneId": "s1"
+          },
+          {
+            "sceneId": "s7",
+            "durationMs": 6000
+          },
+          {
+            "sceneId": "s8"
+          }
+        ]
+      }
+    ]
+  }
+}

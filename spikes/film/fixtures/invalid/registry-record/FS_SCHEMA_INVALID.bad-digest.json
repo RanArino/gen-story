@@ -1,0 +1,20 @@
+{
+  "expect": {
+    "path": "/manifestDigest"
+  },
+  "document": {
+    "schema": "film.registry-record@1",
+    "entity": "capability",
+    "id": "film.transition.dissolve",
+    "version": "1.0.0",
+    "kind": "transition",
+    "trust": "system",
+    "manifestDigest": "md5:abc",
+    "implementationDigest": "sha256:de7d1b721a1e0632b7cf04edf5032c8ecffa9f9a08492152b926f1a5a7e765d7",
+    "assetDigests": [],
+    "validationReportDigests": [],
+    "approvalIds": [],
+    "reviewId": null,
+    "createdAt": "2026-10-21T00:00:00Z"
+  }
+}

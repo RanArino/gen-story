@@ -1,0 +1,268 @@
+{
+  "expect": {
+    "path": "/scenes/1/id"
+  },
+  "document": {
+    "schema": "film.story-graph@1",
+    "id": "sando-walk",
+    "revision": 1,
+    "title": "Sando walk",
+    "scenes": [
+      {
+        "id": "s1",
+        "media": {
+          "asset": "images/s1.jpg"
+        },
+        "caption": {
+          "ja": "白山比咩神社、石川県白山市。",
+          "en": "Shirayama-hime Shrine, Hakusan, Ishikawa.",
+          "claim": {
+            "factId": "f1"
+          }
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.67,
+            "y": 0.12,
+            "w": 0.12,
+            "h": 0.5
+          }
+        },
+        "emphasis": 0.6,
+        "emotion": {
+          "energy": 0.2,
+          "intimacy": 0.5,
+          "openness": 0.6,
+          "warmth": 0.6,
+          "stillness": 0.8
+        },
+        "lineage": {
+          "source": "fixture-copy",
+          "note": "sando s1: stone shrine pillar; bounds cover the vertical name text"
+        }
+      },
+      {
+        "id": "s1",
+        "media": {
+          "asset": "images/s2.jpg"
+        },
+        "caption": {
+          "ja": "鳥居をくぐった先で、騒がしさが薄れていった。",
+          "en": "Somewhere past the torii, the noise began to thin."
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.36,
+            "y": 0.4,
+            "w": 0.14,
+            "h": 0.3
+          }
+        },
+        "emphasis": 0.4,
+        "emotion": {
+          "energy": 0.3,
+          "intimacy": 0.4,
+          "openness": 0.7,
+          "warmth": 0.5,
+          "stillness": 0.6
+        },
+        "lineage": {
+          "source": "fixture-copy",
+          "note": "sando s2: traveller crossing a bridge"
+        }
+      },
+      {
+        "id": "s3",
+        "media": {
+          "asset": "images/s3.jpg"
+        },
+        "caption": {
+          "ja": "一段ごとに、次の一歩だけを求められた。",
+          "en": "Each step asked only for the next one."
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.44,
+            "y": 0.48,
+            "w": 0.14,
+            "h": 0.28
+          }
+        },
+        "emphasis": 0.7,
+        "emotion": {
+          "energy": 0.4,
+          "intimacy": 0.6,
+          "openness": 0.4,
+          "warmth": 0.5,
+          "stillness": 0.5
+        },
+        "lineage": {
+          "source": "fixture-copy",
+          "note": "sando s3: traveller climbing stone steps"
+        }
+      },
+      {
+        "id": "s4",
+        "media": {
+          "asset": "images/s4.jpg"
+        },
+        "caption": {
+          "ja": "先に来ている人たちがいた。",
+          "en": "Others were already there."
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.41,
+            "y": 0.5,
+            "w": 0.14,
+            "h": 0.28
+          }
+        },
+        "emphasis": 0.5,
+        "emotion": {
+          "energy": 0.3,
+          "intimacy": 0.7,
+          "openness": 0.5,
+          "warmth": 0.7,
+          "stillness": 0.6
+        },
+        "lineage": {
+          "source": "fixture-copy",
+          "note": "sando s4: traveller passing the main gate"
+        }
+      },
+      {
+        "id": "s5",
+        "media": {
+          "asset": "images/s5-landscape-3x2.png"
+        },
+        "caption": {
+          "ja": "昼の光が、まだ少し残っていた。",
+          "en": "A little of the daylight was still there."
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.625,
+            "y": 0.3125,
+            "w": 0.2083,
+            "h": 0.3125
+          }
+        },
+        "emphasis": 0.3,
+        "emotion": {
+          "energy": 0.5,
+          "intimacy": 0.3,
+          "openness": 0.8,
+          "warmth": 0.8,
+          "stillness": 0.4
+        },
+        "lineage": {
+          "source": "fixture-synthetic",
+          "note": "3:2 gradient with an off-center square subject"
+        }
+      },
+      {
+        "id": "s6",
+        "media": {
+          "asset": "images/s6-portrait-2x3.png"
+        },
+        "caption": {
+          "ja": "帰り道は、来た道より短く感じた。",
+          "en": "The way back felt shorter than the way in."
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.1875,
+            "y": 0.2083,
+            "w": 0.375,
+            "h": 0.25
+          }
+        },
+        "emphasis": 0.5,
+        "emotion": {
+          "energy": 0.4,
+          "intimacy": 0.5,
+          "openness": 0.5,
+          "warmth": 0.6,
+          "stillness": 0.5
+        },
+        "lineage": {
+          "source": "fixture-synthetic",
+          "note": "2:3 portrait with a high, left subject"
+        }
+      },
+      {
+        "id": "s7",
+        "media": {
+          "asset": "images/s7-portrait-4x5.png"
+        },
+        "caption": {
+          "ja": "小さな灯りが、ひとつずつ点いていく。",
+          "en": "Small lights came on, one by one."
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.5625,
+            "y": 0.6,
+            "w": 0.28125,
+            "h": 0.225
+          }
+        },
+        "emphasis": 0.8,
+        "emotion": {
+          "energy": 0.6,
+          "intimacy": 0.7,
+          "openness": 0.4,
+          "warmth": 0.9,
+          "stillness": 0.3
+        },
+        "lineage": {
+          "source": "fixture-synthetic",
+          "note": "4:5 portrait with a low, right subject"
+        }
+      },
+      {
+        "id": "s8",
+        "media": {
+          "asset": "images/s8-ultrawide-21x9.png"
+        },
+        "caption": {
+          "ja": "歩く道こそが、祈りだった。",
+          "en": "The walk was the prayer."
+        },
+        "analysis": {
+          "subject": {
+            "x": 0.119,
+            "y": 0.2778,
+            "w": 0.1667,
+            "h": 0.3889
+          }
+        },
+        "emphasis": 0.9,
+        "emotion": {
+          "energy": 0.3,
+          "intimacy": 0.8,
+          "openness": 0.9,
+          "warmth": 0.7,
+          "stillness": 0.8
+        },
+        "lineage": {
+          "source": "fixture-synthetic",
+          "note": "21:9 panorama with a far-left subject"
+        }
+      }
+    ],
+    "facts": [
+      {
+        "id": "f1",
+        "text": "Shirayama-hime Shrine is in Hakusan, Ishikawa.",
+        "confirmed": true
+      },
+      {
+        "id": "f2",
+        "text": "The approach includes a long stone stairway.",
+        "confirmed": true
+      }
+    ]
+  }
+}

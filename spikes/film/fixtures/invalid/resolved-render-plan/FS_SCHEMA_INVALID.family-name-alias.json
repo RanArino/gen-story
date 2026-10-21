@@ -1,0 +1,853 @@
+{
+  "expect": {
+    "path": "/fonts/0/alias"
+  },
+  "document": {
+    "schema": "film.resolved-render-plan@1",
+    "chapter": {
+      "id": "c1",
+      "title": "朝 / Morning",
+      "index": 0,
+      "sceneIds": [
+        "s5"
+      ]
+    },
+    "profile": {
+      "id": "landscape-1080p30@1",
+      "widthPx": 1920,
+      "heightPx": 1080,
+      "fps": 30,
+      "video": "h264-high-yuv420p",
+      "audio": "aac-48000-stereo"
+    },
+    "frameQuantization": "round-half-up@1",
+    "options": {
+      "forceLevel0": false,
+      "reducedMotion": false
+    },
+    "timing": {
+      "proposal": {
+        "schema": "film.timing-proposal@1",
+        "chapterId": "c1",
+        "limitMs": 60000,
+        "titleMs": 3000,
+        "overlapMs": 800,
+        "gapMs": 0,
+        "runtimeMs": 8500,
+        "remainingMs": 51500,
+        "scenes": [
+          {
+            "sceneId": "s5",
+            "source": "resolved",
+            "durationMs": 6300,
+            "minMs": 2500
+          }
+        ]
+      },
+      "proposalDigest": "sha256:b9d8349d935596195642a75f036f32586bf493aa1817eb20ecee78dddd5dd1dd"
+    },
+    "segments": [
+      {
+        "kind": "title",
+        "sceneId": null,
+        "startMs": 0,
+        "endMs": 3000
+      },
+      {
+        "kind": "scene",
+        "sceneId": "s5",
+        "startMs": 2200,
+        "endMs": 8500
+      }
+    ],
+    "layers": [
+      {
+        "type": "rect",
+        "startMs": 0,
+        "endMs": 8500,
+        "x": 0,
+        "y": 0,
+        "w": 1920,
+        "h": 1080,
+        "color": "#000000"
+      },
+      {
+        "type": "group",
+        "startMs": 0,
+        "endMs": 3000,
+        "children": [
+          {
+            "type": "rect",
+            "startMs": 0,
+            "endMs": 3000,
+            "x": 0,
+            "y": 0,
+            "w": 1920,
+            "h": 1080,
+            "color": "#101014"
+          },
+          {
+            "type": "text",
+            "role": "title",
+            "startMs": 0,
+            "endMs": 3000,
+            "text": "朝 / Morning",
+            "font": [
+              "fs-01dcc9f2884c",
+              "fs-793a45c7770d"
+            ],
+            "sizePx": 72,
+            "weight": 400,
+            "color": "#f6f1e7",
+            "letterSpacingPx": 4,
+            "align": "center",
+            "x": 960,
+            "y": 453.59999999999997,
+            "maxWidthPx": 1536,
+            "lineHeight": 1.25,
+            "opacity": {
+              "keys": [
+                {
+                  "t": 0,
+                  "v": 0,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 600,
+                  "v": 1,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 2400,
+                  "v": 1,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 3000,
+                  "v": 0,
+                  "ease": "ease-in-out"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "group",
+        "startMs": 2200,
+        "endMs": 8500,
+        "children": [
+          {
+            "type": "image",
+            "startMs": 2200,
+            "endMs": 8500,
+            "asset": "images/s5-landscape-3x2.png",
+            "sha256": "sha256:4d4919dc74dc071ed47791311be8c1e19111c9b8b82ae5aaa8656bbb2f8b4f6e",
+            "src": {
+              "x": {
+                "keys": [
+                  {
+                    "t": 2200,
+                    "v": 120,
+                    "ease": "ease-in-out"
+                  },
+                  {
+                    "t": 8500,
+                    "v": 0,
+                    "ease": "ease-in-out"
+                  }
+                ]
+              },
+              "y": {
+                "keys": [
+                  {
+                    "t": 2200,
+                    "v": 108.75,
+                    "ease": "ease-in-out"
+                  },
+                  {
+                    "t": 8500,
+                    "v": 75,
+                    "ease": "ease-in-out"
+                  }
+                ]
+              },
+              "w": {
+                "keys": [
+                  {
+                    "t": 2200,
+                    "v": 2280,
+                    "ease": "ease-in-out"
+                  },
+                  {
+                    "t": 8500,
+                    "v": 2400,
+                    "ease": "ease-in-out"
+                  }
+                ]
+              },
+              "h": {
+                "keys": [
+                  {
+                    "t": 2200,
+                    "v": 1282.5,
+                    "ease": "ease-in-out"
+                  },
+                  {
+                    "t": 8500,
+                    "v": 1350,
+                    "ease": "ease-in-out"
+                  }
+                ]
+              }
+            },
+            "dst": {
+              "x": 0,
+              "y": 0,
+              "w": 1920,
+              "h": 1080
+            }
+          },
+          {
+            "type": "linearGradient",
+            "startMs": 2200,
+            "endMs": 8500,
+            "x": 0,
+            "y": 0,
+            "w": 1920,
+            "h": 237.6,
+            "from": {
+              "x": 0,
+              "y": 0
+            },
+            "to": {
+              "x": 0,
+              "y": 237.6
+            },
+            "stops": [
+              {
+                "at": 0,
+                "color": "#0000004d"
+              },
+              {
+                "at": 1,
+                "color": "#00000000"
+              }
+            ]
+          },
+          {
+            "type": "linearGradient",
+            "startMs": 2200,
+            "endMs": 8500,
+            "x": 0,
+            "y": 842.4,
+            "w": 1920,
+            "h": 237.6,
+            "from": {
+              "x": 0,
+              "y": 1080
+            },
+            "to": {
+              "x": 0,
+              "y": 842.4
+            },
+            "stops": [
+              {
+                "at": 0,
+                "color": "#0000004d"
+              },
+              {
+                "at": 1,
+                "color": "#00000000"
+              }
+            ]
+          },
+          {
+            "type": "linearGradient",
+            "startMs": 2200,
+            "endMs": 8500,
+            "x": 0,
+            "y": 0,
+            "w": 422.4,
+            "h": 1080,
+            "from": {
+              "x": 0,
+              "y": 0
+            },
+            "to": {
+              "x": 422.4,
+              "y": 0
+            },
+            "stops": [
+              {
+                "at": 0,
+                "color": "#0000004d"
+              },
+              {
+                "at": 1,
+                "color": "#00000000"
+              }
+            ]
+          },
+          {
+            "type": "linearGradient",
+            "startMs": 2200,
+            "endMs": 8500,
+            "x": 1497.6,
+            "y": 0,
+            "w": 422.4,
+            "h": 1080,
+            "from": {
+              "x": 1920,
+              "y": 0
+            },
+            "to": {
+              "x": 1497.6,
+              "y": 0
+            },
+            "stops": [
+              {
+                "at": 0,
+                "color": "#0000004d"
+              },
+              {
+                "at": 1,
+                "color": "#00000000"
+              }
+            ]
+          },
+          {
+            "type": "group",
+            "startMs": 2200,
+            "endMs": 8500,
+            "blend": "screen",
+            "opacity": 0.33,
+            "translateX": {
+              "keys": [
+                {
+                  "t": 2200,
+                  "v": -768,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 8500,
+                  "v": 768,
+                  "ease": "ease-in-out"
+                }
+              ]
+            },
+            "children": [
+              {
+                "type": "linearGradient",
+                "startMs": 2200,
+                "endMs": 8500,
+                "x": 480,
+                "y": 0,
+                "w": 960,
+                "h": 1080,
+                "from": {
+                  "x": 480,
+                  "y": 0
+                },
+                "to": {
+                  "x": 1440,
+                  "y": 0
+                },
+                "stops": [
+                  {
+                    "at": 0,
+                    "color": "#ffb36b00"
+                  },
+                  {
+                    "at": 0.5,
+                    "color": "#ffb36bcc"
+                  },
+                  {
+                    "at": 1,
+                    "color": "#ffb36b00"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "role": "caption",
+            "startMs": 2200,
+            "endMs": 8500,
+            "text": "昼の光が、まだ少し残っていた。",
+            "font": [
+              "fs-793a45c7770d"
+            ],
+            "sizePx": 44,
+            "weight": 400,
+            "color": "#f6f1e7",
+            "letterSpacingPx": 1,
+            "align": "center",
+            "x": 960,
+            "y": 853.2,
+            "maxWidthPx": 1536,
+            "lineHeight": 1.3,
+            "opacity": {
+              "keys": [
+                {
+                  "t": 3000,
+                  "v": 0,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 3400,
+                  "v": 1,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 8100,
+                  "v": 1,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 8500,
+                  "v": 0,
+                  "ease": "ease-in-out"
+                }
+              ]
+            },
+            "scrim": {
+              "color": "#000000",
+              "opacity": 0.45,
+              "padPx": 16
+            }
+          },
+          {
+            "type": "text",
+            "role": "caption",
+            "startMs": 2200,
+            "endMs": 8500,
+            "text": "A little of the daylight was still there.",
+            "font": [
+              "fs-793a45c7770d"
+            ],
+            "sizePx": 30,
+            "weight": 400,
+            "color": "#f6f1e7",
+            "letterSpacingPx": 0,
+            "align": "center",
+            "x": 960,
+            "y": 919.2,
+            "maxWidthPx": 1536,
+            "lineHeight": 1.3,
+            "opacity": {
+              "keys": [
+                {
+                  "t": 3000,
+                  "v": 0,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 3400,
+                  "v": 1,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 8100,
+                  "v": 1,
+                  "ease": "ease-in-out"
+                },
+                {
+                  "t": 8500,
+                  "v": 0,
+                  "ease": "ease-in-out"
+                }
+              ]
+            },
+            "scrim": {
+              "color": "#000000",
+              "opacity": 0.45,
+              "padPx": 16
+            }
+          }
+        ],
+        "opacity": {
+          "keys": [
+            {
+              "t": 2200,
+              "v": 0,
+              "ease": "ease-in-out"
+            },
+            {
+              "t": 3000,
+              "v": 1,
+              "ease": "ease-in-out"
+            }
+          ]
+        }
+      }
+    ],
+    "texts": [
+      {
+        "segment": 0,
+        "role": "title",
+        "text": "朝 / Morning",
+        "font": [
+          "fs-01dcc9f2884c",
+          "fs-793a45c7770d"
+        ],
+        "box": {
+          "x": 706,
+          "y": 453.6,
+          "w": 508,
+          "h": 90
+        },
+        "startMs": 0,
+        "endMs": 3000
+      },
+      {
+        "segment": 1,
+        "role": "caption",
+        "text": "昼の光が、まだ少し残っていた。",
+        "font": [
+          "fs-793a45c7770d"
+        ],
+        "box": {
+          "x": 623,
+          "y": 853.2,
+          "w": 674,
+          "h": 57.2
+        },
+        "startMs": 2200,
+        "endMs": 8500
+      },
+      {
+        "segment": 1,
+        "role": "caption",
+        "text": "A little of the daylight was still there.",
+        "font": [
+          "fs-793a45c7770d"
+        ],
+        "box": {
+          "x": 621.8,
+          "y": 919.2,
+          "w": 676.5,
+          "h": 39
+        },
+        "startMs": 2200,
+        "endMs": 8500
+      }
+    ],
+    "audio": {
+      "bgm": {
+        "asset": "sounds/bgm-96bpm.wav",
+        "sha256": "sha256:b7e26af8ffc086fc59ef6b1f2a83d674b051958bcecf2b951408f9863f5d1443",
+        "startMs": 0,
+        "durationMs": 8500,
+        "gain": 0.8,
+        "loop": false,
+        "fadeInMs": 1000,
+        "fadeOutMs": 1500,
+        "offsetMs": 0
+      },
+      "events": [
+        {
+          "asset": "sounds/ambience.wav",
+          "sha256": "sha256:cf1c9df8d887cab60f8f65a3412c7ccbe7c027f8bb8c5ffca96d3af18dce5295",
+          "startMs": 2200,
+          "durationMs": 6300,
+          "gain": 0.25,
+          "loop": true,
+          "fadeInMs": 600,
+          "fadeOutMs": 600
+        }
+      ]
+    },
+    "fonts": [
+      {
+        "alias": "Noto Sans JP",
+        "font": {
+          "id": "font.fixture-serif-jp",
+          "version": "1.0.0"
+        },
+        "sha256": "sha256:01dcc9f2884cffc4ca2a389032018805cedfba1730cdc758b5ebf1047b056f7c",
+        "weight": 400,
+        "style": "normal",
+        "format": "truetype"
+      },
+      {
+        "alias": "fs-793a45c7770d",
+        "font": {
+          "id": "font.fixture-sans-jp",
+          "version": "1.0.0"
+        },
+        "sha256": "sha256:793a45c7770d4ccf86d707435a4caccb1640aea48eef301aaf5cf412b6750f3c",
+        "weight": 400,
+        "style": "normal",
+        "format": "truetype"
+      }
+    ],
+    "capabilities": [
+      {
+        "slot": "layout",
+        "requested": {
+          "id": "film.layout.full-frame",
+          "version": "1.0.0"
+        },
+        "active": {
+          "id": "film.layout.full-frame",
+          "version": "1.0.0"
+        },
+        "chain": [
+          "film.layout.full-frame@1.0.0"
+        ],
+        "params": {}
+      },
+      {
+        "slot": "motion",
+        "requested": {
+          "id": "film.motion.slow-camera",
+          "version": "1.0.0"
+        },
+        "active": {
+          "id": "film.motion.slow-camera",
+          "version": "1.0.0"
+        },
+        "chain": [
+          "film.motion.slow-camera@1.0.0"
+        ],
+        "params": {
+          "motionAmount": 0.5
+        }
+      },
+      {
+        "slot": "transition",
+        "requested": {
+          "id": "film.transition.dissolve",
+          "version": "1.0.0"
+        },
+        "active": {
+          "id": "film.transition.dissolve",
+          "version": "1.0.0"
+        },
+        "chain": [
+          "film.transition.dissolve@1.0.0"
+        ],
+        "params": {
+          "curve": "ease-in-out"
+        }
+      },
+      {
+        "slot": "typography",
+        "requested": {
+          "id": "film.typography.subtitle",
+          "version": "1.0.0"
+        },
+        "active": {
+          "id": "film.typography.subtitle",
+          "version": "1.0.0"
+        },
+        "chain": [
+          "film.typography.subtitle@1.0.0"
+        ],
+        "params": {}
+      },
+      {
+        "slot": "sound",
+        "requested": {
+          "id": "film.sound.ambience-led",
+          "version": "1.0.0"
+        },
+        "active": {
+          "id": "film.sound.ambience-led",
+          "version": "1.0.0"
+        },
+        "chain": [
+          "film.sound.ambience-led@1.0.0"
+        ],
+        "params": {
+          "hits": false,
+          "sfxLevel": 0.5
+        }
+      },
+      {
+        "slot": "surface",
+        "requested": {
+          "id": "film.surface.soft-vignette",
+          "version": "1.0.0"
+        },
+        "active": {
+          "id": "film.surface.soft-vignette",
+          "version": "1.0.0"
+        },
+        "chain": [
+          "film.surface.soft-vignette@1.0.0"
+        ],
+        "params": {
+          "visualIntensity": 0.5
+        }
+      },
+      {
+        "slot": "effect.0",
+        "requested": {
+          "id": "film.effect.light-leak",
+          "version": "1.0.0"
+        },
+        "active": {
+          "id": "film.effect.light-leak",
+          "version": "1.0.0"
+        },
+        "chain": [
+          "film.effect.light-leak@1.0.0"
+        ],
+        "params": {
+          "visualIntensity": 0.5
+        }
+      }
+    ],
+    "lock": {
+      "capabilities": [
+        {
+          "slot": "layout",
+          "id": "film.layout.full-frame",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:9edc650d4d0d2eef9f721eb64a79bcc76292a7b1cf7df51e8468f54ffaf24f83",
+          "implementationDigest": "sha256:494d6444d7b64d874b9aef0561291a70815499c8c78d31b3f6fddcdb25966e64",
+          "assetDigests": []
+        },
+        {
+          "slot": "motion",
+          "id": "film.motion.slow-camera",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:53b103fce42146e448f59d3e22b76181d31486a19c361b2bec87f9a0d6a9783f",
+          "implementationDigest": "sha256:c8b35965790bf73112d81d1782b1049d7b88700179bc3965b97118942c4ff946",
+          "assetDigests": []
+        },
+        {
+          "slot": "transition",
+          "id": "film.transition.dissolve",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:00ab950258e10288d4ada415ae36b7dd151ff676636ca2e23379ed65685b755b",
+          "implementationDigest": "sha256:24f5d36cdc98ce0d7321cacaae8a45742f173264523a9c3a680ccc0273f15bde",
+          "assetDigests": []
+        },
+        {
+          "slot": "typography",
+          "id": "film.typography.subtitle",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:e55cca7a9403b65ca7c2f79e672e3b41226d6208a384f980e15f54a9b1950a91",
+          "implementationDigest": "sha256:3b749e7a7e8dac5c0efb66315dbf8cd2d584cd7b1c5ced9c6c301260194cfcda",
+          "assetDigests": []
+        },
+        {
+          "slot": "sound",
+          "id": "film.sound.ambience-led",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:85820a2d0393775b4d97a1cc31e2b2833187106363350341062cea177158d797",
+          "implementationDigest": "sha256:5504cde989e2216202bd470b5748fc15e7a344832d16f1f7084bdb143e2329ef",
+          "assetDigests": [
+            {
+              "name": "ambience",
+              "digest": "sha256:cf1c9df8d887cab60f8f65a3412c7ccbe7c027f8bb8c5ffca96d3af18dce5295"
+            },
+            {
+              "name": "hit",
+              "digest": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f"
+            }
+          ]
+        },
+        {
+          "slot": "surface",
+          "id": "film.surface.soft-vignette",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:13ba7dd0ed50bee59be1fbfc92d434ee4dffb2e0d9e93513520b9ceab2838ba2",
+          "implementationDigest": "sha256:c3fabf48bd3d4d931ccf2dadd3c12158bd8eda4674f3c9bd2eaeba833024231c",
+          "assetDigests": []
+        },
+        {
+          "slot": "effect.0",
+          "id": "film.effect.light-leak",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:5a93529e945af6393f291edca44ed289e3f32402f9835188043bf723e13e6968",
+          "implementationDigest": "sha256:0b2da15d1444a3b48e085e00d5f65103442e22addf00699ac5aa8e3b4d1e4d63",
+          "assetDigests": []
+        }
+      ],
+      "fonts": [
+        {
+          "id": "font.fixture-sans-jp",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:f859e98d7d1da038ed80d68800740c73f9024fc9f62e366da8b248e84b736df5",
+          "faces": [
+            "sha256:793a45c7770d4ccf86d707435a4caccb1640aea48eef301aaf5cf412b6750f3c"
+          ]
+        },
+        {
+          "id": "font.fixture-serif-jp",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:a6e78c49b10c119e2d68e91ae2620d2c7934392c7f9b324ecfabd2cb4b3919b5",
+          "faces": [
+            "sha256:01dcc9f2884cffc4ca2a389032018805cedfba1730cdc758b5ebf1047b056f7c"
+          ]
+        }
+      ],
+      "media": [
+        {
+          "asset": "images/s5-landscape-3x2.png",
+          "sha256": "sha256:4d4919dc74dc071ed47791311be8c1e19111c9b8b82ae5aaa8656bbb2f8b4f6e"
+        },
+        {
+          "asset": "sounds/ambience.wav",
+          "sha256": "sha256:cf1c9df8d887cab60f8f65a3412c7ccbe7c027f8bb8c5ffca96d3af18dce5295"
+        },
+        {
+          "asset": "sounds/bgm-96bpm.wav",
+          "sha256": "sha256:b7e26af8ffc086fc59ef6b1f2a83d674b051958bcecf2b951408f9863f5d1443"
+        },
+        {
+          "asset": "sounds/hit.wav",
+          "sha256": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f"
+        }
+      ],
+      "compiler": {
+        "version": "film-compiler@1",
+        "digest": "sha256:95d4da680413b8d1529dff32840c4a6b31ec7ca07efff6adf0f6a7e748ddc9c2"
+      },
+      "painter": {
+        "abi": "film-painter@1",
+        "digest": "sha256:f084e5403d929bf6d1907f286cf67d52dc0df7a42ef5323c080d30c7075d6d02"
+      },
+      "schemaVersion": "film-schemas@1",
+      "profile": "landscape-1080p30@1",
+      "environment": "sha256:adfaa827a17433ab48559051d91d7a0ce4e99567b701ae2e0f37d31262b8aabe"
+    },
+    "provenance": {
+      "storyGraph": {
+        "id": "sando-walk",
+        "revision": 1
+      },
+      "treatment": {
+        "id": "test-baseline",
+        "revision": 1
+      },
+      "recipe": {
+        "id": "org.local.test-baseline",
+        "revision": "r1",
+        "digest": "sha256:01edc09e294649d999bc2628c81a3972b716906685fe6393a932526339765687"
+      },
+      "scenes": [
+        {
+          "sceneId": "s5",
+          "asset": "images/s5-landscape-3x2.png",
+          "sha256": "sha256:4d4919dc74dc071ed47791311be8c1e19111c9b8b82ae5aaa8656bbb2f8b4f6e"
+        }
+      ]
+    },
+    "shared": {
+      "worldview": "A quiet walk toward a shrine, told without explanation.",
+      "colorFamily": "warm-film",
+      "typography": {
+        "id": "font.fixture-sans-jp",
+        "version": "1.0.0"
+      }
+    },
+    "warnings": [],
+    "fingerprint": "sha256:555304f45805cb5dcfbb2a6247e6746db033aac6125360792583e65efce50e3f"
+  }
+}
