@@ -1,0 +1,183 @@
+{
+  "schema": "film.concat-plan@1",
+  "chapters": [
+    {
+      "chapterId": "c1",
+      "planDigest": "sha256:f8872fc19f53102a62176701a5a5b839e1a0ca3ec6487eecd48d2961bb4c2e20",
+      "artifactSha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "runtimeMs": 8500,
+      "offsetMs": 3000
+    }
+  ],
+  "profile": {
+    "id": "landscape-1080p30@1",
+    "widthPx": 1920,
+    "heightPx": 1080,
+    "fps": 30,
+    "video": "h264-high-yuv420p",
+    "audio": "aac-48000-stereo"
+  },
+  "frameQuantization": "round-half-up@1",
+  "overallTitle": {
+    "text": "参道 / Sando",
+    "titleMs": 3000,
+    "layers": [
+      {
+        "type": "rect",
+        "startMs": 0,
+        "endMs": 3000,
+        "x": 0,
+        "y": 0,
+        "w": 1920,
+        "h": 1080,
+        "color": "#101014"
+      },
+      {
+        "type": "text",
+        "role": "title",
+        "startMs": 0,
+        "endMs": 3000,
+        "text": "参道 / Sando",
+        "font": [
+          "fs-01dcc9f2884c",
+          "fs-793a45c7770d"
+        ],
+        "sizePx": 72,
+        "weight": 400,
+        "color": "#f6f1e7",
+        "letterSpacingPx": 4,
+        "align": "center",
+        "x": 960,
+        "y": 453.59999999999997,
+        "maxWidthPx": 1536,
+        "lineHeight": 1.25,
+        "opacity": {
+          "keys": [
+            {
+              "t": 0,
+              "v": 0,
+              "ease": "ease-in-out"
+            },
+            {
+              "t": 600,
+              "v": 1,
+              "ease": "ease-in-out"
+            },
+            {
+              "t": 2400,
+              "v": 1,
+              "ease": "ease-in-out"
+            },
+            {
+              "t": 3000,
+              "v": 0,
+              "ease": "ease-in-out"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "connection": {
+    "ref": {
+      "id": "film.connection.darken-briefly",
+      "version": "1.0.0"
+    },
+    "darkenMs": 800,
+    "brightnessTo": 0.45
+  },
+  "audio": {
+    "bgm": {
+      "asset": "sounds/bgm-96bpm.wav",
+      "sha256": "sha256:b7e26af8ffc086fc59ef6b1f2a83d674b051958bcecf2b951408f9863f5d1443",
+      "startMs": 0,
+      "durationMs": 11500,
+      "gain": 0.8,
+      "loop": false,
+      "fadeInMs": 1000,
+      "fadeOutMs": 1500,
+      "offsetMs": 0
+    }
+  },
+  "fonts": [
+    {
+      "alias": "fs-01dcc9f2884c",
+      "font": {
+        "id": "font.fixture-serif-jp",
+        "version": "1.0.0"
+      },
+      "sha256": "sha256:01dcc9f2884cffc4ca2a389032018805cedfba1730cdc758b5ebf1047b056f7c",
+      "weight": 400,
+      "style": "normal",
+      "format": "truetype"
+    },
+    {
+      "alias": "fs-793a45c7770d",
+      "font": {
+        "id": "font.fixture-sans-jp",
+        "version": "1.0.0"
+      },
+      "sha256": "sha256:793a45c7770d4ccf86d707435a4caccb1640aea48eef301aaf5cf412b6750f3c",
+      "weight": 400,
+      "style": "normal",
+      "format": "truetype"
+    }
+  ],
+  "runtimeMs": 11500,
+  "lock": {
+    "capabilities": [
+      {
+        "slot": "connection",
+        "id": "film.connection.darken-briefly",
+        "version": "1.0.0",
+        "manifestDigest": "sha256:6a66b901a4cf49e581ef331eb0b9bf011b165a5de59e12b54c6379234ab0896a",
+        "implementationDigest": "sha256:e3f386c1b6aa7f413e337b3a9ef02817a70d4ef8e12b625a929f5ce57d6276a8",
+        "assetDigests": []
+      },
+      {
+        "slot": "typography",
+        "id": "film.typography.subtitle",
+        "version": "1.0.0",
+        "manifestDigest": "sha256:e55cca7a9403b65ca7c2f79e672e3b41226d6208a384f980e15f54a9b1950a91",
+        "implementationDigest": "sha256:3b749e7a7e8dac5c0efb66315dbf8cd2d584cd7b1c5ced9c6c301260194cfcda",
+        "assetDigests": []
+      }
+    ],
+    "fonts": [
+      {
+        "id": "font.fixture-sans-jp",
+        "version": "1.0.0",
+        "manifestDigest": "sha256:f859e98d7d1da038ed80d68800740c73f9024fc9f62e366da8b248e84b736df5",
+        "faces": [
+          "sha256:793a45c7770d4ccf86d707435a4caccb1640aea48eef301aaf5cf412b6750f3c"
+        ]
+      },
+      {
+        "id": "font.fixture-serif-jp",
+        "version": "1.0.0",
+        "manifestDigest": "sha256:a6e78c49b10c119e2d68e91ae2620d2c7934392c7f9b324ecfabd2cb4b3919b5",
+        "faces": [
+          "sha256:01dcc9f2884cffc4ca2a389032018805cedfba1730cdc758b5ebf1047b056f7c"
+        ]
+      }
+    ],
+    "media": [
+      {
+        "asset": "sounds/bgm-96bpm.wav",
+        "sha256": "sha256:b7e26af8ffc086fc59ef6b1f2a83d674b051958bcecf2b951408f9863f5d1443"
+      }
+    ],
+    "compiler": {
+      "version": "film-compiler@1",
+      "digest": "sha256:95d4da680413b8d1529dff32840c4a6b31ec7ca07efff6adf0f6a7e748ddc9c2"
+    },
+    "painter": {
+      "abi": "film-painter@1",
+      "digest": "sha256:f084e5403d929bf6d1907f286cf67d52dc0df7a42ef5323c080d30c7075d6d02"
+    },
+    "schemaVersion": "film-schemas@1",
+    "profile": "landscape-1080p30@1",
+    "environment": "sha256:adfaa827a17433ab48559051d91d7a0ce4e99567b701ae2e0f37d31262b8aabe"
+  },
+  "fingerprint": "sha256:2c3a8290ae2d55b70038d1dc0937e12908599853f74bd7dd7a53c0bde137f86b"
+}

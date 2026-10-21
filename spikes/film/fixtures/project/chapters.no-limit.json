@@ -1,0 +1,33 @@
+{
+  "schema": "film.chapters@1",
+  "storyGraph": {
+    "id": "sando-walk",
+    "revision": 1
+  },
+  "chapters": [
+    {
+      "id": "c1",
+      "title": "朝 / Morning",
+      "limitMs": null,
+      "scenes": [
+        {
+          "sceneId": "s1"
+        },
+        {
+          "sceneId": "s2",
+          "durationMs": 9000
+        },
+        {
+          "sceneId": "s3"
+        },
+        {
+          "sceneId": "s4",
+          "durationMs": 4250
+        },
+        {
+          "sceneId": "s5"
+        }
+      ]
+    }
+  ]
+}
