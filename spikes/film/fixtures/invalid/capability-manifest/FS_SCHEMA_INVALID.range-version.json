@@ -1,0 +1,76 @@
+{
+  "expect": {
+    "path": "/version"
+  },
+  "document": {
+    "schema": "film.capability-manifest@1",
+    "id": "film.transition.example-wipe",
+    "version": "^1.0.0",
+    "kind": "transition",
+    "level": 1,
+    "title": "Example wipe",
+    "description": "A left-to-right wipe used only as a schema example.",
+    "tags": [
+      "wipe"
+    ],
+    "rendererApi": "film-capability@1",
+    "layer": 0,
+    "media": {
+      "types": [],
+      "min": 0,
+      "max": 0
+    },
+    "profiles": [
+      "landscape-1080p30@1"
+    ],
+    "aspectRatios": [
+      "16:9"
+    ],
+    "analysis": [],
+    "params": {
+      "softness": {
+        "type": "number",
+        "default": 0.2,
+        "min": 0,
+        "max": 1,
+        "unit": "ratio",
+        "scope": "chapter",
+        "authority": "user-exposable",
+        "description": "Edge softness."
+      }
+    },
+    "requires": [],
+    "incompatibleWith": [],
+    "determinism": {
+      "seeded": false
+    },
+    "motionLevel": "moderate",
+    "budgets": {
+      "maxPrimitives": 8,
+      "maxKeyframes": 32,
+      "maxAudioEvents": 0
+    },
+    "reducedMotion": "fallback",
+    "fallback": {
+      "id": "film.transition.dissolve",
+      "version": "1.0.0"
+    },
+    "timing": {
+      "overlapMs": 800
+    },
+    "assets": [],
+    "fixtures": [
+      {
+        "name": "landscape",
+        "sourceAspect": "16:9",
+        "caption": "ja"
+      }
+    ],
+    "permissions": [],
+    "provenance": {
+      "author": "film spike",
+      "source": "spikes film fixtures",
+      "license": "internal"
+    }
+  }
+}

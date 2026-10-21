@@ -1,0 +1,31 @@
+{
+  "expect": {
+    "path": "/catalogSearch/whyNotRecipe"
+  },
+  "document": {
+    "schema": "film.capability-request@1",
+    "id": "torn-reveal",
+    "title": "Torn-paper reveal transition",
+    "problem": "The incoming scene should appear behind a jagged, animated paper edge.",
+    "kind": "transition",
+    "proposed": {
+      "id": "film.transition.torn-reveal",
+      "version": "1.0.0"
+    },
+    "catalogSearch": {
+      "queries": [
+        "torn",
+        "paper edge",
+        "jagged reveal"
+      ]
+    },
+    "requester": {
+      "kind": "user",
+      "name": "spike operator"
+    },
+    "acceptance": [
+      "Reveals the incoming scene behind a jagged edge within the overlap window.",
+      "Falls back to dissolve under reduced motion."
+    ]
+  }
+}
