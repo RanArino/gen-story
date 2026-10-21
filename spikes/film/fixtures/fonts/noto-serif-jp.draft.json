@@ -1,0 +1,43 @@
+{
+  "schema": "film.font-asset-manifest@1",
+  "id": "font.noto-serif-jp",
+  "version": "1.0.0",
+  "family": "Noto Serif JP",
+  "faces": [
+    {
+      "file": "NotoSerifJP-Variable.ttf",
+      "weight": 400,
+      "style": "normal",
+      "stretch": "normal",
+      "format": "truetype"
+    }
+  ],
+  "coverage": {
+    "scripts": [
+      "Latn",
+      "Jpan"
+    ]
+  },
+  "fallback": [
+    {
+      "id": "font.noto-sans-jp",
+      "version": "1.0.0"
+    }
+  ],
+  "source": {
+    "origin": "https://github.com/google/fonts/tree/main/ofl/notoserifjp",
+    "attribution": "See OFL.txt shipped with the family in google/fonts at the recorded commit.",
+    "commit": "47d54ca1ebb14fd864695f1d39dc734f39017c33"
+  },
+  "license": {
+    "id": "OFL-1.1",
+    "file": "OFL.txt"
+  },
+  "rights": {
+    "redistribution": true,
+    "videoEmbedding": true
+  },
+  "scope": {
+    "kind": "organization"
+  }
+}
