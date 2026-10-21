@@ -1,0 +1,90 @@
+{
+  "schema": "film.capability-manifest@1",
+  "id": "film.layout.memory-board",
+  "version": "1.0.0",
+  "kind": "layout",
+  "level": 1,
+  "title": "Memory board",
+  "description": "A bordered photo card on a softened backdrop of the same image.",
+  "tags": [
+    "card",
+    "collage",
+    "tactile"
+  ],
+  "rendererApi": "film-capability@1",
+  "layer": 10,
+  "media": {
+    "types": [
+      "image"
+    ],
+    "min": 1,
+    "max": 1
+  },
+  "profiles": [
+    "landscape-1080p30@1"
+  ],
+  "aspectRatios": [
+    "16:9"
+  ],
+  "analysis": [
+    "subjectBounds"
+  ],
+  "params": {
+    "cardScale": {
+      "type": "number",
+      "default": 0.62,
+      "min": 0.4,
+      "max": 0.8,
+      "scope": "project",
+      "authority": "user-exposable",
+      "description": "Card height as a share of the frame.",
+      "unit": "ratio"
+    }
+  },
+  "requires": [],
+  "incompatibleWith": [],
+  "determinism": {
+    "seeded": true
+  },
+  "motionLevel": "none",
+  "budgets": {
+    "maxPrimitives": 48,
+    "maxKeyframes": 256,
+    "maxAudioEvents": 16
+  },
+  "reducedMotion": "same",
+  "fallback": {
+    "id": "film.layout.full-frame",
+    "version": "1.0.0"
+  },
+  "timing": {},
+  "assets": [],
+  "fixtures": [
+    {
+      "name": "landscape",
+      "sourceAspect": "16:9",
+      "caption": "ja"
+    },
+    {
+      "name": "square",
+      "sourceAspect": "1:1",
+      "caption": "en"
+    },
+    {
+      "name": "portrait",
+      "sourceAspect": "2:3",
+      "caption": "ja"
+    },
+    {
+      "name": "ultrawide",
+      "sourceAspect": "21:9",
+      "caption": "empty"
+    }
+  ],
+  "permissions": [],
+  "provenance": {
+    "author": "film spike",
+    "source": "spikes film builtin",
+    "license": "internal"
+  }
+}
