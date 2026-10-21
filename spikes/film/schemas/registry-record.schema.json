@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:registry-record",
+  "title": "Registry Record: the append-only promotion result binding id@version to immutable digests",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "entity", "id", "version", "kind", "trust", "manifestDigest", "implementationDigest", "assetDigests",
+    "validationReportDigests", "approvalIds", "reviewId", "createdAt"
+  ],
+  "properties": {
+    "schema": { "const": "film.registry-record@1" },
+    "entity": { "enum": ["capability", "font"] },
+    "id": { "anyOf": [{ "$ref": "urn:film-spike:common#/$defs/capabilityId" }, { "$ref": "urn:film-spike:common#/$defs/fontId" }] },
+    "version": { "$ref": "urn:film-spike:common#/$defs/semver" },
+    "kind": { "anyOf": [{ "$ref": "urn:film-spike:common#/$defs/capabilityKind" }, { "const": "font" }] },
+    "trust": { "enum": ["system", "promoted"] },
+    "manifestDigest": { "$ref": "urn:film-spike:common#/$defs/digest" },
+    "implementationDigest": { "oneOf": [{ "type": "null" }, { "$ref": "urn:film-spike:common#/$defs/digest" }] },
+    "assetDigests": { "type": "array", "items": { "$ref": "urn:film-spike:common#/$defs/assetDigest" } },
+    "validationReportDigests": { "type": "array", "items": { "$ref": "urn:film-spike:common#/$defs/digest" } },
+    "approvalIds": { "type": "array", "items": { "type": "string", "pattern": "^appr-[0-9a-f]{12}$" } },
+    "reviewId": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^rev-[0-9a-f]{12}$" }] },
+    "createdAt": { "$ref": "urn:film-spike:common#/$defs/timestamp" }
+  }
+}

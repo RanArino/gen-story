@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:review-record",
+  "title": "Review Record: an independent review of a candidate's evidence; it is not an approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "subjectDigest", "subject", "reviewer", "verdict", "notes", "createdAt"],
+  "properties": {
+    "schema": { "const": "film.review-record@1" },
+    "id": { "type": "string", "pattern": "^rev-[0-9a-f]{12}$" },
+    "subjectDigest": { "$ref": "urn:film-spike:common#/$defs/digest" },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "reviewer": { "$ref": "urn:film-spike:common#/$defs/name" },
+    "verdict": { "enum": ["accept", "reject"] },
+    "notes": { "$ref": "urn:film-spike:common#/$defs/plainText" },
+    "createdAt": { "$ref": "urn:film-spike:common#/$defs/timestamp" }
+  }
+}

@@ -1,0 +1,642 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:tool-calling",
+  "title": "Tool Calling DTOs: one request schema per authoring-service operation; every response is a Result Envelope. No approval operation exists.",
+  "x-operations": [
+    "catalog.search",
+    "catalog.inspect",
+    "validate",
+    "preflight",
+    "compile",
+    "recipe.fork",
+    "candidate.scaffold",
+    "candidate.staticCheck",
+    "candidate.run",
+    "candidate.evidence",
+    "font.quarantine",
+    "font.inspect",
+    "font.promote",
+    "font.deactivate",
+    "registry.promote",
+    "registry.activate",
+    "registry.deactivate",
+    "registry.rollback",
+    "registry.deprecate",
+    "registry.verify",
+    "replay",
+    "render.chapter",
+    "render.concat",
+    "contactSheet",
+    "review.record"
+  ],
+  "$defs": {
+    "catalog_search.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query"
+      ],
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "kind": {
+          "$ref": "urn:film-spike:common#/$defs/capabilityKind"
+        }
+      },
+      "description": "Search promoted, active registry entries. Never lists quarantined candidates."
+    },
+    "catalog_search.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "catalog_inspect.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "$ref": "urn:film-spike:common#/$defs/semver"
+        }
+      },
+      "description": "Inspect one exact registry entry and its Manifest."
+    },
+    "catalog_inspect.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "validate.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "document"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "story-graph",
+            "chapters",
+            "capability-request",
+            "capability-manifest",
+            "film-style-recipe",
+            "font-asset-manifest",
+            "film-treatment",
+            "cut",
+            "registry-record",
+            "approval-record",
+            "review-record",
+            "validation-report",
+            "timing-proposal",
+            "resolved-render-plan",
+            "concat-plan",
+            "chapter-artifact",
+            "result-envelope"
+          ]
+        },
+        "document": {
+          "type": "object"
+        }
+      },
+      "description": "Validate a document against its canonical schema and semantic rules."
+    },
+    "validate.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "preflight.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "treatment",
+        "chapters"
+      ],
+      "properties": {
+        "treatment": {
+          "type": "object"
+        },
+        "chapters": {
+          "type": "object"
+        }
+      },
+      "description": "Check Chapter timing feasibility before resolution."
+    },
+    "preflight.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "compile.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "treatment",
+        "chapters"
+      ],
+      "properties": {
+        "treatment": {
+          "type": "object"
+        },
+        "chapters": {
+          "type": "object"
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "forceLevel0": {
+              "type": "boolean"
+            },
+            "reducedMotion": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "description": "Compile one Resolved Render Plan per Chapter and a timing proposal."
+    },
+    "compile.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "recipe_fork.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "id",
+        "title",
+        "changes"
+      ],
+      "properties": {
+        "from": {
+          "$ref": "urn:film-spike:common#/$defs/recipeRevisionRef"
+        },
+        "id": {
+          "$ref": "urn:film-spike:common#/$defs/recipeId"
+        },
+        "title": {
+          "$ref": "urn:film-spike:common#/$defs/name"
+        },
+        "changes": {
+          "type": "object"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Fork a Recipe revision into a new organization-scoped Recipe."
+    },
+    "recipe_fork.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "candidate_scaffold.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request"
+      ],
+      "properties": {
+        "request": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Create a quarantined candidate from an approved Capability Request."
+    },
+    "candidate_scaffold.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "candidate_staticCheck.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        }
+      },
+      "description": "Parse and check a candidate without importing it."
+    },
+    "candidate_staticCheck.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "candidate_run.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Run a candidate's fixtures in the contained process."
+    },
+    "candidate_run.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "candidate_evidence.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Produce contact-sheet and clip evidence through the trusted painter."
+    },
+    "candidate_evidence.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "font_quarantine.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incoming",
+        "manifest"
+      ],
+      "properties": {
+        "incoming": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "manifest": {
+          "type": "object"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Copy incoming font bytes and a draft manifest into quarantine."
+    },
+    "font_quarantine.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "font_inspect.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        }
+      },
+      "description": "Inspect a quarantined font in the contained process."
+    },
+    "font_inspect.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "font_promote.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Promote an inspected font into the registry."
+    },
+    "font_promote.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "font_deactivate.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "$ref": "urn:film-spike:common#/$defs/semver"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Stop offering a font for new work; pinned references still resolve."
+    },
+    "font_deactivate.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "registry_promote.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Promote a reviewed candidate Capability."
+    },
+    "registry_promote.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "registry_activate.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "$ref": "urn:film-spike:common#/$defs/semver"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Offer an exact version for new work."
+    },
+    "registry_activate.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "registry_deactivate.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "$ref": "urn:film-spike:common#/$defs/semver"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Stop offering an exact version for new work."
+    },
+    "registry_deactivate.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "registry_rollback.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Restore the previously active version for new work."
+    },
+    "registry_rollback.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "registry_deprecate.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "$ref": "urn:film-spike:common#/$defs/semver"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Mark an exact version deprecated."
+    },
+    "registry_deprecate.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "registry_verify.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {},
+      "description": "Verify every record's blobs against their digests."
+    },
+    "registry_verify.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "replay.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan"
+      ],
+      "properties": {
+        "plan": {
+          "type": "object"
+        }
+      },
+      "description": "Recompile from a Plan's pinned lock and compare digests."
+    },
+    "replay.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "render_chapter.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan"
+      ],
+      "properties": {
+        "plan": {
+          "type": "object"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Render and verify one Chapter MP4 from an approved Plan."
+    },
+    "render_chapter.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "render_concat.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan"
+      ],
+      "properties": {
+        "plan": {
+          "type": "object"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "approvalId": {
+          "type": "string",
+          "pattern": "^appr-[0-9a-f]{12}$"
+        }
+      },
+      "description": "Assemble the concatenated MP4 from cached Chapter artifacts."
+    },
+    "render_concat.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "contactSheet.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan"
+      ],
+      "properties": {
+        "plan": {
+          "type": "object"
+        }
+      },
+      "description": "Write a 12-frame contact sheet for a Plan."
+    },
+    "contactSheet.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "review_record.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subjectDigest",
+        "subject",
+        "reviewer",
+        "verdict",
+        "notes"
+      ],
+      "properties": {
+        "subjectDigest": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "reviewer": {
+          "$ref": "urn:film-spike:common#/$defs/name"
+        },
+        "verdict": {
+          "enum": [
+            "accept",
+            "reject"
+          ]
+        },
+        "notes": {
+          "$ref": "urn:film-spike:common#/$defs/plainText"
+        }
+      },
+      "description": "Record an independent review. This is not an approval."
+    },
+    "review_record.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    }
+  }
+}
