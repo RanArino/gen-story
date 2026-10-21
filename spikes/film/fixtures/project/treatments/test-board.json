@@ -1,0 +1,45 @@
+{
+  "schema": "film.film-treatment@1",
+  "id": "test-board",
+  "revision": 1,
+  "projectId": "sando",
+  "recipe": {
+    "id": "org.local.test-board",
+    "revision": "r1",
+    "digest": "sha256:ba7608a139de1fe94f141b5e51d608b2cddd6f5427805de4939f8cd461954b82"
+  },
+  "storyGraph": {
+    "id": "sando-walk",
+    "revision": 1
+  },
+  "shared": {
+    "worldview": "A quiet walk toward a shrine, told without explanation.",
+    "bgm": {
+      "asset": "sounds/bgm-96bpm.wav",
+      "sha256": "sha256:b7e26af8ffc086fc59ef6b1f2a83d674b051958bcecf2b951408f9863f5d1443",
+      "gain": 0.8
+    },
+    "typography": {
+      "id": "font.fixture-sans-jp",
+      "version": "1.0.0",
+      "digest": "sha256:f859e98d7d1da038ed80d68800740c73f9024fc9f62e366da8b248e84b736df5"
+    },
+    "colorFamily": "warm-film",
+    "outputProfile": "landscape-1080p30@1"
+  },
+  "overallTitle": "参道 / Sando",
+  "projectFonts": [],
+  "chapters": [
+    {
+      "chapterId": "c1",
+      "settings": {}
+    },
+    {
+      "chapterId": "c2",
+      "settings": {
+        "motionAmount": 0.7,
+        "visualIntensity": 0.7
+      }
+    }
+  ]
+}
