@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:cut",
+  "title": "Cut: a named candidate revision of one Chapter Treatment state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "name", "description", "treatment", "chapterId", "settings"],
+  "properties": {
+    "schema": { "const": "film.cut@1" },
+    "id": { "$ref": "urn:film-spike:common#/$defs/slug" },
+    "name": { "$ref": "urn:film-spike:common#/$defs/name" },
+    "description": { "$ref": "urn:film-spike:common#/$defs/plainText" },
+    "treatment": { "$ref": "urn:film-spike:common#/$defs/revisionRef" },
+    "chapterId": { "$ref": "urn:film-spike:common#/$defs/localId" },
+    "settings": { "$ref": "urn:film-spike:common#/$defs/chapterSettings" }
+  }
+}

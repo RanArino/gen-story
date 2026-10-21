@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:font-asset-manifest",
+  "title": "Font Asset Manifest: exact local font bytes and their coverage, fallback, license, and scope",
+  "description": "Rights fields are optional here so that inspection, not schema validation, reports FS_LICENSE_INCOMPLETE; promotion still requires them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "version", "family", "faces", "coverage", "fallback", "source", "license", "rights", "scope"],
+  "properties": {
+    "schema": { "const": "film.font-asset-manifest@1" },
+    "id": { "$ref": "urn:film-spike:common#/$defs/fontId" },
+    "version": { "$ref": "urn:film-spike:common#/$defs/semver" },
+    "family": { "$ref": "urn:film-spike:common#/$defs/name" },
+    "faces": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "weight", "style", "stretch", "format"],
+        "properties": {
+          "file": { "$ref": "urn:film-spike:common#/$defs/fileName" },
+          "weight": { "type": "integer", "minimum": 100, "maximum": 900 },
+          "style": { "enum": ["normal", "italic"] },
+          "stretch": { "const": "normal" },
+          "format": { "enum": ["truetype", "opentype", "woff2"] },
+          "sha256": { "$ref": "urn:film-spike:common#/$defs/digest" }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scripts"],
+      "properties": {
+        "scripts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["Latn", "Jpan"] } },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "integer", "minimum": 0, "maximum": 1114111 },
+              { "type": "integer", "minimum": 0, "maximum": 1114111 }
+            ],
+            "items": false,
+            "minItems": 2
+          }
+        }
+      }
+    },
+    "fallback": { "type": "array", "maxItems": 4, "items": { "$ref": "urn:film-spike:common#/$defs/fontRef" } },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "attribution"],
+      "properties": {
+        "origin": { "type": "string", "maxLength": 300 },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+        "attribution": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "file"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9.+-]{2,40}$" },
+        "file": { "$ref": "urn:film-spike:common#/$defs/fileName" },
+        "sha256": { "$ref": "urn:film-spike:common#/$defs/digest" }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "redistribution": { "type": "boolean" }, "videoEmbedding": { "type": "boolean" } }
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "organization" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "projectId"],
+          "properties": { "kind": { "const": "project" }, "projectId": { "$ref": "urn:film-spike:common#/$defs/slug" } }
+        }
+      ]
+    }
+  }
+}
