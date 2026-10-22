@@ -250,6 +250,16 @@ function recipe(args: Parsed): number {
   });
 }
 
+function grammar(args: Parsed): number {
+  if (!args.positional.length) {
+    console.error("usage: film-spike grammar <plans-dir>... [--json]");
+    return 2;
+  }
+  return report(service.grammar({ plansDirs: args.positional }), args, (env) =>
+    (env.result as { plans: string; metrics: unknown }[]).map((r) => `${r.plans}: ${JSON.stringify(r.metrics)}`),
+  );
+}
+
 function compileArgs(args: Parsed) {
   return {
     treatment: readArg<FilmTreatment>(args.flags.treatment, "treatment"),
@@ -313,10 +323,10 @@ async function preview(args: Parsed): Promise<number> {
 async function sheet(args: Parsed): Promise<number> {
   const [planFile] = args.positional;
   if (!planFile) {
-    console.error("usage: film-spike contact-sheet <plan>");
+    console.error("usage: film-spike contact-sheet <plan> [--grayscale]");
     return 2;
   }
-  return report(await service.contactSheet({ planFile }), args);
+  return report(await service.contactSheet({ planFile, grayscale: args.flags.grayscale === true }), args);
 }
 
 const commands: Record<string, (args: Parsed) => number | Promise<number>> = {
@@ -333,6 +343,7 @@ const commands: Record<string, (args: Parsed) => number | Promise<number>> = {
   render,
   preview,
   "contact-sheet": sheet,
+  grammar,
 };
 
 const [name, ...rest] = process.argv.slice(2);

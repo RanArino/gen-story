@@ -8,7 +8,7 @@ import { ffmpeg, frameCount } from "./ffmpeg.js";
 import { frameTime, loadChapterPlan, outRelative, sampleFrames, type RenderDeps } from "./render-chapter.js";
 import { startServer } from "./server.js";
 
-export async function contactSheet(deps: RenderDeps, planFile: string): Promise<{ file: string; sha256: string; planDigest: string; frames: number[] }> {
+export async function contactSheet(deps: RenderDeps, planFile: string, options: { grayscale: boolean } = { grayscale: false }): Promise<{ file: string; sha256: string; planDigest: string; frames: number[] }> {
   const { paths } = deps;
   const plan = loadChapterPlan(paths, planFile);
   const planPath = outRelative(paths, planFile);
@@ -27,9 +27,11 @@ export async function contactSheet(deps: RenderDeps, planFile: string): Promise<
     }
     const dir = `${paths.out}contact-sheets/${name}/`;
     mkdirSync(dir, { recursive: true });
-    const out = `${dir}${plan.chapter.id}.png`;
-    await ffmpeg(["-framerate", "1", "-i", `${work}/frame-%02d.png`, "-vf", "scale=480:270,tile=4x3", "-frames:v", "1", out]);
-    return { file: `out/contact-sheets/${name}/${plan.chapter.id}.png`, sha256: digestBytes(readFileSync(out)), planDigest: planDigest(plan), frames };
+    const file = `${plan.chapter.id}${options.grayscale ? ".gray" : ""}.png`;
+    const out = `${dir}${file}`;
+    const filter = `scale=480:270,${options.grayscale ? "hue=s=0," : ""}tile=4x3`;
+    await ffmpeg(["-framerate", "1", "-i", `${work}/frame-%02d.png`, "-vf", filter, "-frames:v", "1", out]);
+    return { file: `out/contact-sheets/${name}/${file}`, sha256: digestBytes(readFileSync(out)), planDigest: planDigest(plan), frames };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

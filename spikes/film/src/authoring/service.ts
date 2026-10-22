@@ -28,6 +28,7 @@ import { buildConcatPlan, CONNECTION } from "../compiler/concat.js";
 import { planDigest } from "../compiler/fingerprint.js";
 import type { Catalog, CatalogEntry } from "../compiler/resolve.js";
 import { readFingerprint, type EnvFingerprint } from "../env/fingerprint.js";
+import { grammarMetrics } from "../evaluation/grammar.js";
 import { writeFixtureFonts } from "../fonts/fixtures.js";
 import { inspectFont, planFontPromotion, promoteFont, quarantineFont, type FontDraft } from "../fonts/fonts.js";
 import { glyphChars, JA_SAMPLE_SET, LATIN_SAMPLE_SET } from "../fonts/samples.js";
@@ -459,6 +460,23 @@ export function createService(deps: ServiceDeps) {
       });
     },
 
+    /** Editing-grammar metrics of the Chapter Plans in each directory, one entry per directory. */
+    grammar(input: { plansDirs: string[] }) {
+      return envelope("grammar", true, () => {
+        const result = input.plansDirs.map((given) => {
+          const dir = resolve(paths.root, given) + "/";
+          if (!existsSync(dir)) fail("FS_SCHEMA_INVALID", "/plans", `${given} does not exist`);
+          const plans = readdirSync(dir)
+            .filter((f) => f.endsWith(".plan.json") && f !== "concat.plan.json")
+            .map((f) => loadChapterPlan(paths, `${dir}${f}`))
+            .sort((a, b) => a.chapter.index - b.chapter.index);
+          if (!plans.length) fail("FS_SCHEMA_INVALID", "/plans", `${given} holds no Chapter Plans`);
+          return { plans: given, planDigests: plans.map((p) => planDigest(p)), metrics: grammarMetrics(plans) };
+        });
+        return { result };
+      });
+    },
+
     preflight(input: { treatment: FilmTreatment; chapters: FilmChapters; options?: CompileOptions }) {
       return envelope("preflight", true, () => {
         const errors = preflightChapters(compileInput(input.treatment, input.chapters, input.options ?? {}));
@@ -563,9 +581,9 @@ export function createService(deps: ServiceDeps) {
     },
 
     /** Writes a 4x3 grid of the twelve sample frames of a Chapter Plan, drawn by the painter. */
-    contactSheet(input: { planFile: string }) {
+    contactSheet(input: { planFile: string; grayscale?: boolean }) {
       return envelopeAsync("contactSheet", false, async () => {
-        const r = await contactSheet(renderDeps, input.planFile);
+        const r = await contactSheet(renderDeps, input.planFile, { grayscale: input.grayscale ?? false });
         return { result: r, hashes: { plan: r.planDigest, sheet: r.sha256 }, evidence: [r.file] };
       });
     },
