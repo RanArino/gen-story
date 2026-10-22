@@ -118,8 +118,8 @@ describe("built-in bootstrap", () => {
     const paths = tempPaths();
     const registry = new Registry(paths.state);
     const first = bootstrapBuiltins(registry, paths.media);
-    // 22 Capabilities, one of them (subtitle) in two versions.
-    expect(first.filter((m) => m.kind === "registry.promote")).toHaveLength(23);
+    // 22 Capabilities; the three typography Capabilities each in two versions.
+    expect(first.filter((m) => m.kind === "registry.promote")).toHaveLength(25);
     expect(bootstrapBuiltins(registry, paths.media)).toEqual([]);
     const records = registry.records();
     expect(records.every((r) => r.trust === "system" && r.implementationDigest)).toBe(true);

@@ -18,7 +18,9 @@ import dip from "./transition/dip/index.js";
 import directCut from "./transition/direct-cut/index.js";
 import dissolve from "./transition/dissolve/index.js";
 import editorialNote from "./typography/editorial-note/index.js";
+import editorialNote110 from "./typography/editorial-note@1.1.0/index.js";
 import kineticPhrase from "./typography/kinetic-phrase/index.js";
+import kineticPhrase110 from "./typography/kinetic-phrase@1.1.0/index.js";
 import subtitle from "./typography/subtitle/index.js";
 import subtitle110 from "./typography/subtitle@1.1.0/index.js";
 import ambienceLed from "./sound/ambience-led/index.js";
@@ -47,7 +49,9 @@ const IMPLEMENTATIONS: Record<string, CapabilityFunction> = {
   "typography/subtitle": subtitle,
   "typography/subtitle@1.1.0": subtitle110,
   "typography/editorial-note": editorialNote,
+  "typography/editorial-note@1.1.0": editorialNote110,
   "typography/kinetic-phrase": kineticPhrase,
+  "typography/kinetic-phrase@1.1.0": kineticPhrase110,
   "sound/intentional-silence": intentionalSilence,
   "sound/ambience-led": ambienceLed,
   "sound/beat-led": beatLed,
