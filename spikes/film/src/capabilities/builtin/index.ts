@@ -20,6 +20,7 @@ import dissolve from "./transition/dissolve/index.js";
 import editorialNote from "./typography/editorial-note/index.js";
 import kineticPhrase from "./typography/kinetic-phrase/index.js";
 import subtitle from "./typography/subtitle/index.js";
+import subtitle110 from "./typography/subtitle@1.1.0/index.js";
 import ambienceLed from "./sound/ambience-led/index.js";
 import beatLed from "./sound/beat-led/index.js";
 import intentionalSilence from "./sound/intentional-silence/index.js";
@@ -44,6 +45,7 @@ const IMPLEMENTATIONS: Record<string, CapabilityFunction> = {
   "transition/card-slide": cardSlide,
   "transition/dip": dip,
   "typography/subtitle": subtitle,
+  "typography/subtitle@1.1.0": subtitle110,
   "typography/editorial-note": editorialNote,
   "typography/kinetic-phrase": kineticPhrase,
   "sound/intentional-silence": intentionalSilence,
@@ -62,9 +64,14 @@ export interface BuiltinSource {
   implementation: Buffer;
 }
 
-function keyOf(id: string): string {
+/**
+ * A built-in's directory. The first version lives in `<kind>/<name>/`; each later version gets
+ * its own `<kind>/<name>@<version>/`, so pinned Plans keep replaying the exact older code.
+ */
+function keyOf(id: string, version: string): string {
   const [, kind, name] = id.split(".");
-  return `${kind}/${name}`;
+  const versioned = `${kind}/${name}@${version}`;
+  return versioned in IMPLEMENTATIONS ? versioned : `${kind}/${name}`;
 }
 
 export function builtinSources(): BuiltinSource[] {
@@ -77,9 +84,11 @@ export function builtinSources(): BuiltinSource[] {
 
 /** Returns the trusted implementation for a system record after verifying its source digest. */
 export function loadBuiltin(record: RegistryRecord): CapabilityFunction {
-  const key = keyOf(record.id);
+  const key = keyOf(record.id, record.version);
   const fn = IMPLEMENTATIONS[key];
   if (record.trust !== "system" || !fn) fail("FS_NOT_PROMOTED", "", `${record.id}@${record.version} is not an engine-native Capability`);
+  const manifest = JSON.parse(readFileSync(`${BUILTIN_DIR}${key}/manifest.json`, "utf8")) as CapabilityManifest;
+  if (manifest.version !== record.version) fail("FS_REPLAY_MISSING_VERSION", "", `${record.id}@${record.version} has no engine-native implementation in this build`);
   const digest = digestBytes(readFileSync(`${BUILTIN_DIR}${key}/index.ts`));
   if (digest !== record.implementationDigest) {
     fail("FS_DIGEST_MISMATCH", "", `${record.id}@${record.version} source digest ${digest} differs from the registry record`);

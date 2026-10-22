@@ -36,8 +36,8 @@
       "slot": "typography",
       "ref": {
         "id": "film.typography.subtitle",
-        "version": "1.0.0",
-        "digest": "sha256:e55cca7a9403b65ca7c2f79e672e3b41226d6208a384f980e15f54a9b1950a91"
+        "version": "1.1.0",
+        "digest": "sha256:74df9bc4d9354173630b6a5d83b141ac6549aedf34a3b9312210fe17b4b46f4b"
       }
     },
     {

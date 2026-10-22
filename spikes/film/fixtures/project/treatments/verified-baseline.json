@@ -6,7 +6,7 @@
   "recipe": {
     "id": "org.local.verified-baseline",
     "revision": "r1",
-    "digest": "sha256:7b0fbdea16aa193422ed9b21a44b1b02e72997a5d906d446ddab7cc65a249e53"
+    "digest": "sha256:b213ff06295d2a334d465ae1fd22fde9fb4f5ec5e0fb16b8667ea1b398b6971d"
   },
   "storyGraph": {
     "id": "sando-walk",

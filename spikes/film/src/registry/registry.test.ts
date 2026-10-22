@@ -118,7 +118,8 @@ describe("built-in bootstrap", () => {
     const paths = tempPaths();
     const registry = new Registry(paths.state);
     const first = bootstrapBuiltins(registry, paths.media);
-    expect(first.filter((m) => m.kind === "registry.promote")).toHaveLength(22);
+    // 22 Capabilities, one of them (subtitle) in two versions.
+    expect(first.filter((m) => m.kind === "registry.promote")).toHaveLength(23);
     expect(bootstrapBuiltins(registry, paths.media)).toEqual([]);
     const records = registry.records();
     expect(records.every((r) => r.trust === "system" && r.implementationDigest)).toBe(true);
@@ -129,6 +130,11 @@ describe("built-in bootstrap", () => {
       expect(validateDocument("capability-manifest", registry.manifest(record))).toEqual([]);
     }
     expect(codeOf(() => loadBuiltin({ ...records[0]!, implementationDigest: `sha256:${"0".repeat(64)}` }))).toBe("FS_DIGEST_MISMATCH");
+    const subtitles = records.filter((r) => r.id === "film.typography.subtitle").sort((a, b) => (a.version < b.version ? -1 : 1));
+    expect(subtitles.map((r) => r.version)).toEqual(["1.0.0", "1.1.0"]);
+    expect(subtitles[0]!.implementationDigest).not.toBe(subtitles[1]!.implementationDigest);
+    expect(loadBuiltin(subtitles[0]!)).not.toBe(loadBuiltin(subtitles[1]!));
+    expect(codeOf(() => loadBuiltin({ ...subtitles[1]!, version: "1.2.0" }))).toBe("FS_REPLAY_MISSING_VERSION");
   });
 
   it("every Level 1 built-in declares a same-kind fallback edge that terminates at Level 0", () => {
