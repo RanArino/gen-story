@@ -1,0 +1,15 @@
+{
+  "schema": "film.cut@1",
+  "id": "quiet-cinema-c1",
+  "name": "Morning, held still",
+  "description": "Long, nearly still holds with a faint vignette.",
+  "treatment": {
+    "id": "quiet-cinema",
+    "revision": 1
+  },
+  "chapterId": "c1",
+  "settings": {
+    "motionAmount": 0.35,
+    "visualIntensity": 0.4
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "film.cut@1",
+  "id": "pulse-cut-c2",
+  "name": "Dusk, faster pulse",
+  "description": "A faster pace and stronger pulses within the allowlist.",
+  "treatment": {
+    "id": "pulse-cut",
+    "revision": 1
+  },
+  "chapterId": "c2",
+  "settings": {
+    "motionAmount": 0.95,
+    "visualIntensity": 0.85,
+    "pacing": 1.2
+  }
+}

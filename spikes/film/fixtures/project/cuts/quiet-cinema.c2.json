@@ -1,0 +1,15 @@
+{
+  "schema": "film.cut@1",
+  "id": "quiet-cinema-c2",
+  "name": "Dusk, a little more drift",
+  "description": "Slightly more camera drift and a warmer leak within the allowlist.",
+  "treatment": {
+    "id": "quiet-cinema",
+    "revision": 1
+  },
+  "chapterId": "c2",
+  "settings": {
+    "motionAmount": 0.55,
+    "visualIntensity": 0.65
+  }
+}
