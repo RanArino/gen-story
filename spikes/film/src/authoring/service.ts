@@ -1,8 +1,9 @@
 // The one typed authoring service. The CLI and the Tool Calling adapter call only this module.
 // Mutating operations default to dry run and require a matching operator approval to write.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { relative, resolve } from "node:path";
 import { digestOf } from "../contracts/canonical.js";
-import { envelope, type Mutation, type ResultEnvelope } from "../contracts/envelope.js";
+import { envelope, envelopeAsync, type Mutation, type ResultEnvelope } from "../contracts/envelope.js";
 import { fail, FilmFailure } from "../contracts/errors.js";
 import { validateSchema, type SchemaKind } from "../contracts/schemas.js";
 import { validateDocument, type SemanticContext } from "../contracts/semantic.js";
@@ -24,7 +25,7 @@ import { compileChapters, preflightChapters, type CompileInput, type FontCatalog
 import { buildConcatPlan, CONNECTION } from "../compiler/concat.js";
 import { planDigest } from "../compiler/fingerprint.js";
 import type { Catalog, CatalogEntry } from "../compiler/resolve.js";
-import type { EnvFingerprint } from "../env/fingerprint.js";
+import { readFingerprint, type EnvFingerprint } from "../env/fingerprint.js";
 import { writeFixtureFonts } from "../fonts/fixtures.js";
 import { inspectFont, planFontPromotion, promoteFont, quarantineFont, type FontDraft } from "../fonts/fonts.js";
 import { glyphChars, JA_SAMPLE_SET, LATIN_SAMPLE_SET } from "../fonts/samples.js";
@@ -34,12 +35,17 @@ import { requireApproval } from "../registry/approvals.js";
 import { bootstrapBuiltins } from "../registry/bootstrap.js";
 import { Registry } from "../registry/registry.js";
 import { recordReview, type ReviewInput } from "../registry/reviews.js";
+import { renderConcat } from "../render/concat.js";
+import { contactSheet } from "../render/contact-sheet.js";
+import { loadChapterPlan, renderChapter, type RenderChapterInput, type RenderDeps } from "../render/render-chapter.js";
 import { compilerIdentity, painterIdentity } from "./identity.js";
 
 export interface ServiceDeps {
   paths: SpikePaths;
   /** The pinned environment fingerprint; defaults to out/env.json written by `doctor`. */
   environment?: () => EnvFingerprint;
+  /** The environment rendering runs in now; defaults to a fresh `readFingerprint()`. */
+  liveEnvironment?: () => EnvFingerprint;
 }
 
 export interface CompileOptions {
@@ -62,6 +68,7 @@ function jsonFiles(dir: string): string[] {
 export function createService(deps: ServiceDeps) {
   const { paths } = deps;
   const registry = new Registry(paths.state);
+  const renderDeps: RenderDeps = { paths, liveEnvironment: deps.liveEnvironment ?? (() => readFingerprint()) };
 
   const environment = (): EnvFingerprint => {
     if (deps.environment) return deps.environment();
@@ -206,6 +213,25 @@ export function createService(deps: ServiceDeps) {
     const record = registry.record(id, version);
     if (!record) fail("FS_NOT_PROMOTED", "", `${id}@${version} is not a promoted registry entry`);
     return record;
+  };
+
+  const buildConcat = (treatment: FilmTreatment, artifacts: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[]): ConcatPlan => {
+    const recipe = findRecipe(treatment.recipe);
+    const typography = artifacts[0]?.plan.capabilities.find((c) => c.slot === "typography")?.active;
+    const refs: ExactRef[] = [CONNECTION, ...(typography ? [typography] : [])].map((r) => ({ ...r, digest: exactRecord(r.id, r.version).manifestDigest }));
+    const plan = buildConcatPlan({
+      chapters: artifacts.map((a) => ({ plan: a.plan, planDigest: planDigest(a.plan), artifactSha256: a.artifact.files.mp4.sha256 })),
+      treatment,
+      recipe,
+      catalog: capabilityCatalog(refs),
+      fonts: fontCatalog(artifacts[0]!.plan.lock.fonts.map((f, i) => ({ ref: { id: f.id, version: f.version, digest: f.manifestDigest }, path: `/lock/fonts/${i}` }))),
+      media: readMediaLock(paths.media),
+      environmentDigest: digestOf(environment()),
+      compiler: compilerIdentity(),
+      painter: painterIdentity(),
+    });
+    checkPlan("concat-plan", plan);
+    return plan;
   };
 
   return {
@@ -379,25 +405,81 @@ export function createService(deps: ServiceDeps) {
       });
     },
 
+    /**
+     * Renders one Chapter Plan into a verified artifact. Requires a timing approval bound to the
+     * Plan's proposal digest; reuses the fingerprint cache unless `bypassCache`.
+     */
+    renderChapter(input: RenderChapterInput) {
+      return envelopeAsync("render.chapter", false, async () => {
+        const r = await renderChapter(renderDeps, input);
+        return {
+          result: { artifact: r.artifact, cache: r.cache, samples: r.samples, blocked: r.blocked, fonts: r.fonts, servedFonts: r.server?.fonts ?? [], renderMs: r.renderMs },
+          hashes: { plan: r.artifact.planDigest, fingerprint: r.artifact.fingerprint, mp4: r.artifact.files.mp4.sha256, stem: r.artifact.files.stem.sha256 },
+          warnings: r.warnings,
+          evidence: r.files,
+          mutations: r.cache === "miss" ? [{ kind: "render.chapter", target: r.artifact.chapterId, beforeDigest: null, afterDigest: r.artifact.files.mp4.sha256 }] : [],
+        };
+      });
+    },
+
     /** Builds the concatenation Plan from compiled Chapter Plans and their verified artifact digests. */
     concatPlan(input: { treatment: FilmTreatment; artifacts: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[] }): ResultEnvelope<ConcatPlan> {
       return envelope("compile", true, () => {
-        const recipe = findRecipe(input.treatment.recipe);
-        const typography = input.artifacts[0]?.plan.capabilities.find((c) => c.slot === "typography")?.active;
-        const refs: ExactRef[] = [CONNECTION, ...(typography ? [typography] : [])].map((r) => ({ ...r, digest: exactRecord(r.id, r.version).manifestDigest }));
-        const plan = buildConcatPlan({
-          chapters: input.artifacts.map((a) => ({ plan: a.plan, planDigest: planDigest(a.plan), artifactSha256: a.artifact.files.mp4.sha256 })),
-          treatment: input.treatment,
-          recipe,
-          catalog: capabilityCatalog(refs),
-          fonts: fontCatalog(input.artifacts[0]!.plan.lock.fonts.map((f, i) => ({ ref: { id: f.id, version: f.version, digest: f.manifestDigest }, path: `/lock/fonts/${i}` }))),
-          media: readMediaLock(paths.media),
-          environmentDigest: digestOf(environment()),
-          compiler: compilerIdentity(),
-          painter: painterIdentity(),
-        });
-        checkPlan("concat-plan", plan);
+        const plan = buildConcat(input.treatment, input.artifacts);
         return { result: plan, hashes: { plan: planDigest(plan), fingerprint: plan.fingerprint } };
+      });
+    },
+
+    /**
+     * Builds the concatenation Plan for the Chapter Plans in out/plans/<name>/ from their verified,
+     * cached artifacts. With `write`, it goes to concat.plan.json; rendering needs a `concat` approval.
+     */
+    compileConcat(input: { treatment: FilmTreatment; plansDir: string; write?: boolean }): ResultEnvelope<ConcatPlan> {
+      return envelope("compile", !input.write, () => {
+        const dir = resolve(paths.root, input.plansDir) + "/";
+        if (!existsSync(dir)) fail("FS_SCHEMA_INVALID", "/plans", `${input.plansDir} does not exist; compile the Chapters first`);
+        const plans = readdirSync(dir)
+          .filter((f) => f.endsWith(".plan.json") && f !== "concat.plan.json")
+          .map((f) => loadChapterPlan(paths, `${dir}${f}`))
+          .sort((a, b) => a.chapter.index - b.chapter.index);
+        if (!plans.length) fail("FS_SCHEMA_INVALID", "/plans", `${input.plansDir} holds no Chapter Plans`);
+        const artifacts = plans.map((plan) => {
+          const meta = `${paths.state}cache/chapters/${plan.fingerprint.slice("sha256:".length)}/artifact.json`;
+          const artifact = existsSync(meta) ? readJson<ChapterArtifact>(meta) : null;
+          if (!artifact?.verified || artifact.planDigest !== planDigest(plan)) {
+            fail("FS_ARTIFACT_VERIFY_FAILED", `/chapters/${plan.chapter.index}`, `${plan.chapter.id} has no verified artifact for this Plan; render it first`);
+          }
+          return { plan, artifact };
+        });
+        const plan = buildConcat(input.treatment, artifacts);
+        const evidence: string[] = [];
+        if (input.write) {
+          writeJson(`${dir}concat.plan.json`, plan);
+          evidence.push(`out/${relative(paths.out, `${dir}concat.plan.json`)}`);
+        }
+        return { result: plan, hashes: { plan: planDigest(plan), fingerprint: plan.fingerprint }, evidence };
+      });
+    },
+
+    /** Assembles the concatenated film. Requires a `concat` approval bound to the Plan digest. */
+    renderConcat(input: { planFile: string; approvalId?: string; outName?: string }) {
+      return envelopeAsync("render.concat", false, async () => {
+        const r = await renderConcat(renderDeps, input);
+        return {
+          result: { artifact: r.artifact, cache: r.cache, blocked: r.blocked, renderMs: r.renderMs },
+          hashes: { plan: r.artifact.planDigest, fingerprint: r.artifact.fingerprint, mp4: r.artifact.file.sha256 },
+          warnings: r.warnings,
+          evidence: r.files,
+          mutations: r.cache === "miss" ? [{ kind: "render.concat", target: "concat", beforeDigest: null, afterDigest: r.artifact.file.sha256 }] : [],
+        };
+      });
+    },
+
+    /** Writes a 4x3 grid of the twelve sample frames of a Chapter Plan, drawn by the painter. */
+    contactSheet(input: { planFile: string }) {
+      return envelopeAsync("contactSheet", false, async () => {
+        const r = await contactSheet(renderDeps, input.planFile);
+        return { result: r, hashes: { plan: r.planDigest, sheet: r.sha256 }, evidence: [r.file] };
       });
     },
   };

@@ -11,6 +11,8 @@ import { readFingerprint } from "../env/fingerprint.js";
 import type { FontDraft } from "../fonts/fonts.js";
 import { defaultPaths } from "../paths.js";
 import { confirmationFor, createApproval } from "../registry/approvals.js";
+import { outRelative } from "../render/render-chapter.js";
+import { startServer } from "../render/server.js";
 
 const OUT_DIR = fileURLToPath(new URL("../../out/", import.meta.url));
 const PKG_DIR = fileURLToPath(new URL("../../", import.meta.url));
@@ -212,6 +214,11 @@ function preflight(args: Parsed): number {
 }
 
 function compile(args: Parsed): number {
+  const concatDir = str(args.flags.concat);
+  if (concatDir) {
+    const env = service.compileConcat({ treatment: readArg<FilmTreatment>(args.flags.treatment, "treatment"), plansDir: concatDir, write: args.flags["dry-run"] !== true });
+    return report(env, args, (e) => [`${(e.result as { runtimeMs: number }).runtimeMs} ms`, `approve with: film-spike approve concat ${e.hashes.plan} --subject ${concatDir}`]);
+  }
   const input = compileArgs(args);
   const env = service.compile({ ...input, write: args.flags["dry-run"] !== true });
   return report(env, args, (e) =>
@@ -220,6 +227,47 @@ function compile(args: Parsed): number {
       `  approve timing with: film-spike approve timing ${c.proposalDigest} --subject ${c.proposal.chapterId}`,
     ]),
   );
+}
+
+async function render(args: Parsed): Promise<number> {
+  const [sub, planFile] = args.positional;
+  const approvalId = str(args.flags.approval);
+  const lines = (e: ResultEnvelope) => {
+    const r = e.result as { cache: string; renderMs: number; artifact: { frames: number; runtimeMs: number } };
+    return [`${r.artifact.frames} frames, ${r.artifact.runtimeMs} ms; cache ${r.cache}; ${(r.renderMs / 1000).toFixed(1)} s`];
+  };
+  if (sub === "chapter" && planFile) {
+    return report(await service.renderChapter({ planFile, ...(approvalId ? { approvalId } : {}), bypassCache: args.flags["no-cache"] === true }), args, lines);
+  }
+  if (sub === "concat" && planFile) return report(await service.renderConcat({ planFile, ...(approvalId ? { approvalId } : {}) }), args, lines);
+  console.error("usage: film-spike render chapter <plan> --approval <id> [--no-cache] | render concat <concat.plan.json> --approval <id>");
+  return 2;
+}
+
+/** Serves the preview page for a Plan until interrupted. */
+async function preview(args: Parsed): Promise<number> {
+  const [planFile] = args.positional;
+  if (!planFile) {
+    console.error("usage: film-spike preview <plan>");
+    return 2;
+  }
+  const paths = defaultPaths();
+  const plan = outRelative(paths, planFile);
+  const server = await startServer(paths);
+  console.log(`${server.origin}/runtime/preview.html?plan=${encodeURIComponent(plan)}`);
+  console.log("Press Ctrl-C to stop.");
+  await new Promise<void>((done) => process.once("SIGINT", done));
+  await server.close();
+  return 0;
+}
+
+async function sheet(args: Parsed): Promise<number> {
+  const [planFile] = args.positional;
+  if (!planFile) {
+    console.error("usage: film-spike contact-sheet <plan>");
+    return 2;
+  }
+  return report(await service.contactSheet({ planFile }), args);
 }
 
 const commands: Record<string, (args: Parsed) => number | Promise<number>> = {
@@ -232,6 +280,9 @@ const commands: Record<string, (args: Parsed) => number | Promise<number>> = {
   registry: registryCommand,
   preflight,
   compile,
+  render,
+  preview,
+  "contact-sheet": sheet,
 };
 
 const [name, ...rest] = process.argv.slice(2);

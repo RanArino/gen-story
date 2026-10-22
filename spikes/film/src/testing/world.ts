@@ -1,7 +1,7 @@
 // A complete, temporary spike world for tests: bootstrapped built-ins, promoted fixture fonts,
 // and a fixed environment fingerprint. Approvals are created as the operator would at the prompt.
 import { createService, type AuthoringService } from "../authoring/service.js";
-import type { EnvFingerprint } from "../env/fingerprint.js";
+import { readFingerprint, type EnvFingerprint } from "../env/fingerprint.js";
 import type { FontDraft } from "../fonts/fonts.js";
 import type { SpikePaths } from "../paths.js";
 import { readFixture } from "./fixtures.js";
@@ -35,9 +35,12 @@ export function promoteFixtureFont(world: World, incoming: string, draftFile: st
   return digest;
 }
 
-export function createWorld(): World {
+/** With `liveEnvironment`, Plans pin the real toolchain fingerprint so the renderer accepts them. */
+export function createWorld(options: { liveEnvironment?: boolean } = {}): World {
   const paths = tempPaths();
-  const service = createService({ paths, environment: () => TEST_ENV });
+  const pinned = options.liveEnvironment ? readFingerprint() : TEST_ENV;
+  const environment = () => pinned;
+  const service = createService({ paths, environment, liveEnvironment: environment });
   const world = { paths, service };
   const boot = service.bootstrap();
   if (!boot.ok) throw new Error(JSON.stringify(boot.errors));
