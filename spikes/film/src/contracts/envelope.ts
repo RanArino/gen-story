@@ -63,3 +63,13 @@ export function envelope<T>(operation: string, dryRun: boolean, body: () => Enve
     throw error;
   }
 }
+
+/** The asynchronous form of `envelope`, for operations that drive the browser and the encoder. */
+export async function envelopeAsync<T>(operation: string, dryRun: boolean, body: () => Promise<EnvelopeParts<T>>): Promise<ResultEnvelope<T>> {
+  try {
+    return success(operation, dryRun, await body());
+  } catch (error) {
+    if (error instanceof FilmFailure) return failure(operation, dryRun, error.errors);
+    throw error;
+  }
+}
