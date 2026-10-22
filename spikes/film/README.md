@@ -14,7 +14,7 @@ Local prerequisites: Node.js 25.2.1, ffmpeg/ffprobe, and the reference project's
 `film-making-idea/film-studio/productions/sando/images/` at the repository root. The reference
 project and its images are supplied separately and are not included in this package. Prepare
 the media before running the spike tests or acceptance; both read the local media lock.
-Chrome is fingerprinted by `doctor` for later rendering milestones.
+Rendering also needs Google Chrome; `doctor` fingerprints it from `CHROME_PATH`.
 
     pnpm install
     CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" pnpm cli doctor
@@ -88,5 +88,35 @@ dependencies are deduplicated while preserving font preference; actual cycles re
 `verified-baseline` uses the promoted Noto fonts, so it needs the three real font families in the
 local registry. The `test-*` Treatments pin the fixture fonts that tests promote in temporary
 registries; against the local registry they return `FS_NOT_PROMOTED`.
+
+## Render
+
+Rendering needs `CHROME_PATH`, ffmpeg, and a current `out/env.json` from `doctor`. A Plan compiled
+in a different environment (Chrome, ffmpeg, Node, OS, or painter source) is refused with
+`FS_ENV_MISMATCH`; recompile it.
+
+    pnpm cli approve timing <proposal digest> --subject c1          # operator, interactive
+    pnpm cli render chapter out/plans/verified-baseline/c1.plan.json --approval <id> [--no-cache]
+    pnpm cli compile --treatment fixtures/project/treatments/verified-baseline.json --concat out/plans/verified-baseline/
+    pnpm cli approve concat <concat plan digest> --subject verified-baseline
+    pnpm cli render concat out/plans/verified-baseline/concat.plan.json --approval <id>
+    pnpm cli contact-sheet out/plans/verified-baseline/c1.plan.json
+    pnpm cli preview out/plans/verified-baseline/c1.plan.json   # prints a 127.0.0.1 URL; Ctrl-C stops
+
+`render chapter` writes `out/artifacts/<name>/<chapter>.{mp4,stem.wav,json,frames.json}` after
+ffprobe verifies the exact frame count, 1920x1080, 30 fps, and AAC 48 kHz. Artifacts are cached
+in `.state/cache/chapters/<fingerprint>/`; an unchanged Chapter is a cache hit, and a cached file
+that no longer matches its digest is discarded and rebuilt. `compile --concat` builds the
+concatenation Plan from the verified cached Chapters. `render concat` paints only the overall
+title, joins the Chapter video by stream copy (Chapter frames stay identical), darkens the last
+Chapter frame for 800 ms at each join, and lays the BGM continuously under the cached stems.
+
+The render server listens on 127.0.0.1 only and serves the runtime pages, the painter
+transpiled from `src/painter/painter.ts`, Plans under `out/`, locked media, and registry font
+blobs. Chrome aborts every other request.
+
+`pnpm test` runs the render acceptance cases (`src/render/render.test.ts`) only when
+`CHROME_PATH` names an installed Chrome; they take several minutes. Without it they are skipped,
+and `pnpm accept` reports their rows as pending.
 
 `.media/`, `.state/`, and `out/` are gitignored.
