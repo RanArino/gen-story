@@ -2,11 +2,11 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { createService } from "../authoring/service.js";
+import { createService, type RecipeForkInput } from "../authoring/service.js";
 import { failure, type ResultEnvelope } from "../contracts/envelope.js";
 import { filmError, FilmFailure } from "../contracts/errors.js";
 import { SCHEMA_KINDS, type SchemaKind } from "../contracts/schemas.js";
-import { APPROVAL_KINDS, type ApprovalKind, type FilmChapters, type FilmTreatment } from "../contracts/types.js";
+import { APPROVAL_KINDS, REQUIRED_SLOTS, type ApprovalKind, type FilmChapters, type FilmTreatment, type VersionRef } from "../contracts/types.js";
 import { readFingerprint } from "../env/fingerprint.js";
 import type { FontDraft } from "../fonts/fonts.js";
 import { defaultPaths } from "../paths.js";
@@ -201,6 +201,55 @@ function registryCommand(args: Parsed): number {
   return 2;
 }
 
+/** Parses `a@1.0.0,b@1.1.0` into exact version references. */
+function versionRefs(value: string): VersionRef[] {
+  return value.split(",").map((item) => {
+    const at = item.lastIndexOf("@");
+    if (at <= 0) throw new FilmFailure([{ ...filmError("FS_SCHEMA_INVALID", "/--ref", `${item} is not <id>@<version>`), owner: "user" }]);
+    return { id: item.slice(0, at), version: item.slice(at + 1) };
+  });
+}
+
+/** Parses `slot=id@version,...` into a map of exact version references. */
+function assignments(value: string | undefined, allowed: readonly string[], name: string): Record<string, VersionRef> {
+  if (!value) return {};
+  return Object.fromEntries(
+    value.split(",").map((item) => {
+      const [key, ref] = item.split("=");
+      if (!key || !ref || !allowed.includes(key)) {
+        throw new FilmFailure([{ ...filmError("FS_SCHEMA_INVALID", `/--${name}`, `${item} is not <${allowed.join("|")}>=<id>@<version>`), owner: "user" }]);
+      }
+      return [key, versionRefs(ref)[0]!];
+    }),
+  );
+}
+
+function recipe(args: Parsed): number {
+  const [sub, id, revision] = args.positional;
+  const as = str(args.flags.as);
+  if (sub !== "fork" || !id || !revision || !as) {
+    console.error(
+      "usage: film-spike recipe fork <id> <revision> --as <org.local.id> [--revision r1] [--title <text>] [--slots slot=id@version,...] [--fonts caption|title=id@version,...] [--effects id@version,...|none] [--apply]",
+    );
+    return 2;
+  }
+  const effects = str(args.flags.effects);
+  const input: RecipeForkInput = {
+    source: { id, revision },
+    id: as,
+    slots: assignments(str(args.flags.slots), REQUIRED_SLOTS, "slots"),
+    fonts: assignments(str(args.flags.fonts), ["caption", "title"], "fonts"),
+    dryRun: !args.flags.apply,
+    ...(str(args.flags.revision) ? { revision: str(args.flags.revision)! } : {}),
+    ...(str(args.flags.title) ? { title: str(args.flags.title)! } : {}),
+    ...(effects ? { effects: effects === "none" ? [] : versionRefs(effects) } : {}),
+  };
+  return report(service.recipeFork(input), args, (env) => {
+    const r = env.result as { recipe: { id: string; revision: string; capabilities: { slot: string; ref: VersionRef }[] } };
+    return [`${r.recipe.id}@${r.recipe.revision}`, ...r.recipe.capabilities.map((c) => `${c.slot}: ${c.ref.id}@${c.ref.version}`)];
+  });
+}
+
 function compileArgs(args: Parsed) {
   return {
     treatment: readArg<FilmTreatment>(args.flags.treatment, "treatment"),
@@ -278,6 +327,7 @@ const commands: Record<string, (args: Parsed) => number | Promise<number>> = {
   catalog,
   font,
   registry: registryCommand,
+  recipe,
   preflight,
   compile,
   render,

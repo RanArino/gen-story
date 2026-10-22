@@ -4,18 +4,20 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { digestOf } from "../contracts/canonical.js";
 import { envelope, envelopeAsync, type Mutation, type ResultEnvelope } from "../contracts/envelope.js";
-import { fail, FilmFailure } from "../contracts/errors.js";
+import { fail, filmError, FilmFailure } from "../contracts/errors.js";
 import { validateSchema, type SchemaKind } from "../contracts/schemas.js";
 import { validateDocument, type SemanticContext } from "../contracts/semantic.js";
 import type {
   CapabilityManifest,
   ChapterArtifact,
   ConcatPlan,
+  Cut,
   ExactRef,
   FilmChapters,
   FilmStyleRecipe,
   FilmTreatment,
   FontAssetManifest,
+  RequiredSlot,
   ResolvedRenderPlan,
   StoryGraph,
   VersionRef,
@@ -51,6 +53,19 @@ export interface ServiceDeps {
 export interface CompileOptions {
   forceLevel0?: boolean;
   reducedMotion?: boolean;
+}
+
+/** A Recipe fork: replacements are exact versions, pinned to their registry digests at fork time. */
+export interface RecipeForkInput {
+  source: { id: string; revision: string };
+  id: string;
+  revision?: string;
+  title?: string;
+  description?: string;
+  slots?: Partial<Record<RequiredSlot, VersionRef>>;
+  fonts?: Partial<Record<"caption" | "title", VersionRef>>;
+  effects?: VersionRef[];
+  dryRun?: boolean;
 }
 
 function readJson<T>(path: string): T {
@@ -95,6 +110,14 @@ export function createService(deps: ServiceDeps) {
       return doc as FilmStyleRecipe;
     }
     return fail("FS_NOT_PROMOTED", path, `Recipe ${ref.id}@${ref.revision} was not found`);
+  };
+
+  const findTreatment = (ref: { id: string; revision: number }): FilmTreatment => {
+    for (const file of jsonFiles(`${paths.fixtures}project/treatments`)) {
+      const doc = readJson<Partial<FilmTreatment>>(file);
+      if (doc.schema === "film.film-treatment@1" && doc.id === ref.id && doc.revision === ref.revision) return doc as FilmTreatment;
+    }
+    return fail("FS_SEMANTIC_INVALID", "/treatment", `Treatment ${ref.id} revision ${ref.revision} was not found`);
   };
 
   const fontLookup = (ref: VersionRef): FontAssetManifest | undefined => {
@@ -248,6 +271,7 @@ export function createService(deps: ServiceDeps) {
           if (ref) ctx.storyGraph = findStoryGraph(ref);
         }
         if (input.kind === "film-treatment") ctx.recipe = findRecipe(doc.recipe as FilmTreatment["recipe"]);
+        if (input.kind === "cut") ctx.recipe = findRecipe(findTreatment((doc as unknown as Cut).treatment).recipe);
         const errors = validateDocument(input.kind, input.document, ctx);
         if (errors.length) throw new FilmFailure(errors);
         return { result: { valid: true }, hashes: { document: digestOf(input.document) } };
@@ -369,6 +393,69 @@ export function createService(deps: ServiceDeps) {
       return envelope("review.record", false, () => {
         const review = recordReview(paths.state, input);
         return { result: review, mutations: [{ kind: "review.record", target: review.id, beforeDigest: null, afterDigest: digestOf(review) }] };
+      });
+    },
+
+    /**
+     * Forks a Recipe revision into an organization Recipe under .state/recipes/. Replacements name
+     * exact versions offered for new work; their digests are pinned from the registry. Saved
+     * revisions are immutable: identical bytes are a no-op, different bytes are a collision.
+     */
+    recipeFork(input: RecipeForkInput) {
+      const dryRun = input.dryRun ?? true;
+      return envelope("recipe.fork", dryRun, () => {
+        if (!input.id.startsWith("org.local.")) fail("FS_SEMANTIC_INVALID", "/id", "a fork is an organization Recipe; use an org.local.* id");
+        const source = findRecipe(input.source, "/source");
+        const pin = (ref: VersionRef, entity: "capability" | "font", path: string): ExactRef => {
+          const record = registry.record(ref.id, ref.version);
+          if (!record) return fail("FS_NOT_PROMOTED", path, `${ref.id}@${ref.version} is not a promoted registry entry`);
+          if (record.entity !== entity) fail("FS_SEMANTIC_INVALID", path, `${ref.id}@${ref.version} is not a ${entity}`);
+          if (!registry.isOffered(ref.id, ref.version)) fail("FS_NOT_PROMOTED", path, `${ref.id}@${ref.version} is not offered for new work`);
+          return { id: ref.id, version: ref.version, digest: record.manifestDigest };
+        };
+        const capabilities = source.capabilities.map((c) => {
+          const replacement = input.slots?.[c.slot];
+          return replacement ? { slot: c.slot, ref: pin(replacement, "capability", `/slots/${c.slot}`) } : c;
+        });
+        const effects = input.effects ? input.effects.map((e, i) => pin(e, "capability", `/effects/${i}`)) : source.effects;
+        const fonts = source.fonts.map((f) => {
+          const replacement = input.fonts?.[f.role];
+          return replacement ? { role: f.role, ref: pin(replacement, "font", `/fonts/${f.role}`) } : f;
+        });
+        const selected = new Set([...capabilities.map((c) => c.ref.id), ...effects.map((e) => e.id)]);
+        const recipe: FilmStyleRecipe = {
+          ...source,
+          id: input.id,
+          revision: input.revision ?? "r1",
+          title: input.title ?? `${source.title} fork`,
+          description: input.description ?? source.description,
+          scope: "organization",
+          owner: "local",
+          lineage: { forkedFrom: { id: source.id, revision: source.revision, digest: digestOf(source) } },
+          capabilities,
+          effects,
+          // Parameters of a replaced Capability no longer apply.
+          params: Object.fromEntries(Object.entries(source.params).filter(([id]) => selected.has(id))),
+          fonts,
+        };
+        const errors = validateDocument("film-style-recipe", recipe, { font: fontLookup });
+        if (errors.length) throw new FilmFailure(errors);
+        const digest = digestOf(recipe);
+        const file = `${paths.state}recipes/${recipe.id}.${recipe.revision}.json`;
+        const existing = existsSync(file) ? digestOf(readJson(file)) : null;
+        if (existing && existing !== digest) {
+          throw new FilmFailure([
+            { ...filmError("FS_VERSION_COLLISION", "/revision", `${recipe.id}@${recipe.revision} is already saved as ${existing}`), owner: "recipe-author", remediation: "Saved Recipe revisions are immutable; fork under a new revision." },
+          ]);
+        }
+        if (dryRun || existing) return { result: { recipe, digest }, hashes: { recipe: digest } };
+        writeJson(file, recipe);
+        return {
+          result: { recipe, digest },
+          hashes: { recipe: digest },
+          evidence: [`.state/recipes/${recipe.id}.${recipe.revision}.json`],
+          mutations: [{ kind: "recipe.fork", target: `${recipe.id}@${recipe.revision}`, beforeDigest: null, afterDigest: digest }],
+        };
       });
     },
 
