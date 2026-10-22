@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { createService } from "../authoring/service.js";
-import type { ResultEnvelope } from "../contracts/envelope.js";
-import { FilmFailure } from "../contracts/errors.js";
+import { failure, type ResultEnvelope } from "../contracts/envelope.js";
+import { filmError, FilmFailure } from "../contracts/errors.js";
 import { SCHEMA_KINDS, type SchemaKind } from "../contracts/schemas.js";
 import { APPROVAL_KINDS, type ApprovalKind, type FilmChapters, type FilmTreatment } from "../contracts/types.js";
 import { readFingerprint } from "../env/fingerprint.js";
@@ -33,9 +33,21 @@ function parse(args: string[]): Parsed {
   return { positional, flags };
 }
 
+/** Reads a JSON input file. A missing or unparsable file is the user's input error, not a crash. */
 function readArg<T>(file: string | true | undefined, name: string): T {
-  if (typeof file !== "string") throw new Error(`missing --${name} <file>`);
-  return JSON.parse(readFileSync(resolve(PKG_DIR, file), "utf8")) as T;
+  const inputError = (message: string) => new FilmFailure([{ ...filmError("FS_SCHEMA_INVALID", `/--${name}`, message), owner: "user", remediation: "Pass a readable JSON file." }]);
+  if (typeof file !== "string") throw inputError(`missing --${name} <file>`);
+  let text: string;
+  try {
+    text = readFileSync(resolve(PKG_DIR, file), "utf8");
+  } catch {
+    throw inputError(`cannot read ${file}`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw inputError(`${file} is not valid JSON`);
+  }
 }
 
 function str(value: string | true | undefined): string | undefined {
@@ -228,4 +240,10 @@ if (!command) {
   console.error(`usage: film-spike <${Object.keys(commands).join("|")}> ...`);
   process.exit(2);
 }
-process.exit(await command(parse(rest)));
+const parsed = parse(rest);
+try {
+  process.exit(await command(parsed));
+} catch (error) {
+  if (!(error instanceof FilmFailure)) throw error;
+  process.exit(report(failure(name!, true, error.errors), parsed));
+}

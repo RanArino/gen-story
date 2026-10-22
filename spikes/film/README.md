@@ -80,10 +80,13 @@ dependencies are deduplicated while preserving font preference; actual cycles re
 
 ## Compile
 
-    pnpm cli preflight --treatment fixtures/project/treatments/test-baseline.json --chapters fixtures/project/chapters.json
-    pnpm cli compile --treatment fixtures/project/treatments/test-baseline.json --chapters fixtures/project/chapters.json
+    pnpm cli preflight --treatment fixtures/project/treatments/verified-baseline.json --chapters fixtures/project/chapters.json
+    pnpm cli compile --treatment fixtures/project/treatments/verified-baseline.json --chapters fixtures/project/chapters.json
 
 `compile` writes one Resolved Render Plan and one timing proposal per Chapter to
 `out/plans/<treatment>/`. Add `--reduced-motion` or `--force-level0` to compile those variants.
+`verified-baseline` uses the promoted Noto fonts, so it needs the three real font families in the
+local registry. The `test-*` Treatments pin the fixture fonts that tests promote in temporary
+registries; against the local registry they return `FS_NOT_PROMOTED`.
 
 `.media/`, `.state/`, and `out/` are gitignored.

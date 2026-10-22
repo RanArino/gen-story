@@ -35,6 +35,15 @@ describe("film-spike CLI", () => {
     expect(env.errors[0]).toMatchObject({ code: "FS_SCHEMA_INVALID", path });
   });
 
+  it("an unreadable input file returns a failed envelope instead of a stack trace", () => {
+    const run = cli("preflight", "--treatment", "fixtures/project/treatments/missing.json", "--chapters", "fixtures/project/chapters.json", "--json");
+    expect(run.status).toBe(1);
+    const env = JSON.parse(run.stdout);
+    expect(validateSchema("urn:film-spike:result-envelope", env)).toEqual([]);
+    expect(env).toMatchObject({ ok: false, operation: "preflight" });
+    expect(env.errors[0]).toMatchObject({ code: "FS_SCHEMA_INVALID", path: "/--treatment", owner: "user" });
+  });
+
   it("approve refuses to run without an interactive terminal", () => {
     const run = cli("approve", "promotion", `sha256:${"a".repeat(64)}`);
     expect(run.status).toBe(1);
