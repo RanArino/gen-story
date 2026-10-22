@@ -100,7 +100,7 @@ in a different environment (Chrome, ffmpeg, Node, OS, or painter source) is refu
     pnpm cli compile --treatment fixtures/project/treatments/verified-baseline.json --concat out/plans/verified-baseline/
     pnpm cli approve concat <concat plan digest> --subject verified-baseline
     pnpm cli render concat out/plans/verified-baseline/concat.plan.json --approval <id>
-    pnpm cli contact-sheet out/plans/verified-baseline/c1.plan.json
+    pnpm cli contact-sheet out/plans/verified-baseline/c1.plan.json [--grayscale]
     pnpm cli preview out/plans/verified-baseline/c1.plan.json   # prints a 127.0.0.1 URL; Ctrl-C stops
 
 `render chapter` writes `out/artifacts/<name>/<chapter>.{mp4,stem.wav,json,frames.json}` after
@@ -118,5 +118,31 @@ blobs. Chrome aborts every other request.
 `pnpm test` runs the render acceptance cases (`src/render/render.test.ts`) only when
 `CHROME_PATH` names an installed Chrome; they take several minutes. Without it they are skipped,
 and `pnpm accept` reports their rows as pending.
+
+## Three Cuts and Recipe forks
+
+The system Recipes `fixtures/recipes/system/{quiet-cinema,memory-board,pulse-cut}.r1.json` pin
+the promoted Noto fonts. Their Treatments are `fixtures/project/treatments/<cut>.json`, and
+`fixtures/project/cuts/<cut>.<chapter>.json` holds one Cut per Chapter, equal to that Chapter's
+state in the Treatment. Compile and render them like `verified-baseline` above.
+
+`recipe fork` creates an organization Recipe in `.state/recipes/` from a saved revision, without
+any source change. Replacements name exact versions offered for new work; the fork pins their
+registry digests and drops parameters of replaced Capabilities. It is a dry run unless `--apply`
+is given, and a saved revision is immutable (different bytes give `FS_VERSION_COLLISION`).
+
+    pnpm cli recipe fork system.quiet-cinema r1 --as org.local.quiet-editorial --title "Quiet Editorial" \
+      --slots typography=film.typography.editorial-note@1.1.0,transition=film.transition.dip@1.0.0,surface=film.surface.paper-tone@1.0.0 \
+      --fonts caption=font.noto-sans-jp@1.0.0,title=font.noto-sans-jp@1.0.0 [--effects id@version,...|none] [--apply]
+
+A fork needs a Treatment bound to its digest (`recipe` and `shared.typography`) before it compiles.
+`grammar <plans-dir>...` prints editing-grammar metrics read from compiled Plans (shot count, shot
+length mean and variance, layout, transition, and motion histograms, text windows), and
+`contact-sheet --grayscale` writes `<chapter>.gray.png` for the diversity evaluation.
+
+Tests exercise the Cuts by forking each system Recipe into a temporary registry with the fixture
+fonts (`src/testing/cuts.ts`). A21 and A22 also check the operator's real-font evidence in
+`out/evidence/` (`recipe-variation.json`, `diversity-review.json`, `diversity/key.json`) and stay
+pending without it.
 
 `.media/`, `.state/`, and `out/` are gitignored.

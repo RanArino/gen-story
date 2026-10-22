@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "implementedThrough": "M4",
+  "implementedThrough": "M5",
   "note": "Rows are proven by Vitest tests whose names contain the row tag, for example [A04]. Rows above implementedThrough report pending, never fail. A row whose requirement is not available reports pending with the reason.",
   "rows": [
     {
@@ -206,8 +206,7 @@
         "vitestTag": "[A18]"
       },
       "requires": [
-        "chrome",
-        "ffmpeg"
+        "chrome"
       ]
     },
     {
@@ -245,8 +244,7 @@
         "vitestTag": "[A21]"
       },
       "requires": [
-        "chrome",
-        "ffmpeg"
+        "operator-fonts"
       ]
     },
     {
@@ -258,8 +256,7 @@
         "vitestTag": "[A22]"
       },
       "requires": [
-        "chrome",
-        "ffmpeg"
+        "operator-fonts"
       ]
     },
     {
