@@ -1,0 +1,14 @@
+{
+  "expect": {
+    "gate": "static",
+    "code": "FS_FALLBACK_CYCLE"
+  },
+  "manifest": {
+    "id": "film.transition.fallback-cycle-a",
+    "version": "1.0.0",
+    "fallback": {
+      "id": "film.transition.fallback-cycle-b",
+      "version": "1.0.0"
+    }
+  }
+}

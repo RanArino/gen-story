@@ -1,0 +1,10 @@
+{
+  "expect": {
+    "gate": "static",
+    "code": "FS_FORBIDDEN_IMPORT"
+  },
+  "manifest": {
+    "id": "film.transition.forbidden-import",
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "expect": {
+    "gate": "static",
+    "code": "FS_VERSION_COLLISION"
+  },
+  "manifest": {
+    "id": "film.transition.torn-reveal",
+    "version": "1.0.0"
+  }
+}

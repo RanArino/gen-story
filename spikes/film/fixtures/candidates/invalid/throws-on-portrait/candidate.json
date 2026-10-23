@@ -1,0 +1,22 @@
+{
+  "expect": {
+    "gate": "run",
+    "code": "FS_RUNTIME_ERROR"
+  },
+  "manifest": {
+    "id": "film.transition.throws-on-portrait",
+    "version": "1.0.0",
+    "fixtures": [
+      {
+        "name": "landscape",
+        "sourceAspect": "16:9",
+        "caption": "ja"
+      },
+      {
+        "name": "portrait",
+        "sourceAspect": "2:3",
+        "caption": "ja"
+      }
+    ]
+  }
+}
