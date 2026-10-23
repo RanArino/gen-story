@@ -146,3 +146,76 @@ fonts (`src/testing/cuts.ts`). A21 and A22 also check the operator's real-font e
 pending without it.
 
 `.media/`, `.state/`, and `out/` are gitignored.
+
+## Capability authoring (M6)
+
+Every gate up to and including promotion is available: request, static, fallback compile, contained runtime, painter evidence, review, and promotion. Promoted Capabilities load from their registry bytes and run in the contained process. Acceptance rows A26–A28 cover the lifecycle, negative candidates, and exact-version replay.
+
+    pnpm cli validate request fixtures/requests/torn-reveal.request.json
+    pnpm cli approve request <request digest> --subject film.transition.torn-reveal@1.0.0
+    pnpm cli candidate scaffold fixtures/requests/torn-reveal.request.json --approval <id> --apply
+    pnpm cli candidate static-check torn-reveal
+
+Scaffolding requires an exact request approval even in dry-run mode. It writes a placeholder
+implementation and a manifest under `.state/quarantine/capabilities/<request-id>/`; repeat
+scaffolding preserves author edits. Author the candidate only after request approval.
+Static checks parse source without importing it and write `static.json` and `source.diff`.
+The execution target binds the approved request, manifest, source, and trusted runner/SDK bytes.
+Static success does not authorize execution or promotion. Quarantine is absent from catalog search.
+
+Candidate imports may use only `film-capability-sdk`. The conservative static subset also rejects
+computed property access and reflective constructor/prototype access, so forbidden globals cannot
+be reached by a computed property spelling. Use array methods and named properties instead.
+
+After reviewing the static report and source diff, obtain the separate execution approval:
+
+    pnpm cli approve execution <execution digest> --subject film.transition.torn-reveal@1.0.0
+    pnpm cli candidate run torn-reveal --approval <id> --apply
+
+`candidate run` requires the saved static report to match the current source, manifest, request,
+runner/SDK/containment, and generated ABI inputs. It defaults to a dry run that executes nothing.
+Each declared fixture is tested at default and boundary parameters, twice in one contained
+process and once in another. A passing report records all output digests. These synthetic ABI
+checks do not replace the required real-media painter evidence, fallback compilation, independent
+review, and promotion. Approval of execution does not make the candidate a catalog entry.
+
+Fallback compile (no approval; quarantined code never runs in-process):
+
+    pnpm cli candidate compile torn-reveal --treatment fixtures/project/treatments/memory-board.json --chapters fixtures/project/chapters.json
+
+This puts the candidate in its kind's slot of the Treatment's Recipe, in memory only. Under default options it checks
+resolution and compatibility only. Under `reducedMotion` and `forceLevel0`, it compiles every Chapter wherever the
+safety fallback replaces the candidate. The result is written to `compile.json`.
+
+Painter evidence (needs `CHROME_PATH` and the same execution approval):
+
+    pnpm cli candidate evidence torn-reveal --approval <execution approval id> --apply
+
+This re-executes exactly the approved inputs and fails with `FS_NONDETERMINISTIC` unless every output equals
+`runtime.json`. It paints the first fixture's parameter cases over two locked images and writes
+`out/candidates/<candidate>/evidence/{clip.mp4,contact-sheet.png}` and `evidence.json`.
+It is implemented for transitions only.
+
+Review, then promotion:
+
+    pnpm cli candidate promotion-target torn-reveal     # prints the digest to review and approve
+    pnpm cli review record <promotion digest> --subject <id@version> --reviewer <name> --verdict accept --notes <text>
+    pnpm cli approve promotion <promotion digest> --subject <id@version>
+    pnpm cli registry promote torn-reveal --approval <id> --apply
+
+The promotion target binds the Manifest, implementation bytes, execution target, and the static,
+runtime, compile, and evidence reports. `registry promote` refuses with `FS_REVIEW_REQUIRED` until an
+accepted review of that exact digest exists, then requires the promotion approval. It stores the reports as
+registry blobs and offers the version for new work. Reviews are recorded by someone who did not author
+the candidate; a review is evidence, not an approval.
+
+Replay a pinned Chapter Plan (read-only):
+
+    pnpm cli replay out/plans/<name>/c1.plan.json --treatment <file> --chapters fixtures/project/chapters.json
+
+Every locked Capability must still resolve to its pinned manifest and implementation bytes
+(`FS_REPLAY_MISSING_VERSION` when a version is gone), and recompiling must reproduce the Plan digest.
+
+Negative candidates live under `fixtures/candidates/invalid/`. Each `candidate.json` names its first
+failing gate and code. `fixtures/candidates/valid/torn-reveal/` is a byte-identical copy of the
+authored 1.0.0 candidate for tests.
