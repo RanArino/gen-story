@@ -22,11 +22,14 @@ import type {
   StoryGraph,
   VersionRef,
 } from "../contracts/types.js";
+import { planPromotion, promoteCandidate, quarantinedEntry, runCandidate, scaffold, staticCheck } from "../candidates/candidate.js";
+import { candidateEvidence } from "../candidates/evidence.js";
+import type { CapabilityRequest } from "../contracts/types.js";
 import { loadImplementation } from "../capabilities/loader.js";
 import { compileChapters, preflightChapters, type CompileInput, type FontCatalog, type FontEntry } from "../compiler/compile.js";
 import { buildConcatPlan, CONNECTION } from "../compiler/concat.js";
 import { planDigest } from "../compiler/fingerprint.js";
-import type { Catalog, CatalogEntry } from "../compiler/resolve.js";
+import { resolveRecipe, type Catalog, type CatalogEntry } from "../compiler/resolve.js";
 import { readFingerprint, type EnvFingerprint } from "../env/fingerprint.js";
 import { grammarMetrics } from "../evaluation/grammar.js";
 import { writeFixtureFonts } from "../fonts/fixtures.js";
@@ -126,19 +129,25 @@ export function createService(deps: ServiceDeps) {
     return record?.entity === "font" ? registry.manifest<FontAssetManifest>(record) : undefined;
   };
 
-  const capabilityCatalog = (refs: ExactRef[]): Catalog => {
+  const capabilityCatalog = (refs: ExactRef[], candidate?: CatalogEntry): Catalog => {
     const entries = new Map<string, CatalogEntry>();
+    const follow = (manifest: CapabilityManifest) => {
+      // Follow declared safety-fallback edges by exact version; missing edges are reported by the resolver.
+      if (!manifest.fallback) return;
+      const next = registry.record(manifest.fallback.id, manifest.fallback.version);
+      if (next?.entity === "capability") add(next);
+    };
     const add = (record: NonNullable<ReturnType<Registry["record"]>>) => {
       const key = `${record.id}@${record.version}`;
       if (entries.has(key)) return;
       const manifest = registry.manifest<CapabilityManifest>(record);
-      entries.set(key, { record, manifest, run: loadImplementation(record) });
-      // Follow declared safety-fallback edges by exact version; missing edges are reported by the resolver.
-      if (manifest.fallback) {
-        const next = registry.record(manifest.fallback.id, manifest.fallback.version);
-        if (next?.entity === "capability") add(next);
-      }
+      entries.set(key, { record, manifest, run: loadImplementation(record, { registry, scratchDir: `${paths.state}cache/capabilities/` }) });
+      follow(manifest);
     };
+    if (candidate) {
+      entries.set(`${candidate.manifest.id}@${candidate.manifest.version}`, candidate);
+      follow(candidate.manifest);
+    }
     const errors = [];
     for (const ref of refs) {
       try {
@@ -179,14 +188,19 @@ export function createService(deps: ServiceDeps) {
 
   // --- compile inputs ----------------------------------------------------------------------------
 
-  const compileInput = (treatment: FilmTreatment, chapters: FilmChapters, options: CompileOptions): CompileInput => {
+  /** With a quarantined candidate, its kind's slot in the Treatment's Recipe is replaced in memory only. */
+  const compileInput = (treatment: FilmTreatment, chapters: FilmChapters, options: CompileOptions, candidate?: CatalogEntry): CompileInput => {
     const errors = [
       ...validateDocument("film-treatment", treatment),
       ...validateDocument("chapters", chapters),
     ];
     if (errors.length) throw new FilmFailure(errors);
     const storyGraph = findStoryGraph(treatment.storyGraph);
-    const recipe = findRecipe(treatment.recipe);
+    const found = findRecipe(treatment.recipe);
+    if (candidate && !found.capabilities.some((c) => c.slot === candidate.manifest.kind)) fail("FS_SEMANTIC_INVALID", "/candidate", `the Recipe has no ${candidate.manifest.kind} slot`);
+    const recipe: FilmStyleRecipe = candidate
+      ? { ...found, capabilities: found.capabilities.map((c) => (c.slot === candidate.manifest.kind ? { slot: c.slot, ref: { id: candidate.manifest.id, version: candidate.manifest.version, digest: candidate.record.manifestDigest } } : c)) }
+      : found;
     const ctx: SemanticContext = { storyGraph, recipe, font: fontLookup };
     const semantic = [
       ...validateDocument("story-graph", storyGraph),
@@ -198,7 +212,7 @@ export function createService(deps: ServiceDeps) {
     if (chapters.storyGraph.id !== treatment.storyGraph.id || chapters.storyGraph.revision !== treatment.storyGraph.revision) {
       fail("FS_SEMANTIC_INVALID", "/storyGraph", "chapters and Treatment reference different Story Graph revisions");
     }
-    const refs = [...recipe.capabilities.map((c) => c.ref), ...recipe.effects];
+    const refs = [...recipe.capabilities.map((c) => c.ref), ...recipe.effects].filter((r) => !candidate || r.id !== candidate.manifest.id || r.version !== candidate.manifest.version);
     const fontRefs = [
       { ref: treatment.shared.typography, path: "/shared/typography" },
       ...recipe.fonts.map((f, i) => ({ ref: f.ref, path: `/fonts/${i}/ref` })),
@@ -210,7 +224,7 @@ export function createService(deps: ServiceDeps) {
       treatment,
       recipe,
       recipeDigest: digestOf(recipe),
-      catalog: capabilityCatalog(refs),
+      catalog: capabilityCatalog(refs, candidate),
       fonts: fontCatalog(fontRefs),
       media: readMediaLock(paths.media),
       environmentDigest: digestOf(environment()),
@@ -284,6 +298,95 @@ export function createService(deps: ServiceDeps) {
       return envelope("bootstrap", false, () => {
         const mutations = bootstrapBuiltins(registry, paths.media);
         return { result: { records: registry.records().length }, mutations };
+      });
+    },
+
+    candidateScaffold(input: { request: CapabilityRequest; approvalId?: string; dryRun?: boolean }) {
+      return envelope("candidate.scaffold", input.dryRun ?? true, () => {
+        const result = scaffold(paths, input);
+        return {
+          result, hashes: { request: result.requestDigest },
+          mutations: result.created ? [{ kind: "candidate.scaffold", target: result.candidate, beforeDigest: null, afterDigest: result.requestDigest }] : [],
+        };
+      });
+    },
+
+    candidateStaticCheck(input: { candidate: string }) {
+      return envelope("candidate.staticCheck", false, () => {
+        const result = staticCheck(paths, registry, input.candidate);
+        return { result, hashes: { execution: result.executionDigest }, evidence: [`.state/quarantine/capabilities/${input.candidate}/static.json`, `.state/quarantine/capabilities/${input.candidate}/source.diff`] };
+      });
+    },
+
+    candidateRun(input: { candidate: string; approvalId?: string; dryRun?: boolean }) {
+      return envelope("candidate.run", input.dryRun ?? true, () => {
+        const result = runCandidate(paths, registry, input);
+        return { result, hashes: { execution: result.executionDigest }, evidence: result.report ? [`.state/quarantine/capabilities/${input.candidate}/runtime.json`] : [] };
+      });
+    },
+
+    /**
+     * Compiles a Treatment with the quarantined candidate in its kind's slot, without executing it:
+     * resolution (compatibility) under default options, then full Chapter compiles under
+     * reducedMotion and forceLevel0 wherever the safety fallback replaces the candidate.
+     */
+    candidateCompile(input: { candidate: string; treatment: FilmTreatment; chapters: FilmChapters }) {
+      return envelope("candidate.compile", false, () => {
+        const { entry, executionDigest, dir } = quarantinedEntry(paths, registry, input.candidate);
+        const key = (m: CapabilityManifest) => `${m.id}@${m.version}`;
+        const variants = ([{}, { reducedMotion: true }, { forceLevel0: true }] as CompileOptions[]).map((options) => {
+          const ci = compileInput(input.treatment, input.chapters, options, entry);
+          const resolved = resolveRecipe(ci.recipe, ci.catalog, { ...ci.options, profile: input.treatment.shared.outputProfile }).slots.find((s) => s.slot === entry.manifest.kind)!;
+          const active = resolved.active.manifest;
+          const summary = { options: ci.options, requested: key(entry.manifest), active: key(active), activeLevel: active.level, chain: resolved.chain.map((c) => key(c.manifest)) };
+          if (key(active) === key(entry.manifest)) return { ...summary, compiled: false, plans: [] };
+          const plans = compileChapters(ci).map(({ plan }) => {
+            checkPlan("resolved-render-plan", plan);
+            const slot = plan.capabilities.find((c) => c.slot === entry.manifest.kind)!;
+            if (`${slot.active.id}@${slot.active.version}` !== key(active)) throw new Error("internal: compiled Plan disagrees with resolution");
+            return { chapter: plan.chapter.id, planDigest: planDigest(plan) };
+          });
+          return { ...summary, compiled: true, plans };
+        });
+        const report = {
+          candidate: input.candidate,
+          ok: true,
+          subject: { id: entry.manifest.id, version: entry.manifest.version, digest: executionDigest },
+          treatment: { id: input.treatment.id, revision: input.treatment.revision },
+          recipe: input.treatment.recipe,
+          variants,
+          createdAt: new Date().toISOString(),
+        };
+        writeJson(`${dir}compile.json`, report);
+        return { result: report, hashes: { execution: executionDigest, report: digestOf(report) }, evidence: [`.state/quarantine/capabilities/${input.candidate}/compile.json`] };
+      });
+    },
+
+    candidateEvidence(input: { candidate: string; approvalId?: string; dryRun?: boolean }) {
+      return envelopeAsync("candidate.evidence", input.dryRun ?? true, async () => {
+        const result = await candidateEvidence(paths, registry, input);
+        const files = result.evidence ? [result.evidence.clip.file, result.evidence.contactSheet.file, `.state/quarantine/capabilities/${input.candidate}/evidence.json`] : [];
+        return { result, hashes: { execution: result.executionDigest, ...(result.evidence ? { clip: result.evidence.clip.sha256, contactSheet: result.evidence.contactSheet.sha256 } : {}) }, evidence: files };
+      });
+    },
+
+    /** Read-only: what the independent review and the promotion approval must be bound to. */
+    candidatePromotionTarget(input: { candidate: string }) {
+      return envelope("registry.promote", true, () => {
+        const plan = planPromotion(paths, registry, input.candidate);
+        return { result: { subject: plan.target.subject, digest: plan.promotionDigest, target: plan.target }, hashes: { promotion: plan.promotionDigest } };
+      });
+    },
+
+    registryPromote(input: { candidate: string; approvalId?: string; dryRun?: boolean }) {
+      const dryRun = input.dryRun ?? true;
+      return envelope("registry.promote", dryRun, () => {
+        const { plan, record, created } = promoteCandidate(paths, registry, input);
+        return {
+          result: { id: plan.manifest.id, version: plan.manifest.version, digest: digestOf(plan.manifest), promotion: plan.promotionDigest },
+          hashes: { promotion: plan.promotionDigest, manifest: digestOf(plan.manifest) },
+          mutations: record && created ? [{ kind: "registry.promote", target: `${record.id}@${record.version}`, beforeDigest: null, afterDigest: record.manifestDigest }] : [],
+        };
       });
     },
 
@@ -507,6 +610,26 @@ export function createService(deps: ServiceDeps) {
           }
         }
         return { result: compiled.map((c) => ({ plan: c.plan, proposal: c.proposal, proposalDigest: c.proposalDigest })), hashes, evidence };
+      });
+    },
+
+    /**
+     * Replays a pinned Chapter Plan: every locked Capability must still resolve to the exact
+     * recorded manifest and implementation (a missing one is FS_REPLAY_MISSING_VERSION), and
+     * recompiling the Treatment must reproduce the identical Plan digest.
+     */
+    replay(input: { planFile: string; treatment: FilmTreatment; chapters: FilmChapters }) {
+      return envelope("replay", true, () => {
+        const plan = loadChapterPlan(paths, input.planFile);
+        plan.lock.capabilities.forEach((locked, i) => {
+          const { record } = registry.resolve({ id: locked.id, version: locked.version, digest: locked.manifestDigest }, "replay", `/lock/capabilities/${i}`);
+          if (record.implementationDigest !== locked.implementationDigest) fail("FS_DIGEST_MISMATCH", `/lock/capabilities/${i}`, `${locked.id}@${locked.version} implementation differs from the pinned bytes`);
+        });
+        const recompiled = compileChapters(compileInput(input.treatment, input.chapters, plan.options)).find((c) => c.plan.chapter.id === plan.chapter.id);
+        const expected = planDigest(plan);
+        const actual = recompiled ? planDigest(recompiled.plan) : null;
+        if (actual !== expected) fail("FS_DIGEST_MISMATCH", "/plan", `recompiling ${plan.chapter.id} gives ${actual}, not the pinned ${expected}`);
+        return { result: { chapter: plan.chapter.id, planDigest: expected, capabilities: plan.lock.capabilities.length }, hashes: { plan: expected } };
       });
     },
 

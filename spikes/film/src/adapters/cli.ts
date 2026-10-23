@@ -6,7 +6,7 @@ import { createService, type RecipeForkInput } from "../authoring/service.js";
 import { failure, type ResultEnvelope } from "../contracts/envelope.js";
 import { filmError, FilmFailure } from "../contracts/errors.js";
 import { SCHEMA_KINDS, type SchemaKind } from "../contracts/schemas.js";
-import { APPROVAL_KINDS, REQUIRED_SLOTS, type ApprovalKind, type FilmChapters, type FilmTreatment, type VersionRef } from "../contracts/types.js";
+import { APPROVAL_KINDS, REQUIRED_SLOTS, type ApprovalKind, type CapabilityRequest, type FilmChapters, type FilmTreatment, type VersionRef } from "../contracts/types.js";
 import { readFingerprint } from "../env/fingerprint.js";
 import type { FontDraft } from "../fonts/fonts.js";
 import { defaultPaths } from "../paths.js";
@@ -157,6 +157,46 @@ function catalog(args: Parsed): number {
   return 2;
 }
 
+async function candidate(args: Parsed): Promise<number> {
+  const [sub, value] = args.positional;
+  const approvalId = str(args.flags.approval);
+  if (sub === "scaffold" && value) return report(service.candidateScaffold({ request: readArg<CapabilityRequest>(value, "request"), ...(approvalId ? { approvalId } : {}), dryRun: !args.flags.apply }), args);
+  if (sub === "run" && value) return report(service.candidateRun({ candidate: value, ...(approvalId ? { approvalId } : {}), dryRun: !args.flags.apply }), args);
+  if (sub === "static-check" && value) return report(service.candidateStaticCheck({ candidate: value }), args);
+  if (sub === "compile" && value) {
+    const { treatment, chapters } = compileArgs(args);
+    return report(service.candidateCompile({ candidate: value, treatment, chapters }), args, (env) =>
+      (env.result as { variants: { options: object; active: string; compiled: boolean }[] }).variants.map((v) => `${JSON.stringify(v.options)}: ${v.active}${v.compiled ? " (compiled)" : " (resolved only)"}`),
+    );
+  }
+  if (sub === "evidence" && value) return report(await service.candidateEvidence({ candidate: value, ...(approvalId ? { approvalId } : {}), dryRun: !args.flags.apply }), args);
+  if (sub === "promotion-target" && value) {
+    return report(service.candidatePromotionTarget({ candidate: value }), args, (env) => {
+      const r = env.result as { subject: string; digest: string };
+      return [
+        `${r.subject} promotion target ${r.digest}`,
+        `review with: film-spike review record ${r.digest} --subject ${r.subject} --reviewer <name> --verdict accept|reject --notes <text>`,
+        `then approve with: film-spike approve promotion ${r.digest} --subject ${r.subject}`,
+      ];
+    });
+  }
+  console.error(
+    "usage: film-spike candidate scaffold <request.json> --approval <id> [--apply] | static-check <candidate> | compile <candidate> --treatment <file> --chapters <file> | run <candidate> --approval <id> [--apply] | evidence <candidate> --approval <id> [--apply] | promotion-target <candidate>",
+  );
+  return 2;
+}
+
+function review(args: Parsed): number {
+  const [sub, subjectDigest] = args.positional;
+  const verdict = str(args.flags.verdict);
+  const [subject, reviewer, notes] = [str(args.flags.subject), str(args.flags.reviewer), str(args.flags.notes)];
+  if (sub !== "record" || !subjectDigest || !subject || !reviewer || !notes || (verdict !== "accept" && verdict !== "reject")) {
+    console.error("usage: film-spike review record <sha256:digest> --subject <text> --reviewer <name> --verdict accept|reject --notes <text>");
+    return 2;
+  }
+  return report(service.reviewRecord({ subjectDigest, subject, reviewer, verdict, notes }), args, (env) => [`recorded ${(env.result as { id: string }).id}`]);
+}
+
 function font(args: Parsed): number {
   const [sub, a, b] = args.positional;
   const dryRun = !args.flags.apply;
@@ -197,7 +237,8 @@ function registryCommand(args: Parsed): number {
   if (sub === "deactivate" && exact) return report(service.registryDeactivate(exact), args);
   if (sub === "deprecate" && exact) return report(service.registryDeprecate(exact), args);
   if (sub === "rollback" && id) return report(service.registryRollback({ id, ...(approvalId ? { approvalId } : {}), dryRun }), args);
-  console.error("usage: film-spike registry verify | activate|deactivate|deprecate <id> <version> --approval <id> [--apply] | rollback <id> --approval <id> [--apply]");
+  if (sub === "promote" && id) return report(service.registryPromote({ candidate: id, ...(approvalId ? { approvalId } : {}), dryRun }), args);
+  console.error("usage: film-spike registry verify | promote <candidate> --approval <id> [--apply] | activate|deactivate|deprecate <id> <version> --approval <id> [--apply] | rollback <id> --approval <id> [--apply]");
   return 2;
 }
 
@@ -268,6 +309,16 @@ function compileArgs(args: Parsed) {
   };
 }
 
+function replay(args: Parsed): number {
+  const [planFile] = args.positional;
+  if (!planFile) {
+    console.error("usage: film-spike replay <plan> --treatment <file> --chapters <file>");
+    return 2;
+  }
+  const { treatment, chapters } = compileArgs(args);
+  return report(service.replay({ planFile, treatment, chapters }), args, (env) => [`${(env.result as { chapter: string }).chapter} replays at ${env.hashes.plan}`]);
+}
+
 function preflight(args: Parsed): number {
   return report(service.preflight(compileArgs(args)), args, () => ["every Chapter fits its limit and transitions"]);
 }
@@ -335,11 +386,14 @@ const commands: Record<string, (args: Parsed) => number | Promise<number>> = {
   bootstrap: (args) => report(service.bootstrap(), args, (env) => [`${(env.result as { records: number }).records} registry records`]),
   approve,
   catalog,
+  candidate,
   font,
   registry: registryCommand,
+  review,
   recipe,
   preflight,
   compile,
+  replay,
   render,
   preview,
   "contact-sheet": sheet,
