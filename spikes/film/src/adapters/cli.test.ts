@@ -1,3 +1,4 @@
+import { requireApprovalTerminal } from "./approval-terminal.js";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { validateSchema } from "../contracts/schemas.js";
@@ -44,9 +45,7 @@ describe("film-spike CLI", () => {
     expect(env.errors[0]).toMatchObject({ code: "FS_SCHEMA_INVALID", path: "/--treatment", owner: "user" });
   });
 
-  it("approve refuses to run without an interactive terminal", () => {
-    const run = cli("approve", "promotion", `sha256:${"a".repeat(64)}`);
-    expect(run.status).toBe(1);
-    expect(run.stderr).toContain("interactive terminal");
+  it.each([[false, false], [false, true], [true, false], [undefined, undefined]])("approval terminal guard refuses non-interactive streams (%s, %s)", (input, output) => {
+    expect(() => requireApprovalTerminal(input, output)).toThrow("interactive terminal");
   });
 });

@@ -1,0 +1,17 @@
+{
+  "tool": "font_inspect",
+  "input": {
+    "candidate": "fixture-sans-jp-1-0-0"
+  },
+  "cli": [
+    "font",
+    "inspect",
+    "fixture-sans-jp-1-0-0",
+    "--dry-run"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

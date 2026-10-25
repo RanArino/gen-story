@@ -1,0 +1,22 @@
+{
+  "tool": "registry_activate",
+  "input": {
+    "id": "film.transition.dissolve",
+    "version": "1.0.0",
+    "dryRun": false
+  },
+  "cli": [
+    "registry",
+    "activate",
+    "film.transition.dissolve",
+    "1.0.0",
+    "--apply"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": [
+      "FS_APPROVAL_REQUIRED"
+    ],
+    "mutationKinds": []
+  }
+}

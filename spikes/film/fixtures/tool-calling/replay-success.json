@@ -1,0 +1,25 @@
+{
+  "tool": "replay",
+  "input": {
+    "planFile": "out/plans/test-baseline/c1.plan.json",
+    "treatment": {
+      "$fixture": "project/treatments/test-baseline.json"
+    },
+    "chapters": {
+      "$fixture": "project/chapters.json"
+    }
+  },
+  "cli": [
+    "replay",
+    "out/plans/test-baseline/c1.plan.json",
+    "--treatment",
+    "fixtures/project/treatments/test-baseline.json",
+    "--chapters",
+    "fixtures/project/chapters.json"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

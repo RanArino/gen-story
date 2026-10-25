@@ -1,0 +1,27 @@
+{
+  "tool": "candidate_compile",
+  "input": {
+    "candidate": "tool-candidate",
+    "treatment": {
+      "$fixture": "project/treatments/test-baseline.json"
+    },
+    "chapters": {
+      "$fixture": "project/chapters.json"
+    }
+  },
+  "cli": [
+    "candidate",
+    "compile",
+    "tool-candidate",
+    "--dry-run",
+    "--treatment",
+    "fixtures/project/treatments/test-baseline.json",
+    "--chapters",
+    "fixtures/project/chapters.json"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

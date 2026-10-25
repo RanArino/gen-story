@@ -219,3 +219,56 @@ Every locked Capability must still resolve to its pinned manifest and implementa
 Negative candidates live under `fixtures/candidates/invalid/`. Each `candidate.json` names its first
 failing gate and code. `fixtures/candidates/valid/torn-reveal/` is a byte-identical copy of the
 authored 1.0.0 candidate for tests.
+
+## Capability Authoring Skill (M7 complete)
+
+`skills/capability-authoring/SKILL.md` is an agent-neutral authoring workflow, not an editor-registered Skill. It prefers Recipe composition, confines direct edits to quarantine and evidence, and stops for operator request, execution, and promotion approvals. Its operation names are checked against the authoring service by `src/adapters/skill.test.ts`. The Tool Calling adapter and the real walkthrough are complete.
+
+Local manual-viewing preparation is in `out/evidence/viewing-sheet.md`: all four joined films, their transition and caption windows, and Chapter joins. Verdicts must come from the operator watching with sound.
+
+The resumed local A30 transcript is `out/evidence/skill-walkthrough.md`. Runtime and painter evidence are complete for `torn-reveal-1-1-0`, and the transcript reaches the exact promotion handoff without running an approval command. By the product owner's 2026-10-25 decision, an independent review of this real candidate is not required to complete the spike walkthrough. This does not waive the registry's review gate or authorize promotion; the candidate remains quarantined.
+
+## Tool Calling
+
+`src/adapters/tool-calling.ts` exports `listTools()` and async `callTool(name, input)`.
+The 31 tool names, descriptions, and input DTOs are defined by
+`schemas/tool-calling.schema.json`. No approval, bootstrap, or fixture-font creation tool
+is exposed. Inputs are validated before service delegation; unknown tools and invalid
+DTOs return `FS_SCHEMA_INVALID` envelopes. All 21 mutating tools default to `dryRun: true`.
+Pass `dryRun: false` to apply; approval-gated operations also need the existing exact
+`approvalId`. Dry run does not waive an approval gate or other prerequisites.
+
+Existing authoring/evidence exceptions remain: Recipe forks, font quarantine/inspection,
+static checks, candidate fallback compilation, ordinary compilation, contact sheets, and
+review recording do not gain new approval gates. Candidate static checks still require
+the approved request receipt. Reviews remain independent evidence, never approvals.
+The adapter covers every public service operation, including candidate compilation,
+promotion targets, concatenation planning, grammar metrics, and historical replay.
+`bootstrap` and fixture-font creation remain CLI-only helpers.
+
+The CLI keeps its existing defaults. Add `--dry-run` to `candidate static-check`,
+`candidate compile`, `font inspect`, `review record`, `render chapter`, `render concat`,
+and `contact-sheet` to validate without writing. Font inspection dry runs validate the
+quarantine manifest without starting the inspector; rendering and contact-sheet dry runs
+validate the Plan (and rendering approval) without launching Chrome. `compile --dry-run`
+already suppresses Plan writes. `font promotion-target <candidate> --json` now exposes
+the service's read-only font promotion target. Applied font inspection envelopes correctly
+report `dryRun: false` because they write inspection reports.
+
+`fixtures/tool-calling/*.json` contains inputs, equivalent CLI arguments, and expected
+success, error codes, and mutation kinds. The test harness expands `$fixture` document
+references and synthetic approval tokens, copies the CLI package into a temporary directory,
+and resets isolated state between adapter and CLI calls. It compares complete envelopes,
+normalizing only evidence timestamps and their verified report hash, and checks filesystem
+snapshots for dry runs and refusals. The real registry and rendered films are untouched.
+
+    pnpm exec vitest run src/adapters/tool-calling.test.ts src/adapters/skill.test.ts src/adapters/cli.test.ts --maxWorkers=2
+
+The CLI terminal guard is tested directly without invoking the approval command. A30 requires
+exact request/execution/promotion commands and confirmations, a promotion-target call, and no
+approval command in the agent's executed transcript. The real walkthrough satisfies that
+contract and stops without promoting the candidate.
+
+M7 is implemented. Final Chrome-backed acceptance reports 30 pass, 0 fail, and 0 pending. The earlier first run failed A20 on a missing PSNR measurement, and the requested rerun passed it; both historical reports are retained locally under `out/evidence/m7-acceptance-*`.
+
+The optional 1.1.0 review package is `out/evidence/torn-reveal/1.1.0/review-package.md`. Runtime: 12/12 cases pass; painter evidence matches every approved output. Execution approval does not authorize promotion, and no promotion was performed.

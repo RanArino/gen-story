@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "implementedThrough": "M6",
+  "implementedThrough": "M7",
   "note": "Rows are proven by Vitest tests whose names contain the row tag, for example [A04]. Rows above implementedThrough report pending, never fail. A row whose requirement is not available reports pending with the reason.",
   "rows": [
     {

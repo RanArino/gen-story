@@ -1,0 +1,16 @@
+{
+  "tool": "catalog_search",
+  "input": {
+    "query": "no-such-capability"
+  },
+  "cli": [
+    "catalog",
+    "search",
+    "no-such-capability"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "tool": "recipe_fork",
+  "input": {
+    "source": {
+      "id": "org.local.test-baseline",
+      "revision": "r1"
+    },
+    "id": "org.local.tool-fork",
+    "dryRun": false
+  },
+  "cli": [
+    "recipe",
+    "fork",
+    "org.local.test-baseline",
+    "r1",
+    "--as",
+    "org.local.tool-fork",
+    "--apply"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": [
+      "recipe.fork"
+    ]
+  }
+}
