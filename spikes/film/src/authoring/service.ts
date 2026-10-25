@@ -43,7 +43,7 @@ import { Registry } from "../registry/registry.js";
 import { recordReview, type ReviewInput } from "../registry/reviews.js";
 import { renderConcat } from "../render/concat.js";
 import { contactSheet } from "../render/contact-sheet.js";
-import { loadChapterPlan, renderChapter, type RenderChapterInput, type RenderDeps } from "../render/render-chapter.js";
+import { loadChapterPlan, loadConcatPlan, renderChapter, type RenderChapterInput, type RenderDeps } from "../render/render-chapter.js";
 import { compilerIdentity, painterIdentity } from "./identity.js";
 
 export interface ServiceDeps {
@@ -311,10 +311,11 @@ export function createService(deps: ServiceDeps) {
       });
     },
 
-    candidateStaticCheck(input: { candidate: string }) {
-      return envelope("candidate.staticCheck", false, () => {
-        const result = staticCheck(paths, registry, input.candidate);
-        return { result, hashes: { execution: result.executionDigest }, evidence: [`.state/quarantine/capabilities/${input.candidate}/static.json`, `.state/quarantine/capabilities/${input.candidate}/source.diff`] };
+    candidateStaticCheck(input: { candidate: string; dryRun?: boolean }) {
+      const dryRun = input.dryRun ?? false;
+      return envelope("candidate.staticCheck", dryRun, () => {
+        const result = staticCheck(paths, registry, input.candidate, !dryRun);
+        return { result, hashes: { execution: result.executionDigest }, evidence: dryRun ? [] : [`.state/quarantine/capabilities/${input.candidate}/static.json`, `.state/quarantine/capabilities/${input.candidate}/source.diff`] };
       });
     },
 
@@ -330,8 +331,9 @@ export function createService(deps: ServiceDeps) {
      * resolution (compatibility) under default options, then full Chapter compiles under
      * reducedMotion and forceLevel0 wherever the safety fallback replaces the candidate.
      */
-    candidateCompile(input: { candidate: string; treatment: FilmTreatment; chapters: FilmChapters }) {
-      return envelope("candidate.compile", false, () => {
+    candidateCompile(input: { candidate: string; treatment: FilmTreatment; chapters: FilmChapters; dryRun?: boolean }) {
+      const dryRun = input.dryRun ?? false;
+      return envelope("candidate.compile", dryRun, () => {
         const { entry, executionDigest, dir } = quarantinedEntry(paths, registry, input.candidate);
         const key = (m: CapabilityManifest) => `${m.id}@${m.version}`;
         const variants = ([{}, { reducedMotion: true }, { forceLevel0: true }] as CompileOptions[]).map((options) => {
@@ -357,8 +359,8 @@ export function createService(deps: ServiceDeps) {
           variants,
           createdAt: new Date().toISOString(),
         };
-        writeJson(`${dir}compile.json`, report);
-        return { result: report, hashes: { execution: executionDigest, report: digestOf(report) }, evidence: [`.state/quarantine/capabilities/${input.candidate}/compile.json`] };
+        if (!dryRun) writeJson(`${dir}compile.json`, report);
+        return { result: report, hashes: { execution: executionDigest, report: digestOf(report) }, evidence: dryRun ? [] : [`.state/quarantine/capabilities/${input.candidate}/compile.json`] };
       });
     },
 
@@ -427,8 +429,15 @@ export function createService(deps: ServiceDeps) {
       });
     },
 
-    fontInspect(input: { candidate: string }) {
-      return envelope("font.inspect", true, () => {
+    fontInspect(input: { candidate: string; dryRun?: boolean }) {
+      return envelope("font.inspect", input.dryRun ?? false, () => {
+        if (input.dryRun) {
+          const file = `${paths.state}quarantine/fonts/${input.candidate}/manifest.json`;
+          if (!existsSync(file)) fail("FS_SCHEMA_INVALID", "/candidate", `${input.candidate} does not exist`);
+          const errors = validateSchema("urn:film-spike:font-asset-manifest", readJson(file));
+          if (errors.length) throw new FilmFailure(errors);
+          return {};
+        }
         const result = inspectFont(paths, registry, input.candidate, samples());
         if (result.errors.length) throw new FilmFailure(result.errors);
         return {
@@ -493,9 +502,11 @@ export function createService(deps: ServiceDeps) {
       });
     },
 
-    reviewRecord(input: ReviewInput) {
-      return envelope("review.record", false, () => {
-        const review = recordReview(paths.state, input);
+    reviewRecord(input: ReviewInput & { dryRun?: boolean }) {
+      const { dryRun = false, ...reviewInput } = input;
+      return envelope("review.record", dryRun, () => {
+        const review = recordReview(paths.state, reviewInput, undefined, !dryRun);
+        if (dryRun) return {};
         return { result: review, mutations: [{ kind: "review.record", target: review.id, beforeDigest: null, afterDigest: digestOf(review) }] };
       });
     },
@@ -637,8 +648,13 @@ export function createService(deps: ServiceDeps) {
      * Renders one Chapter Plan into a verified artifact. Requires a timing approval bound to the
      * Plan's proposal digest; reuses the fingerprint cache unless `bypassCache`.
      */
-    renderChapter(input: RenderChapterInput) {
-      return envelopeAsync("render.chapter", false, async () => {
+    renderChapter(input: RenderChapterInput & { dryRun?: boolean }) {
+      return envelopeAsync("render.chapter", input.dryRun ?? false, async () => {
+        if (input.dryRun) {
+          const plan = loadChapterPlan(paths, input.planFile);
+          requireApproval(paths.state, input.approvalId, "timing", plan.timing.proposalDigest);
+          return { hashes: { plan: planDigest(plan) } as Record<string, string> };
+        }
         const r = await renderChapter(renderDeps, input);
         return {
           result: { artifact: r.artifact, cache: r.cache, samples: r.samples, blocked: r.blocked, fonts: r.fonts, servedFonts: r.server?.fonts ?? [], renderMs: r.renderMs },
@@ -690,8 +706,14 @@ export function createService(deps: ServiceDeps) {
     },
 
     /** Assembles the concatenated film. Requires a `concat` approval bound to the Plan digest. */
-    renderConcat(input: { planFile: string; approvalId?: string; outName?: string }) {
-      return envelopeAsync("render.concat", false, async () => {
+    renderConcat(input: { planFile: string; approvalId?: string; outName?: string; dryRun?: boolean }) {
+      return envelopeAsync("render.concat", input.dryRun ?? false, async () => {
+        if (input.dryRun) {
+          const plan = loadConcatPlan<ConcatPlan>(paths, input.planFile);
+          const digest = planDigest(plan);
+          requireApproval(paths.state, input.approvalId, "concat", digest);
+          return { hashes: { plan: digest } as Record<string, string> };
+        }
         const r = await renderConcat(renderDeps, input);
         return {
           result: { artifact: r.artifact, cache: r.cache, blocked: r.blocked, renderMs: r.renderMs },
@@ -704,8 +726,9 @@ export function createService(deps: ServiceDeps) {
     },
 
     /** Writes a 4x3 grid of the twelve sample frames of a Chapter Plan, drawn by the painter. */
-    contactSheet(input: { planFile: string; grayscale?: boolean }) {
-      return envelopeAsync("contactSheet", false, async () => {
+    contactSheet(input: { planFile: string; grayscale?: boolean; dryRun?: boolean }) {
+      return envelopeAsync("contactSheet", input.dryRun ?? false, async () => {
+        if (input.dryRun) return { hashes: { plan: planDigest(loadChapterPlan(paths, input.planFile)) } as Record<string, string> };
         const r = await contactSheet(renderDeps, input.planFile, { grayscale: input.grayscale ?? false });
         return { result: r, hashes: { plan: r.planDigest, sheet: r.sha256 }, evidence: [r.file] };
       });

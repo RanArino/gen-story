@@ -1,3 +1,4 @@
+import { requireApprovalTerminal } from "./approval-terminal.js";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -117,8 +118,10 @@ async function approve(args: Parsed): Promise<number> {
     console.error(`usage: film-spike approve <${APPROVAL_KINDS.join("|")}> <sha256:digest> [--subject <text>]`);
     return 2;
   }
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    console.error("approve requires an interactive terminal; approvals cannot be scripted or delegated.");
+  try {
+    requireApprovalTerminal(process.stdin.isTTY, process.stdout.isTTY);
+  } catch (error) {
+    console.error((error as Error).message);
     return 1;
   }
   const subject = str(args.flags.subject) ?? digest;
@@ -162,10 +165,10 @@ async function candidate(args: Parsed): Promise<number> {
   const approvalId = str(args.flags.approval);
   if (sub === "scaffold" && value) return report(service.candidateScaffold({ request: readArg<CapabilityRequest>(value, "request"), ...(approvalId ? { approvalId } : {}), dryRun: !args.flags.apply }), args);
   if (sub === "run" && value) return report(service.candidateRun({ candidate: value, ...(approvalId ? { approvalId } : {}), dryRun: !args.flags.apply }), args);
-  if (sub === "static-check" && value) return report(service.candidateStaticCheck({ candidate: value }), args);
+  if (sub === "static-check" && value) return report(service.candidateStaticCheck({ candidate: value, dryRun: args.flags["dry-run"] === true }), args);
   if (sub === "compile" && value) {
     const { treatment, chapters } = compileArgs(args);
-    return report(service.candidateCompile({ candidate: value, treatment, chapters }), args, (env) =>
+    return report(service.candidateCompile({ candidate: value, treatment, chapters, dryRun: args.flags["dry-run"] === true }), args, (env) =>
       (env.result as { variants: { options: object; active: string; compiled: boolean }[] }).variants.map((v) => `${JSON.stringify(v.options)}: ${v.active}${v.compiled ? " (compiled)" : " (resolved only)"}`),
     );
   }
@@ -194,7 +197,7 @@ function review(args: Parsed): number {
     console.error("usage: film-spike review record <sha256:digest> --subject <text> --reviewer <name> --verdict accept|reject --notes <text>");
     return 2;
   }
-  return report(service.reviewRecord({ subjectDigest, subject, reviewer, verdict, notes }), args, (env) => [`recorded ${(env.result as { id: string }).id}`]);
+  return report(service.reviewRecord({ subjectDigest, subject, reviewer, verdict, notes, dryRun: args.flags["dry-run"] === true }), args, (env) => env.dryRun ? [] : [`recorded ${(env.result as { id: string }).id}`]);
 }
 
 function font(args: Parsed): number {
@@ -211,9 +214,12 @@ function font(args: Parsed): number {
       ]);
     case "inspect":
       if (!a) break;
-      return report(service.fontInspect({ candidate: a }), args, (env) => [
+      return report(service.fontInspect({ candidate: a, dryRun: args.flags["dry-run"] === true }), args, (env) => env.dryRun ? [] : [
         `approve with: film-spike approve promotion ${(env.result as { subjectDigest: string }).subjectDigest} --subject ${a}`,
       ]);
+    case "promotion-target":
+      if (!a) break;
+      return report(service.fontPromotionTarget({ candidate: a }), args);
     case "promote":
       if (!a) break;
       return report(service.fontPromote({ candidate: a, ...(approvalId ? { approvalId } : {}), dryRun }), args);
@@ -343,13 +349,14 @@ async function render(args: Parsed): Promise<number> {
   const [sub, planFile] = args.positional;
   const approvalId = str(args.flags.approval);
   const lines = (e: ResultEnvelope) => {
+    if (e.dryRun) return [];
     const r = e.result as { cache: string; renderMs: number; artifact: { frames: number; runtimeMs: number } };
     return [`${r.artifact.frames} frames, ${r.artifact.runtimeMs} ms; cache ${r.cache}; ${(r.renderMs / 1000).toFixed(1)} s`];
   };
   if (sub === "chapter" && planFile) {
-    return report(await service.renderChapter({ planFile, ...(approvalId ? { approvalId } : {}), bypassCache: args.flags["no-cache"] === true }), args, lines);
+    return report(await service.renderChapter({ planFile, ...(approvalId ? { approvalId } : {}), bypassCache: args.flags["no-cache"] === true, dryRun: args.flags["dry-run"] === true }), args, lines);
   }
-  if (sub === "concat" && planFile) return report(await service.renderConcat({ planFile, ...(approvalId ? { approvalId } : {}) }), args, lines);
+  if (sub === "concat" && planFile) return report(await service.renderConcat({ planFile, ...(approvalId ? { approvalId } : {}), dryRun: args.flags["dry-run"] === true }), args, lines);
   console.error("usage: film-spike render chapter <plan> --approval <id> [--no-cache] | render concat <concat.plan.json> --approval <id>");
   return 2;
 }
@@ -377,7 +384,7 @@ async function sheet(args: Parsed): Promise<number> {
     console.error("usage: film-spike contact-sheet <plan> [--grayscale]");
     return 2;
   }
-  return report(await service.contactSheet({ planFile, grayscale: args.flags.grayscale === true }), args);
+  return report(await service.contactSheet({ planFile, grayscale: args.flags.grayscale === true, dryRun: args.flags["dry-run"] === true }), args);
 }
 
 const commands: Record<string, (args: Parsed) => number | Promise<number>> = {

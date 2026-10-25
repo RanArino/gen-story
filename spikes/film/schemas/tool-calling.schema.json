@@ -27,7 +27,13 @@
     "render.chapter",
     "render.concat",
     "contactSheet",
-    "review.record"
+    "review.record",
+    "candidate.compile",
+    "candidate.promotionTarget",
+    "font.promotionTarget",
+    "compileConcat",
+    "concatPlan",
+    "grammar"
   ],
   "$defs": {
     "catalog_search.request": {
@@ -117,10 +123,23 @@
       ],
       "properties": {
         "treatment": {
-          "type": "object"
+          "$ref": "urn:film-spike:film-treatment"
         },
         "chapters": {
-          "type": "object"
+          "$ref": "urn:film-spike:chapters"
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "forceLevel0": {
+              "type": "boolean"
+            },
+            "reducedMotion": {
+              "type": "boolean"
+            }
+          }
         }
       },
       "description": "Check Chapter timing feasibility before resolution."
@@ -137,10 +156,10 @@
       ],
       "properties": {
         "treatment": {
-          "type": "object"
+          "$ref": "urn:film-spike:film-treatment"
         },
         "chapters": {
-          "type": "object"
+          "$ref": "urn:film-spike:chapters"
         },
         "options": {
           "type": "object",
@@ -154,6 +173,13 @@
               "type": "boolean"
             }
           }
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "outName": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
         }
       },
       "description": "Compile one Resolved Render Plan per Chapter and a timing proposal."
@@ -165,34 +191,86 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "from",
-        "id",
-        "title",
-        "changes"
+        "source",
+        "id"
       ],
       "properties": {
-        "from": {
-          "$ref": "urn:film-spike:common#/$defs/recipeRevisionRef"
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            }
+          }
         },
         "id": {
           "$ref": "urn:film-spike:common#/$defs/recipeId"
         },
+        "revision": {
+          "type": "string"
+        },
         "title": {
           "$ref": "urn:film-spike:common#/$defs/name"
         },
-        "changes": {
-          "type": "object"
+        "description": {
+          "type": "string"
+        },
+        "slots": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            },
+            "motion": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            },
+            "transition": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            },
+            "typography": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            },
+            "sound": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            },
+            "surface": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            }
+          }
+        },
+        "fonts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "caption": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            },
+            "title": {
+              "$ref": "urn:film-spike:common#/$defs/versionRef"
+            }
+          }
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:film-spike:common#/$defs/versionRef"
+          }
         },
         "dryRun": {
           "type": "boolean",
           "default": true
-        },
-        "approvalId": {
-          "type": "string",
-          "pattern": "^appr-[0-9a-f]{12}$"
         }
       },
-      "description": "Fork a Recipe revision into a new organization-scoped Recipe."
+      "description": "Fork a Recipe revision; authoring writes do not require approval."
     },
     "recipe_fork.response": {
       "$ref": "urn:film-spike:result-envelope"
@@ -205,7 +283,7 @@
       ],
       "properties": {
         "request": {
-          "$ref": "urn:film-spike:common#/$defs/slug"
+          "$ref": "urn:film-spike:capability-request"
         },
         "dryRun": {
           "type": "boolean",
@@ -219,22 +297,6 @@
       "description": "Create a quarantined candidate from an approved Capability Request."
     },
     "candidate_scaffold.response": {
-      "$ref": "urn:film-spike:result-envelope"
-    },
-    "candidate_staticCheck.request": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "candidate"
-      ],
-      "properties": {
-        "candidate": {
-          "$ref": "urn:film-spike:common#/$defs/slug"
-        }
-      },
-      "description": "Parse and check a candidate without importing it."
-    },
-    "candidate_staticCheck.response": {
       "$ref": "urn:film-spike:result-envelope"
     },
     "candidate_run.request": {
@@ -302,10 +364,6 @@
         "dryRun": {
           "type": "boolean",
           "default": true
-        },
-        "approvalId": {
-          "type": "string",
-          "pattern": "^appr-[0-9a-f]{12}$"
         }
       },
       "description": "Copy incoming font bytes and a draft manifest into quarantine."
@@ -322,6 +380,10 @@
       "properties": {
         "candidate": {
           "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
         }
       },
       "description": "Inspect a quarantined font in the contained process."
@@ -527,14 +589,22 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "plan"
+        "planFile",
+        "treatment",
+        "chapters"
       ],
       "properties": {
-        "plan": {
-          "type": "object"
+        "planFile": {
+          "type": "string"
+        },
+        "treatment": {
+          "$ref": "urn:film-spike:film-treatment"
+        },
+        "chapters": {
+          "$ref": "urn:film-spike:chapters"
         }
       },
-      "description": "Recompile from a Plan's pinned lock and compare digests."
+      "description": "Recompile a pinned Chapter Plan and compare its digest without rendering."
     },
     "replay.response": {
       "$ref": "urn:film-spike:result-envelope"
@@ -543,12 +613,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "plan"
+        "planFile"
       ],
       "properties": {
-        "plan": {
-          "type": "object"
-        },
         "dryRun": {
           "type": "boolean",
           "default": true
@@ -556,6 +623,15 @@
         "approvalId": {
           "type": "string",
           "pattern": "^appr-[0-9a-f]{12}$"
+        },
+        "planFile": {
+          "type": "string"
+        },
+        "bypassCache": {
+          "type": "boolean"
+        },
+        "outName": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
         }
       },
       "description": "Render and verify one Chapter MP4 from an approved Plan."
@@ -567,12 +643,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "plan"
+        "planFile"
       ],
       "properties": {
-        "plan": {
-          "type": "object"
-        },
         "dryRun": {
           "type": "boolean",
           "default": true
@@ -580,27 +653,17 @@
         "approvalId": {
           "type": "string",
           "pattern": "^appr-[0-9a-f]{12}$"
+        },
+        "planFile": {
+          "type": "string"
+        },
+        "outName": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
         }
       },
       "description": "Assemble the concatenated MP4 from cached Chapter artifacts."
     },
     "render_concat.response": {
-      "$ref": "urn:film-spike:result-envelope"
-    },
-    "contactSheet.request": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "plan"
-      ],
-      "properties": {
-        "plan": {
-          "type": "object"
-        }
-      },
-      "description": "Write a 12-frame contact sheet for a Plan."
-    },
-    "contactSheet.response": {
       "$ref": "urn:film-spike:result-envelope"
     },
     "review_record.request": {
@@ -631,11 +694,207 @@
         },
         "notes": {
           "$ref": "urn:film-spike:common#/$defs/plainText"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
         }
       },
       "description": "Record an independent review. This is not an approval."
     },
     "review_record.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "candidate_static_check.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "description": "Parse and check a candidate without importing it."
+    },
+    "candidate_static_check.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "contact_sheet.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planFile"
+      ],
+      "properties": {
+        "planFile": {
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "grayscale": {
+          "type": "boolean"
+        }
+      },
+      "description": "Write a 12-frame contact sheet for a Plan."
+    },
+    "contact_sheet.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "candidate_compile.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate",
+        "treatment",
+        "chapters"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "treatment": {
+          "$ref": "urn:film-spike:film-treatment"
+        },
+        "chapters": {
+          "$ref": "urn:film-spike:chapters"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "description": "Check candidate compatibility and compile safety fallbacks without running candidate code."
+    },
+    "candidate_compile.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "candidate_promotion_target.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        }
+      },
+      "description": "Read the digest requiring independent review and promotion approval."
+    },
+    "candidate_promotion_target.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "font_promotion_target.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        }
+      },
+      "description": "Read the inspected font promotion target."
+    },
+    "font_promotion_target.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "compile_concat.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "treatment",
+        "plansDir"
+      ],
+      "properties": {
+        "treatment": {
+          "$ref": "urn:film-spike:film-treatment"
+        },
+        "plansDir": {
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "description": "Compile the concatenation Plan from cached Chapter artifacts."
+    },
+    "compile_concat.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "concat_plan.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "treatment",
+        "artifacts"
+      ],
+      "properties": {
+        "treatment": {
+          "$ref": "urn:film-spike:film-treatment"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "plan",
+              "artifact"
+            ],
+            "properties": {
+              "plan": {
+                "$ref": "urn:film-spike:resolved-render-plan"
+              },
+              "artifact": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "files"
+                ],
+                "properties": {
+                  "files": {
+                    "$ref": "urn:film-spike:chapter-artifact#/properties/files"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "description": "Build a concatenation Plan from supplied Chapter Plans and artifact metadata."
+    },
+    "concat_plan.response": {
+      "$ref": "urn:film-spike:result-envelope"
+    },
+    "grammar.request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plansDirs"
+      ],
+      "properties": {
+        "plansDirs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Read editing-grammar metrics from Chapter Plan directories."
+    },
+    "grammar.response": {
       "$ref": "urn:film-spike:result-envelope"
     }
   }

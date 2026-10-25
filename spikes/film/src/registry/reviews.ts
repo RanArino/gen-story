@@ -8,7 +8,7 @@ import { writeJson } from "../paths.js";
 
 export type ReviewInput = Pick<ReviewRecord, "subjectDigest" | "subject" | "reviewer" | "verdict" | "notes">;
 
-export function recordReview(stateDir: string, input: ReviewInput, now = new Date().toISOString()): ReviewRecord {
+export function recordReview(stateDir: string, input: ReviewInput, now = new Date().toISOString(), persist = true): ReviewRecord {
   const record: ReviewRecord = {
     schema: "film.review-record@1",
     id: `rev-${sha256Hex(`${input.subjectDigest}|${input.reviewer}|${now}`).slice(0, 12)}`,
@@ -17,7 +17,7 @@ export function recordReview(stateDir: string, input: ReviewInput, now = new Dat
   };
   const errors = validateSchema("urn:film-spike:review-record", record);
   if (errors.length) fail("FS_SCHEMA_INVALID", errors[0]!.path, errors[0]!.message);
-  writeJson(`${stateDir}reviews/${record.id}.json`, record);
+  if (persist) writeJson(`${stateDir}reviews/${record.id}.json`, record);
   return record;
 }
 
