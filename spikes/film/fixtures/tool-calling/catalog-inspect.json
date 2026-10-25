@@ -1,0 +1,18 @@
+{
+  "tool": "catalog_inspect",
+  "input": {
+    "id": "film.transition.dissolve",
+    "version": "1.0.0"
+  },
+  "cli": [
+    "catalog",
+    "inspect",
+    "film.transition.dissolve",
+    "1.0.0"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "film.cut@1",
+  "id": "memory-board-c1",
+  "name": "Morning, pinned cards",
+  "description": "Cards settle on the board with gentle parallax.",
+  "treatment": {
+    "id": "memory-board",
+    "revision": 1
+  },
+  "chapterId": "c1",
+  "settings": {
+    "motionAmount": 0.5,
+    "visualIntensity": 0.5,
+    "sfxLevel": 0.5
+  }
+}

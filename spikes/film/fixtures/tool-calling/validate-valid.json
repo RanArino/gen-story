@@ -1,0 +1,19 @@
+{
+  "tool": "validate",
+  "input": {
+    "kind": "story-graph",
+    "document": {
+      "$fixture": "project/story-graph.json"
+    }
+  },
+  "cli": [
+    "validate",
+    "story-graph",
+    "fixtures/project/story-graph.json"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "schema": "film.capability-manifest@1",
+  "id": "film.transition.torn-reveal",
+  "version": "1.0.0",
+  "kind": "transition",
+  "level": 1,
+  "title": "Torn-paper reveal",
+  "description": "Reveal the incoming scene behind a deterministic jagged paper edge travelling left to right.",
+  "tags": [
+    "torn",
+    "paper",
+    "jagged",
+    "reveal"
+  ],
+  "rendererApi": "film-capability@1",
+  "layer": 0,
+  "media": {
+    "types": [],
+    "min": 0,
+    "max": 0
+  },
+  "profiles": [
+    "landscape-1080p30@1"
+  ],
+  "aspectRatios": [
+    "16:9"
+  ],
+  "analysis": [],
+  "params": {
+    "jaggedness": {
+      "type": "number",
+      "default": 0.012,
+      "min": 0.004,
+      "max": 0.04,
+      "unit": "ratio",
+      "scope": "chapter",
+      "authority": "agent-settable",
+      "description": "Horizontal edge irregularity as a fraction of frame width."
+    }
+  },
+  "requires": [],
+  "incompatibleWith": [],
+  "determinism": {
+    "seeded": true
+  },
+  "motionLevel": "moderate",
+  "budgets": {
+    "maxPrimitives": 0,
+    "maxKeyframes": 32,
+    "maxAudioEvents": 0
+  },
+  "reducedMotion": "fallback",
+  "fallback": {
+    "id": "film.transition.dissolve",
+    "version": "1.0.0"
+  },
+  "timing": {
+    "overlapMs": 700,
+    "gapMs": 0
+  },
+  "assets": [],
+  "fixtures": [
+    {
+      "name": "landscape",
+      "sourceAspect": "16:9",
+      "caption": "ja"
+    },
+    {
+      "name": "square",
+      "sourceAspect": "1:1",
+      "caption": "en"
+    },
+    {
+      "name": "portrait",
+      "sourceAspect": "2:3",
+      "caption": "ja"
+    },
+    {
+      "name": "ultrawide",
+      "sourceAspect": "21:9",
+      "caption": "empty"
+    }
+  ],
+  "permissions": [],
+  "provenance": {
+    "author": "Codex under approved request",
+    "source": "request sha256:3426c66f7926a9c2348751dadbcbd8f9e0d6deb30c9fec62b60c05403ae26fa5",
+    "license": "internal"
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "expect": {
+    "path": "/fonts/0/ref"
+  },
+  "document": {
+    "schema": "film.film-style-recipe@1",
+    "id": "org.local.example",
+    "revision": "r1",
+    "title": "Example recipe",
+    "description": "Schema example; digests are placeholders.",
+    "scope": "organization",
+    "owner": "local",
+    "lineage": null,
+    "capabilities": [
+      {
+        "slot": "layout",
+        "ref": {
+          "id": "film.layout.full-frame",
+          "version": "1.0.0",
+          "digest": "sha256:9dba450b65a027f5ed176ba4de6198909cd6a68de60cb1dbfc3390ba9e824ae2"
+        }
+      },
+      {
+        "slot": "motion",
+        "ref": {
+          "id": "film.motion.static",
+          "version": "1.0.0",
+          "digest": "sha256:84cade9854c45bbd8cf3993b467c4012e127617cbf0b7757527084144befe6f5"
+        }
+      },
+      {
+        "slot": "transition",
+        "ref": {
+          "id": "film.transition.dissolve",
+          "version": "1.0.0",
+          "digest": "sha256:dcba536a1352a05fa05c1b05d843cdb32ee9123b7a819b68afc173f50060b8ad"
+        }
+      },
+      {
+        "slot": "typography",
+        "ref": {
+          "id": "film.typography.subtitle",
+          "version": "1.0.0",
+          "digest": "sha256:d5bdd1c1d6023fe96643ccc3141a70ce82e688b5c311b69a7586eeae8861f004"
+        }
+      },
+      {
+        "slot": "sound",
+        "ref": {
+          "id": "film.sound.intentional-silence",
+          "version": "1.0.0",
+          "digest": "sha256:5e860692484809e85795e9677f5adfb5ea6877026c158f6372033aaa80f9b60f"
+        }
+      },
+      {
+        "slot": "surface",
+        "ref": {
+          "id": "film.surface.no-surface",
+          "version": "1.0.0",
+          "digest": "sha256:6ba70df7ed55ccacd23c03ec087c165f8c4b3bafc1c3ddf0803fabfc03be2966"
+        }
+      }
+    ],
+    "effects": [],
+    "params": {
+      "film.transition.dissolve": {
+        "curve": "linear"
+      }
+    },
+    "fonts": [
+      {
+        "role": "caption",
+        "ref": "Noto Sans JP"
+      }
+    ],
+    "palette": {
+      "family": "warm-film",
+      "background": "#101014",
+      "text": "#f6f1e7",
+      "accent": "#e8b26a",
+      "scrim": "#000000"
+    },
+    "curves": {
+      "energy": 0.3,
+      "intimacy": 0.6,
+      "openness": 0.5,
+      "warmth": 0.6,
+      "stillness": 0.7
+    },
+    "timing": {
+      "preferredSceneMs": 7000,
+      "minSceneMs": 2500,
+      "maxSceneMs": 14000,
+      "minHoldMs": 1500,
+      "beatQuantized": false
+    },
+    "chapterAllowlist": [
+      {
+        "field": "pacing",
+        "min": 0.8,
+        "max": 1.25
+      },
+      {
+        "field": "motionAmount",
+        "min": 0,
+        "max": 0.8
+      }
+    ],
+    "output": {
+      "profile": "landscape-1080p30@1"
+    }
+  }
+}

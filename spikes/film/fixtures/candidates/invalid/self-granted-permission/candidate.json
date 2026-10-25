@@ -1,0 +1,13 @@
+{
+  "expect": {
+    "gate": "static",
+    "code": "FS_PERMISSION_FORBIDDEN"
+  },
+  "manifest": {
+    "id": "film.transition.self-granted-permission",
+    "version": "1.0.0",
+    "permissions": [
+      "network"
+    ]
+  }
+}

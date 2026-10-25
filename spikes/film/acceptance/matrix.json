@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "implementedThrough": "M7",
+  "note": "Rows are proven by Vitest tests whose names contain the row tag, for example [A04]. Rows above implementedThrough report pending, never fail. A row whose requirement is not available reports pending with the reason.",
+  "rows": [
+    {
+      "id": "A01",
+      "title": "Valid fixtures pass",
+      "scope": "define schemas and valid and invalid examples",
+      "milestone": "M1",
+      "check": {
+        "vitestTag": "[A01]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A02",
+      "title": "Invalid fixtures fail correctly",
+      "scope": "define schemas and valid and invalid examples",
+      "milestone": "M1",
+      "check": {
+        "vitestTag": "[A02]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A03",
+      "title": "Recipes stay code-free",
+      "scope": "Film Style Recipes contain no code, CSS, paths, URLs, floating versions, extends chains, or font-family strings",
+      "milestone": "M1",
+      "check": {
+        "vitestTag": "[A03]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A04",
+      "title": "User durations preserved",
+      "scope": "preserve exact operator-entered scene durations and keep each limited Chapter within its approved limit",
+      "milestone": "M3",
+      "check": {
+        "vitestTag": "[A04]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A05",
+      "title": "Over-constrained Chapter blocked",
+      "scope": "refuse to start when fixed values cannot fit the Chapter limit",
+      "milestone": "M3",
+      "check": {
+        "vitestTag": "[A05]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A06",
+      "title": "Limits honoured",
+      "scope": "honour removed limits and transition minimums without changing user values",
+      "milestone": "M3",
+      "check": {
+        "vitestTag": "[A06]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A07",
+      "title": "Resolved durations need approval",
+      "scope": "expose every agent-resolved duration for approval",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A07]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A08",
+      "title": "Each Chapter MP4 verified",
+      "scope": "produce inspectable metadata and file artifacts for every Chapter",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A08]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A09",
+      "title": "Concatenation verified",
+      "scope": "add one approved overall title, briefly darken between Chapters, and assemble from cached Chapter outputs",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A09]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A10",
+      "title": "BGM continuous across joins",
+      "scope": "retain the shared BGM across the concatenated film",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A10]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A11",
+      "title": "One-scene change rebuilds one Chapter",
+      "scope": "a one-scene revision invalidates only the containing Chapter plus the concatenation",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A11]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A12",
+      "title": "Artifact metadata complete",
+      "scope": "produce inspectable metadata for every Chapter artifact",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A12]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A13",
+      "title": "Safe crop",
+      "scope": "subject-aware cropping keeps every scene's subject in frame",
+      "milestone": "M3",
+      "check": {
+        "vitestTag": "[A13]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A14",
+      "title": "Text readable",
+      "scope": "captions meet contrast and title-safe requirements",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A14]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A15",
+      "title": "Japanese glyphs covered",
+      "scope": "a missing glyph is a preflight error; fonts are registered and pinned",
+      "milestone": "M3",
+      "check": {
+        "vitestTag": "[A15]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A16",
+      "title": "Fonts offline and pinned",
+      "scope": "use identical pinned font bytes for preview and export",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A16]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A17",
+      "title": "Reduced motion",
+      "scope": "reduced-motion behaviour and safety fallbacks are materialized by the compiler",
+      "milestone": "M3",
+      "check": {
+        "vitestTag": "[A17]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A18",
+      "title": "Forced Level 0 still complete",
+      "scope": "outputs remain complete when optional capabilities are disabled",
+      "milestone": "M5",
+      "check": {
+        "vitestTag": "[A18]"
+      },
+      "requires": [
+        "chrome"
+      ]
+    },
+    {
+      "id": "A19",
+      "title": "Deterministic replay",
+      "scope": "deterministic replay in the pinned environment",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A19]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A20",
+      "title": "Preview matches final",
+      "scope": "preview and export consume the same Plan",
+      "milestone": "M4",
+      "check": {
+        "vitestTag": "[A20]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A21",
+      "title": "Three Cuts differ in grammar",
+      "scope": "three outputs differ in grammar without three renderer implementations",
+      "milestone": "M5",
+      "check": {
+        "vitestTag": "[A21]"
+      },
+      "requires": [
+        "operator-fonts"
+      ]
+    },
+    {
+      "id": "A22",
+      "title": "Recipe variation without code",
+      "scope": "a new Recipe with a different typography Capability and font renders without source changes",
+      "milestone": "M5",
+      "check": {
+        "vitestTag": "[A22]"
+      },
+      "requires": [
+        "operator-fonts"
+      ]
+    },
+    {
+      "id": "A23",
+      "title": "Chapters share identity, vary within bounds",
+      "scope": "Chapters share worldview and BGM and vary only within the allowlist",
+      "milestone": "M5",
+      "check": {
+        "vitestTag": "[A23]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A24",
+      "title": "Font promotion",
+      "scope": "imported font bytes stay quarantined until contained inspection and explicit promotion",
+      "milestone": "M2",
+      "check": {
+        "vitestTag": "[A24]"
+      },
+      "requires": [
+        "operator-fonts"
+      ]
+    },
+    {
+      "id": "A25",
+      "title": "Bad fonts stay out",
+      "scope": "version or digest collisions and invalid fonts fail and never reach the catalog",
+      "milestone": "M2",
+      "check": {
+        "vitestTag": "[A25]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A26",
+      "title": "Torn-reveal lifecycle",
+      "scope": "one quarantined-to-promoted Capability path",
+      "milestone": "M6",
+      "check": {
+        "vitestTag": "[A26]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A27",
+      "title": "Bad candidates blocked",
+      "scope": "keep unpromoted code unreachable from Film compilation",
+      "milestone": "M6",
+      "check": {
+        "vitestTag": "[A27]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A28",
+      "title": "Historical replay",
+      "scope": "preserve exact historical dependencies",
+      "milestone": "M6",
+      "check": {
+        "vitestTag": "[A28]"
+      },
+      "requires": [
+        "chrome",
+        "ffmpeg"
+      ]
+    },
+    {
+      "id": "A29",
+      "title": "Tool Calling conformance",
+      "scope": "pass the Tool Calling adapter-conformance fixtures against the same authoring service",
+      "milestone": "M7",
+      "check": {
+        "vitestTag": "[A29]"
+      },
+      "requires": []
+    },
+    {
+      "id": "A30",
+      "title": "Skill walkthrough",
+      "scope": "a repository-owned Capability Authoring Skill orchestrates the typed service",
+      "milestone": "M7",
+      "check": {
+        "vitestTag": "[A30]"
+      },
+      "requires": []
+    }
+  ]
+}

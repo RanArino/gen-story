@@ -1,0 +1,21 @@
+{
+  "expect": {
+    "path": "/checks"
+  },
+  "document": {
+    "schema": "film.validation-report@1",
+    "subject": {
+      "entity": "font",
+      "id": "font.fixture-latin",
+      "version": "1.0.0",
+      "digest": "sha256:62c66a7a5dd70c3146618063c344e531e6d4b59e379808443ce962b3abd63c5a"
+    },
+    "gate": "font-inspection",
+    "ok": true,
+    "checks": [],
+    "toolchain": {
+      "node": "v25.2.1"
+    },
+    "createdAt": "2026-10-21T00:00:00Z"
+  }
+}

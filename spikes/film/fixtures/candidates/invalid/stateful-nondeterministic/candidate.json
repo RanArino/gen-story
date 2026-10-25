@@ -1,0 +1,10 @@
+{
+  "expect": {
+    "gate": "run",
+    "code": "FS_NONDETERMINISTIC"
+  },
+  "manifest": {
+    "id": "film.transition.stateful-nondeterministic",
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "film.cut@1",
+  "id": "memory-board-c2",
+  "name": "Dusk, livelier board",
+  "description": "More parallax, a stronger paper tone, and louder tactile hits within the allowlist.",
+  "treatment": {
+    "id": "memory-board",
+    "revision": 1
+  },
+  "chapterId": "c2",
+  "settings": {
+    "motionAmount": 0.75,
+    "visualIntensity": 0.8,
+    "sfxLevel": 0.7
+  }
+}

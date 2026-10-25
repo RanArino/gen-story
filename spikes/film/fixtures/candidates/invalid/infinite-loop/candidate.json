@@ -1,0 +1,10 @@
+{
+  "expect": {
+    "gate": "run",
+    "code": "FS_RESOURCE_CEILING"
+  },
+  "manifest": {
+    "id": "film.transition.infinite-loop",
+    "version": "1.0.0"
+  }
+}

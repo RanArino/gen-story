@@ -1,0 +1,17 @@
+{
+  "tool": "candidate_static_check",
+  "input": {
+    "candidate": "tool-candidate"
+  },
+  "cli": [
+    "candidate",
+    "static-check",
+    "tool-candidate",
+    "--dry-run"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

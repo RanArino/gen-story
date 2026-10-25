@@ -1,0 +1,19 @@
+{
+  "tool": "render_chapter",
+  "input": {
+    "planFile": "out/plans/test-baseline/c1.plan.json"
+  },
+  "cli": [
+    "render",
+    "chapter",
+    "out/plans/test-baseline/c1.plan.json",
+    "--dry-run"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": [
+      "FS_APPROVAL_REQUIRED"
+    ],
+    "mutationKinds": []
+  }
+}

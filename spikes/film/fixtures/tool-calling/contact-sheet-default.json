@@ -1,0 +1,16 @@
+{
+  "tool": "contact_sheet",
+  "input": {
+    "planFile": "out/plans/test-baseline/c1.plan.json"
+  },
+  "cli": [
+    "contact-sheet",
+    "out/plans/test-baseline/c1.plan.json",
+    "--dry-run"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

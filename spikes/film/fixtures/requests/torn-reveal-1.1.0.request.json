@@ -1,0 +1,26 @@
+{
+  "schema": "film.capability-request@1",
+  "id": "torn-reveal-1-1-0",
+  "title": "Torn-paper reveal 1.1.0 with a stronger default edge",
+  "problem": "The 1.0.0 default jaggedness (0.012 of frame width) reads as subtle at contact-sheet scale; publish 1.1.0 with default 0.024 under the same bounds, leaving 1.0.0 pinned Plans unchanged.",
+  "kind": "transition",
+  "proposed": {
+    "id": "film.transition.torn-reveal",
+    "version": "1.1.0"
+  },
+  "catalogSearch": {
+    "queries": [
+      "torn"
+    ],
+    "whyNotRecipe": "Only torn-reveal@1.0.0 matches; a Recipe can set jaggedness per Recipe but cannot change the Capability default that the plan requires 1.1.0 to change."
+  },
+  "requester": {
+    "kind": "agent",
+    "name": "Codex M6 implementation"
+  },
+  "acceptance": [
+    "Same implementation behaviour as 1.0.0 with default jaggedness 0.024 (bounds 0.004-0.04).",
+    "Pass the same contained fixtures, fallback compile, and painter evidence gates as 1.0.0.",
+    "After promotion, the pinned 1.0.0 memory-torn Plans replay with unchanged Plan digests and painter frame hashes, and a Plan pinning a version removed from a scratch registry copy fails with FS_REPLAY_MISSING_VERSION."
+  ]
+}

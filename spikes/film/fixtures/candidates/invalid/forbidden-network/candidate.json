@@ -1,0 +1,10 @@
+{
+  "expect": {
+    "gate": "static",
+    "code": "FS_FORBIDDEN_GLOBAL"
+  },
+  "manifest": {
+    "id": "film.transition.forbidden-network",
+    "version": "1.0.0"
+  }
+}

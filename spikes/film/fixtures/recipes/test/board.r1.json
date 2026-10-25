@@ -1,0 +1,135 @@
+{
+  "schema": "film.film-style-recipe@1",
+  "id": "org.local.test-board",
+  "revision": "r1",
+  "title": "Test board",
+  "description": "Compiler test Recipe; not one of the three spike Cuts.",
+  "scope": "organization",
+  "owner": "local",
+  "lineage": null,
+  "capabilities": [
+    {
+      "slot": "layout",
+      "ref": {
+        "id": "film.layout.memory-board",
+        "version": "1.0.0",
+        "digest": "sha256:9a9547075fec3a8d32295d81f0b988af15649340a9a386620fafc45be8f14b86"
+      }
+    },
+    {
+      "slot": "motion",
+      "ref": {
+        "id": "film.motion.parallax-cards",
+        "version": "1.0.0",
+        "digest": "sha256:a3534006eb9a485764db10e7d070f1511b5b9cf27617ce89f9b5aa2549ec8fa2"
+      }
+    },
+    {
+      "slot": "transition",
+      "ref": {
+        "id": "film.transition.card-slide",
+        "version": "1.0.0",
+        "digest": "sha256:61b0bb7d83b51b91a2157a83a0bfadea40d9fce301b5b7a73151d73e3305d179"
+      }
+    },
+    {
+      "slot": "typography",
+      "ref": {
+        "id": "film.typography.editorial-note",
+        "version": "1.0.0",
+        "digest": "sha256:ff746ff506403d97dafc97a447787f82926ba90d723c50800ea5c468ab61151e"
+      }
+    },
+    {
+      "slot": "sound",
+      "ref": {
+        "id": "film.sound.ambience-led",
+        "version": "1.0.0",
+        "digest": "sha256:85820a2d0393775b4d97a1cc31e2b2833187106363350341062cea177158d797"
+      }
+    },
+    {
+      "slot": "surface",
+      "ref": {
+        "id": "film.surface.paper-tone",
+        "version": "1.0.0",
+        "digest": "sha256:60003811ab71339281bb22c06ccb0f10ffd793fd573b3a96dca087eb95593a8e"
+      }
+    }
+  ],
+  "effects": [],
+  "params": {
+    "film.sound.ambience-led": {
+      "hits": true
+    }
+  },
+  "fonts": [
+    {
+      "role": "caption",
+      "ref": {
+        "id": "font.fixture-sans-jp",
+        "version": "1.0.0",
+        "digest": "sha256:f859e98d7d1da038ed80d68800740c73f9024fc9f62e366da8b248e84b736df5"
+      }
+    },
+    {
+      "role": "title",
+      "ref": {
+        "id": "font.fixture-serif-jp",
+        "version": "1.0.0",
+        "digest": "sha256:a6e78c49b10c119e2d68e91ae2620d2c7934392c7f9b324ecfabd2cb4b3919b5"
+      }
+    }
+  ],
+  "palette": {
+    "family": "warm-film",
+    "background": "#101014",
+    "text": "#f6f1e7",
+    "accent": "#e8b26a",
+    "scrim": "#000000"
+  },
+  "curves": {
+    "energy": 0.3,
+    "intimacy": 0.6,
+    "openness": 0.5,
+    "warmth": 0.6,
+    "stillness": 0.7
+  },
+  "timing": {
+    "preferredSceneMs": 7000,
+    "minSceneMs": 2500,
+    "maxSceneMs": 14000,
+    "minHoldMs": 1500,
+    "beatQuantized": false
+  },
+  "chapterAllowlist": [
+    {
+      "field": "pacing",
+      "min": 0.8,
+      "max": 1.25
+    },
+    {
+      "field": "motionAmount",
+      "min": 0,
+      "max": 0.8
+    },
+    {
+      "field": "emphasis",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "field": "sfxLevel",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "field": "visualIntensity",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "output": {
+    "profile": "landscape-1080p30@1"
+  }
+}

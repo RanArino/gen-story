@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:common",
+  "title": "Shared definitions for the film spike schemas",
+  "$defs": {
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 },
+    "localId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "token": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 32 },
+    "paramName": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9]{0,31}$" },
+    "capabilityKind": { "enum": ["layout", "motion", "transition", "typography", "sound", "surface", "effect", "connection"] },
+    "requiredSlot": { "enum": ["layout", "motion", "transition", "typography", "sound", "surface"] },
+    "chapterField": { "enum": ["pacing", "motionAmount", "emphasis", "sfxLevel", "visualIntensity"] },
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^film\\.(layout|motion|transition|typography|sound|surface|effect|connection)\\.[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 96
+    },
+    "fontId": { "type": "string", "pattern": "^font\\.[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 96 },
+    "recipeId": { "type": "string", "pattern": "^(system|org\\.local)\\.[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 96 },
+    "recipeRevision": { "type": "string", "pattern": "^r[1-9][0-9]*$" },
+    "profileId": { "enum": ["landscape-1080p30@1"] },
+    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$" },
+    "errorCode": { "type": "string", "pattern": "^FS_[A-Z0-9_]+$" },
+    "mediaAsset": { "type": "string", "pattern": "^(images|sounds)/[a-z0-9][a-z0-9-]*\\.(jpg|png|wav)$" },
+    "fileName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "color": { "type": "string", "pattern": "^#[0-9a-f]{6}([0-9a-f]{2})?$" },
+    "ms": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+    "unit": { "type": "number", "minimum": 0, "maximum": 1 },
+    "plainText": {
+      "type": "string",
+      "maxLength": 2000,
+      "not": { "pattern": "([A-Za-z][A-Za-z0-9+.-]*://|[<>{}`$\\\\]|\\.\\./|^/|^~)" }
+    },
+    "name": { "allOf": [{ "$ref": "#/$defs/plainText" }, { "minLength": 1, "maxLength": 120 }] },
+    "paramValue": {
+      "oneOf": [{ "type": "number" }, { "type": "boolean" }, { "$ref": "#/$defs/token" }]
+    },
+    "exactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "digest"],
+      "properties": {
+        "id": { "anyOf": [{ "$ref": "#/$defs/capabilityId" }, { "$ref": "#/$defs/fontId" }] },
+        "version": { "$ref": "#/$defs/semver" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "capabilityRef": {
+      "allOf": [{ "$ref": "#/$defs/exactRef" }, { "properties": { "id": { "$ref": "#/$defs/capabilityId" } } }]
+    },
+    "fontRef": {
+      "allOf": [{ "$ref": "#/$defs/exactRef" }, { "properties": { "id": { "$ref": "#/$defs/fontId" } } }]
+    },
+    "versionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "anyOf": [{ "$ref": "#/$defs/capabilityId" }, { "$ref": "#/$defs/fontId" }] },
+        "version": { "$ref": "#/$defs/semver" }
+      }
+    },
+    "revisionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision"],
+      "properties": { "id": { "$ref": "#/$defs/slug" }, "revision": { "type": "integer", "minimum": 1 } }
+    },
+    "recipeRevisionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "digest"],
+      "properties": {
+        "id": { "$ref": "#/$defs/recipeId" },
+        "revision": { "$ref": "#/$defs/recipeRevision" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number", "minimum": 0 },
+        "h": { "type": "number", "minimum": 0 }
+      }
+    },
+    "unitRect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "$ref": "#/$defs/unit" },
+        "y": { "$ref": "#/$defs/unit" },
+        "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "curves": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["energy", "intimacy", "openness", "warmth", "stillness"],
+      "properties": {
+        "energy": { "$ref": "#/$defs/unit" },
+        "intimacy": { "$ref": "#/$defs/unit" },
+        "openness": { "$ref": "#/$defs/unit" },
+        "warmth": { "$ref": "#/$defs/unit" },
+        "stillness": { "$ref": "#/$defs/unit" }
+      }
+    },
+    "chapterSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pacing": { "type": "number", "minimum": 0.25, "maximum": 4 },
+        "motionAmount": { "$ref": "#/$defs/unit" },
+        "emphasis": { "$ref": "#/$defs/unit" },
+        "sfxLevel": { "$ref": "#/$defs/unit" },
+        "visualIntensity": { "$ref": "#/$defs/unit" }
+      }
+    },
+    "outputProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "widthPx", "heightPx", "fps", "video", "audio"],
+      "properties": {
+        "id": { "$ref": "#/$defs/profileId" },
+        "widthPx": { "const": 1920 },
+        "heightPx": { "const": 1080 },
+        "fps": { "const": 30 },
+        "video": { "const": "h264-high-yuv420p" },
+        "audio": { "const": "aac-48000-stereo" }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "path", "message", "disposition"],
+      "properties": {
+        "code": { "type": "string" },
+        "path": { "type": "string" },
+        "message": { "type": "string" },
+        "disposition": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["acceptedBy", "reason"],
+              "properties": { "acceptedBy": { "type": "string" }, "reason": { "type": "string" } }
+            }
+          ]
+        }
+      }
+    },
+    "assetDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "digest"],
+      "properties": { "name": { "$ref": "#/$defs/slug" }, "digest": { "$ref": "#/$defs/digest" } }
+    },
+    "mediaDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset", "sha256"],
+      "properties": { "asset": { "$ref": "#/$defs/mediaAsset" }, "sha256": { "$ref": "#/$defs/digest" } }
+    }
+  }
+}

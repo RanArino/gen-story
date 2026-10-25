@@ -1,0 +1,18 @@
+{
+  "tool": "candidate_promotion_target",
+  "input": {
+    "candidate": "tool-candidate"
+  },
+  "cli": [
+    "candidate",
+    "promotion-target",
+    "tool-candidate"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": [
+      "FS_SEMANTIC_INVALID"
+    ],
+    "mutationKinds": []
+  }
+}

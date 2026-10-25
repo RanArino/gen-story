@@ -1,0 +1,23 @@
+{
+  "name": "@gen-story/film-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.painter.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run --maxWorkers=2 --passWithNoTests",
+    "cli": "tsx src/adapters/cli.ts",
+    "prepare:media": "tsx src/media/prepare-media.ts",
+    "build:painter": "tsc -p tsconfig.painter.json",
+    "accept": "tsx src/acceptance/run.ts"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "fontkit": "2.0.4",
+    "puppeteer-core": "25.15.0"
+  },
+  "devDependencies": {
+    "@types/fontkit": "2.0.9"
+  }
+}

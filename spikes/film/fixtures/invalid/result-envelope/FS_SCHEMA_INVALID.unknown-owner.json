@@ -1,0 +1,26 @@
+{
+  "expect": {
+    "path": "/errors/0/owner"
+  },
+  "document": {
+    "ok": false,
+    "operation": "preflight",
+    "dryRun": true,
+    "errors": [
+      {
+        "code": "FS_PREFLIGHT_OVER_LIMIT",
+        "path": "/chapters/0",
+        "message": "over by 4000 ms",
+        "owner": "nobody",
+        "remediation": "Shorten scenes.",
+        "details": {
+          "overByMs": 4000
+        }
+      }
+    ],
+    "warnings": [],
+    "hashes": {},
+    "evidence": [],
+    "mutations": []
+  }
+}

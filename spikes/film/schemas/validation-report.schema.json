@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:validation-report",
+  "title": "Validation Report: the result of one gate (static, runtime, or font inspection) for exact bytes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "subject", "gate", "ok", "checks", "toolchain", "createdAt"],
+  "properties": {
+    "schema": { "const": "film.validation-report@1" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "id", "version", "digest"],
+      "properties": {
+        "entity": { "enum": ["capability", "font"] },
+        "id": { "anyOf": [{ "$ref": "urn:film-spike:common#/$defs/capabilityId" }, { "$ref": "urn:film-spike:common#/$defs/fontId" }] },
+        "version": { "$ref": "urn:film-spike:common#/$defs/semver" },
+        "digest": { "$ref": "urn:film-spike:common#/$defs/digest" }
+      }
+    },
+    "gate": { "enum": ["static", "runtime", "font-inspection"] },
+    "ok": { "type": "boolean" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "ok"],
+        "properties": {
+          "name": { "$ref": "urn:film-spike:common#/$defs/slug" },
+          "ok": { "type": "boolean" },
+          "code": { "$ref": "urn:film-spike:common#/$defs/errorCode" },
+          "path": { "type": "string" },
+          "message": { "type": "string", "maxLength": 2000 }
+        }
+      }
+    },
+    "data": { "type": "object" },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node"],
+      "properties": { "node": { "type": "string" } }
+    },
+    "createdAt": { "$ref": "urn:film-spike:common#/$defs/timestamp" }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "tool": "candidate_scaffold",
+  "input": {
+    "request": {
+      "$fixture": "requests/torn-reveal.request.json"
+    },
+    "dryRun": false
+  },
+  "cli": [
+    "candidate",
+    "scaffold",
+    "fixtures/requests/torn-reveal.request.json",
+    "--apply"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": [
+      "FS_APPROVAL_REQUIRED"
+    ],
+    "mutationKinds": []
+  }
+}

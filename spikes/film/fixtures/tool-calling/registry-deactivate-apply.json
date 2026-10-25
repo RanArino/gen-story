@@ -1,0 +1,25 @@
+{
+  "tool": "registry_deactivate",
+  "input": {
+    "id": "film.transition.dissolve",
+    "version": "1.0.0",
+    "approvalId": "$promotionApproval",
+    "dryRun": false
+  },
+  "cli": [
+    "registry",
+    "deactivate",
+    "film.transition.dissolve",
+    "1.0.0",
+    "--approval",
+    "$promotionApproval",
+    "--apply"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": [
+      "registry.deactivate"
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "schema": "film.chapter-artifact@1",
+  "chapterId": "c1",
+  "order": 0,
+  "title": "朝 / Morning",
+  "scenes": [
+    {
+      "sceneId": "s1",
+      "asset": "images/s1.jpg",
+      "sha256": "sha256:e8bc163c82eee18733288c7d4ac636db3a6deb013ef2d37b68322be20edc45cc"
+    }
+  ],
+  "recipe": {
+    "id": "org.local.example",
+    "revision": "r1",
+    "digest": "sha256:e1d8e552330911f9f779f85b6f2c00a15e790dcc3fbb3b28f5da1d660a30c5b8"
+  },
+  "capabilityLock": [
+    {
+      "slot": "layout",
+      "id": "film.layout.full-frame",
+      "version": "1.0.0",
+      "manifestDigest": "sha256:62c66a7a5dd70c3146618063c344e531e6d4b59e379808443ce962b3abd63c5a",
+      "implementationDigest": "sha256:de7d1b721a1e0632b7cf04edf5032c8ecffa9f9a08492152b926f1a5a7e765d7",
+      "assetDigests": []
+    }
+  ],
+  "fonts": [
+    {
+      "id": "font.fixture-sans-jp",
+      "version": "1.0.0",
+      "manifestDigest": "sha256:252f10c83610ebca1a059c0bae8255eba2f95be4d1d7bcfa89d7248a82d9f111",
+      "faces": [
+        "sha256:0282d9b79f42c74c1550b20ff2dd16aafc3fe5d8ae9a00b2f66996d0ae882775"
+      ]
+    }
+  ],
+  "bgm": {
+    "asset": "sounds/bgm-96bpm.wav",
+    "sha256": "sha256:e0ee4e4fbfb3229980b0535bce983cbee2a833156045cabcdc73eddfd126819f"
+  },
+  "planDigest": "sha256:64879f7d6b960a01909762d911a32d4582c20010c5641ee90278b644a9e3b525",
+  "fingerprint": "sha256:5aef96240bca5582e6fd0468879a26863d81d1c1fb602def55926ef33ec8bb1f",
+  "environment": "sha256:b77349bf1fa9b26d45d545d7d64dad96737e9cfbb3cbb5f5d10fb77b0fcc44ad",
+  "runtimeMs": 30000,
+  "frames": 900,
+  "files": {
+    "mp4": {
+      "name": "c1.mp4",
+      "sha256": "sha256:862c4ec62defaadafbf7638961214d286015c38ed4ccc7b10d52bdf434e5bee1",
+      "bytes": 1000
+    },
+    "stem": {
+      "name": "c1.stem.wav",
+      "sha256": "sha256:61e25c2cdda1758ce167dbeb7e6d776c5cd6c2f12168f190ef0dca674ff60e6c",
+      "bytes": 1000
+    }
+  },
+  "verified": true
+}

@@ -1,0 +1,25 @@
+{
+  "tool": "candidate_scaffold",
+  "input": {
+    "request": {
+      "$fixture": "requests/torn-reveal.request.json"
+    },
+    "approvalId": "$requestApproval",
+    "dryRun": false
+  },
+  "cli": [
+    "candidate",
+    "scaffold",
+    "fixtures/requests/torn-reveal.request.json",
+    "--approval",
+    "$requestApproval",
+    "--apply"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": [
+      "candidate.scaffold"
+    ]
+  }
+}

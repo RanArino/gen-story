@@ -1,0 +1,23 @@
+{
+  "tool": "candidate_run",
+  "input": {
+    "candidate": "tool-candidate",
+    "approvalId": "$requestApproval",
+    "dryRun": false
+  },
+  "cli": [
+    "candidate",
+    "run",
+    "tool-candidate",
+    "--approval",
+    "$requestApproval",
+    "--apply"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": [
+      "FS_APPROVAL_MISMATCH"
+    ],
+    "mutationKinds": []
+  }
+}

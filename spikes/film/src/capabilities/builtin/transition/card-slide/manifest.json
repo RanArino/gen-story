@@ -1,0 +1,77 @@
+{
+  "schema": "film.capability-manifest@1",
+  "id": "film.transition.card-slide",
+  "version": "1.0.0",
+  "kind": "transition",
+  "level": 1,
+  "title": "Card slide",
+  "description": "The incoming scene slides in like a card over the outgoing one.",
+  "tags": [
+    "slide",
+    "card"
+  ],
+  "rendererApi": "film-capability@1",
+  "layer": 0,
+  "media": {
+    "types": [],
+    "min": 0,
+    "max": 0
+  },
+  "profiles": [
+    "landscape-1080p30@1"
+  ],
+  "aspectRatios": [
+    "16:9"
+  ],
+  "analysis": [],
+  "params": {},
+  "requires": [],
+  "incompatibleWith": [],
+  "determinism": {
+    "seeded": false
+  },
+  "motionLevel": "moderate",
+  "budgets": {
+    "maxPrimitives": 48,
+    "maxKeyframes": 256,
+    "maxAudioEvents": 16
+  },
+  "reducedMotion": "fallback",
+  "fallback": {
+    "id": "film.transition.dissolve",
+    "version": "1.0.0"
+  },
+  "timing": {
+    "overlapMs": 700,
+    "gapMs": 0
+  },
+  "assets": [],
+  "fixtures": [
+    {
+      "name": "landscape",
+      "sourceAspect": "16:9",
+      "caption": "ja"
+    },
+    {
+      "name": "square",
+      "sourceAspect": "1:1",
+      "caption": "en"
+    },
+    {
+      "name": "portrait",
+      "sourceAspect": "2:3",
+      "caption": "ja"
+    },
+    {
+      "name": "ultrawide",
+      "sourceAspect": "21:9",
+      "caption": "empty"
+    }
+  ],
+  "permissions": [],
+  "provenance": {
+    "author": "film spike",
+    "source": "spikes film builtin",
+    "license": "internal"
+  }
+}

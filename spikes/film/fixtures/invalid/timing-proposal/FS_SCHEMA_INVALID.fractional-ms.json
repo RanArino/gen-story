@@ -1,0 +1,29 @@
+{
+  "expect": {
+    "path": "/scenes/0/durationMs"
+  },
+  "document": {
+    "schema": "film.timing-proposal@1",
+    "chapterId": "c1",
+    "limitMs": 60000,
+    "titleMs": 3000,
+    "overlapMs": 800,
+    "gapMs": 0,
+    "runtimeMs": 30000,
+    "remainingMs": 30000,
+    "scenes": [
+      {
+        "sceneId": "s1",
+        "source": "resolved",
+        "durationMs": 7000.25,
+        "minMs": 3100
+      },
+      {
+        "sceneId": "s2",
+        "source": "user",
+        "durationMs": 9000,
+        "minMs": 3100
+      }
+    ]
+  }
+}

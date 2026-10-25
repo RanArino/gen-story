@@ -1,0 +1,20 @@
+{
+  "tool": "render_chapter",
+  "input": {
+    "planFile": "out/plans/test-baseline/c1.plan.json",
+    "approvalId": "$timingApproval"
+  },
+  "cli": [
+    "render",
+    "chapter",
+    "out/plans/test-baseline/c1.plan.json",
+    "--approval",
+    "$timingApproval",
+    "--dry-run"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "expect": {
+    "gate": "static",
+    "code": "FS_FALLBACK_MISSING"
+  },
+  "manifest": {
+    "id": "film.transition.missing-fallback",
+    "version": "1.0.0",
+    "fallback": null
+  }
+}

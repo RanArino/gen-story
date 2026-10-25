@@ -1,0 +1,14 @@
+{
+  "schema": "film.cut@1",
+  "id": "example-c2",
+  "name": "Dusk, a little livelier",
+  "description": "Raises motion within the allowlist.",
+  "treatment": {
+    "id": "example-treatment",
+    "revision": 1
+  },
+  "chapterId": "c2",
+  "settings": {
+    "motionAmount": 0.6
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:chapters",
+  "title": "Film Chapters: user-defined ordered scene groups, limits, and user-entered durations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "storyGraph", "chapters"],
+  "properties": {
+    "schema": { "const": "film.chapters@1" },
+    "storyGraph": { "$ref": "urn:film-spike:common#/$defs/revisionRef" },
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "scenes"],
+        "properties": {
+          "id": { "$ref": "urn:film-spike:common#/$defs/localId" },
+          "title": { "$ref": "urn:film-spike:common#/$defs/name" },
+          "limitMs": {
+            "description": "Absent means the 60,000 ms default; null means the user removed the limit.",
+            "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 1000, "maximum": 3600000 }]
+          },
+          "scenes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sceneId"],
+              "properties": {
+                "sceneId": { "$ref": "urn:film-spike:common#/$defs/localId" },
+                "durationMs": { "type": "integer", "minimum": 1, "maximum": 600000 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

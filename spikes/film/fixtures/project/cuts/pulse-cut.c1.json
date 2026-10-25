@@ -1,0 +1,15 @@
+{
+  "schema": "film.cut@1",
+  "id": "pulse-cut-c1",
+  "name": "Morning, on the beat",
+  "description": "Split panels pulse on each beat.",
+  "treatment": {
+    "id": "pulse-cut",
+    "revision": 1
+  },
+  "chapterId": "c1",
+  "settings": {
+    "motionAmount": 0.7,
+    "visualIntensity": 0.6
+  }
+}

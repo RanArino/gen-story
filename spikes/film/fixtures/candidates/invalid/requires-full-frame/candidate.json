@@ -1,0 +1,13 @@
+{
+  "expect": {
+    "gate": "compile",
+    "code": "FS_COMPAT_CONFLICT"
+  },
+  "manifest": {
+    "id": "film.transition.requires-full-frame",
+    "version": "1.0.0",
+    "requires": [
+      "film.layout.full-frame"
+    ]
+  }
+}

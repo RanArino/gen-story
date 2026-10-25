@@ -1,0 +1,19 @@
+{
+  "tool": "validate",
+  "input": {
+    "kind": "film-treatment",
+    "document": {}
+  },
+  "cli": [
+    "validate",
+    "film-treatment",
+    "fixtures/invalid/film-treatment/FS_SCHEMA_INVALID.missing-fields.json"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": [
+      "FS_SCHEMA_INVALID"
+    ],
+    "mutationKinds": []
+  }
+}

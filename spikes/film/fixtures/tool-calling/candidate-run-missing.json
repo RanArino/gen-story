@@ -1,0 +1,20 @@
+{
+  "tool": "candidate_run",
+  "input": {
+    "candidate": "tool-candidate",
+    "dryRun": false
+  },
+  "cli": [
+    "candidate",
+    "run",
+    "tool-candidate",
+    "--apply"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": [
+      "FS_APPROVAL_REQUIRED"
+    ],
+    "mutationKinds": []
+  }
+}

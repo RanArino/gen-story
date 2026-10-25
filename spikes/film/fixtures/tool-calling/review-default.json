@@ -1,0 +1,29 @@
+{
+  "tool": "review_record",
+  "input": {
+    "subjectDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "subject": "test",
+    "reviewer": "test reviewer",
+    "verdict": "accept",
+    "notes": "Synthetic test review."
+  },
+  "cli": [
+    "review",
+    "record",
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "--subject",
+    "test",
+    "--reviewer",
+    "test reviewer",
+    "--verdict",
+    "accept",
+    "--notes",
+    "Synthetic test review.",
+    "--dry-run"
+  ],
+  "expected": {
+    "ok": true,
+    "errorCodes": [],
+    "mutationKinds": []
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:result-envelope",
+  "title": "Result Envelope returned by every authoring operation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "operation", "dryRun", "errors", "warnings", "hashes", "evidence", "mutations"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "operation": { "type": "string", "pattern": "^[a-z][a-zA-Z]*(\\.[a-z][a-zA-Z]*)?$" },
+    "dryRun": { "type": "boolean" },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "path", "message", "owner", "remediation"],
+        "properties": {
+          "code": { "$ref": "urn:film-spike:common#/$defs/errorCode" },
+          "path": { "type": "string" },
+          "message": { "type": "string" },
+          "owner": { "enum": ["user", "recipe-author", "capability-author", "operator", "system"] },
+          "remediation": { "type": "string" },
+          "details": { "type": "object" }
+        }
+      }
+    },
+    "warnings": { "type": "array", "items": { "$ref": "urn:film-spike:common#/$defs/warning" } },
+    "hashes": { "type": "object", "additionalProperties": { "$ref": "urn:film-spike:common#/$defs/digest" } },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "mutations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "target", "beforeDigest", "afterDigest"],
+        "properties": {
+          "kind": { "type": "string" },
+          "target": { "type": "string" },
+          "beforeDigest": { "oneOf": [{ "type": "null" }, { "$ref": "urn:film-spike:common#/$defs/digest" }] },
+          "afterDigest": { "oneOf": [{ "type": "null" }, { "$ref": "urn:film-spike:common#/$defs/digest" }] }
+        }
+      }
+    },
+    "result": {}
+  }
+}

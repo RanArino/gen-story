@@ -1,0 +1,30 @@
+{
+  "schema": "film.capability-request@1",
+  "id": "torn-reveal",
+  "title": "Torn-paper reveal transition",
+  "problem": "The incoming scene should appear behind a jagged, animated paper edge.",
+  "kind": "transition",
+  "proposed": {
+    "id": "film.transition.torn-reveal",
+    "version": "1.0.0"
+  },
+  "catalogSearch": {
+    "queries": [
+      "torn",
+      "paper edge",
+      "jagged reveal"
+    ],
+    "whyNotRecipe": "No registered transition animates a jagged reveal edge; dissolve, card-slide, dip, and direct-cut only fade, slide, or cut."
+  },
+  "requester": {
+    "kind": "agent",
+    "name": "Codex M6 implementation"
+  },
+  "acceptance": [
+    "Reveals the incoming scene behind a jagged edge within the overlap window.",
+    "Falls back to dissolve under reduced motion.",
+    "Pass all declared source-aspect, parameter-bound, empty-caption, and Japanese-text fixtures with identical repeated outputs in contained processes.",
+    "Produce a trusted-painter contact sheet and clip, obtain independent review and explicit promotion approval before catalog use.",
+    "Compile and render org.local.memory-torn@r1; preserve pinned 1.0.0 Plan digest and painter frame hashes after separately governed 1.1.0 promotion."
+  ]
+}
