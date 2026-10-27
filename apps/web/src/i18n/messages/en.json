@@ -412,8 +412,8 @@
       "promptPlaceholder": "Describe who may appear, where, clothing, continuity, and how prominent they should be.",
       "savePrompt": "Save character prompt",
       "saving": "Saving…",
-      "generateSheet": "Generate character reference sheet (1 paid image call)",
-      "regenerateSheet": "Regenerate character reference sheet (1 paid image call)",
+      "generateSheet": "Generate character reference sheet (Codex → Gemini API)",
+      "regenerateSheet": "Regenerate character reference sheet (Codex → Gemini API)",
       "generatingSheet": "Generating reference sheet…",
       "sheetReady": "Character reference sheet is ready!",
       "sheetFailed": "Failed to generate character reference sheet",
@@ -468,7 +468,9 @@
     "olderBatchNotice": "These are earlier samples. Adjustments apply to the newest run only, but you can confirm one of these and continue to generation."
   },
   "imageModel": {
-    "label": "Image model"
+    "label": "Image model",
+    "automatic": "Automatic (Codex → Gemini API)",
+    "automaticDescription": "Uses your Codex subscription first. If it fails, this image uses the configured Gemini API billing."
   },
   "generate": {
     "title": "Generate",

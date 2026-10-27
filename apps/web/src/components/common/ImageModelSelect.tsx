@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   DEFAULT_IMAGE_GENERATION_MODEL,
@@ -49,6 +49,7 @@ export function ImageModelSelect({
   disabled?: boolean;
 }) {
   const t = useTranslations("imageModel");
+  const descriptionId = useId();
   return (
     <label
       style={{
@@ -60,16 +61,22 @@ export function ImageModelSelect({
     >
       <span style={{ color: "#52606d", fontWeight: 600 }}>{t("label")}</span>
       <select
+        aria-describedby={value === "auto" ? descriptionId : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
       >
         {IMAGE_GENERATION_MODELS.map((option) => (
           <option key={option.id} value={option.id}>
-            {option.label}
+            {option.id === "auto" ? t("automatic") : option.label}
           </option>
         ))}
       </select>
+      {value === "auto" && (
+        <span id={descriptionId} style={{ fontSize: 12 }}>
+          {t("automaticDescription")}
+        </span>
+      )}
     </label>
   );
 }

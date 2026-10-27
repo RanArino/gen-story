@@ -1,13 +1,16 @@
-// Image models the GUI offers for scene generation. The id is sent as
-// `inputJson.model` on each generation request; the API routes ids that start
-// with `gemini-` to Gemini and everything else to OpenAI.
+// The selected id is sent as `inputJson.model` on each generation request.
 export type ImageGenerationModelOption = {
   id: string;
   label: string;
-  provider: "gemini" | "openai";
+  provider: "auto" | "gemini" | "openai";
 };
 
 export const IMAGE_GENERATION_MODELS: readonly ImageGenerationModelOption[] = [
+  {
+    id: "auto",
+    label: "Automatic (Codex → Gemini API)",
+    provider: "auto",
+  },
   {
     id: "gemini-3.1-flash-image",
     label: "Nano Banana 2 (Gemini 3.1 Flash Image)",
@@ -20,7 +23,8 @@ export const IMAGE_GENERATION_MODELS: readonly ImageGenerationModelOption[] = [
   },
 ];
 
-export const DEFAULT_IMAGE_GENERATION_MODEL = "gemini-3.1-flash-image";
+export const DEFAULT_IMAGE_GENERATION_MODEL = "auto";
+export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image";
 
 export function isGeminiImageModel(model: string): boolean {
   return model.startsWith("gemini-");
