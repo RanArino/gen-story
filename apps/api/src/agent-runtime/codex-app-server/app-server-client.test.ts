@@ -57,6 +57,31 @@ function makeClient(fake: { command: string; args: string[] }) {
 }
 
 describe("CodexAppServerClient", () => {
+  it("can finish image cleanup after a process fails to spawn", async () => {
+    const client = new CodexAppServerClient({
+      command: join(temporaryRoot, "missing-codex-binary"),
+      workingDirectory,
+      allowedWorkingDirectoryRoot: temporaryRoot,
+    });
+    await expect(client.request("initialize", {})).rejects.toThrow(
+      "process error",
+    );
+    const exit = await client.waitForExit();
+    expect(exit.signal).toBeNull();
+  });
+
+  it("can await an already signaled process exit during image cleanup", async () => {
+    const client = makeClient(
+      writeFakeAppServer("write({ id: line.id, result: {} });"),
+    );
+    await client.request("initialize", {});
+    const exit = client.waitForExit();
+    client.kill("SIGKILL");
+    const status = await exit;
+    expect(status.signal).toBe("SIGKILL");
+    await expect(client.waitForExit()).resolves.toEqual(status);
+  });
+
   it("resolves a request with the matching response", async () => {
     const fake = writeFakeAppServer(`
       write({ id: line.id, result: { echoedMethod: line.method } });

@@ -11,6 +11,7 @@ export class RoutingImageGenerationAdapter implements ImageGenerationPort {
   constructor(
     private readonly gemini: ImageGenerationPort,
     private readonly openai: ImageGenerationPort,
+    private readonly automatic: ImageGenerationPort,
   ) {}
 
   generate(input: {
@@ -21,7 +22,12 @@ export class RoutingImageGenerationAdapter implements ImageGenerationPort {
       typeof input.inputJson.model === "string" && input.inputJson.model
         ? input.inputJson.model
         : DEFAULT_IMAGE_GENERATION_MODEL;
-    const adapter = isGeminiImageModel(model) ? this.gemini : this.openai;
+    const adapter =
+      model === "auto"
+        ? this.automatic
+        : isGeminiImageModel(model)
+          ? this.gemini
+          : this.openai;
     return adapter.generate({
       ...input,
       inputJson: { ...input.inputJson, model },

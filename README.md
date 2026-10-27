@@ -45,12 +45,28 @@ cp apps/api/.env.example apps/api/.env
 | `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_         | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`)                                             |
 | `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint                                                    |
 | `OPENAI_API_KEY`              | _(none)_                     | Optional. Real image generation with GPT Image instead of mock                                                      |
-| `GEMINI_API_KEY`              | _(none)_                     | Optional. Real photo analysis, and real image generation with Nano Banana (the default image model) instead of mock |
+| `GEMINI_API_KEY`              | _(none)_                     | Optional. Photo analysis, explicit Nano Banana generation, and Automatic image fallback |
 | `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`           | Gemini model used for project photo analysis                                                                        |
 | `GEMINI_STORY_SETUP_MODEL`    | `gemini-2.5-flash`           | Gemini model used for storyboard story setup (step 4)                                                               |
 
-The app works without an OpenAI key — it uses a mock adapter that generates placeholder images.
-The app works without a Gemini key; photo analysis and story setup use deterministic local fallbacks.
+Image generation defaults to **Automatic (Codex → Gemini API)** for new model selections.
+Install Codex CLI 0.164.0 or later and run `codex login` with your ChatGPT subscription
+on the machine running the local API. Codex's built-in image generation uses included
+Codex limits; it does not use `OPENAI_API_KEY`. Scene images, test samples, and character
+sheets try Codex once, with a 180-second deadline. On an error, that image uses
+`gemini-3.1-flash-image` through the configured Gemini API or Vertex AI, with normal
+API billing. Each new image tries Codex again. Cancellation skips fallback.
+
+Configure `GEMINI_API_KEY` (paid image-generation access) or Vertex AI for fallback.
+If Codex fails and Gemini is unavailable, the job fails with an error rather than
+returning a placeholder. Outside local deployment, Automatic uses Gemini directly.
+Explicit Gemini and GPT Image selections retain the existing API/mock behavior;
+previous saved selections are preserved. The image selection is independent of
+the text/vision runtime in Settings. Character sheets always use Automatic.
+
+The app works without a Gemini key for photo analysis and story setup using
+deterministic local fallbacks. Explicit API image choices without their provider's
+credentials generate placeholder images. Style-preview scripts retain their API path.
 
 ## Google Cloud project
 
@@ -245,7 +261,15 @@ API terminal logs each request in structured format:
 
 **HEIC conversion fails** — `sharp` requires `libvips`. On macOS: `brew install vips`. On Linux: `apt install libvips-dev`.
 
-**Placeholder images instead of real ones** — The selected image model's key is missing. Nano Banana (the default) needs `GEMINI_API_KEY` on a paid tier, or Vertex AI via `GEMINI_USE_VERTEXAI=true` (see `apps/api/.env.example`); GPT Image needs `OPENAI_API_KEY`, both in `apps/api/.env`. Without the key, that provider's mock adapter produces gray placeholder images.
+**Automatic image generation failed** — Check `codex login status` reports ChatGPT
+and Codex CLI is at least 0.164.0. If Codex is unavailable or its limits are reached,
+Automatic needs a paid `GEMINI_API_KEY` or configured Vertex AI for fallback. The
+job error names both provider failures. Each retry attempts Codex again.
+
+**Placeholder images instead of real ones** — An explicit API model is selected
+without its credentials. Nano Banana needs a paid `GEMINI_API_KEY` or Vertex AI
+via `GEMINI_USE_VERTEXAI=true`; GPT Image needs `OPENAI_API_KEY`. Configure these
+in `apps/api/.env` using `apps/api/.env.example`. Automatic never returns a mock.
 
 ## Workspace Layout
 

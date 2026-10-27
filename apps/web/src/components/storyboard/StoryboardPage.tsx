@@ -191,6 +191,7 @@ function sceneDtoToState(scene: SceneDto): SceneState {
 export function StoryboardPage({ projectId }: { projectId: string }) {
   const t = useTranslations("storyboard");
   const tCommon = useTranslations("common");
+  const tImageModel = useTranslations("imageModel");
   const [storyboard, setStoryboard] = useState<StoryboardDto | null>(null);
   const [scenes, setScenes] = useState<SceneState[]>([]);
   const [stylePresets, setStylePresets] = useState<StylePresetDto[]>([]);
@@ -1669,6 +1670,9 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                         alt={t("characterPolicy.sheetAlt")}
                       />
                     )}
+                  <span className={styles.photoAssignHint}>
+                    {tImageModel("automaticDescription")}
+                  </span>
                 </div>
               )}
             </section>

@@ -4,7 +4,8 @@ import type {
   ImageGenerationPort,
   ObjectStoragePort,
 } from "@gen-story/application";
-import { DEFAULT_IMAGE_GENERATION_MODEL } from "@gen-story/shared";
+import { DEFAULT_GEMINI_IMAGE_MODEL } from "@gen-story/shared";
+import sharp from "sharp";
 
 import { retryGeminiRateLimit } from "../gemini/gemini-rate-limit";
 import { ensurePngImage } from "../images/image-metadata";
@@ -45,6 +46,10 @@ export class GeminiImageGenerationAdapter implements ImageGenerationPort {
   constructor(
     private readonly objectStorage: ObjectStoragePort,
     private readonly client: GeminiImageClient,
+    private readonly storageKeyForInput?: (input: {
+      requestId: string;
+      inputJson: Record<string, unknown>;
+    }) => string,
   ) {}
 
   async generate(input: {
@@ -60,7 +65,7 @@ export class GeminiImageGenerationAdapter implements ImageGenerationPort {
   }> {
     const {
       prompt = "A cinematic still image.",
-      model = DEFAULT_IMAGE_GENERATION_MODEL,
+      model = DEFAULT_GEMINI_IMAGE_MODEL,
       size,
       projectId = "unknown-project",
       sceneId = "unknown-scene",
@@ -122,13 +127,16 @@ export class GeminiImageGenerationAdapter implements ImageGenerationPort {
       new Uint8Array(Buffer.from(b64, "base64")),
     );
     const checksum = createHash("sha256").update(bytes).digest("hex");
+    const metadata = await sharp(Buffer.from(bytes)).metadata();
 
-    const storageKey = buildGeneratedImageStorageKey({
-      projectId: String(projectId),
-      sceneId: String(sceneId),
-      generatedImageId: `gemini-${input.requestId}`,
-      extension: "png",
-    });
+    const storageKey =
+      this.storageKeyForInput?.(input) ??
+      buildGeneratedImageStorageKey({
+        projectId: String(projectId),
+        sceneId: String(sceneId),
+        generatedImageId: `gemini-${input.requestId}`,
+        extension: "png",
+      });
 
     await this.objectStorage.putObject({
       key: storageKey,
@@ -140,8 +148,8 @@ export class GeminiImageGenerationAdapter implements ImageGenerationPort {
       storageKey,
       mimeType: "image/png",
       size: bytes.byteLength,
-      width: null,
-      height: null,
+      width: metadata.width ?? null,
+      height: metadata.height ?? null,
       checksum,
     };
   }

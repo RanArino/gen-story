@@ -85,6 +85,9 @@ export class CodexAppServerClient extends EventEmitter {
     });
 
     this.child.on("error", (error) => {
+      // A failed spawn emits error/close without an exit event. Cleanup must
+      // not wait forever for an event this child can never emit.
+      if (this.child.pid == null) this.exited = true;
       this.failAllPending(
         new Error(`App Server process error: ${error.message}`),
       );
@@ -255,7 +258,7 @@ export class CodexAppServerClient extends EventEmitter {
     code: number | null;
     signal: NodeJS.Signals | null;
   }> {
-    if (this.exited && this.child.exitCode !== null) {
+    if (this.exited) {
       return Promise.resolve({
         code: this.child.exitCode,
         signal: this.child.signalCode,

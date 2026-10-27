@@ -29,10 +29,10 @@ import { SqliteJobQueue } from "../jobs/sqlite-job-queue";
 import { GeminiImageGenerationAdapter } from "../generation/gemini-image-generation";
 import { MockImageGenerationAdapter } from "../generation/mock-image-generation";
 import { RoutingImageGenerationAdapter } from "../generation/routing-image-generation";
-import {
-  MockCharacterSheetGenerationAdapter,
-  OpenAiCharacterSheetGenerationAdapter,
-} from "../generation/character-sheet-generation";
+import { AutomaticImageGenerationAdapter } from "../generation/automatic-image-generation";
+import { CodexImageGenerationAdapter } from "../generation/codex-image-generation";
+import { buildCharacterSheetStorageKey } from "../storage/storage-keys";
+import { AutomaticCharacterSheetGenerationAdapter } from "../generation/character-sheet-generation";
 import {
   DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS,
   OpenAiImageGenerationAdapter,
@@ -211,31 +211,72 @@ export function createApiContext(
     configuredImageGenerationIntervalMs > 0
       ? configuredImageGenerationIntervalMs
       : DEFAULT_OPENAI_IMAGE_GENERATION_INTERVAL_MS;
-  // Each provider falls back to the mock adapter when it has no credentials,
-  // so a setup with only one provider still generates (placeholders) for the
-  // other.
+  const deployTarget = resolveDeployTarget(env);
   const geminiImageClient = createGeminiImageClient(env);
+  const geminiImageGeneration = geminiImageClient
+    ? new GeminiImageGenerationAdapter(objectStorage, geminiImageClient)
+    : null;
+  const automaticImageGeneration = new AutomaticImageGenerationAdapter(
+    deployTarget === "local"
+      ? new CodexImageGenerationAdapter(objectStorage, { environment: env })
+      : null,
+    geminiImageGeneration,
+    {
+      environment: env,
+      canFallback: async (requestId) =>
+        (await repos.generationRequests.findById(requestId))?.status ===
+        "running",
+    },
+  );
+  // Explicit API choices retain their existing no-credential mock behavior.
+  // Automatic requires a real provider and never silently returns a mock.
   const imageGeneration = new RoutingImageGenerationAdapter(
-    geminiImageClient
-      ? new GeminiImageGenerationAdapter(objectStorage, geminiImageClient)
-      : new MockImageGenerationAdapter(objectStorage),
+    geminiImageGeneration ?? new MockImageGenerationAdapter(objectStorage),
     openaiApiKey
       ? new OpenAiImageGenerationAdapter(objectStorage, openaiApiKey, {
           requestIntervalMs: imageGenerationIntervalMs,
         })
       : new MockImageGenerationAdapter(objectStorage),
+    automaticImageGeneration,
   );
 
   // R1.1/R1.2/R2.1: a single env var selects the runtime for every
   // text/vision capability; unknown values and non-local CLI selection fail
   // fast here rather than falling back silently.
   const configuredRuntime = resolveAgentRuntimeSelection(env);
-  const deployTarget = resolveDeployTarget(env);
   assertLocalDeploymentForCliRuntime(configuredRuntime, deployTarget);
 
-  const characterSheetGeneration = openaiApiKey
-    ? new OpenAiCharacterSheetGenerationAdapter(objectStorage, openaiApiKey)
-    : new MockCharacterSheetGenerationAdapter(objectStorage);
+  const characterSheetStorageKey = (input: {
+    requestId: string;
+    inputJson: Record<string, unknown>;
+  }) =>
+    buildCharacterSheetStorageKey({
+      jobId: input.requestId,
+      projectId: String(input.inputJson.projectId),
+      storyboardId: String(input.inputJson.storyboardId),
+    });
+  const characterSheetGeneration = new AutomaticCharacterSheetGenerationAdapter(
+    new AutomaticImageGenerationAdapter(
+      deployTarget === "local"
+        ? new CodexImageGenerationAdapter(objectStorage, {
+            environment: env,
+            storageKeyForInput: characterSheetStorageKey,
+          })
+        : null,
+      geminiImageClient
+        ? new GeminiImageGenerationAdapter(
+            objectStorage,
+            geminiImageClient,
+            characterSheetStorageKey,
+          )
+        : null,
+      {
+        environment: env,
+        canFallback: async (jobId) =>
+          (await repos.aiJobs.findById(jobId))?.status === "running",
+      },
+    ),
+  );
 
   const {
     sceneFillGeneration,

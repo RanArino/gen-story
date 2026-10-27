@@ -156,10 +156,11 @@ describe("RoutingImageGenerationAdapter", () => {
     };
   }
 
-  it("defaults to Nano Banana and routes gpt-image models to OpenAI", async () => {
+  it("defaults to Automatic and routes explicit API models directly", async () => {
     const gemini = recorder("gemini");
     const openai = recorder("openai");
-    const router = new RoutingImageGenerationAdapter(gemini, openai);
+    const automatic = recorder("automatic");
+    const router = new RoutingImageGenerationAdapter(gemini, openai, automatic);
 
     await router.generate({ requestId: "1", inputJson: {} });
     await router.generate({
@@ -167,7 +168,8 @@ describe("RoutingImageGenerationAdapter", () => {
       inputJson: { model: "gpt-image-2.5-flare-2026-09-08" },
     });
 
-    expect(gemini.models).toEqual(["gemini-3.1-flash-image"]);
+    expect(automatic.models).toEqual(["auto"]);
+    expect(gemini.models).toEqual([]);
     expect(openai.models).toEqual(["gpt-image-2.5-flare-2026-09-08"]);
   });
 });

@@ -1,7 +1,10 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createGenerationRequest } from "@gen-story/domain";
+import { CodexImageGenerationAdapter } from "../generation/codex-image-generation";
+import { GeminiImageGenerationAdapter } from "../generation/gemini-image-generation";
 
 import { migrateDatabase, openDatabase } from "../db";
 import type { GenStorySqliteClient } from "../db/client";
@@ -36,10 +39,93 @@ function withClient(): GenStorySqliteClient {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   client?.close();
   if (directory) rmSync(directory, { force: true, recursive: true });
   client = null;
   directory = null;
+});
+
+describe("createApiContext Automatic image routing", () => {
+  const image = {
+    storageKey: "data/uploads/generated/test.png",
+    mimeType: "image/png",
+    size: 10,
+    width: 2,
+    height: 2,
+    checksum: "checksum",
+  };
+  const input = {
+    requestId: "image-request",
+    inputJson: { prompt: "A scene" },
+  };
+
+  function runningRequest() {
+    return createGenerationRequest({
+      id: input.requestId,
+      projectId: "project-1",
+      storyboardId: "storyboard-1",
+      sceneId: "scene-1",
+      status: "running",
+      inputJson: {},
+      createdAt: "2026-10-27T00:00:00.000Z",
+      updatedAt: "2026-10-27T00:00:00.000Z",
+    });
+  }
+
+  it("uses Codex for images independently of the text runtime", async () => {
+    const codex = vi
+      .spyOn(CodexImageGenerationAdapter.prototype, "generate")
+      .mockResolvedValue(image);
+    const gemini = vi
+      .spyOn(GeminiImageGenerationAdapter.prototype, "generate")
+      .mockResolvedValue(image);
+    const deps = createApiContext(withClient(), {
+      GEN_STORY_AGENT_RUNTIME: "api",
+      GEMINI_API_KEY: "test-key",
+    });
+    expect(await deps.imageGeneration.generate(input)).toEqual(image);
+    expect(codex).toHaveBeenCalledOnce();
+    expect(gemini).not.toHaveBeenCalled();
+  });
+
+  it("checks persisted scene status before falling back to Gemini", async () => {
+    vi.spyOn(
+      CodexImageGenerationAdapter.prototype,
+      "generate",
+    ).mockRejectedValue(new Error("quota exceeded"));
+    const gemini = vi
+      .spyOn(GeminiImageGenerationAdapter.prototype, "generate")
+      .mockResolvedValue(image);
+    const deps = createApiContext(withClient(), { GEMINI_API_KEY: "test-key" });
+    const find = vi
+      .spyOn(deps.generationRequests, "findById")
+      .mockResolvedValue(runningRequest());
+    await deps.imageGeneration.generate(input);
+    expect(gemini).toHaveBeenCalledWith({
+      ...input,
+      inputJson: { ...input.inputJson, model: "gemini-3.1-flash-image" },
+    });
+    find.mockResolvedValue({ ...runningRequest(), status: "canceled" });
+    await expect(deps.imageGeneration.generate(input)).rejects.toThrow(
+      "canceled",
+    );
+    expect(gemini).toHaveBeenCalledOnce();
+  });
+
+  it("bypasses Codex on hosted deployments and fails without fallback credentials", async () => {
+    const codex = vi.spyOn(CodexImageGenerationAdapter.prototype, "generate");
+    const deps = createApiContext(withClient(), {
+      GEN_STORY_DEPLOY_TARGET: "hosted",
+    });
+    vi.spyOn(deps.generationRequests, "findById").mockResolvedValue(
+      runningRequest(),
+    );
+    await expect(deps.imageGeneration.generate(input)).rejects.toThrow(
+      "Gemini image generation is not configured",
+    );
+    expect(codex).not.toHaveBeenCalled();
+  });
 });
 
 describe("createApiContext runtime selection", () => {

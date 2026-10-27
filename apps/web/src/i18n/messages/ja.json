@@ -412,8 +412,8 @@
       "promptPlaceholder": "登場人物、登場する場面、服装、連続性、画面内での強さを記述してください。",
       "savePrompt": "キャラクタープロンプトを保存",
       "saving": "保存中…",
-      "generateSheet": "キャラクター参照シートを生成（有料画像生成1回）",
-      "regenerateSheet": "キャラクター参照シートを再生成（有料画像生成1回）",
+      "generateSheet": "キャラクター参照シートを生成（Codex → Gemini API）",
+      "regenerateSheet": "キャラクター参照シートを再生成（Codex → Gemini API）",
       "generatingSheet": "参照シートを生成中…",
       "sheetReady": "キャラクター参照シートが完成しました！",
       "sheetFailed": "キャラクター参照シートの生成に失敗しました",
@@ -468,7 +468,9 @@
     "olderBatchNotice": "過去のサンプルです。調整は最新の回でのみ行えますが、ここから確定して本生成に進めます。"
   },
   "imageModel": {
-    "label": "画像生成モデル"
+    "label": "画像生成モデル",
+    "automatic": "自動（Codex → Gemini API）",
+    "automaticDescription": "まずCodexサブスクリプションを使用します。失敗した画像は設定済みのGemini APIで生成され、API利用料金が発生します。"
   },
   "generate": {
     "title": "生成",
