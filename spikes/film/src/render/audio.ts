@@ -58,7 +58,7 @@ export interface BedInput {
   bgm: AudioEvent & { offsetMs: number };
   runtimeMs: number;
   /** Stem WAV files and where each starts on the output timeline. */
-  stems: { file: string; startMs: number }[];
+  stems: { file: string; startMs: number; startSample?: number }[];
   mediaDir: string;
   /** Number of inputs already given to ffmpeg before these (the video for a Chapter mux). */
   firstInput: number;
@@ -75,7 +75,7 @@ export function bedGraph(input: BedInput): AudioGraph {
     ...fades(bgm.fadeInMs, bgm.fadeOutMs, runtimeMs),
     `volume=${bgm.gain}[bgm]`,
   ].join(",");
-  const stemChains = stems.map((s, i) => `[${at(i + 1)}:a]${FORMAT},adelay=${s.startMs}|${s.startMs}[s${i}]`);
+  const stemChains = stems.map((s, i) => `[${at(i + 1)}:a]${FORMAT},adelay=${s.startSample ?? Math.round(s.startMs * SAMPLE_RATE / 1000)}S:all=1[s${i}]`);
   const mix = `[bgm]${stems.map((_, i) => `[s${i}]`).join("")}amix=inputs=${stems.length + 1}:normalize=0:dropout_transition=0,apad=whole_dur=${sec(runtimeMs)},atrim=0:${sec(runtimeMs)}[mix]`;
   return {
     inputs: ["-i", `${input.mediaDir}${bgm.asset}`, ...stems.flatMap((s) => ["-i", s.file])],

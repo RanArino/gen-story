@@ -66,3 +66,17 @@ describe("Chapter timing", () => {
     expect(over.scenes[0]!.durationMs).toBe(5000);
   });
 });
+
+it("fits frame boundaries and blank budgets without changing fixed milliseconds", () => {
+  const fixed = input({ id: "c1", title: "t", limitMs: 6000, scenes: scenes(3800) }, [1]);
+  expect(resolveTiming(fixed).runtimeMs).toBe(6000);
+  fixed.chapter.limitMs = 6020;
+  fixed.chapter.scenes[0]!.durationMs = 3820;
+  expect(preflight(fixed)[0]).toMatchObject({ code: "FS_PREFLIGHT_OVER_LIMIT", details: { requiredMinMs: 6020, encodedFrames: 181, fps: 30 } });
+  fixed.chapter.limitMs = null;
+  expect(resolveTiming(fixed).scenes[0]!.durationMs).toBe(3820);
+  const blank = input({ id: "c1", title: "t", limitMs: 6020, scenes: scenes(undefined) }, [1], 625);
+  const result = resolveTiming(blank);
+  expect(result.scenes[0]!.durationMs % 625).toBe(0);
+  expect(Math.floor((result.runtimeMs * 30 + 500) / 1000) * 1000).toBeLessThanOrEqual(6020 * 30);
+});

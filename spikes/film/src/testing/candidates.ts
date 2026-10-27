@@ -1,3 +1,4 @@
+import { writeJson } from "../paths.js";
 // Quarantined candidates in a temporary test world. Requests, approvals, and source are written
 // only under the world's temporary state; the operator's quarantine and registry are never touched.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -62,8 +63,22 @@ export async function promoteThroughLifecycle(world: World, candidate: string, t
   const evidence = await service.candidateEvidence({ candidate, approvalId: executionApproval, dryRun: false });
   if (!evidence.ok) throw new Error(JSON.stringify(evidence.errors));
   const target = service.candidatePromotionTarget({ candidate }).result!;
-  service.reviewRecord({ subjectDigest: target.digest, subject: target.subject, reviewer: "test reviewer", verdict: "accept", notes: "Test review." });
+  operatorReviews(world, { candidate, subjectDigest: target.digest, subject: target.subject, reviewer: "test reviewer", verdict: "accept", notes: "Test review." });
   const promoted = service.registryPromote({ candidate, approvalId: operatorApproves(paths, "promotion", target.digest), dryRun: false });
   if (!promoted.ok) throw new Error(JSON.stringify(promoted.errors));
   return target.digest;
+}
+
+/** Simulated operator evidence in isolated test state; the service itself never writes reviews. */
+export function operatorReviews(world: World, input: import("../registry/reviews.js").ReviewInput) {
+  const prepared = world.service.reviewRecord({ ...input, dryRun: true });
+  if (!prepared.ok) throw new Error(JSON.stringify(prepared.errors));
+  const p = prepared.result!;
+  const record: import("../contracts/types.js").ReviewRecordV2 = {
+    schema: "film.review-record@2", id: `rev-${digestOf(input).slice(7, 19)}`, ...input,
+    author: p.author, requester: p.requester, operator: "test operator", createdAt: new Date().toISOString(),
+    confirmation: { kind: "interactive-tty", value: p.confirmation, confirmedAt: new Date().toISOString() },
+  };
+  writeJson(`${world.paths.state}reviews/${record.id}.json`, record);
+  return record;
 }

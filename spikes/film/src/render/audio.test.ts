@@ -26,7 +26,22 @@ describe("audio graphs", () => {
     expect(g.inputs).toEqual(["-i", "/m/sounds/bgm.wav", "-i", "/c/c1.wav", "-i", "/c/c2.wav"]);
     expect(g.filter).toContain("[1:a]");
     expect(g.filter).toContain("atrim=start=0:duration=60");
-    expect(g.filter).toContain("[3:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,adelay=37400|37400[s1]");
+    expect(g.filter).toContain("[3:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,adelay=1795200S:all=1[s1]");
     expect(g.filter).toContain("[bgm][s0][s1]amix=inputs=3:normalize=0");
   });
 });
+
+it("positions decoded stem impulses at exact sample offsets", async () => {
+  const { tempPaths } = await import("../testing/state.js");
+  const { mkdirSync } = await import("node:fs");
+  const { ffmpeg, ffmpegOut } = await import("./ffmpeg.js");
+  const paths = tempPaths();
+  mkdirSync(paths.out, { recursive: true });
+  await ffmpeg(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "1", `${paths.out}silence.wav`]);
+  await ffmpeg(["-f", "lavfi", "-i", "aevalsrc=if(eq(n\\,0)\\,0.5\\,0):s=48000:d=0.1", "-ac", "2", `${paths.out}impulse.wav`]);
+  const graph = bedGraph({ bgm: { ...bed, asset: "silence.wav", offsetMs: 0, gain: 1, fadeInMs: 0, fadeOutMs: 0 }, runtimeMs: 200, mediaDir: paths.out, firstInput: 0, stems: [{ file: `${paths.out}impulse.wav`, startMs: 33, startSample: 1600 }, { file: `${paths.out}impulse.wav`, startMs: 66, startSample: 3200 }] });
+  const pcm = await ffmpegOut([...graph.inputs, "-filter_complex", graph.filter, "-map", graph.output, "-ac", "1", "-f", "f32le", "-"]);
+  const impulses: number[] = [];
+  for (let sample = 0; sample < pcm.length / 4; sample++) if (Math.abs(pcm.readFloatLE(sample * 4)) > 0.1) impulses.push(sample);
+  expect(impulses).toEqual([1600, 3200]);
+}, 30000);

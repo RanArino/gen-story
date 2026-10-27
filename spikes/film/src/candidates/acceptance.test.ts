@@ -1,3 +1,4 @@
+import { operatorReviews } from "../testing/candidates.js";
 // M6 acceptance in temporary state: the torn-reveal lifecycle end to end (A26) and exact-version
 // replay after 1.1.0 (A28). Approvals and reviews are created as the operator and an independent
 // reviewer would; nothing touches the operator's state. Needs Chrome and ffmpeg.
@@ -70,7 +71,7 @@ describe.skipIf(!CHROME)("torn-reveal acceptance", () => {
     const promotionApproval = operatorApproves(paths, "promotion", target.digest);
     expect(codes(service.registryPromote({ candidate: "torn-reveal", approvalId: promotionApproval, dryRun: false }))).toEqual(["FS_REVIEW_REQUIRED"]);
     expect(service.catalogSearch({ query: "torn" }).result).toEqual([]);
-    service.reviewRecord({ subjectDigest: target.digest, subject: target.subject, reviewer: "acceptance reviewer", verdict: "accept", notes: "Edge reads as torn paper." });
+    operatorReviews(world, { candidate: "torn-reveal", subjectDigest: target.digest, subject: target.subject, reviewer: "acceptance reviewer", verdict: "accept", notes: "Edge reads as torn paper." });
     expect(codes(service.registryPromote({ candidate: "torn-reveal", dryRun: false }))).toEqual(["FS_APPROVAL_REQUIRED"]);
     expect(service.registryPromote({ candidate: "torn-reveal", approvalId: promotionApproval, dryRun: false }).ok).toBe(true);
     expect(service.catalogSearch({ query: "torn" }).result!.map((h) => `${h.id}@${h.version}`)).toEqual([`${TORN}@1.0.0`]);

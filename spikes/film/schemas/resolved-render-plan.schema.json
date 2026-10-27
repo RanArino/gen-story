@@ -258,6 +258,7 @@
         "scenes"
       ],
       "properties": {
+        "projectId": { "$ref": "urn:film-spike:common#/$defs/localId" },
         "storyGraph": {
           "$ref": "urn:film-spike:common#/$defs/revisionRef"
         },

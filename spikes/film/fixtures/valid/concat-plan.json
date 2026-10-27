@@ -1,12 +1,14 @@
 {
-  "schema": "film.concat-plan@1",
+  "schema": "film.concat-plan@2",
   "chapters": [
     {
       "chapterId": "c1",
       "planDigest": "sha256:f8872fc19f53102a62176701a5a5b839e1a0ca3ec6487eecd48d2961bb4c2e20",
       "artifactSha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "runtimeMs": 8500,
-      "offsetMs": 3000
+      "offsetMs": 3000,
+      "stemSha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "frames": 255
     }
   ],
   "profile": {
@@ -19,7 +21,7 @@
   },
   "frameQuantization": "round-half-up@1",
   "overallTitle": {
-    "text": "参道 / Sando",
+    "text": "\u53c2\u9053 / Sando",
     "titleMs": 3000,
     "layers": [
       {
@@ -37,7 +39,7 @@
         "role": "title",
         "startMs": 0,
         "endMs": 3000,
-        "text": "参道 / Sando",
+        "text": "\u53c2\u9053 / Sando",
         "font": [
           "fs-01dcc9f2884c",
           "fs-793a45c7770d"

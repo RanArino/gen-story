@@ -240,7 +240,7 @@ export interface ApprovalRecord {
   createdAt: string;
 }
 
-export interface ReviewRecord {
+export interface LegacyReviewRecord {
   schema: "film.review-record@1";
   id: string;
   subjectDigest: string;
@@ -250,6 +250,16 @@ export interface ReviewRecord {
   notes: string;
   createdAt: string;
 }
+
+export interface ReviewRecordV2 extends Omit<LegacyReviewRecord, "schema"> {
+  schema: "film.review-record@2";
+  candidate: string;
+  author: string;
+  requester: string;
+  operator: string;
+  confirmation: { kind: "interactive-tty"; value: string; confirmedAt: string };
+}
+export type ReviewRecord = LegacyReviewRecord | ReviewRecordV2;
 
 export interface ValidationCheck {
   name: string;
@@ -428,6 +438,7 @@ export interface ResolvedRenderPlan {
   }[];
   lock: PlanLock;
   provenance: {
+    projectId?: string; // Absent only in legacy Plans, which must be recompiled before concatenation.
     storyGraph: RevisionRef;
     treatment: RevisionRef;
     recipe: { id: string; revision: string; digest: string };
@@ -438,7 +449,7 @@ export interface ResolvedRenderPlan {
   fingerprint: string;
 }
 
-export interface ConcatPlan {
+export interface LegacyConcatPlan {
   schema: "film.concat-plan@1";
   chapters: { chapterId: string; planDigest: string; artifactSha256: string; runtimeMs: number; offsetMs: number }[];
   profile: OutputProfile;
@@ -451,6 +462,12 @@ export interface ConcatPlan {
   lock: PlanLock;
   fingerprint: string;
 }
+
+export interface ConcatPlanV2 extends Omit<LegacyConcatPlan, "schema" | "chapters"> {
+  schema: "film.concat-plan@2";
+  chapters: (LegacyConcatPlan["chapters"][number] & { stemSha256: string; frames: number })[];
+}
+export type ConcatPlan = LegacyConcatPlan | ConcatPlanV2;
 
 export interface ChapterArtifact {
   schema: "film.chapter-artifact@1";

@@ -1,7 +1,7 @@
 // Concatenation Plan: the approved overall title, the ordered cached Chapter artifacts, and the
 // connection between them. It never redraws Chapter scenes; only the overall title is painted.
 import { filmError, FilmFailure } from "../contracts/errors.js";
-import type { ConcatPlan, FilmStyleRecipe, FilmTreatment, PlanLock, ResolvedRenderPlan, VersionRef } from "../contracts/types.js";
+import type { ConcatPlanV2, FilmStyleRecipe, FilmTreatment, PlanLock, ResolvedRenderPlan, VersionRef } from "../contracts/types.js";
 import { CAPABILITY_ABI } from "../capability-sdk/abi.js";
 import type { MediaLock } from "../media/lock.js";
 import { lockFonts, PROFILES, SCHEMA_VERSION, type FontCatalog } from "./compile.js";
@@ -11,7 +11,7 @@ import type { Catalog, CatalogEntry } from "./resolve.js";
 export const CONNECTION: VersionRef = { id: "film.connection.darken-briefly", version: "1.0.0" };
 
 export interface ConcatInput {
-  chapters: { plan: ResolvedRenderPlan; planDigest: string; artifactSha256: string }[];
+  chapters: { plan: ResolvedRenderPlan; planDigest: string; artifactSha256: string; stemSha256: string; frames: number }[];
   treatment: FilmTreatment;
   recipe: FilmStyleRecipe;
   catalog: Catalog;
@@ -28,7 +28,7 @@ function entryOf(catalog: Catalog, ref: VersionRef, path: string): CatalogEntry 
   return entry;
 }
 
-export function buildConcatPlan(input: ConcatInput): ConcatPlan {
+export function buildConcatPlan(input: ConcatInput): ConcatPlanV2 {
   if (!input.chapters.length) throw new FilmFailure([filmError("FS_SEMANTIC_INVALID", "/chapters", "a concatenation needs at least one Chapter artifact")]);
   const first = input.chapters[0]!.plan;
   const profile = PROFILES[first.profile.id]!;
@@ -55,14 +55,15 @@ export function buildConcatPlan(input: ConcatInput): ConcatPlan {
     assets: {},
   });
 
-  let offset = titleMs;
+  const titleFrames = Math.floor((titleMs * profile.fps + 500) / 1000);
+  const joinFrames = Math.floor((darkenMs * profile.fps + 500) / 1000);
+  let offset = titleFrames;
   const chapters = input.chapters.map((c, i) => {
-    const entry = { chapterId: c.plan.chapter.id, planDigest: c.planDigest, artifactSha256: c.artifactSha256, runtimeMs: c.plan.timing.proposal.runtimeMs, offsetMs: offset };
-    offset += entry.runtimeMs + (i < input.chapters.length - 1 ? darkenMs : 0);
+    const entry = { chapterId: c.plan.chapter.id, planDigest: c.planDigest, artifactSha256: c.artifactSha256, stemSha256: c.stemSha256, frames: c.frames, runtimeMs: c.frames * 1000 / profile.fps, offsetMs: offset * 1000 / profile.fps };
+    offset += c.frames + (i < input.chapters.length - 1 ? joinFrames : 0);
     return entry;
   });
-  const runtimeMs = titleMs + chapters.reduce((sum, c) => sum + c.runtimeMs, 0) + (chapters.length - 1) * darkenMs;
-  if (offset !== runtimeMs) throw new Error("internal: concatenation offsets disagree with the runtime formula");
+  const runtimeMs = offset * 1000 / profile.fps;
 
   const bgm = first.audio.bgm;
   const fontEntries = usedFonts.map((f) => input.fonts.get(f.font.id, f.font.version)).filter((e) => e !== undefined);
@@ -83,8 +84,8 @@ export function buildConcatPlan(input: ConcatInput): ConcatPlan {
     profile: profile.id,
     environment: input.environmentDigest,
   };
-  const plan: ConcatPlan = {
-    schema: "film.concat-plan@1",
+  const plan: ConcatPlanV2 = {
+    schema: "film.concat-plan@2",
     chapters,
     profile,
     frameQuantization: "round-half-up@1",
@@ -96,6 +97,8 @@ export function buildConcatPlan(input: ConcatInput): ConcatPlan {
     lock,
     fingerprint: concatFingerprint({
       artifactSha256: chapters.map((c) => c.artifactSha256),
+      stemSha256: chapters.map((c) => c.stemSha256),
+      frames: chapters.map((c) => c.frames!),
       overallTitle: input.treatment.overallTitle,
       connection: { ...CONNECTION, manifestDigest: connection.record.manifestDigest, implementationDigest: connection.record.implementationDigest },
       lock,

@@ -1,0 +1,27 @@
+{
+  "tool": "compile_concat",
+  "input": {
+    "treatment": {
+      "$fixture": "project/treatments/test-baseline.json"
+    },
+    "plansDir": "out/plans/test-baseline/",
+    "chapters": {
+      "$fixture": "project/chapters.json"
+    }
+  },
+  "cli": [
+    "compile",
+    "--treatment",
+    "fixtures/project/treatments/test-baseline.json",
+    "--chapters",
+    "fixtures/project/chapters.json",
+    "--concat",
+    "out/plans/test-baseline/",
+    "--dry-run"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": ["FS_ARTIFACT_VERIFY_FAILED"],
+    "mutationKinds": []
+  }
+}

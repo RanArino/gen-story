@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FIXTURES, contextFor, listFixtures, readFixture, type InvalidFixture } from "../testing/fixtures.js";
 import { ERROR_CODES } from "./errors.js";
-import { SCHEMA_KINDS, schemaDocument, type SchemaKind } from "./schemas.js";
+import { SCHEMA_KINDS, validateSchema, type SchemaKind } from "./schemas.js";
 import { validateDocument } from "./semantic.js";
 import type { StoryGraph } from "./types.js";
 
@@ -53,7 +53,7 @@ describe("canonical schemas", () => {
 
   it("every schema rejects unknown top-level properties", () => {
     for (const kind of SCHEMA_KINDS) {
-      expect(schemaDocument(kind).additionalProperties, kind).toBe(false);
+      expect(validateSchema(`urn:film-spike:${kind}`, { ...readFixture<object>(VALID.find(([name]) => name === kind)![1]), unknown: true }).length, kind).toBeGreaterThan(0);
     }
   });
 });

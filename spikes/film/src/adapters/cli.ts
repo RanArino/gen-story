@@ -1,3 +1,4 @@
+import { recordReview, type ReviewInput } from "../registry/reviews.js";
 import { requireApprovalTerminal } from "./approval-terminal.js";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -178,7 +179,7 @@ async function candidate(args: Parsed): Promise<number> {
       const r = env.result as { subject: string; digest: string };
       return [
         `${r.subject} promotion target ${r.digest}`,
-        `review with: film-spike review record ${r.digest} --subject ${r.subject} --reviewer <name> --verdict accept|reject --notes <text>`,
+        `review with: film-spike review record ${r.digest} --candidate ${value} --subject ${r.subject} --reviewer <name> --verdict accept|reject --notes <text>`,
         `then approve with: film-spike approve promotion ${r.digest} --subject ${r.subject}`,
       ];
     });
@@ -189,15 +190,27 @@ async function candidate(args: Parsed): Promise<number> {
   return 2;
 }
 
-function review(args: Parsed): number {
+async function review(args: Parsed): Promise<number> {
   const [sub, subjectDigest] = args.positional;
   const verdict = str(args.flags.verdict);
+  const candidate = str(args.flags.candidate);
   const [subject, reviewer, notes] = [str(args.flags.subject), str(args.flags.reviewer), str(args.flags.notes)];
-  if (sub !== "record" || !subjectDigest || !subject || !reviewer || !notes || (verdict !== "accept" && verdict !== "reject")) {
-    console.error("usage: film-spike review record <sha256:digest> --subject <text> --reviewer <name> --verdict accept|reject --notes <text>");
+  if (sub !== "record" || !subjectDigest || !candidate || !subject || !reviewer || !notes || (verdict !== "accept" && verdict !== "reject")) {
+    console.error("usage: film-spike review record <sha256:digest> --candidate <id> --subject <text> --reviewer <name> --verdict accept|reject --notes <text>");
     return 2;
   }
-  return report(service.reviewRecord({ subjectDigest, subject, reviewer, verdict, notes, dryRun: args.flags["dry-run"] === true }), args, (env) => env.dryRun ? [] : [`recorded ${(env.result as { id: string }).id}`]);
+  const input: ReviewInput = { candidate, subjectDigest, subject, reviewer, verdict, notes };
+  if (!args.flags["dry-run"] && (!process.stdin.isTTY || !process.stdout.isTTY)) return report(service.reviewRecord({ ...input, dryRun: false }), args);
+  const prepared = service.reviewRecord({ ...input, dryRun: true });
+  if (args.flags["dry-run"] || !prepared.ok) return report(prepared, args);
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const operator = await rl.question("Recording operator: ");
+    const confirmation = await rl.question(`Type ${prepared.result!.confirmation} to record this review: `);
+    const recorded = recordReview(defaultPaths(), service.registry, input, operator, confirmation);
+    console.log(`recorded ${recorded.id}`);
+    return 0;
+  } finally { rl.close(); }
 }
 
 function font(args: Parsed): number {
@@ -332,7 +345,7 @@ function preflight(args: Parsed): number {
 function compile(args: Parsed): number {
   const concatDir = str(args.flags.concat);
   if (concatDir) {
-    const env = service.compileConcat({ treatment: readArg<FilmTreatment>(args.flags.treatment, "treatment"), plansDir: concatDir, write: args.flags["dry-run"] !== true });
+    const env = service.compileConcat({ treatment: readArg<FilmTreatment>(args.flags.treatment, "treatment"), chapters: readArg<FilmChapters>(args.flags.chapters, "chapters"), plansDir: concatDir, write: args.flags["dry-run"] !== true });
     return report(env, args, (e) => [`${(e.result as { runtimeMs: number }).runtimeMs} ms`, `approve with: film-spike approve concat ${e.hashes.plan} --subject ${concatDir}`]);
   }
   const input = compileArgs(args);

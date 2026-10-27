@@ -9,6 +9,7 @@ import type {
   StoryScene,
   TimingProposal,
   VersionRef,
+  ResolvedRenderPlan,
 } from "../contracts/types.js";
 
 export function planDigest(plan: unknown): string {
@@ -50,11 +51,23 @@ export function chapterFingerprint(input: ChapterFingerprintInput): string {
 
 export interface ConcatFingerprintInput {
   artifactSha256: string[];
+  stemSha256: string[];
+  frames: number[];
   overallTitle: string;
   connection: VersionRef & { manifestDigest: string; implementationDigest: string | null };
   lock: PlanLock;
 }
 
 export function concatFingerprint(input: ConcatFingerprintInput): string {
-  return digestOf({ kind: "film.concat-fingerprint@1", ...input });
+  return digestOf({ kind: "film.concat-fingerprint@2", ...input });
+}
+
+/** Media identity preserves all materialized inputs except non-rendering parent bindings. */
+export function renderDigest(plan: ResolvedRenderPlan): string {
+  const material = structuredClone(plan);
+  Reflect.deleteProperty(material, "fingerprint");
+  Reflect.deleteProperty(material.chapter, "index");
+  Reflect.deleteProperty(material.provenance.storyGraph, "revision");
+  Reflect.deleteProperty(material.provenance.treatment, "revision");
+  return digestOf(material);
 }

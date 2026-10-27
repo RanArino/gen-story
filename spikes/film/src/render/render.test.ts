@@ -60,7 +60,7 @@ describe.skipIf(!CHROME)("rendering", () => {
       approvals[c.plan.chapter.id] = operatorApproves(world.paths, "timing", c.proposalDigest);
       rendered[c.plan.chapter.id] = ok(await world.service.renderChapter({ planFile: planFile("baseline", c.plan.chapter.id), approvalId: approvals[c.plan.chapter.id]! })) as ChapterResult;
     }
-    const built = world.service.compileConcat({ treatment, plansDir: `${world.paths.out}plans/baseline/`, write: true });
+    const built = world.service.compileConcat({ treatment, chapters, plansDir: `${world.paths.out}plans/baseline/`, write: true });
     concatPlan = ok(built);
     concat = ok(
       await world.service.renderConcat({ planFile: `${world.paths.out}plans/baseline/concat.plan.json`, approvalId: operatorApproves(world.paths, "concat", built.hashes.plan!) }),
@@ -83,8 +83,8 @@ describe.skipIf(!CHROME)("rendering", () => {
       const plan = plans[id]!;
       const file = artifactFile("baseline", `${id}.mp4`);
       const frames = frameCount(plan.timing.proposal.runtimeMs, 30);
-      expect(await verifyMp4(file, frames, plan.profile)).toEqual([]);
-      expect(await probe(file)).toEqual({ video: { codec: "h264", width: 1920, height: 1080, rate: "30/1", frames }, audio: { codec: "aac", sampleRate: 48000, channels: 2 } });
+      expect(await verifyMp4(file, frames, plan.profile, plan.timing.proposal.limitMs)).toEqual([]);
+      expect(await probe(file)).toMatchObject({ video: { codec: "h264", width: 1920, height: 1080, rate: "30/1", frames }, audio: { codec: "aac", sampleRate: 48000, channels: 2 } });
       expect(rendered[id]!.artifact).toMatchObject({ frames, verified: true });
       expect(plan.segments[0]).toMatchObject({ kind: "title", startMs: 0 });
     }
@@ -162,7 +162,7 @@ describe.skipIf(!CHROME)("rendering", () => {
     const again2 = ok(await world.service.renderChapter({ planFile: planFile("baseline-s7", "c2"), approvalId: operatorApproves(world.paths, "timing", c2.proposalDigest) })) as ChapterResult;
     expect(again2.cache).toBe("miss");
 
-    const built = world.service.compileConcat({ treatment, plansDir: `${world.paths.out}plans/baseline-s7/`, write: true });
+    const built = world.service.compileConcat({ treatment, chapters: edited, plansDir: `${world.paths.out}plans/baseline-s7/`, write: true });
     const plan = ok(built);
     expect(plan.fingerprint).not.toBe(concatPlan.fingerprint);
     expect(plan.chapters[0]!.artifactSha256).toBe(concatPlan.chapters[0]!.artifactSha256);

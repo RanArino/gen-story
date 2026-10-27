@@ -5,7 +5,8 @@
     "subject": "test",
     "reviewer": "test reviewer",
     "verdict": "accept",
-    "notes": "Synthetic test review."
+    "notes": "Synthetic test review.",
+    "candidate": "missing"
   },
   "cli": [
     "review",
@@ -19,11 +20,13 @@
     "accept",
     "--notes",
     "Synthetic test review.",
-    "--dry-run"
+    "--dry-run",
+    "--candidate",
+    "missing"
   ],
   "expected": {
-    "ok": true,
-    "errorCodes": [],
+    "ok": false,
+    "errorCodes": ["FS_SEMANTIC_INVALID"],
     "mutationKinds": []
   }
 }

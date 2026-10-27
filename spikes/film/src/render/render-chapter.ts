@@ -1,5 +1,7 @@
 // Renders one Resolved Render Plan into a verified Chapter artifact: an MP4 with the BGM mixed in,
-// a WAV stem of the Chapter's other sound, and metadata. Artifacts are cached by fingerprint.
+// a WAV stem of the Chapter's other sound, and metadata. Media is cached by render digest.
+import { chapterCacheDir, resolveChapterCache } from "./cache.js";
+import { verifyAudio } from "./inputs.js";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { relative, resolve } from "node:path";
@@ -93,22 +95,6 @@ function fileEntry(path: string, name: string) {
   return { name, sha256: digestBytes(readFileSync(path)), bytes: statSync(path).size };
 }
 
-/** Reuses a cached artifact only when every stored file still matches its recorded digest. */
-function cached(dir: string, planDigestValue: string, warnings: Warning[]): ChapterArtifact | null {
-  const meta = `${dir}artifact.json`;
-  if (!existsSync(meta)) return null;
-  const artifact = JSON.parse(readFileSync(meta, "utf8")) as ChapterArtifact;
-  const intact =
-    artifact.verified &&
-    artifact.planDigest === planDigestValue &&
-    [artifact.files.mp4, artifact.files.stem].every((f) => existsSync(`${dir}${f.name}`) && digestBytes(readFileSync(`${dir}${f.name}`)) === f.sha256) &&
-    existsSync(`${dir}frames.json`);
-  if (intact) return artifact;
-  warnings.push({ code: "FS_CACHE_CORRUPT", path: dir, message: "a cached Chapter artifact did not match its digests; it was discarded and rebuilt", disposition: null });
-  rmSync(dir, { recursive: true, force: true });
-  return null;
-}
-
 export interface CaptureResult {
   samples: FrameSample[];
   blocked: string[];
@@ -164,21 +150,24 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
   const planPath = outRelative(paths, input.planFile);
   const outName = input.outName ?? planPath.split("/").at(-2)!;
   const chapterId = plan.chapter.id;
-  const cacheDir = `${paths.state}cache/chapters/${plan.fingerprint.slice("sha256:".length)}/`;
+  const cacheDir = chapterCacheDir(paths.state, plan);
+  verifyAudio(paths.media, [plan.audio.bgm, ...plan.audio.events]);
   const warnings: Warning[] = [];
   const frames = frameCount(plan.timing.proposal.runtimeMs, plan.profile.fps);
 
-  let artifact = input.bypassCache ? null : cached(cacheDir, digest, warnings);
+  let artifact = input.bypassCache ? null : resolveChapterCache(paths.state, plan)?.artifact ?? null;
   let cache: "hit" | "miss" = artifact ? "hit" : "miss";
   let capture: CaptureResult & { fonts: string[] } = { samples: [], blocked: [], fonts: [] };
   let serverLog: ServerLog | null = null;
 
   if (!artifact) {
     cache = "miss";
-    const work = `${paths.state}cache/chapters/.tmp-${process.pid}-${chapterId}/`;
+    const work = `${paths.state}cache/chapter-media-v2/.tmp-${process.pid}-${chapterId}/`;
     rmSync(work, { recursive: true, force: true });
     mkdirSync(work, { recursive: true });
     try {
+      const audioDir = `${work}audio/`;
+      verifyAudio(paths.media, [plan.audio.bgm, ...plan.audio.events], audioDir);
       const server = await startServer(paths);
       try {
         const result = await withBrowser(async (browser) => {
@@ -196,15 +185,15 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
       const lock = readMediaLock(paths.media);
       const assetMs = (asset: string) => lock.files.find((f) => f.path === asset)?.durationMs ?? 0;
       const runtimeMs = plan.timing.proposal.runtimeMs;
-      const stem = stemGraph(plan.audio.events, runtimeMs, paths.media, assetMs);
+      const stem = stemGraph(plan.audio.events, runtimeMs, audioDir, assetMs);
       const stemName = `${chapterId}.stem.wav`;
       await ffmpeg([...stem.inputs, "-filter_complex", stem.filter, "-map", stem.output, "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-fflags", "+bitexact", "-flags:a", "+bitexact", `${work}${stemName}`]);
-      const bed = bedGraph({ bgm: plan.audio.bgm, runtimeMs, stems: [{ file: `${work}${stemName}`, startMs: 0 }], mediaDir: paths.media, firstInput: 1 });
+      const bed = bedGraph({ bgm: plan.audio.bgm, runtimeMs, stems: [{ file: `${work}${stemName}`, startMs: 0 }], mediaDir: audioDir, firstInput: 1 });
       const mp4Name = `${chapterId}.mp4`;
-      await ffmpeg(["-i", `${work}video.mp4`, ...bed.inputs, "-filter_complex", bed.filter, "-map", "0:v", "-c:v", "copy", "-map", bed.output, ...AAC, "-movflags", "+faststart", `${work}${mp4Name}`]);
+      await ffmpeg(["-i", `${work}video.mp4`, ...bed.inputs, "-filter_complex", bed.filter, "-map", "0:v", "-c:v", "copy", "-map", bed.output, ...AAC, "-movie_timescale", "48000", "-movflags", "+faststart", `${work}${mp4Name}`]);
       rmSync(`${work}video.mp4`);
 
-      const errors = await verifyMp4(`${work}${mp4Name}`, frames, plan.profile);
+      const errors = await verifyMp4(`${work}${mp4Name}`, frames, plan.profile, plan.timing.proposal.limitMs);
       if (errors.length) throw new FilmFailure(errors);
       artifact = {
         schema: "film.chapter-artifact@1",
@@ -228,25 +217,31 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
       if (schemaErrors.length) throw new FilmFailure(schemaErrors);
       writeJson(`${work}artifact.json`, artifact);
       writeJson(`${work}frames.json`, { planDigest: digest, samples: capture.samples });
-      rmSync(cacheDir, { recursive: true, force: true });
-      renameSync(work, cacheDir);
+      writeJson(`${work}origin.plan.json`, plan);
+      rmSync(audioDir, { recursive: true, force: true });
+      if (!existsSync(cacheDir)) renameSync(work, cacheDir);
+      else {
+        const existing = resolveChapterCache(paths.state, plan)!;
+        if (digestOf(existing.artifact.files) !== digestOf(artifact.files)) fail("FS_NONDETERMINISTIC", "/files", "replay differs from immutable cached media");
+      }
     } finally {
       rmSync(work, { recursive: true, force: true });
     }
   }
 
-  const samples = (JSON.parse(readFileSync(`${cacheDir}frames.json`, "utf8")) as { samples: FrameSample[] }).samples;
+  const samples = input.bypassCache ? capture.samples : (JSON.parse(readFileSync(`${cacheDir}frames.json`, "utf8")) as { samples: FrameSample[] }).samples;
   const target = `${paths.out}artifacts/${outName}/`;
   mkdirSync(target, { recursive: true });
   const files: string[] = [];
   for (const [from, to] of [
     [artifact.files.mp4.name, `${chapterId}.mp4`],
     [artifact.files.stem.name, `${chapterId}.stem.wav`],
-    ["artifact.json", `${chapterId}.json`],
-    ["frames.json", `${chapterId}.frames.json`],
   ] as const) {
     copyFileSync(`${cacheDir}${from}`, `${target}${to}`);
     files.push(`out/artifacts/${outName}/${to}`);
   }
+  writeJson(`${target}${chapterId}.json`, artifact);
+  writeJson(`${target}${chapterId}.frames.json`, { planDigest: digest, samples });
+  files.push(`out/artifacts/${outName}/${chapterId}.json`, `out/artifacts/${outName}/${chapterId}.frames.json`);
   return { artifact, cache, samples, files, warnings, blocked: capture.blocked, fonts: capture.fonts, server: serverLog, renderMs: Math.round(performance.now() - started) };
 }

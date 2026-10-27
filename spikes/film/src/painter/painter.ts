@@ -200,7 +200,7 @@ export function drawFrame(surface: Surface, nodes: PainterNode[], t: number, opt
 
 /** The layers a document paints: a Chapter Plan's layers, or a concatenation Plan's overall title. */
 export function paintedLayers(doc: ResolvedRenderPlan | ConcatPlan): PainterNode[] {
-  return doc.schema === "film.concat-plan@1" ? doc.overallTitle.layers : doc.layers;
+  return "overallTitle" in doc ? doc.overallTitle.layers : doc.layers;
 }
 
 export function imageAssets(nodes: PainterNode[], out = new Set<string>()): Set<string> {
@@ -275,7 +275,7 @@ async function boot(): Promise<void> {
       return layer;
     },
   };
-  const runtimeMs = doc.schema === "film.concat-plan@1" ? doc.overallTitle.titleMs : doc.timing.proposal.runtimeMs;
+  const runtimeMs = "overallTitle" in doc ? doc.overallTitle.titleMs : doc.timing.proposal.runtimeMs;
   const handle: PainterHandle = {
     digest,
     runtimeMs,

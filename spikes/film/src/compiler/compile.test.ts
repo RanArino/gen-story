@@ -351,14 +351,14 @@ describe("concatenation Plan", () => {
   it("runtime is overall title + Σ Chapter runtimes + one 800 ms darken per join; fingerprint follows artifacts", () => {
     const compiled = compile(treatment("baseline"));
     const fake = (n: number) => ({ files: { mp4: { name: "x.mp4", sha256: `sha256:${String(n).repeat(64).slice(0, 64)}`, bytes: 1 }, stem: { name: "x.wav", sha256: `sha256:${"e".repeat(64)}`, bytes: 1 } } });
-    const result = service.concatPlan({ treatment: treatment("baseline"), artifacts: compiled.map((c, i) => ({ plan: c.plan, artifact: fake(i + 1) })) });
+    const result = service.concatPlan({ treatment: treatment("baseline"), chapters, artifacts: compiled.map((c, i) => ({ plan: c.plan, artifact: fake(i + 1) })) });
     if (!result.ok) throw new Error(JSON.stringify(result.errors));
     const plan = result.result!;
-    const sum = compiled.reduce((a, c) => a + c.proposal.runtimeMs, 0);
+    const sum = compiled.reduce((a, c) => a + Math.floor((c.proposal.runtimeMs * 30 + 500) / 1000) * 1000 / 30, 0);
     expect(plan.runtimeMs).toBe(plan.overallTitle.titleMs + sum + 800);
     expect(plan.connection).toMatchObject({ ref: { id: "film.connection.darken-briefly", version: "1.0.0" }, darkenMs: 800, brightnessTo: 0.45 });
-    expect(plan.chapters.map((c) => c.offsetMs)).toEqual([plan.overallTitle.titleMs, plan.overallTitle.titleMs + compiled[0]!.proposal.runtimeMs + 800]);
-    const changed = service.concatPlan({ treatment: treatment("baseline"), artifacts: compiled.map((c, i) => ({ plan: c.plan, artifact: fake(i + 3) })) });
+    expect(plan.chapters.map((c) => c.offsetMs)).toEqual([plan.overallTitle.titleMs, plan.overallTitle.titleMs + Math.floor((compiled[0]!.proposal.runtimeMs * 30 + 500) / 1000) * 1000 / 30 + 800]);
+    const changed = service.concatPlan({ treatment: treatment("baseline"), chapters, artifacts: compiled.map((c, i) => ({ plan: c.plan, artifact: fake(i + 3) })) });
     expect(changed.result!.fingerprint).not.toBe(plan.fingerprint);
   });
 });

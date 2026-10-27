@@ -1,5 +1,7 @@
 // The one typed authoring service. The CLI and the Tool Calling adapter call only this module.
 // Mutating operations default to dry run and require a matching operator approval to write.
+import { resolveChapterCache } from "../render/cache.js";
+import { frameCount } from "../render/ffmpeg.js";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { digestOf } from "../contracts/canonical.js";
@@ -28,7 +30,7 @@ import type { CapabilityRequest } from "../contracts/types.js";
 import { loadImplementation } from "../capabilities/loader.js";
 import { compileChapters, preflightChapters, type CompileInput, type FontCatalog, type FontEntry } from "../compiler/compile.js";
 import { buildConcatPlan, CONNECTION } from "../compiler/concat.js";
-import { planDigest } from "../compiler/fingerprint.js";
+import { planDigest, renderDigest } from "../compiler/fingerprint.js";
 import { resolveRecipe, type Catalog, type CatalogEntry } from "../compiler/resolve.js";
 import { readFingerprint, type EnvFingerprint } from "../env/fingerprint.js";
 import { grammarMetrics } from "../evaluation/grammar.js";
@@ -40,7 +42,7 @@ import { writeJson, type SpikePaths } from "../paths.js";
 import { requireApproval } from "../registry/approvals.js";
 import { bootstrapBuiltins } from "../registry/bootstrap.js";
 import { Registry } from "../registry/registry.js";
-import { recordReview, type ReviewInput } from "../registry/reviews.js";
+import { prepareReview, type ReviewInput } from "../registry/reviews.js";
 import { renderConcat } from "../render/concat.js";
 import { contactSheet } from "../render/contact-sheet.js";
 import { loadChapterPlan, loadConcatPlan, renderChapter, type RenderChapterInput, type RenderDeps } from "../render/render-chapter.js";
@@ -253,12 +255,20 @@ export function createService(deps: ServiceDeps) {
     return record;
   };
 
-  const buildConcat = (treatment: FilmTreatment, artifacts: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[]): ConcatPlan => {
+  const buildConcat = (treatment: FilmTreatment, chapters: FilmChapters, supplied: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[]): ConcatPlan => {
+    const expected = compileChapters(compileInput(treatment, chapters, supplied.find(a => chapters.chapters.some(c => c.id === a.plan.chapter.id))?.plan.options ?? {}));
+    const artifacts = expected.map(({ plan: current }) => {
+      const matches = supplied.filter(a => a.plan.chapter.id === current.chapter.id);
+      if (matches.length !== 1) fail("FS_SEMANTIC_INVALID", "/chapters", `${current.chapter.id} needs exactly one selected Plan; found ${matches.length}`);
+      const selected = matches[0]!;
+      if (renderDigest(selected.plan) !== renderDigest(current)) fail("FS_SEMANTIC_INVALID", "/chapters", `${current.chapter.id} has stale scene membership, title, settings, dependencies, or profile; recompile it`);
+      return { ...selected, plan: current };
+    });
     const recipe = findRecipe(treatment.recipe);
     const typography = artifacts[0]?.plan.capabilities.find((c) => c.slot === "typography")?.active;
     const refs: ExactRef[] = [CONNECTION, ...(typography ? [typography] : [])].map((r) => ({ ...r, digest: exactRecord(r.id, r.version).manifestDigest }));
     const plan = buildConcatPlan({
-      chapters: artifacts.map((a) => ({ plan: a.plan, planDigest: planDigest(a.plan), artifactSha256: a.artifact.files.mp4.sha256 })),
+      chapters: artifacts.map((a) => ({ plan: a.plan, planDigest: planDigest(a.plan), artifactSha256: a.artifact.files.mp4.sha256, stemSha256: a.artifact.files.stem.sha256, frames: frameCount(a.plan.timing.proposal.runtimeMs, a.plan.profile.fps) })),
       treatment,
       recipe,
       catalog: capabilityCatalog(refs),
@@ -503,11 +513,10 @@ export function createService(deps: ServiceDeps) {
     },
 
     reviewRecord(input: ReviewInput & { dryRun?: boolean }) {
-      const { dryRun = false, ...reviewInput } = input;
-      return envelope("review.record", dryRun, () => {
-        const review = recordReview(paths.state, reviewInput, undefined, !dryRun);
-        if (dryRun) return {};
-        return { result: review, mutations: [{ kind: "review.record", target: review.id, beforeDigest: null, afterDigest: digestOf(review) }] };
+      const { dryRun = true, ...reviewInput } = input;
+      return envelope("review.record", true, () => {
+        if (!dryRun) fail("FS_OPERATOR_REQUIRED", "", "review service is preparation-only; use the interactive CLI recorder");
+        return { result: prepareReview(paths, registry, reviewInput) };
       });
     },
 
@@ -646,7 +655,7 @@ export function createService(deps: ServiceDeps) {
 
     /**
      * Renders one Chapter Plan into a verified artifact. Requires a timing approval bound to the
-     * Plan's proposal digest; reuses the fingerprint cache unless `bypassCache`.
+     * Plan's proposal digest; reuses immutable render-digest media unless `bypassCache`.
      */
     renderChapter(input: RenderChapterInput & { dryRun?: boolean }) {
       return envelopeAsync("render.chapter", input.dryRun ?? false, async () => {
@@ -667,9 +676,9 @@ export function createService(deps: ServiceDeps) {
     },
 
     /** Builds the concatenation Plan from compiled Chapter Plans and their verified artifact digests. */
-    concatPlan(input: { treatment: FilmTreatment; artifacts: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[] }): ResultEnvelope<ConcatPlan> {
+    concatPlan(input: { treatment: FilmTreatment; chapters: FilmChapters; artifacts: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[] }): ResultEnvelope<ConcatPlan> {
       return envelope("compile", true, () => {
-        const plan = buildConcat(input.treatment, input.artifacts);
+        const plan = buildConcat(input.treatment, input.chapters, input.artifacts);
         return { result: plan, hashes: { plan: planDigest(plan), fingerprint: plan.fingerprint } };
       });
     },
@@ -678,24 +687,21 @@ export function createService(deps: ServiceDeps) {
      * Builds the concatenation Plan for the Chapter Plans in out/plans/<name>/ from their verified,
      * cached artifacts. With `write`, it goes to concat.plan.json; rendering needs a `concat` approval.
      */
-    compileConcat(input: { treatment: FilmTreatment; plansDir: string; write?: boolean }): ResultEnvelope<ConcatPlan> {
+    compileConcat(input: { treatment: FilmTreatment; chapters: FilmChapters; plansDir: string; write?: boolean }): ResultEnvelope<ConcatPlan> {
       return envelope("compile", !input.write, () => {
         const dir = resolve(paths.root, input.plansDir) + "/";
         if (!existsSync(dir)) fail("FS_SCHEMA_INVALID", "/plans", `${input.plansDir} does not exist; compile the Chapters first`);
+        const ids = new Set(input.chapters.chapters.map(c => c.id));
         const plans = readdirSync(dir)
           .filter((f) => f.endsWith(".plan.json") && f !== "concat.plan.json")
-          .map((f) => loadChapterPlan(paths, `${dir}${f}`))
-          .sort((a, b) => a.chapter.index - b.chapter.index);
-        if (!plans.length) fail("FS_SCHEMA_INVALID", "/plans", `${input.plansDir} holds no Chapter Plans`);
+          .filter((f) => ids.has(readJson<{ chapter?: { id?: string } }>(`${dir}${f}`).chapter?.id ?? ""))
+          .map((f) => loadChapterPlan(paths, `${dir}${f}`));
         const artifacts = plans.map((plan) => {
-          const meta = `${paths.state}cache/chapters/${plan.fingerprint.slice("sha256:".length)}/artifact.json`;
-          const artifact = existsSync(meta) ? readJson<ChapterArtifact>(meta) : null;
-          if (!artifact?.verified || artifact.planDigest !== planDigest(plan)) {
-            fail("FS_ARTIFACT_VERIFY_FAILED", `/chapters/${plan.chapter.index}`, `${plan.chapter.id} has no verified artifact for this Plan; render it first`);
-          }
-          return { plan, artifact };
+          const found = resolveChapterCache(paths.state, plan);
+          if (!found) fail("FS_ARTIFACT_VERIFY_FAILED", "/chapters", `${plan.chapter.id} has no verified media; render it first`);
+          return { plan, artifact: found.artifact };
         });
-        const plan = buildConcat(input.treatment, artifacts);
+        const plan = buildConcat(input.treatment, input.chapters, artifacts);
         const evidence: string[] = [];
         if (input.write) {
           writeJson(`${dir}concat.plan.json`, plan);

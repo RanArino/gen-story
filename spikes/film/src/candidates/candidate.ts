@@ -9,7 +9,7 @@ import type { CapabilityManifest, CapabilityRequest, RegistryRecord, ValidationR
 import { writeAtomic, writeJson, type SpikePaths } from "../paths.js";
 import { requireApproval } from "../registry/approvals.js";
 import type { Registry } from "../registry/registry.js";
-import { requireAcceptedReview } from "../registry/reviews.js";
+import { requireAcceptedReview, reviewBinding } from "../registry/reviews.js";
 import { candidateInputs } from "./inputs.js";
 import { checkOutput, executeContained, runtimeIdentity } from "./runtime.js";
 import { checkManifest, checkSource } from "./static.js";
@@ -188,7 +188,7 @@ export function planPromotion(paths: SpikePaths, registry: Registry, candidate: 
 /** Promotion needs an accepted independent review of the target, then an exact promotion approval. */
 export function promoteCandidate(paths: SpikePaths, registry: Registry, input: { candidate: string; approvalId?: string; dryRun?: boolean }) {
   const plan = planPromotion(paths, registry, input.candidate);
-  const review = requireAcceptedReview(paths.state, plan.promotionDigest);
+  const review = requireAcceptedReview(paths.state, plan.promotionDigest, reviewBinding(paths, registry, input.candidate));
   const approval = requireApproval(paths.state, input.approvalId, "promotion", plan.promotionDigest);
   if (input.dryRun ?? true) return { plan, record: null, created: false };
   const receipt = JSON.parse(readFileSync(`${plan.dir}request.json`, "utf8")) as { approvalId: string };

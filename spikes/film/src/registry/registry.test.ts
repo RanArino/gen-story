@@ -1,3 +1,4 @@
+import { writeJson } from "../paths.js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FilmFailure } from "../contracts/errors.js";
@@ -10,7 +11,7 @@ import { operatorApproves, tempPaths } from "../testing/state.js";
 import { confirmationFor, createApproval, requireApproval } from "./approvals.js";
 import { bootstrapBuiltins } from "./bootstrap.js";
 import { Registry } from "./registry.js";
-import { recordReview, requireAcceptedReview } from "./reviews.js";
+import { requireAcceptedReview } from "./reviews.js";
 
 function codeOf(fn: () => unknown): string | undefined {
   try {
@@ -105,11 +106,12 @@ describe("approvals and reviews", () => {
   it("promotion evidence needs an accepted independent review", () => {
     const paths = tempPaths();
     const digest = `sha256:${"c".repeat(64)}`;
-    expect(codeOf(() => requireAcceptedReview(paths.state, digest))).toBe("FS_REVIEW_REQUIRED");
-    recordReview(paths.state, { subjectDigest: digest, subject: "x", reviewer: "reviewer", verdict: "reject", notes: "Edge flickers." });
-    expect(codeOf(() => requireAcceptedReview(paths.state, digest))).toBe("FS_REVIEW_REQUIRED");
-    recordReview(paths.state, { subjectDigest: digest, subject: "x", reviewer: "reviewer", verdict: "accept", notes: "Fixed." });
-    expect(requireAcceptedReview(paths.state, digest).verdict).toBe("accept");
+    const binding = { candidate: "x", subject: "x", author: "author", requester: "requester" };
+    const requireReview = () => requireAcceptedReview(paths.state, digest, binding);
+    expect(codeOf(requireReview)).toBe("FS_REVIEW_REQUIRED");
+    const legacy = { schema: "film.review-record@1", id: "rev-000000000000", subjectDigest: digest, subject: "x", reviewer: "reviewer", verdict: "accept", notes: "Fixed.", createdAt: new Date().toISOString() };
+    writeJson(`${paths.state}reviews/${legacy.id}.json`, legacy);
+    expect(codeOf(requireReview)).toBe("FS_REVIEW_REQUIRED");
   });
 });
 
