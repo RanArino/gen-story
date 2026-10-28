@@ -24,3 +24,6 @@ apps/api/data/uploads/
 
 # Internal strategy, requirements, and planning docs (not for public release)
 internal/
+
+# Private film reference project (supplied separately, not for public release)
+film-making-idea/

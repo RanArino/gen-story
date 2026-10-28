@@ -1,3 +1,4 @@
+import { setImmediate } from "node:timers/promises";
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -166,5 +167,6 @@ describe("Tool Calling", () => {
     const cli = JSON.parse(run.stdout) as ResultEnvelope;
     expect(withoutEvidenceTime(cli)).toEqual(withoutEvidenceTime(adapter));
     if (cli.dryRun || !cli.ok) expect(snapshot()).toEqual(cliBefore);
+    await setImmediate();
   }, 15_000);
 });

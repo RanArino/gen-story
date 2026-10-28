@@ -35,6 +35,7 @@ export const ERROR_CODES = {
   FS_RESOURCE_CEILING: { owner: "capability-author", remediation: "Stay within the declared budget and the time ceiling." },
   FS_APPROVAL_REQUIRED: { owner: "operator", remediation: "Obtain the approval with `film-spike approve` and pass its id." },
   FS_APPROVAL_MISMATCH: { owner: "operator", remediation: "Pass an approval bound to this exact kind and digest." },
+  FS_OPERATOR_REQUIRED: { owner: "operator", remediation: "Run the prepared review command in an interactive terminal and confirm the current digest." },
   FS_REVIEW_REQUIRED: { owner: "operator", remediation: "Record an independent review before promotion." },
   FS_REPLAY_MISSING_VERSION: { owner: "operator", remediation: "Restore the exact pinned version; replay never loads a newer one." },
   FS_ENV_MISMATCH: { owner: "operator", remediation: "Recompile the Plan in the current environment or restore the pinned one." },

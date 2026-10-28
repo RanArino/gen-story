@@ -1,0 +1,32 @@
+{
+  "tool": "review_record",
+  "input": {
+    "subjectDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "subject": "test",
+    "reviewer": "test reviewer",
+    "verdict": "accept",
+    "notes": "Synthetic test review.",
+    "candidate": "missing",
+    "dryRun": false
+  },
+  "cli": [
+    "review",
+    "record",
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "--subject",
+    "test",
+    "--reviewer",
+    "test reviewer",
+    "--verdict",
+    "accept",
+    "--notes",
+    "Synthetic test review.",
+    "--candidate",
+    "missing"
+  ],
+  "expected": {
+    "ok": false,
+    "errorCodes": ["FS_OPERATOR_REQUIRED"],
+    "mutationKinds": []
+  }
+}

@@ -105,9 +105,9 @@ export async function psnr(png: Buffer, file: string, frame: number): Promise<nu
   const dir = mkdtempSync(`${tmpdir()}/film-psnr-`);
   try {
     writeFileSync(`${dir}/f.png`, png);
-    const r = await run("ffmpeg", ["-hide_banner", "-i", `${dir}/f.png`, "-i", file, "-filter_complex", `[0:v]format=rgb24[a];[1:v]${frameFilter(frame)},format=rgb24[b];[a][b]psnr`, "-frames:v", "1", "-f", "null", "-"]);
+    const r = await run("ffmpeg", ["-hide_banner", "-i", `${dir}/f.png`, "-i", file, "-filter_complex", `[0:v]format=rgb24,settb=AVTB,setpts=PTS-STARTPTS[a];[1:v]${frameFilter(frame)},format=rgb24,settb=AVTB,setpts=PTS-STARTPTS[b];[a][b]psnr`, "-frames:v", "1", "-an", "-f", "null", "-"]);
     const match = /average:([0-9.]+|inf)/.exec(r.stderr);
-    if (!match?.[1]) throw new Error(`psnr failed: ${r.stderr.slice(-500)}`);
+    if (r.code !== 0 || !match?.[1]) throw new Error(`psnr failed: ${r.stderr.slice(-500)}`);
     return match[1] === "inf" ? Infinity : Number(match[1]);
   } finally {
     rmSync(dir, { recursive: true, force: true });

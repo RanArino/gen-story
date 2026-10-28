@@ -1,7 +1,7 @@
 # @gen-story/film-spike
 
 Non-production spike for the photo-to-film authoring contracts. See the private ExecPlan
-`internal/plans/active/20261021-photo-to-film-spike.md`. Nothing in `apps/*` or `packages/*`
+`internal/plans/completed/20261021-photo-to-film-spike.md`. Nothing in `apps/*` or `packages/*`
 imports this package.
 
 All commands below run from `spikes/film/` (or prefix them with
@@ -97,7 +97,7 @@ in a different environment (Chrome, ffmpeg, Node, OS, or painter source) is refu
 
     pnpm cli approve timing <proposal digest> --subject c1          # operator, interactive
     pnpm cli render chapter out/plans/verified-baseline/c1.plan.json --approval <id> [--no-cache]
-    pnpm cli compile --treatment fixtures/project/treatments/verified-baseline.json --concat out/plans/verified-baseline/
+    pnpm cli compile --treatment fixtures/project/treatments/verified-baseline.json --chapters fixtures/project/chapters.json --concat out/plans/verified-baseline/
     pnpm cli approve concat <concat plan digest> --subject verified-baseline
     pnpm cli render concat out/plans/verified-baseline/concat.plan.json --approval <id>
     pnpm cli contact-sheet out/plans/verified-baseline/c1.plan.json [--grayscale]
@@ -105,10 +105,24 @@ in a different environment (Chrome, ffmpeg, Node, OS, or painter source) is refu
 
 `render chapter` writes `out/artifacts/<name>/<chapter>.{mp4,stem.wav,json,frames.json}` after
 ffprobe verifies the exact frame count, 1920x1080, 30 fps, and AAC 48 kHz. Artifacts are cached
-in `.state/cache/chapters/<fingerprint>/`; an unchanged Chapter is a cache hit, and a cached file
-that no longer matches its digest is discarded and rebuilt. `compile --concat` builds the
-concatenation Plan from the verified cached Chapters. `render concat` paints only the overall
-title, joins the Chapter video by stream copy (Chapter frames stay identical), darkens the last
+in `.state/cache/chapter-media-v2/<render-digest>/`. The render digest omits only parent
+Story Graph/Treatment revision numbers, Chapter index, and the existing fingerprint.
+New Chapter Plans also bind `provenance.projectId`; legacy Plans remain readable and must be
+recompiled before concatenation. Plans and cache metadata remain immutable; reuse writes fresh output metadata bound to the
+current full Plan digest. New storage starts cold once, leaving legacy caches intact. Damaged
+Chapter media fails with `FS_ARTIFACT_VERIFY_FAILED`; `render chapter --no-cache` replaces a
+damaged or incomplete cache entry with the verified re-render and warns `FS_CACHE_CORRUPT`.
+
+`compile --concat` requires the current `--chapters` document, selecting exactly its Chapter IDs
+and order. Removed Chapters can leave files behind; those files are ignored. Missing, duplicate,
+or stale selected Plans fail. Current settings, scene provenance, Recipe, fonts, and overall-title
+glyph coverage are revalidated independently of parent revision numbers. A supported title-only
+change reuses Chapter media; missing glyphs fail at `/overallTitle` with `FS_GLYPH_MISSING`.
+
+New concatenation Plans use `film.concat-plan@2`, pinning both MP4 and stem checksums and actual
+Chapter frame counts in fingerprints and approvals. Legacy v1 Plans remain readable, but rendering
+requires compiling v2 and obtaining its new approval; approved Plans are never silently upgraded.
+`render concat` paints only the overall title, joins the Chapter video by stream copy (Chapter frames stay identical), darkens the last
 Chapter frame for 800 ms at each join, and lays the BGM continuously under the cached stems.
 
 The render server listens on 127.0.0.1 only and serves the runtime pages, the painter
@@ -196,18 +210,24 @@ This re-executes exactly the approved inputs and fails with `FS_NONDETERMINISTIC
 `out/candidates/<candidate>/evidence/{clip.mp4,contact-sheet.png}` and `evidence.json`.
 It is implemented for transitions only.
 
-Review, then promotion:
+Operator-recorded independent review, then separate promotion approval:
 
     pnpm cli candidate promotion-target torn-reveal     # prints the digest to review and approve
-    pnpm cli review record <promotion digest> --subject <id@version> --reviewer <name> --verdict accept --notes <text>
+    pnpm cli review record <promotion digest> --candidate torn-reveal --subject <id@version> --reviewer <name> --verdict accept --notes <text>
     pnpm cli approve promotion <promotion digest> --subject <id@version>
     pnpm cli registry promote torn-reveal --approval <id> --apply
 
 The promotion target binds the Manifest, implementation bytes, execution target, and the static,
 runtime, compile, and evidence reports. `registry promote` refuses with `FS_REVIEW_REQUIRED` until an
 accepted review of that exact digest exists, then requires the promotion approval. It stores the reports as
-registry blobs and offers the version for new work. Reviews are recorded by someone who did not author
-the candidate; a review is evidence, not an approval.
+registry blobs and offers the version for new work. The service and `review_record` tool only prepare
+a review and return the operator command. Applied service/tool requests fail with `FS_OPERATOR_REQUIRED`.
+Only the CLI persists a review, after actual stdin/stdout TTY checks and typed digest confirmation.
+It recomputes the current candidate target and rejects stale digests and a reviewer matching the
+Manifest author or request requester after Unicode normalization, trimming, and case folding.
+`film.review-record@2` binds candidate, both author identities, reviewer, recording operator,
+verdict, notes, and confirmation provenance. Legacy evidence and promoted entries remain intact;
+legacy reviews cannot authorize new promotion. This local operator boundary adds no authentication service.
 
 Replay a pinned Chapter Plan (read-only):
 
@@ -234,13 +254,14 @@ The resumed local A30 transcript is `out/evidence/skill-walkthrough.md`. Runtime
 The 31 tool names, descriptions, and input DTOs are defined by
 `schemas/tool-calling.schema.json`. No approval, bootstrap, or fixture-font creation tool
 is exposed. Inputs are validated before service delegation; unknown tools and invalid
-DTOs return `FS_SCHEMA_INVALID` envelopes. All 21 mutating tools default to `dryRun: true`.
+DTOs return `FS_SCHEMA_INVALID` envelopes. Tools with a `dryRun` input default to `true`.
 Pass `dryRun: false` to apply; approval-gated operations also need the existing exact
 `approvalId`. Dry run does not waive an approval gate or other prerequisites.
 
 Existing authoring/evidence exceptions remain: Recipe forks, font quarantine/inspection,
-static checks, candidate fallback compilation, ordinary compilation, contact sheets, and
-review recording do not gain new approval gates. Candidate static checks still require
+static checks, candidate fallback compilation, ordinary compilation, and contact sheets do not
+gain new approval gates. Review preparation remains read-only; recording requires the
+interactive operator command and typed confirmation. Candidate static checks still require
 the approved request receipt. Reviews remain independent evidence, never approvals.
 The adapter covers every public service operation, including candidate compilation,
 promotion targets, concatenation planning, grammar metrics, and historical replay.
@@ -272,3 +293,35 @@ contract and stops without promoting the candidate.
 M7 is implemented. Final Chrome-backed acceptance reports 30 pass, 0 fail, and 0 pending. The earlier first run failed A20 on a missing PSNR measurement, and the requested rerun passed it; both historical reports are retained locally under `out/evidence/m7-acceptance-*`.
 
 The optional 1.1.0 review package is `out/evidence/torn-reveal/1.1.0/review-package.md`. Runtime: 12/12 cases pass; painter evidence matches every approved output. Execution approval does not authorize promotion, and no promotion was performed.
+
+## Audit repairs (2026-10-27)
+
+Source BGM and sound events are checksum-verified before cache reuse or rendering. ffmpeg reads
+verified temporary copies, and concatenation checks both cached MP4 and stem bytes. Changed
+source audio returns `FS_DIGEST_MISMATCH`; damaged media returns `FS_ARTIFACT_VERIFY_FAILED`,
+without publishing a successful output.
+
+Chapter timing preserves exact fixed milliseconds and round-half-up frame rounding. Preflight
+uses the selected profile fps and limits blank-scene allocation to both logical and frame-safe
+budgets. A fixed 6,020 ms runtime becomes 181 frames at 30 fps and cannot fit a 6,020 ms limit;
+preflight reports `overByMs` against the frame-safe budget (4 ms here). `render chapter` refuses
+an earlier-approved Plan that rounds past its limit with `FS_PREFLIGHT_OVER_LIMIT` before
+capturing; recompile it.
+ffprobe checks presented video, audio, and container duration; hidden AAC encoder padding does
+not count as presented duration. Concatenation offsets and runtime come from frame counts;
+stems are positioned at corresponding 48 kHz sample offsets. Every MP4 encoding/remux stage
+uses a 48 kHz movie clock, and the concat demuxer receives explicit part durations, so edit
+metadata preserves fractional-frame boundaries.
+
+The bounded spike delivery and historical owner viewing waiver remain recorded in the completed
+spike Plan. These repairs do not deliver production Film UI, APIs, persistence, or Capability
+promotion. Current repair verification is recorded in the private audit ExecPlan.
+
+Repair verification: all 272 cases passed across the full Chrome run and one targeted retry of
+a Chrome startup timeout before caption assertions. Combined acceptance is 30 pass / 0 fail /
+0 pending, recorded locally in `out/acceptance/audit-fixes-report.json`; the original full-run
+exit 1 and successful retry are retained separately. Workspace typecheck/lint, painter build,
+and new-file formatting pass. Root formatting fails on 11 unchanged files; modified-spike
+formatting fails on the same 33 existing paths as the untouched baseline. The private completion
+record is `internal/plans/completed/20261027-photo-to-film-audit-fixes.md`. Historical human
+viewing verdicts remain unrecorded and the owner's waiver remains unchanged.

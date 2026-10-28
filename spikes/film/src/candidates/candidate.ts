@@ -2,14 +2,15 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { CapabilityFunction } from "../capability-sdk/abi.js";
 import type { CatalogEntry } from "../compiler/resolve.js";
-import { canonicalJson, digestBytes, digestOf } from "../contracts/canonical.js";
+import { canonicalJson, digestBytes, digestOf, sha256Hex } from "../contracts/canonical.js";
 import { fail, FilmFailure } from "../contracts/errors.js";
+import { validateSchema } from "../contracts/schemas.js";
 import { validateDocument } from "../contracts/semantic.js";
-import type { CapabilityManifest, CapabilityRequest, RegistryRecord, ValidationReport } from "../contracts/types.js";
+import type { CapabilityManifest, CapabilityRequest, RegistryRecord, ReviewRecordV2, ValidationReport } from "../contracts/types.js";
 import { writeAtomic, writeJson, type SpikePaths } from "../paths.js";
-import { requireApproval } from "../registry/approvals.js";
+import { confirmationFor, requireApproval } from "../registry/approvals.js";
 import type { Registry } from "../registry/registry.js";
-import { requireAcceptedReview } from "../registry/reviews.js";
+import { normalizedIdentity, requireAcceptedReview, type ReviewInput } from "../registry/reviews.js";
 import { candidateInputs } from "./inputs.js";
 import { checkOutput, executeContained, runtimeIdentity } from "./runtime.js";
 import { checkManifest, checkSource } from "./static.js";
@@ -185,10 +186,54 @@ export function planPromotion(paths: SpikePaths, registry: Registry, candidate: 
   return { ...c, reports, target, promotionDigest: digestOf(target) };
 }
 
+/** What an independent review of a promotion plan binds: its target, and the identities that may not review it. */
+export function reviewBinding(plan: ReturnType<typeof planPromotion>, candidate: string) {
+  const receipt = JSON.parse(readFileSync(`${plan.dir}request.json`, "utf8")) as { request: CapabilityRequest };
+  return { candidate, subject: plan.target.subject, subjectDigest: plan.promotionDigest, author: plan.manifest.provenance.author, requester: receipt.request.requester.name };
+}
+
+// Independent review evidence is prepared by services and recorded only by a terminal operator.
+export function prepareReview(paths: SpikePaths, registry: Registry, input: ReviewInput) {
+  const binding = reviewBinding(planPromotion(paths, registry, input.candidate), input.candidate);
+  if (input.subjectDigest !== binding.subjectDigest || input.subject !== binding.subject) fail("FS_DIGEST_MISMATCH", "/subjectDigest", "review target is stale; recompute candidate promotion-target");
+  const reviewer = normalizedIdentity(input.reviewer);
+  if (!reviewer || [binding.author, binding.requester].some(a => normalizedIdentity(a) === reviewer)) fail("FS_REVIEW_REQUIRED", "/reviewer", "reviewer must differ from both Manifest author and requester");
+  const probe = { schema: "film.review-record@1", id: "rev-000000000000", subjectDigest: input.subjectDigest, subject: input.subject, reviewer: input.reviewer, verdict: input.verdict, notes: input.notes, createdAt: new Date().toISOString() };
+  const errors = validateSchema("urn:film-spike:review-record", probe);
+  if (errors.length) fail("FS_SCHEMA_INVALID", errors[0]!.path, errors[0]!.message);
+  const quote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
+  const command = `film-spike review record ${quote(input.subjectDigest)} --candidate ${quote(input.candidate)} --subject ${quote(input.subject)} --reviewer ${quote(input.reviewer)} --verdict ${input.verdict} --notes ${quote(input.notes)}`;
+  return { ...input, ...binding, operatorCommand: command, confirmation: confirmationFor(binding.subjectDigest) };
+}
+
+/** Checked as soon as the operator is named, before the confirmation prompt, against the record's name rule. */
+export function requireOperator(operator: string): void {
+  if (validateSchema("urn:film-spike:common#/$defs/name", operator).length) {
+    fail("FS_SCHEMA_INVALID", "/operator", "recording operator must be 1 to 120 characters of plain text, without URLs, paths, or any of < > { } ` $ \\");
+  }
+}
+
+export function recordReview(paths: SpikePaths, registry: Registry, input: ReviewInput, operator: string, confirmation: string): ReviewRecordV2 {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) fail("FS_OPERATOR_REQUIRED", "", "review recording requires interactive stdin and stdout");
+  requireOperator(operator);
+  const prepared = prepareReview(paths, registry, input);
+  if (confirmation !== prepared.confirmation) fail("FS_APPROVAL_MISMATCH", "/confirmation", "type the current target digest confirmation exactly");
+  const now = new Date().toISOString();
+  const record: ReviewRecordV2 = {
+    schema: "film.review-record@2", id: `rev-${sha256Hex(`${input.subjectDigest}|${input.reviewer}|${now}`).slice(0, 12)}`,
+    ...input, author: prepared.author, requester: prepared.requester, operator, createdAt: now,
+    confirmation: { kind: "interactive-tty", value: confirmation, confirmedAt: now },
+  };
+  const errors = validateSchema("urn:film-spike:review-record", record);
+  if (errors.length) fail("FS_SCHEMA_INVALID", errors[0]!.path, errors[0]!.message);
+  writeJson(`${paths.state}reviews/${record.id}.json`, record);
+  return record;
+}
+
 /** Promotion needs an accepted independent review of the target, then an exact promotion approval. */
 export function promoteCandidate(paths: SpikePaths, registry: Registry, input: { candidate: string; approvalId?: string; dryRun?: boolean }) {
   const plan = planPromotion(paths, registry, input.candidate);
-  const review = requireAcceptedReview(paths.state, plan.promotionDigest);
+  const review = requireAcceptedReview(paths.state, plan.promotionDigest, reviewBinding(plan, input.candidate));
   const approval = requireApproval(paths.state, input.approvalId, "promotion", plan.promotionDigest);
   if (input.dryRun ?? true) return { plan, record: null, created: false };
   const receipt = JSON.parse(readFileSync(`${plan.dir}request.json`, "utf8")) as { approvalId: string };

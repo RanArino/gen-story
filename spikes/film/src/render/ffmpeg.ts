@@ -5,14 +5,10 @@ import { fail } from "../contracts/errors.js";
 /**
  * One fixed H.264 configuration for every video part (Chapters, the overall title, and darken
  * holds), so the concatenation can join them with stream copy and keep Chapter frames identical.
+ * A 48 kHz movie clock represents both frame boundaries and audio samples without edit rounding.
  */
-export const X264 = ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-profile:v", "high", "-level:v", "4.1", "-g", "30", "-bf", "2", "-r", "30"];
+export const X264 = ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-profile:v", "high", "-level:v", "4.1", "-g", "30", "-bf", "2", "-r", "30", "-movie_timescale", "48000"];
 export const AAC = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"];
-
-/** frame = floor((ms * fps + 500) / 1000), recorded in Plans as round-half-up@1. */
-export function frameCount(ms: number, fps: number): number {
-  return Math.floor((ms * fps + 500) / 1000);
-}
 
 /**
  * Runs a binary without blocking the event loop (the render server shares this process) and
@@ -69,18 +65,21 @@ export function pngEncoder(out: string, fps: number): FrameSink {
 }
 
 export interface ProbeResult {
-  video?: { codec: string; width: number; height: number; rate: string; frames: number };
-  audio?: { codec: string; sampleRate: number; channels: number };
+  containerDurationUs?: number;
+  video?: { durationTicks: number; timeBase: string; codec: string; width: number; height: number; rate: string; frames: number };
+  audio?: { durationTicks: number; timeBase: string; codec: string; sampleRate: number; channels: number };
 }
 
 export async function probe(file: string): Promise<ProbeResult> {
-  const r = await run("ffprobe", ["-v", "error", "-count_frames", "-show_entries", "stream=codec_type,codec_name,width,height,r_frame_rate,nb_read_frames,sample_rate,channels", "-of", "json", file]);
+  const r = await run("ffprobe", ["-v", "error", "-count_frames", "-show_entries", "format=duration:stream=duration_ts,time_base,codec_type,codec_name,width,height,r_frame_rate,nb_read_frames,sample_rate,channels", "-of", "json", file]);
   if (r.code !== 0) fail("FS_ARTIFACT_VERIFY_FAILED", "", `ffprobe failed on ${file}: ${r.stderr.trim()}`);
-  const streams = (JSON.parse(r.stdout.toString()) as { streams: Record<string, string | number>[] }).streams;
+  const raw = JSON.parse(r.stdout.toString()) as { streams: Record<string, string | number>[]; format: { duration?: string } };
+  const streams = raw.streams;
   const v = streams.find((s) => s.codec_type === "video");
   const a = streams.find((s) => s.codec_type === "audio");
   return {
-    ...(v ? { video: { codec: String(v.codec_name), width: Number(v.width), height: Number(v.height), rate: String(v.r_frame_rate), frames: Number(v.nb_read_frames) } } : {}),
-    ...(a ? { audio: { codec: String(a.codec_name), sampleRate: Number(a.sample_rate), channels: Number(a.channels) } } : {}),
+    ...(raw.format.duration ? { containerDurationUs: Math.round(Number(raw.format.duration) * 1000000) } : {}),
+    ...(v ? { video: { durationTicks: Number(v.duration_ts), timeBase: String(v.time_base), codec: String(v.codec_name), width: Number(v.width), height: Number(v.height), rate: String(v.r_frame_rate), frames: Number(v.nb_read_frames) } } : {}),
+    ...(a ? { audio: { durationTicks: Number(a.duration_ts), timeBase: String(a.time_base), codec: String(a.codec_name), sampleRate: Number(a.sample_rate), channels: Number(a.channels) } } : {}),
   };
 }

@@ -20,9 +20,9 @@ Read `spikes/film/src/`, `schemas/`, `fixtures/`, and `.state/registry/` (read-o
 Read the selected candidate and its evidence to resume. Direct author edits may write only
 `.state/quarantine/capabilities/<candidate>/` and `out/evidence/`. Never edit the registry,
 approval records, trusted runner, SDK, compiler, contracts, or renderer. Service operations
-own their documented output locations, including `out/candidates/` evidence and review
-records; these are not additional roots for direct edits. Registry promotion is an operator
-handoff, outside this authoring workflow's write scope.
+own their documented output locations, including `out/candidates/` evidence; review records
+belong exclusively to the interactive CLI recorder. These are not additional roots for direct
+edits. Registry promotion is an operator handoff, outside this authoring workflow's write scope.
 
 ## Catalog-first decision
 
@@ -45,7 +45,7 @@ At every stop, print the exact operator command, subject, full digest, and confi
 id; never execute `approve`, script its input, fake a TTY, or create approval records directly.
 Use the operator command template `pnpm cli approve <kind> <sha256:digest> --subject <id@version>`.
 Existing authoring/evidence writes (Recipe fork, static checks, fallback compilation,
-font quarantine/inspection, ordinary compilation, contact sheets, and review records)
+font quarantine/inspection, ordinary compilation, and contact sheets)
 do not gain extra approval gates. Tool calls still default to dry run; an applied static
 check requires its existing approved request receipt.
 
@@ -68,9 +68,16 @@ target and stop again. Unrelated work can continue while waiting.
    Inspect the deterministic runtime report, budgets, fixture coverage, contact sheet,
    and short clip. Do not re-render existing films as part of this workflow.
 4. Use `film-spike candidate promotion-target <candidate>` to obtain the exact review
-   and promotion digest. Request review from someone other than the candidate author;
-   never invent an accepted review. Record only the supplied review with
-   `film-spike review record <digest> --subject <id@version> --reviewer <name> --verdict <accept|reject> --notes <text>`.
+   and promotion digest. Request review from someone other than both the Manifest author and request requester;
+   never invent an accepted review. Prepare the supplied review with the read-only `review_record`
+   tool, including `candidate`, or CLI `--dry-run`. Applied Tool Calling returns `FS_OPERATOR_REQUIRED`.
+   Hand the returned command to the operator:
+   `film-spike review record <digest> --candidate <candidate> --subject <id@version> --reviewer <name> --verdict <accept|reject> --notes <text>`.
+   Only the operator runs it in an actual interactive terminal and types the current digest
+   confirmation. Never script the recorder, fake a TTY, or write review records. The recorder
+   recomputes the candidate target and binds both author identities in `film.review-record@2`;
+   stale targets, self-review after normalized identity comparison, and legacy reviews cannot
+   authorize promotion. A review remains evidence, separate from promotion approval.
    **Promotion stop.** Present the exact promotion command and confirmation after an
    accepted review of the same target. Stop here; this walkthrough does not promote.
    The operator's later handoff is `film-spike registry promote <candidate> --approval <id> --apply`.
@@ -91,3 +98,7 @@ walkthrough identifies the previously completed request gate and starts at the n
 
 If historical replay is in scope, use `film-spike replay <plan> --treatment <file> --chapters <file>`
 to verify the exact pinned versions without changing the Plan or re-rendering the film.
+
+For a subsequent film, both concatenation operations require the current Chapters document
+(CLI `--chapters`). A v2 Plan binds ordered Chapter MP4/stem checksums and frame counts. Title
+changes undergo current font/glyph validation without forcing Chapter media rerenders.

@@ -4,56 +4,214 @@
   "title": "Concatenation Plan: ordered cached Chapter artifacts, the approved overall title, and the connection",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "chapters", "profile", "frameQuantization", "overallTitle", "connection", "audio", "fonts", "runtimeMs", "lock", "fingerprint"],
+  "required": [
+    "schema",
+    "chapters",
+    "profile",
+    "frameQuantization",
+    "overallTitle",
+    "connection",
+    "audio",
+    "fonts",
+    "runtimeMs",
+    "lock",
+    "fingerprint"
+  ],
   "properties": {
-    "schema": { "const": "film.concat-plan@1" },
+    "schema": {
+      "enum": [
+        "film.concat-plan@1",
+        "film.concat-plan@2"
+      ]
+    },
     "chapters": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["chapterId", "planDigest", "artifactSha256", "runtimeMs", "offsetMs"],
+        "required": [
+          "chapterId",
+          "planDigest",
+          "artifactSha256",
+          "runtimeMs",
+          "offsetMs"
+        ],
         "properties": {
-          "chapterId": { "$ref": "urn:film-spike:common#/$defs/localId" },
-          "planDigest": { "$ref": "urn:film-spike:common#/$defs/digest" },
-          "artifactSha256": { "$ref": "urn:film-spike:common#/$defs/digest" },
-          "runtimeMs": { "$ref": "urn:film-spike:common#/$defs/ms" },
-          "offsetMs": { "$ref": "urn:film-spike:common#/$defs/ms" }
+          "chapterId": {
+            "$ref": "urn:film-spike:common#/$defs/localId"
+          },
+          "planDigest": {
+            "$ref": "urn:film-spike:common#/$defs/digest"
+          },
+          "artifactSha256": {
+            "$ref": "urn:film-spike:common#/$defs/digest"
+          },
+          "runtimeMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "offsetMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "stemSha256": {
+            "$ref": "urn:film-spike:common#/$defs/digest"
+          },
+          "frames": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     },
-    "profile": { "$ref": "urn:film-spike:common#/$defs/outputProfile" },
-    "frameQuantization": { "const": "round-half-up@1" },
+    "profile": {
+      "$ref": "urn:film-spike:common#/$defs/outputProfile"
+    },
+    "frameQuantization": {
+      "const": "round-half-up@1"
+    },
     "overallTitle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["text", "titleMs", "layers"],
+      "required": [
+        "text",
+        "titleMs",
+        "layers"
+      ],
       "properties": {
-        "text": { "type": "string" },
-        "titleMs": { "$ref": "urn:film-spike:common#/$defs/ms" },
-        "layers": { "type": "array", "items": { "$ref": "urn:film-spike:resolved-render-plan#/$defs/node" } }
+        "text": {
+          "type": "string"
+        },
+        "titleMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:film-spike:resolved-render-plan#/$defs/node"
+          }
+        }
       }
     },
     "connection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ref", "darkenMs", "brightnessTo"],
+      "required": [
+        "ref",
+        "darkenMs",
+        "brightnessTo"
+      ],
       "properties": {
-        "ref": { "$ref": "urn:film-spike:common#/$defs/versionRef" },
-        "darkenMs": { "$ref": "urn:film-spike:common#/$defs/ms" },
-        "brightnessTo": { "$ref": "urn:film-spike:common#/$defs/unit" }
+        "ref": {
+          "$ref": "urn:film-spike:common#/$defs/versionRef"
+        },
+        "darkenMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "brightnessTo": {
+          "$ref": "urn:film-spike:common#/$defs/unit"
+        }
       }
     },
     "audio": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["bgm"],
-      "properties": { "bgm": { "$ref": "urn:film-spike:resolved-render-plan#/$defs/bgm" } }
+      "required": [
+        "bgm"
+      ],
+      "properties": {
+        "bgm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "asset",
+            "sha256",
+            "startMs",
+            "durationMs",
+            "gain",
+            "loop",
+            "fadeInMs",
+            "fadeOutMs",
+            "offsetMs"
+          ],
+          "properties": {
+            "asset": {
+              "$ref": "urn:film-spike:common#/$defs/mediaAsset"
+            },
+            "sha256": {
+              "$ref": "urn:film-spike:common#/$defs/digest"
+            },
+            "startMs": {
+              "$ref": "urn:film-spike:common#/$defs/ms"
+            },
+            "durationMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "gain": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "loop": {
+              "type": "boolean"
+            },
+            "fadeInMs": {
+              "$ref": "urn:film-spike:common#/$defs/ms"
+            },
+            "fadeOutMs": {
+              "$ref": "urn:film-spike:common#/$defs/ms"
+            },
+            "offsetMs": {
+              "$ref": "urn:film-spike:common#/$defs/ms"
+            }
+          }
+        }
+      }
     },
-    "fonts": { "type": "array", "items": { "$ref": "urn:film-spike:resolved-render-plan#/$defs/planFont" } },
-    "runtimeMs": { "$ref": "urn:film-spike:common#/$defs/ms" },
-    "lock": { "$ref": "urn:film-spike:resolved-render-plan#/$defs/lock" },
-    "fingerprint": { "$ref": "urn:film-spike:common#/$defs/digest" }
-  }
+    "fonts": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:film-spike:resolved-render-plan#/$defs/planFont"
+      }
+    },
+    "runtimeMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "lock": {
+      "$ref": "urn:film-spike:resolved-render-plan#/$defs/lock"
+    },
+    "fingerprint": {
+      "$ref": "urn:film-spike:common#/$defs/digest"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema": {
+            "const": "film.concat-plan@2"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "chapters": {
+            "items": {
+              "required": [
+                "stemSha256",
+                "frames"
+              ],
+              "properties": {
+                "stemSha256": {},
+                "frames": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

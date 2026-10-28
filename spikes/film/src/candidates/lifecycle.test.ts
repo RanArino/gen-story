@@ -1,3 +1,4 @@
+import { operatorReviews } from "../testing/candidates.js";
 // The torn-reveal lifecycle gates after the contained run, in temporary state: the fallback compile
 // (M6 step 5), FS_NOT_PROMOTED for quarantined references, evidence gating, review-then-approval
 // promotion, and promoted loading through the contained process.
@@ -97,9 +98,9 @@ describe("torn-reveal evidence and promotion gates", () => {
     expect(service.registryPromote({ candidate: "torn-reveal", dryRun: false }).errors[0]?.code).toBe("FS_REVIEW_REQUIRED");
     const early = operatorApproves(paths, "promotion", target.digest);
     expect(service.registryPromote({ candidate: "torn-reveal", approvalId: early, dryRun: false }).errors[0]?.code).toBe("FS_REVIEW_REQUIRED");
-    ok(service.reviewRecord({ subjectDigest: target.digest, subject: target.subject, reviewer: "test reviewer", verdict: "reject", notes: "Edge too regular." }));
+    operatorReviews(world, { candidate: "torn-reveal", subjectDigest: target.digest, subject: target.subject, reviewer: "test reviewer", verdict: "reject", notes: "Edge too regular." });
     expect(service.registryPromote({ candidate: "torn-reveal", approvalId: early, dryRun: false }).errors[0]?.code).toBe("FS_REVIEW_REQUIRED");
-    ok(service.reviewRecord({ subjectDigest: target.digest, subject: target.subject, reviewer: "test reviewer", verdict: "accept", notes: "Edge reads as torn paper." }));
+    operatorReviews(world, { candidate: "torn-reveal", subjectDigest: target.digest, subject: target.subject, reviewer: "test reviewer", verdict: "accept", notes: "Edge reads as torn paper." });
     expect(service.registryPromote({ candidate: "torn-reveal", dryRun: false }).errors[0]?.code).toBe("FS_APPROVAL_REQUIRED");
     expect(service.registryPromote({ candidate: "torn-reveal", approvalId: executionApproval, dryRun: false }).errors[0]?.code).toBe("FS_APPROVAL_MISMATCH");
     expect(service.registryPromote({ candidate: "torn-reveal", approvalId: early }).mutations).toEqual([]);

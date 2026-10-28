@@ -674,7 +674,8 @@
         "subject",
         "reviewer",
         "verdict",
-        "notes"
+        "notes",
+        "candidate"
       ],
       "properties": {
         "subjectDigest": {
@@ -698,9 +699,12 @@
         "dryRun": {
           "type": "boolean",
           "default": true
+        },
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
         }
       },
-      "description": "Record an independent review. This is not an approval."
+      "description": "Prepare an independent review and return its operator command. Applied requests require an interactive operator."
     },
     "review_record.response": {
       "$ref": "urn:film-spike:result-envelope"
@@ -813,7 +817,8 @@
       "additionalProperties": false,
       "required": [
         "treatment",
-        "plansDir"
+        "plansDir",
+        "chapters"
       ],
       "properties": {
         "treatment": {
@@ -825,6 +830,9 @@
         "dryRun": {
           "type": "boolean",
           "default": true
+        },
+        "chapters": {
+          "$ref": "urn:film-spike:chapters"
         }
       },
       "description": "Compile the concatenation Plan from cached Chapter artifacts."
@@ -837,7 +845,8 @@
       "additionalProperties": false,
       "required": [
         "treatment",
-        "artifacts"
+        "artifacts",
+        "chapters"
       ],
       "properties": {
         "treatment": {
@@ -870,6 +879,9 @@
               }
             }
           }
+        },
+        "chapters": {
+          "$ref": "urn:film-spike:chapters"
         }
       },
       "description": "Build a concatenation Plan from supplied Chapter Plans and artifact metadata."

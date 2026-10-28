@@ -114,6 +114,7 @@ function timingInput(input: CompileInput, chapter: FilmChapter, index: number, s
   return {
     chapter,
     chapterPath: `/chapters/${index}`,
+    fps: PROFILES[input.treatment.shared.outputProfile]!.fps,
     titleMs: typography.titleMs ?? 3000,
     overlapMs: transition.overlapMs ?? 0,
     gapMs: transition.gapMs ?? 0,
@@ -566,6 +567,7 @@ export function compileChapters(input: CompileInput): CompiledChapter[] {
       })),
       lock,
       provenance: {
+        projectId: input.treatment.projectId,
         storyGraph: { id: input.storyGraph.id, revision: input.storyGraph.revision },
         treatment: { id: input.treatment.id, revision: input.treatment.revision },
         recipe: recipeRef,
