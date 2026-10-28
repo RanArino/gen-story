@@ -7,7 +7,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameS
 import { digestBytes } from "../contracts/canonical.js";
 import type { Warning } from "../contracts/envelope.js";
 import { fail, FilmFailure } from "../contracts/errors.js";
-import type { ChapterArtifact, ConcatPlan } from "../contracts/types.js";
+import type { ChapterArtifact, ConcatPlan, ConcatPlanV2 } from "../contracts/types.js";
 import { planDigest } from "../compiler/fingerprint.js";
 import { frameCount } from "../compiler/timing.js";
 import { writeJson } from "../paths.js";
@@ -41,8 +41,8 @@ export interface ConcatRender {
   renderMs: number;
 }
 
-/** Finds the cached Chapter artifact whose MP4 bytes the concatenation Plan pinned. */
-export function findChapterArtifact(stateDir: string, mp4Sha256: string, stemSha256?: string): { dir: string; artifact: ChapterArtifact } {
+/** Finds the cached Chapter artifact whose MP4 bytes the concatenation Plan pinned; `stageStem` as in verifyChapterFiles. */
+export function findChapterArtifact(stateDir: string, mp4Sha256: string, stemSha256?: string, stageStem?: string): { dir: string; artifact: ChapterArtifact } {
   for (const namespace of ["chapter-media-v2", "chapters"]) {
     const root = `${stateDir}cache/${namespace}/`;
     for (const name of existsSync(root) ? readdirSync(root) : []) {
@@ -51,7 +51,7 @@ export function findChapterArtifact(stateDir: string, mp4Sha256: string, stemSha
       const artifact = JSON.parse(readFileSync(meta, "utf8")) as ChapterArtifact;
       if (artifact.verified && artifact.files.mp4.sha256 === mp4Sha256 && (!stemSha256 || artifact.files.stem.sha256 === stemSha256)) {
         const dir = `${root}${name}/`;
-        verifyChapterFiles(dir, artifact);
+        verifyChapterFiles(dir, artifact, stageStem);
         return { dir, artifact };
       }
     }
@@ -71,44 +71,53 @@ function cachedConcat(dir: string, digest: string, warnings: Warning[]): ConcatA
   return null;
 }
 
+/** The prerequisites a dry run checks too, before any media: a v2 Plan, its concat approval, and the pinned environment. */
+export function requireConcatPlan(deps: RenderDeps, input: { planFile: string; approvalId?: string }): { plan: ConcatPlanV2; digest: string } {
+  const plan = loadConcatPlan<ConcatPlan>(deps.paths, input.planFile);
+  if (plan.schema !== "film.concat-plan@2") fail("FS_SCHEMA_INVALID", "/schema", "legacy concatenation is read-only; compile a v2 Plan and obtain a new concat approval");
+  const digest = planDigest(plan);
+  requireApproval(deps.paths.state, input.approvalId, "concat", digest);
+  requireEnvironment(deps, plan.lock.environment);
+  return { plan, digest };
+}
+
+/** The pinned Chapter artifacts in Plan order; with `stageDir`, each verified stem is staged there. */
+function chapterSources(stateDir: string, plan: ConcatPlanV2, stageDir?: string) {
+  return plan.chapters.map((c, i) => {
+    const stem = stageDir ? `${stageDir}stem-${i}.wav` : undefined;
+    const found = findChapterArtifact(stateDir, c.artifactSha256, c.stemSha256, stem);
+    if (found.artifact.frames !== c.frames) fail("FS_ARTIFACT_VERIFY_FAILED", "/chapters", `${c.chapterId} runtime differs from the concatenation Plan`);
+    return { ...c, ...found, stem };
+  });
+}
+
 export async function renderConcat(deps: RenderDeps, input: { planFile: string; approvalId?: string; outName?: string }): Promise<ConcatRender> {
   const { paths } = deps;
   const started = performance.now();
-  const plan = loadConcatPlan<ConcatPlan>(paths, input.planFile);
-  if (plan.schema !== "film.concat-plan@2") fail("FS_SCHEMA_INVALID", "/schema", "legacy concatenation is read-only; compile a v2 Plan and obtain a new concat approval");
-  verifyAudio(paths.media, [plan.audio.bgm]);
-  const digest = planDigest(plan);
-  requireApproval(paths.state, input.approvalId, "concat", digest);
-  requireEnvironment(deps, plan.lock.environment);
+  const { plan, digest } = requireConcatPlan(deps, input);
 
   const planPath = outRelative(paths, input.planFile);
   const outName = input.outName ?? planPath.split("/").at(-2)!;
   const fps = plan.profile.fps;
   const cacheDir = `${paths.state}cache/concat/${plan.fingerprint.slice("sha256:".length)}/`;
   const warnings: Warning[] = [];
-  const sources = plan.chapters.map((c) => {
-    const found = findChapterArtifact(paths.state, c.artifactSha256, c.stemSha256);
-    if (found.artifact.frames !== c.frames) fail("FS_ARTIFACT_VERIFY_FAILED", "/chapters", `${c.chapterId} runtime differs from the concatenation Plan`);
-    return { ...c, ...found };
-  });
 
   let artifact = cachedConcat(cacheDir, digest, warnings);
   const cache: "hit" | "miss" = artifact ? "hit" : "miss";
   let blocked: string[] = [];
-  if (!artifact) {
+  if (artifact) {
+    // A hit still needs the approved BGM and intact Chapter media; a miss verifies both while staging them.
+    verifyAudio(paths.media, [plan.audio.bgm]);
+    chapterSources(paths.state, plan);
+  } else {
     const work = `${paths.state}cache/concat/.tmp-${process.pid}/`;
     rmSync(work, { recursive: true, force: true });
     mkdirSync(work, { recursive: true });
     try {
       const audioDir = `${work}audio/`;
       verifyAudio(paths.media, [plan.audio.bgm], audioDir);
-      const stagedSources = sources.map((s, i) => {
-        const file = `${work}stem-${i}.wav`;
-        const bytes = readFileSync(`${s.dir}${s.artifact.files.stem.name}`);
-        if (digestBytes(bytes) !== s.stemSha256) fail("FS_ARTIFACT_VERIFY_FAILED", "/chapters", "stem changed before staging");
-        writeFileSync(file, bytes);
-        return { file, startMs: s.offsetMs, startSample: Math.round((s.offsetMs * SAMPLE_RATE) / 1000) };
-      });
+      const sources = chapterSources(paths.state, plan, work);
+      const stagedSources = sources.map((s) => ({ file: s.stem!, startMs: s.offsetMs, startSample: Math.round((s.offsetMs * SAMPLE_RATE) / 1000) }));
       const titleFrames = frameCount(plan.overallTitle.titleMs, fps);
       const holdFrames = frameCount(plan.connection.darkenMs, fps);
       const server = await startServer(paths);

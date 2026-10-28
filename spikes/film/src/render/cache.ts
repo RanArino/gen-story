@@ -1,5 +1,5 @@
 // Immutable media and originating Plan live separately from current output bindings.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { digestBytes } from "../contracts/canonical.js";
 import { fail } from "../contracts/errors.js";
 import type {
@@ -30,23 +30,24 @@ export function chapterCacheDir(
   return `${state}cache/chapter-media-v2/${renderDigest(plan).slice(7)}/`;
 }
 
+/** Verifies both cached media files; with `stageStem`, the verified stem bytes are written there. */
 export function verifyChapterFiles(
   dir: string,
   artifact: ChapterArtifact,
+  stageStem?: string,
 ): void {
-  if (
-    !artifact.verified ||
-    ![artifact.files.mp4, artifact.files.stem].every(
-      (f) =>
-        existsSync(`${dir}${f.name}`) &&
-        digestBytes(readFileSync(`${dir}${f.name}`)) === f.sha256,
-    )
-  ) {
+  const damaged = () =>
     fail(
       "FS_ARTIFACT_VERIFY_FAILED",
       "/chapters",
       `cached Chapter media failed checksum verification: ${dir}; ${REBUILD}`,
     );
+  if (!artifact.verified) damaged();
+  for (const f of [artifact.files.mp4, artifact.files.stem]) {
+    if (!existsSync(`${dir}${f.name}`)) damaged();
+    const bytes = readFileSync(`${dir}${f.name}`);
+    if (digestBytes(bytes) !== f.sha256) damaged();
+    if (stageStem && f === artifact.files.stem) writeFileSync(stageStem, bytes);
   }
 }
 

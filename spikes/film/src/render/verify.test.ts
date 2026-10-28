@@ -87,6 +87,20 @@ it("refuses legacy concatenation rendering without silently upgrading approval",
   });
 });
 
+it("refuses legacy concatenation in a dry run too", async () => {
+  const { readFixture } = await import("../testing/fixtures.js");
+  const { writeJson } = await import("../paths.js");
+  const { createWorld } = await import("../testing/world.js");
+  const { paths, service } = createWorld();
+  const planFile = `${paths.out}legacy.plan.json`;
+  writeJson(planFile, readFixture("legacy/concat-plan.json"));
+  const result = await service.renderConcat({ planFile, dryRun: true });
+  expect(result.errors[0]).toMatchObject({
+    code: "FS_SCHEMA_INVALID",
+    path: "/schema",
+  });
+});
+
 it("preserves exact presented frame ticks in intermediate PNG video encodings", async () => {
   const paths = tempPaths();
   mkdirSync(paths.out, { recursive: true });

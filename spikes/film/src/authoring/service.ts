@@ -43,9 +43,10 @@ import { requireApproval } from "../registry/approvals.js";
 import { bootstrapBuiltins } from "../registry/bootstrap.js";
 import { Registry } from "../registry/registry.js";
 import { prepareReview, type ReviewInput } from "../registry/reviews.js";
-import { renderConcat } from "../render/concat.js";
+import { renderConcat, requireConcatPlan } from "../render/concat.js";
 import { contactSheet } from "../render/contact-sheet.js";
-import { loadChapterPlan, loadConcatPlan, renderChapter, type RenderChapterInput, type RenderDeps } from "../render/render-chapter.js";
+import { verifyAudio } from "../render/inputs.js";
+import { loadChapterPlan, renderChapter, type RenderChapterInput, type RenderDeps } from "../render/render-chapter.js";
 import { compilerIdentity, painterIdentity } from "./identity.js";
 
 export interface ServiceDeps {
@@ -255,15 +256,17 @@ export function createService(deps: ServiceDeps) {
     return record;
   };
 
-  const buildConcat = (treatment: FilmTreatment, chapters: FilmChapters, supplied: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[]): ConcatPlan => {
+  /** Media is looked up through `artifactOf` only after every selected Plan is known to be current. */
+  const buildConcat = <T extends { plan: ResolvedRenderPlan }>(treatment: FilmTreatment, chapters: FilmChapters, supplied: T[], artifactOf: (selected: T) => Pick<ChapterArtifact, "files">): ConcatPlan => {
     const expected = compileChapters(compileInput(treatment, chapters, supplied.find(a => chapters.chapters.some(c => c.id === a.plan.chapter.id))?.plan.options ?? {}));
-    const artifacts = expected.map(({ plan: current }) => {
-      const matches = supplied.filter(a => a.plan.chapter.id === current.chapter.id);
-      if (matches.length !== 1) fail("FS_SEMANTIC_INVALID", "/chapters", `${current.chapter.id} needs exactly one selected Plan; found ${matches.length}`);
+    const current = expected.map(({ plan }) => {
+      const matches = supplied.filter(a => a.plan.chapter.id === plan.chapter.id);
+      if (matches.length !== 1) fail("FS_SEMANTIC_INVALID", "/chapters", `${plan.chapter.id} needs exactly one selected Plan; found ${matches.length}`);
       const selected = matches[0]!;
-      if (renderDigest(selected.plan) !== renderDigest(current)) fail("FS_SEMANTIC_INVALID", "/chapters", `${current.chapter.id} has stale scene membership, title, settings, dependencies, or profile; recompile it`);
-      return { ...selected, plan: current };
+      if (renderDigest(selected.plan) !== renderDigest(plan)) fail("FS_SEMANTIC_INVALID", "/chapters", `${plan.chapter.id} has stale scene membership, title, settings, dependencies, or profile; recompile it`);
+      return { selected, plan };
     });
+    const artifacts = current.map(({ selected, plan }) => ({ plan, artifact: artifactOf(selected) }));
     const recipe = findRecipe(treatment.recipe);
     const typography = artifacts[0]?.plan.capabilities.find((c) => c.slot === "typography")?.active;
     const refs: ExactRef[] = [CONNECTION, ...(typography ? [typography] : [])].map((r) => ({ ...r, digest: exactRecord(r.id, r.version).manifestDigest }));
@@ -678,7 +681,7 @@ export function createService(deps: ServiceDeps) {
     /** Builds the concatenation Plan from compiled Chapter Plans and their verified artifact digests. */
     concatPlan(input: { treatment: FilmTreatment; chapters: FilmChapters; artifacts: { plan: ResolvedRenderPlan; artifact: Pick<ChapterArtifact, "files"> }[] }): ResultEnvelope<ConcatPlan> {
       return envelope("compile", true, () => {
-        const plan = buildConcat(input.treatment, input.chapters, input.artifacts);
+        const plan = buildConcat(input.treatment, input.chapters, input.artifacts, (a) => a.artifact);
         return { result: plan, hashes: { plan: planDigest(plan), fingerprint: plan.fingerprint } };
       });
     },
@@ -695,13 +698,12 @@ export function createService(deps: ServiceDeps) {
         const plans = readdirSync(dir)
           .filter((f) => f.endsWith(".plan.json") && f !== "concat.plan.json")
           .filter((f) => ids.has(readJson<{ chapter?: { id?: string } }>(`${dir}${f}`).chapter?.id ?? ""))
-          .map((f) => loadChapterPlan(paths, `${dir}${f}`));
-        const artifacts = plans.map((plan) => {
+          .map((f) => ({ plan: loadChapterPlan(paths, `${dir}${f}`) }));
+        const plan = buildConcat(input.treatment, input.chapters, plans, ({ plan }) => {
           const found = resolveChapterCache(paths.state, plan);
           if (!found) fail("FS_ARTIFACT_VERIFY_FAILED", "/chapters", `${plan.chapter.id} has no verified media; render it first`);
-          return { plan, artifact: found.artifact };
+          return found.artifact;
         });
-        const plan = buildConcat(input.treatment, input.chapters, artifacts);
         const evidence: string[] = [];
         if (input.write) {
           writeJson(`${dir}concat.plan.json`, plan);
@@ -715,9 +717,8 @@ export function createService(deps: ServiceDeps) {
     renderConcat(input: { planFile: string; approvalId?: string; outName?: string; dryRun?: boolean }) {
       return envelopeAsync("render.concat", input.dryRun ?? false, async () => {
         if (input.dryRun) {
-          const plan = loadConcatPlan<ConcatPlan>(paths, input.planFile);
-          const digest = planDigest(plan);
-          requireApproval(paths.state, input.approvalId, "concat", digest);
+          const { plan, digest } = requireConcatPlan(renderDeps, input);
+          verifyAudio(paths.media, [plan.audio.bgm]);
           return { hashes: { plan: digest } as Record<string, string> };
         }
         const r = await renderConcat(renderDeps, input);

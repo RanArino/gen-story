@@ -191,6 +191,25 @@ describe("audit boundary coverage", () => {
       expect(() => verifyAudio(dir, [input])).toThrow();
     },
   );
+  it("reports a stale unrendered Plan as stale before looking for its media", () => {
+    world.service.compile({
+      treatment,
+      chapters,
+      write: true,
+      outName: "stale",
+    });
+    const retitled = structuredClone(chapters);
+    retitled.chapters[0]!.title += " (revised)";
+    const result = world.service.compileConcat({
+      treatment,
+      chapters: retitled,
+      plansDir: `${world.paths.out}plans/stale/`,
+    });
+    expect(result.errors[0]).toMatchObject({
+      code: "FS_SEMANTIC_INVALID",
+      message: expect.stringContaining("recompile it"),
+    });
+  });
   it("refuses an earlier-approved Plan that rounds past its limit before capturing", async () => {
     const live = createWorld({ liveEnvironment: true });
     const plan = structuredClone(
