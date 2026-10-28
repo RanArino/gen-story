@@ -26,3 +26,17 @@ it("rejects Chapter Plans from another project even when Treatment IDs coincide"
   });
   expect(result.errors[0]?.code).toBe("FS_SEMANTIC_INVALID");
 });
+
+it("compiles any project slug the Treatment schema accepts, including a leading digit", () => {
+  const { service } = createWorld();
+  const treatment = readFixture<FilmTreatment>(
+    "project/treatments/test-baseline.json",
+  );
+  const chapters = readFixture<FilmChapters>("project/chapters.json");
+  const result = service.compile({
+    treatment: { ...treatment, projectId: "2026-trip" },
+    chapters,
+  });
+  expect(result.errors).toEqual([]);
+  expect(result.result![0]!.plan.provenance.projectId).toBe("2026-trip");
+});
