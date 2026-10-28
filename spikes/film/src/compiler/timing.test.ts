@@ -6,6 +6,7 @@ function input(chapter: FilmChapter, weights: number[], beatMs: number | null = 
   return {
     chapter,
     chapterPath: "/chapters/0",
+    fps: 30,
     titleMs: 3000,
     overlapMs: 800,
     gapMs: 0,
@@ -72,7 +73,11 @@ it("fits frame boundaries and blank budgets without changing fixed milliseconds"
   expect(resolveTiming(fixed).runtimeMs).toBe(6000);
   fixed.chapter.limitMs = 6020;
   fixed.chapter.scenes[0]!.durationMs = 3820;
-  expect(preflight(fixed)[0]).toMatchObject({ code: "FS_PREFLIGHT_OVER_LIMIT", details: { requiredMinMs: 6020, encodedFrames: 181, fps: 30 } });
+  expect(preflight(fixed)[0]).toMatchObject({
+    code: "FS_PREFLIGHT_OVER_LIMIT",
+    message: expect.stringContaining("181 frames (6033.3 ms) at 30 fps, over its 6020 ms limit; shorten it by 4 ms"),
+    details: { requiredMinMs: 6020, encodedFrames: 181, fps: 30, overByMs: 4 },
+  });
   fixed.chapter.limitMs = null;
   expect(resolveTiming(fixed).scenes[0]!.durationMs).toBe(3820);
   const blank = input({ id: "c1", title: "t", limitMs: 6020, scenes: scenes(undefined) }, [1], 625);

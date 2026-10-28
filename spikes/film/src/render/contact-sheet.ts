@@ -3,8 +3,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { digestBytes } from "../contracts/canonical.js";
 import { planDigest } from "../compiler/fingerprint.js";
+import { frameCount } from "../compiler/timing.js";
 import { openPlan, withBrowser } from "./browser.js";
-import { ffmpeg, frameCount } from "./ffmpeg.js";
+import { ffmpeg } from "./ffmpeg.js";
 import { frameTime, loadChapterPlan, outRelative, sampleFrames, type RenderDeps } from "./render-chapter.js";
 import { startServer } from "./server.js";
 

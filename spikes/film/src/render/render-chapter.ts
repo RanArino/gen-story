@@ -12,14 +12,14 @@ import { fail, FilmFailure } from "../contracts/errors.js";
 import { validateSchema } from "../contracts/schemas.js";
 import type { ChapterArtifact, ResolvedRenderPlan } from "../contracts/types.js";
 import { planDigest } from "../compiler/fingerprint.js";
-import { proposalDigest } from "../compiler/timing.js";
+import { frameCount, proposalDigest } from "../compiler/timing.js";
 import type { EnvFingerprint } from "../env/fingerprint.js";
 import { readMediaLock } from "../media/lock.js";
 import { writeJson, type SpikePaths } from "../paths.js";
 import { requireApproval } from "../registry/approvals.js";
 import { bedGraph, stemGraph } from "./audio.js";
 import { openPlan, withBrowser } from "./browser.js";
-import { AAC, ffmpeg, frameCount, pngEncoder } from "./ffmpeg.js";
+import { AAC, ffmpeg, pngEncoder } from "./ffmpeg.js";
 import { startServer, type ServerLog } from "./server.js";
 import { verifyMp4 } from "./verify.js";
 

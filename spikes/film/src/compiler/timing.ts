@@ -17,7 +17,7 @@ export interface CutTiming {
 
 export interface TimingInput {
   chapter: FilmChapter;
-  fps?: number;
+  fps: number;
   chapterPath: string; // JSON pointer of the Chapter in its chapters document
   titleMs: number;
   overlapMs: number; // per adjacent segment pair
@@ -28,6 +28,17 @@ export interface TimingInput {
 
 export function chapterLimit(chapter: FilmChapter): number | null {
   return chapter.limitMs === undefined ? DEFAULT_CHAPTER_LIMIT_MS : chapter.limitMs;
+}
+
+/** frame = floor((ms * fps + 500) / 1000), recorded in Plans as round-half-up@1. */
+export function frameCount(ms: number, fps: number): number {
+  return Math.floor((ms * fps + 500) / 1000);
+}
+
+/** The longest runtime within the limit whose frameCount also presents within the limit at fps. */
+export function frameSafeLimitMs(limitMs: number, fps: number): number {
+  const maxFrames = Math.floor((limitMs * fps) / 1000);
+  return Math.min(limitMs, Math.ceil((maxFrames * 1000 + 500) / fps) - 1);
 }
 
 function ceilTo(value: number, step: number | null): number {
@@ -74,18 +85,25 @@ export function preflight(input: TimingInput): FilmError[] {
     input,
     input.chapter.scenes.map((s, i) => s.durationMs ?? minimums[i]!),
   );
-  const fps = input.fps ?? 30;
-  const frames = Math.floor((requiredMinMs * fps + 500) / 1000);
-  if (requiredMinMs > limit || frames * 1000 > limit * fps) {
+  const { fps } = input;
+  const maxRuntimeMs = frameSafeLimitMs(limit, fps);
+  if (requiredMinMs > maxRuntimeMs) {
+    const frames = frameCount(requiredMinMs, fps);
+    const encodedDurationMs = (frames * 1000) / fps;
+    const overByMs = requiredMinMs - maxRuntimeMs;
+    const need =
+      requiredMinMs > limit
+        ? `needs at least ${requiredMinMs} ms but its limit is ${limit} ms`
+        : `needs at least ${requiredMinMs} ms, which encodes as ${frames} frames (${encodedDurationMs.toFixed(1)} ms) at ${fps} fps, over its ${limit} ms limit`;
     errors.push(
-      filmError("FS_PREFLIGHT_OVER_LIMIT", input.chapterPath, `Chapter ${input.chapter.id} needs at least ${requiredMinMs} ms but its limit is ${limit} ms`, {
+      filmError("FS_PREFLIGHT_OVER_LIMIT", input.chapterPath, `Chapter ${input.chapter.id} ${need}; shorten it by ${overByMs} ms`, {
         chapterId: input.chapter.id,
         limitMs: limit,
         requiredMinMs,
         encodedFrames: frames,
-        encodedDurationMs: frames * 1000 / fps,
+        encodedDurationMs,
         fps,
-        overByMs: requiredMinMs - limit,
+        overByMs,
         fixedScenes: input.chapter.scenes.filter((s) => s.durationMs !== undefined).map((s) => ({ sceneId: s.sceneId, durationMs: s.durationMs })),
       }),
     );
@@ -139,10 +157,7 @@ export function resolveTiming(input: TimingInput): TimingProposal {
 
   if (limit !== null && blanks.length) {
     const fixedRuntime = runtimeOf(input, durations) - blanks.reduce((sum, i) => sum + durations[i]!, 0);
-    const fps = input.fps ?? 30;
-    const maxFrames = Math.floor(limit * fps / 1000);
-    const frameSafeMs = Math.ceil((maxFrames * 1000 + 500) / fps) - 1;
-    const available = Math.min(limit, frameSafeMs) - fixedRuntime;
+    const available = frameSafeLimitMs(limit, input.fps) - fixedRuntime;
     const preferredTotal = blanks.reduce((sum, i) => sum + preferred[i]!, 0);
     if (preferredTotal > available) {
       const filled = waterFill(

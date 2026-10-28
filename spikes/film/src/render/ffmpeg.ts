@@ -10,11 +10,6 @@ import { fail } from "../contracts/errors.js";
 export const X264 = ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-profile:v", "high", "-level:v", "4.1", "-g", "30", "-bf", "2", "-r", "30", "-movie_timescale", "48000"];
 export const AAC = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"];
 
-/** frame = floor((ms * fps + 500) / 1000), recorded in Plans as round-half-up@1. */
-export function frameCount(ms: number, fps: number): number {
-  return Math.floor((ms * fps + 500) / 1000);
-}
-
 /**
  * Runs a binary without blocking the event loop (the render server shares this process) and
  * returns its stdout, stderr, and exit code.

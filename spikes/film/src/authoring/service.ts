@@ -1,7 +1,6 @@
 // The one typed authoring service. The CLI and the Tool Calling adapter call only this module.
 // Mutating operations default to dry run and require a matching operator approval to write.
 import { resolveChapterCache } from "../render/cache.js";
-import { frameCount } from "../render/ffmpeg.js";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { digestOf } from "../contracts/canonical.js";
@@ -31,6 +30,7 @@ import { loadImplementation } from "../capabilities/loader.js";
 import { compileChapters, preflightChapters, type CompileInput, type FontCatalog, type FontEntry } from "../compiler/compile.js";
 import { buildConcatPlan, CONNECTION } from "../compiler/concat.js";
 import { planDigest, renderDigest } from "../compiler/fingerprint.js";
+import { frameCount } from "../compiler/timing.js";
 import { resolveRecipe, type Catalog, type CatalogEntry } from "../compiler/resolve.js";
 import { readFingerprint, type EnvFingerprint } from "../env/fingerprint.js";
 import { grammarMetrics } from "../evaluation/grammar.js";

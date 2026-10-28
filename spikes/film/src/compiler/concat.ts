@@ -6,6 +6,7 @@ import { CAPABILITY_ABI } from "../capability-sdk/abi.js";
 import type { MediaLock } from "../media/lock.js";
 import { lockFonts, PROFILES, SCHEMA_VERSION, type FontCatalog } from "./compile.js";
 import { concatFingerprint } from "./fingerprint.js";
+import { frameCount } from "./timing.js";
 import type { Catalog, CatalogEntry } from "./resolve.js";
 
 export const CONNECTION: VersionRef = { id: "film.connection.darken-briefly", version: "1.0.0" };
@@ -55,8 +56,8 @@ export function buildConcatPlan(input: ConcatInput): ConcatPlanV2 {
     assets: {},
   });
 
-  const titleFrames = Math.floor((titleMs * profile.fps + 500) / 1000);
-  const joinFrames = Math.floor((darkenMs * profile.fps + 500) / 1000);
+  const titleFrames = frameCount(titleMs, profile.fps);
+  const joinFrames = frameCount(darkenMs, profile.fps);
   let offset = titleFrames;
   const chapters = input.chapters.map((c, i) => {
     const entry = { chapterId: c.plan.chapter.id, planDigest: c.planDigest, artifactSha256: c.artifactSha256, stemSha256: c.stemSha256, frames: c.frames, runtimeMs: c.frames * 1000 / profile.fps, offsetMs: offset * 1000 / profile.fps };
