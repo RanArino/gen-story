@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { FilmFailure } from "../contracts/errors.js";
+import { validateSchema } from "../contracts/schemas.js";
 import type { CapabilityRequest } from "../contracts/types.js";
 import { writeJson } from "../paths.js";
 import {
@@ -12,11 +13,11 @@ import { readFixture } from "../testing/fixtures.js";
 import { createWorld } from "../testing/world.js";
 import { callTool } from "../adapters/tool-calling.js";
 import {
-  normalizedIdentity,
   prepareReview,
   recordReview,
-  requireAcceptedReview,
-} from "./reviews.js";
+  requireOperator,
+} from "../candidates/candidate.js";
+import { normalizedIdentity, requireAcceptedReview } from "./reviews.js";
 
 function code(fn: () => unknown) {
   try {
@@ -142,6 +143,20 @@ describe("operator review boundary", () => {
       else Reflect.deleteProperty(process.stdout, "isTTY");
       vi.restoreAllMocks();
     }
+  });
+  it("reports an invalid operator at /operator, before the confirmation is checked", () => {
+    const record = readFixture<Record<string, unknown>>(
+      "valid/review-record.json",
+    );
+    expect(
+      validateSchema("urn:film-spike:review-record", {
+        ...record,
+        operator: "<bad>",
+      })[0]?.path,
+    ).toBe("/operator");
+    expect(code(() => requireOperator("<bad>"))).toBe("FS_SCHEMA_INVALID");
+    expect(code(() => requireOperator(""))).toBe("FS_SCHEMA_INVALID");
+    expect(code(() => requireOperator("Operator"))).toBeUndefined();
   });
   it("binds both identities from Manifest and approved request", () => {
     const request = JSON.parse(

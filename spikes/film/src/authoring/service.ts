@@ -23,7 +23,7 @@ import type {
   StoryGraph,
   VersionRef,
 } from "../contracts/types.js";
-import { planPromotion, promoteCandidate, quarantinedEntry, runCandidate, scaffold, staticCheck } from "../candidates/candidate.js";
+import { planPromotion, prepareReview, promoteCandidate, quarantinedEntry, runCandidate, scaffold, staticCheck } from "../candidates/candidate.js";
 import { candidateEvidence } from "../candidates/evidence.js";
 import type { CapabilityRequest } from "../contracts/types.js";
 import { loadImplementation } from "../capabilities/loader.js";
@@ -42,7 +42,7 @@ import { writeJson, type SpikePaths } from "../paths.js";
 import { requireApproval } from "../registry/approvals.js";
 import { bootstrapBuiltins } from "../registry/bootstrap.js";
 import { Registry } from "../registry/registry.js";
-import { prepareReview, type ReviewInput } from "../registry/reviews.js";
+import type { ReviewInput } from "../registry/reviews.js";
 import { renderConcat, requireConcatPlan } from "../render/concat.js";
 import { contactSheet } from "../render/contact-sheet.js";
 import { verifyAudio } from "../render/inputs.js";

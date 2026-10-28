@@ -1,6 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:film-spike:review-record",
+  "type": "object",
+  "discriminator": {
+    "propertyName": "schema"
+  },
   "oneOf": [
     {
       "title": "Review Record: an independent review of a candidate's evidence; it is not an approval",

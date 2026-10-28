@@ -1,4 +1,5 @@
-import { recordReview, type ReviewInput } from "../registry/reviews.js";
+import { recordReview, requireOperator } from "../candidates/candidate.js";
+import type { ReviewInput } from "../registry/reviews.js";
 import { requireApprovalTerminal } from "./approval-terminal.js";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -205,8 +206,9 @@ async function review(args: Parsed): Promise<number> {
   if (args.flags["dry-run"] || !prepared.ok) return report(prepared, args);
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const operator = await rl.question("Recording operator: ");
-    const confirmation = await rl.question(`Type ${prepared.result!.confirmation} to record this review: `);
+    const operator = (await rl.question("Recording operator: ")).trim();
+    requireOperator(operator);
+    const confirmation = (await rl.question(`Type ${prepared.result!.confirmation} to record this review: `)).trim();
     const recorded = recordReview(defaultPaths(), service.registry, input, operator, confirmation);
     console.log(`recorded ${recorded.id}`);
     return 0;
