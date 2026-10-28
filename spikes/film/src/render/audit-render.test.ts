@@ -1,4 +1,10 @@
-import { cpSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import type {
   ChapterArtifact,
@@ -93,6 +99,38 @@ describe.skipIf(!chrome)("render audit", () => {
       }
     },
   );
+
+  it("refuses damaged cache entries, and replaces damaged or incomplete ones only by a verified render", async () => {
+    const plan = initial![0]!.plan;
+    const dir = chapterCacheDir(world.paths.state, plan);
+    const stem = `${dir}${rendered[0]!.artifact.files.stem.name}`;
+    const bytes = readFileSync(stem);
+    writeFileSync(stem, "damaged");
+    expect((await render("audit", 0)).errors[0]).toMatchObject({
+      code: "FS_ARTIFACT_VERIFY_FAILED",
+      message: expect.stringContaining("--no-cache"),
+    });
+    const bypassed = await world.service.renderChapter({
+      planFile: planFile("audit", plan.chapter.id),
+      approvalId: operatorApproves(
+        world.paths,
+        "timing",
+        initial![0]!.proposalDigest,
+      ),
+      bypassCache: true,
+    });
+    expect(bypassed.errors).toEqual([]);
+    expect(bypassed.warnings.map((w) => w.code)).toContain("FS_CACHE_CORRUPT");
+    expect(readFileSync(stem)).toEqual(bytes);
+    rmSync(`${dir}artifact.json`);
+    const incomplete = await render("audit", 0);
+    expect(incomplete.errors).toEqual([]);
+    expect((incomplete.result as Rendered).cache).toBe("miss");
+    expect(incomplete.warnings.map((w) => w.code)).toContain(
+      "FS_CACHE_CORRUPT",
+    );
+    expect(((await render("audit", 0)).result as Rendered).cache).toBe("hit");
+  }, 180000);
 
   it("reuses unaffected media after Treatment and Story Graph revisions, binding current metadata", async () => {
     const t = structuredClone(treatment);

@@ -12,7 +12,7 @@ import { fail, FilmFailure } from "../contracts/errors.js";
 import { validateSchema } from "../contracts/schemas.js";
 import type { ChapterArtifact, ResolvedRenderPlan } from "../contracts/types.js";
 import { planDigest } from "../compiler/fingerprint.js";
-import { frameCount, proposalDigest } from "../compiler/timing.js";
+import { frameCount, frameSafeLimitMs, proposalDigest } from "../compiler/timing.js";
 import type { EnvFingerprint } from "../env/fingerprint.js";
 import { readMediaLock } from "../media/lock.js";
 import { writeJson, type SpikePaths } from "../paths.js";
@@ -131,6 +131,16 @@ export async function captureVideo(browser: Browser, origin: string, planPath: s
   return { samples: hashes, blocked: pages.flatMap((p) => p.blocked) };
 }
 
+/** The intact cache entry for this render digest, or null when it is absent, incomplete, or damaged. */
+function intactCache(state: string, plan: ResolvedRenderPlan): ReturnType<typeof resolveChapterCache> {
+  try {
+    return resolveChapterCache(state, plan);
+  } catch (error) {
+    if (error instanceof FilmFailure && error.errors[0]?.code === "FS_ARTIFACT_VERIFY_FAILED") return null;
+    throw error;
+  }
+}
+
 export interface RenderChapterInput {
   planFile: string;
   approvalId?: string;
@@ -151,12 +161,19 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
   const outName = input.outName ?? planPath.split("/").at(-2)!;
   const chapterId = plan.chapter.id;
   const cacheDir = chapterCacheDir(paths.state, plan);
-  verifyAudio(paths.media, [plan.audio.bgm, ...plan.audio.events]);
   const warnings: Warning[] = [];
-  const frames = frameCount(plan.timing.proposal.runtimeMs, plan.profile.fps);
+  const { fps } = plan.profile;
+  const { limitMs, runtimeMs } = plan.timing.proposal;
+  const frames = frameCount(runtimeMs, fps);
+  // Plans approved under earlier timing rules can round past their limit; refuse before capturing.
+  if (limitMs !== null && runtimeMs > frameSafeLimitMs(limitMs, fps)) {
+    fail("FS_PREFLIGHT_OVER_LIMIT", "/timing/proposal/runtimeMs", `${runtimeMs} ms encodes as ${frames} frames (${((frames * 1000) / fps).toFixed(1)} ms) at ${fps} fps, over the ${limitMs} ms limit; recompile the Chapter`, { limitMs, runtimeMs, encodedFrames: frames, fps });
+  }
 
   let artifact = input.bypassCache ? null : resolveChapterCache(paths.state, plan)?.artifact ?? null;
   let cache: "hit" | "miss" = artifact ? "hit" : "miss";
+  // A hit only verifies the approved audio; a miss verifies it while staging it below.
+  if (artifact) verifyAudio(paths.media, [plan.audio.bgm, ...plan.audio.events]);
   let capture: CaptureResult & { fonts: string[] } = { samples: [], blocked: [], fonts: [] };
   let serverLog: ServerLog | null = null;
 
@@ -171,7 +188,7 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
       const server = await startServer(paths);
       try {
         const result = await withBrowser(async (browser) => {
-          const video = await captureVideo(browser, server.origin, planPath, frames, plan.profile.fps, `${work}video.mp4`, sampleFrames(frames));
+          const video = await captureVideo(browser, server.origin, planPath, frames, fps, `${work}video.mp4`, sampleFrames(frames));
           const page = await openPlan(browser, server.origin, planPath);
           const fonts = await page.fonts();
           await page.page.close();
@@ -184,7 +201,6 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
       }
       const lock = readMediaLock(paths.media);
       const assetMs = (asset: string) => lock.files.find((f) => f.path === asset)?.durationMs ?? 0;
-      const runtimeMs = plan.timing.proposal.runtimeMs;
       const stem = stemGraph(plan.audio.events, runtimeMs, audioDir, assetMs);
       const stemName = `${chapterId}.stem.wav`;
       await ffmpeg([...stem.inputs, "-filter_complex", stem.filter, "-map", stem.output, "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", "-fflags", "+bitexact", "-flags:a", "+bitexact", `${work}${stemName}`]);
@@ -193,7 +209,7 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
       await ffmpeg(["-i", `${work}video.mp4`, ...bed.inputs, "-filter_complex", bed.filter, "-map", "0:v", "-c:v", "copy", "-map", bed.output, ...AAC, "-movie_timescale", "48000", "-movflags", "+faststart", `${work}${mp4Name}`]);
       rmSync(`${work}video.mp4`);
 
-      const errors = await verifyMp4(`${work}${mp4Name}`, frames, plan.profile, plan.timing.proposal.limitMs);
+      const errors = await verifyMp4(`${work}${mp4Name}`, frames, plan.profile, limitMs);
       if (errors.length) throw new FilmFailure(errors);
       artifact = {
         schema: "film.chapter-artifact@1",
@@ -219,10 +235,16 @@ export async function renderChapter(deps: RenderDeps, input: RenderChapterInput)
       writeJson(`${work}frames.json`, { planDigest: digest, samples: capture.samples });
       writeJson(`${work}origin.plan.json`, plan);
       rmSync(audioDir, { recursive: true, force: true });
-      if (!existsSync(cacheDir)) renameSync(work, cacheDir);
-      else {
-        const existing = resolveChapterCache(paths.state, plan)!;
+      const existing = intactCache(paths.state, plan);
+      if (existing) {
         if (digestOf(existing.artifact.files) !== digestOf(artifact.files)) fail("FS_NONDETERMINISTIC", "/files", "replay differs from immutable cached media");
+      } else {
+        // A damaged or incomplete entry (bypassed, or without artifact.json) is replaced by this verified render.
+        if (existsSync(cacheDir)) {
+          warnings.push({ code: "FS_CACHE_CORRUPT", path: cacheDir, message: "a damaged cached Chapter entry was replaced by this verified render", disposition: null });
+          rmSync(cacheDir, { recursive: true, force: true });
+        }
+        renameSync(work, cacheDir);
       }
     } finally {
       rmSync(work, { recursive: true, force: true });

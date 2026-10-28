@@ -8,6 +8,21 @@ import type {
 } from "../contracts/types.js";
 import { planDigest, renderDigest } from "../compiler/fingerprint.js";
 
+const REBUILD =
+  "render the Chapter with the cache bypassed (--no-cache) to replace it";
+
+function readEntry<T>(file: string): T {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch {
+    return fail(
+      "FS_ARTIFACT_VERIFY_FAILED",
+      "/chapters",
+      `cached ${file} is unreadable; ${REBUILD}`,
+    );
+  }
+}
+
 export function chapterCacheDir(
   state: string,
   plan: ResolvedRenderPlan,
@@ -30,7 +45,7 @@ export function verifyChapterFiles(
     fail(
       "FS_ARTIFACT_VERIFY_FAILED",
       "/chapters",
-      `cached Chapter media failed checksum verification: ${dir}`,
+      `cached Chapter media failed checksum verification: ${dir}; ${REBUILD}`,
     );
   }
 }
@@ -41,18 +56,14 @@ export function resolveChapterCache(
 ): { dir: string; artifact: ChapterArtifact } | null {
   const dir = chapterCacheDir(state, plan);
   if (!existsSync(`${dir}artifact.json`)) return null;
-  const artifact = JSON.parse(
-    readFileSync(`${dir}artifact.json`, "utf8"),
-  ) as ChapterArtifact;
+  const artifact = readEntry<ChapterArtifact>(`${dir}artifact.json`);
   if (!existsSync(`${dir}origin.plan.json`) || !existsSync(`${dir}frames.json`))
     fail(
       "FS_ARTIFACT_VERIFY_FAILED",
       "/chapters",
-      "cached originating Plan or frame evidence is missing",
+      `cached originating Plan or frame evidence is missing; ${REBUILD}`,
     );
-  const origin = JSON.parse(
-    readFileSync(`${dir}origin.plan.json`, "utf8"),
-  ) as ResolvedRenderPlan;
+  const origin = readEntry<ResolvedRenderPlan>(`${dir}origin.plan.json`);
   if (
     planDigest(origin) !== artifact.planDigest ||
     renderDigest(origin) !== renderDigest(plan)
@@ -60,7 +71,7 @@ export function resolveChapterCache(
     fail(
       "FS_ARTIFACT_VERIFY_FAILED",
       "/chapters",
-      "cached Plan identity is damaged",
+      `cached Plan identity is damaged; ${REBUILD}`,
     );
   verifyChapterFiles(dir, artifact);
   return {

@@ -6,8 +6,15 @@ import { verifyAudio } from "../render/inputs.js";
 import { renderDigest, planDigest } from "./fingerprint.js";
 import { findChapterArtifact } from "../render/concat.js";
 import { readFixture } from "../testing/fixtures.js";
+import { operatorApproves } from "../testing/state.js";
 import { createWorld } from "../testing/world.js";
-import { preflight, resolveTiming, type TimingInput } from "./timing.js";
+import { writeJson } from "../paths.js";
+import {
+  preflight,
+  proposalDigest,
+  resolveTiming,
+  type TimingInput,
+} from "./timing.js";
 
 const world = createWorld();
 const treatment = readFixture<FilmTreatment>(
@@ -184,6 +191,32 @@ describe("audit boundary coverage", () => {
       expect(() => verifyAudio(dir, [input])).toThrow();
     },
   );
+  it("refuses an earlier-approved Plan that rounds past its limit before capturing", async () => {
+    const live = createWorld({ liveEnvironment: true });
+    const plan = structuredClone(
+      live.service.compile({ treatment, chapters }).result![0]!.plan,
+    );
+    Object.assign(plan.timing.proposal, {
+      limitMs: 6020,
+      runtimeMs: 6020,
+      remainingMs: 0,
+    });
+    plan.timing.proposalDigest = proposalDigest(plan.timing.proposal);
+    const planFile = `${live.paths.out}plans/legacy-limit/${plan.chapter.id}.plan.json`;
+    writeJson(planFile, plan);
+    const result = await live.service.renderChapter({
+      planFile,
+      approvalId: operatorApproves(
+        live.paths,
+        "timing",
+        plan.timing.proposalDigest,
+      ),
+    });
+    expect(result.errors[0]).toMatchObject({
+      code: "FS_PREFLIGHT_OVER_LIMIT",
+      path: "/timing/proposal/runtimeMs",
+    });
+  });
 });
 
 it("resolves the approved video/stem pair without inspecting an unrelated audio revision", () => {
