@@ -106,11 +106,12 @@ in a different environment (Chrome, ffmpeg, Node, OS, or painter source) is refu
 `render chapter` writes `out/artifacts/<name>/<chapter>.{mp4,stem.wav,json,frames.json}` after
 ffprobe verifies the exact frame count, 1920x1080, 30 fps, and AAC 48 kHz. Artifacts are cached
 in `.state/cache/chapter-media-v2/<render-digest>/`. The render digest omits only parent
-Story Graph/Treatment revision numbers, Chapter index, and the existing fingerprint. Original
+Story Graph/Treatment revision numbers, Chapter index, and the existing fingerprint.
 New Chapter Plans also bind `provenance.projectId`; legacy Plans remain readable and must be
 recompiled before concatenation. Plans and cache metadata remain immutable; reuse writes fresh output metadata bound to the
 current full Plan digest. New storage starts cold once, leaving legacy caches intact. Damaged
-Chapter media fails with `FS_ARTIFACT_VERIFY_FAILED`.
+Chapter media fails with `FS_ARTIFACT_VERIFY_FAILED`; `render chapter --no-cache` replaces a
+damaged or incomplete cache entry with the verified re-render and warns `FS_CACHE_CORRUPT`.
 
 `compile --concat` requires the current `--chapters` document, selecting exactly its Chapter IDs
 and order. Removed Chapters can leave files behind; those files are ignored. Missing, duplicate,
@@ -258,7 +259,8 @@ Pass `dryRun: false` to apply; approval-gated operations also need the existing 
 `approvalId`. Dry run does not waive an approval gate or other prerequisites.
 
 Existing authoring/evidence exceptions remain: Recipe forks, font quarantine/inspection,
-static checks, candidate fallback compilation, ordinary compilation, contact sheets, do not gain new approval gates. Review preparation remains read-only; recording requires the
+static checks, candidate fallback compilation, ordinary compilation, and contact sheets do not
+gain new approval gates. Review preparation remains read-only; recording requires the
 interactive operator command and typed confirmation. Candidate static checks still require
 the approved request receipt. Reviews remain independent evidence, never approvals.
 The adapter covers every public service operation, including candidate compilation,
@@ -301,7 +303,10 @@ without publishing a successful output.
 
 Chapter timing preserves exact fixed milliseconds and round-half-up frame rounding. Preflight
 uses the selected profile fps and limits blank-scene allocation to both logical and frame-safe
-budgets. A fixed 6,020 ms runtime becomes 181 frames at 30 fps and cannot fit a 6,020 ms limit.
+budgets. A fixed 6,020 ms runtime becomes 181 frames at 30 fps and cannot fit a 6,020 ms limit;
+preflight reports `overByMs` against the frame-safe budget (4 ms here). `render chapter` refuses
+an earlier-approved Plan that rounds past its limit with `FS_PREFLIGHT_OVER_LIMIT` before
+capturing; recompile it.
 ffprobe checks presented video, audio, and container duration; hidden AAC encoder padding does
 not count as presented duration. Concatenation offsets and runtime come from frame counts;
 stems are positioned at corresponding 48 kHz sample offsets. Every MP4 encoding/remux stage
