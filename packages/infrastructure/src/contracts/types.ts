@@ -1,3 +1,4 @@
+import type { CinematicDirection } from "../cinematic/types.js";
 // TypeScript mirrors of the canonical JSON Schemas in spikes/film/schemas/. The schemas are
 // the source of truth; schemas.test.ts validates every fixture so the two cannot drift silently.
 import type { Warning } from "./envelope.js";
@@ -401,7 +402,14 @@ export interface GroupNode extends NodeBase {
   translateX?: Anim;
   translateY?: Anim;
 }
+export interface CinematicNode extends NodeBase {
+  type: "cinematic";
+  fonts: { serif: string; latin: string };
+  direction: CinematicDirection;
+}
+
 export type PainterNode =
+  | CinematicNode
   | ImageNode
   | RectNode
   | GradientNode
@@ -444,6 +452,8 @@ export interface TimingProposal {
   runtimeMs: number;
   remainingMs: number | null;
   scenes: TimingScene[];
+  authoredWindows?: { sceneId: string; startMs: number; endMs: number }[];
+  endingMs?: number;
 }
 
 export interface LockedCapability {

@@ -264,3 +264,10 @@ export async function renderFilmAssembly(
     cache: result.cache,
   };
 }
+
+export { compileCinematicFilm } from "./cinematic/compile.js";
+export {
+  prepareCinematicScore,
+  lockCinematicMedia,
+} from "./cinematic/prepare.js";
+export type { CinematicDirection, CinematicScore } from "./cinematic/types.js";

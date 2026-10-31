@@ -165,8 +165,11 @@ any cloud setup. The following features are deliberately excluded from this vers
   16:9 1080p30. Chrome and FFmpeg are required. Chapter and joined MP4s can be
   played and downloaded. Recipe creation, new Capability authoring, and additional
   output profiles are not part of this first integrated UI.
-- Bundled sound effects and silence as the initial BGM are supported. There is no
-  BGM generation or generative video. Film jobs run serially in the API process;
+- The current Film UI uses bundled sound effects and silence as the initial BGM.
+  The authored cinematic runtime additionally supports local procedural music/sound
+  for quality-recovery comparisons, but is not yet wired to user project Agent
+  planning or the UI. No external BGM provider or generative video is integrated.
+  Film jobs run serially in the API process;
   interrupted jobs fail explicitly and can be retried from the Film page.
 
 ## Infrastructure

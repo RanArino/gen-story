@@ -1,3 +1,7 @@
+import {
+  CINEMATIC_BROWSER_FILES,
+  cinematicRoot,
+} from "../cinematic/sources.js";
 // Local render server. Serves only the runtime pages, the painter transpiled from its locked
 // source, Plans under out/, locked fixture media, and registry font blobs, on 127.0.0.1.
 import { existsSync, readFileSync } from "node:fs";
@@ -53,6 +57,12 @@ export async function startServer(
   const registry = new Registry(paths.state);
   const lock = readMediaLock(paths.media);
   const painter = painterScript();
+  const cinematicScripts = new Map(
+    CINEMATIC_BROWSER_FILES.map((name) => [
+      `/cinematic/${name}`,
+      readFileSync(`${cinematicRoot}${name}`),
+    ]),
+  );
   const pages = {
     "render.html": readFileSync(`${paths.root}runtime/render.html`),
     "preview.html": readFileSync(`${paths.root}runtime/preview.html`),
@@ -77,6 +87,8 @@ export async function startServer(
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     try {
+      const cinematicScript = cinematicScripts.get(url.pathname);
+      if (cinematicScript) return send(res, 200, cinematicScript, TYPES[".js"]);
       if (url.pathname === "/runtime/painter.js")
         return send(res, 200, painter, TYPES[".js"]);
       const page = url.pathname

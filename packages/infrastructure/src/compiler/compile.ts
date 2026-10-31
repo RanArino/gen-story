@@ -50,7 +50,7 @@ import {
 } from "./timing.js";
 
 export const COMPILER_VERSION = "film-compiler@1";
-export const SCHEMA_VERSION = "film-schemas@2";
+export const SCHEMA_VERSION = "film-schemas@3";
 
 export const PROFILES: Record<string, OutputProfile> = {
   "landscape-1080p30@1": {

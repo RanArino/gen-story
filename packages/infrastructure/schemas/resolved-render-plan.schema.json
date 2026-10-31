@@ -222,7 +222,9 @@
       "additionalProperties": false,
       "required": ["storyGraph", "treatment", "recipe", "scenes"],
       "properties": {
-        "projectId": { "$ref": "urn:film-spike:common#/$defs/slug" },
+        "projectId": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
         "storyGraph": {
           "$ref": "urn:film-spike:common#/$defs/revisionRef"
         },
@@ -328,7 +330,14 @@
       "required": ["type", "startMs", "endMs"],
       "properties": {
         "type": {
-          "enum": ["image", "rect", "linearGradient", "text", "group"]
+          "enum": [
+            "image",
+            "rect",
+            "linearGradient",
+            "text",
+            "group",
+            "cinematic"
+          ]
         },
         "startMs": {
           "$ref": "urn:film-spike:common#/$defs/ms"
@@ -346,7 +355,14 @@
       "required": ["type"],
       "properties": {
         "type": {
-          "enum": ["image", "rect", "linearGradient", "text", "group"]
+          "enum": [
+            "image",
+            "rect",
+            "linearGradient",
+            "text",
+            "group",
+            "cinematic"
+          ]
         }
       },
       "discriminator": {
@@ -367,6 +383,9 @@
         },
         {
           "$ref": "#/$defs/group"
+        },
+        {
+          "$ref": "#/$defs/cinematic"
         }
       ]
     },
@@ -920,6 +939,38 @@
         },
         "environment": {
           "$ref": "urn:film-spike:common#/$defs/digest"
+        }
+      }
+    },
+    "cinematic": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base"
+        }
+      ],
+      "required": ["direction", "fonts"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": {
+          "const": "cinematic"
+        },
+        "direction": {
+          "$ref": "urn:gen-story:cinematic-direction"
+        },
+        "fonts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["serif", "latin"],
+          "properties": {
+            "serif": {
+              "type": "string",
+              "pattern": "^fs-[0-9a-f]{12}$"
+            },
+            "latin": {
+              "type": "string",
+              "pattern": "^fs-[0-9a-f]{12}$"
+            }
+          }
         }
       }
     }

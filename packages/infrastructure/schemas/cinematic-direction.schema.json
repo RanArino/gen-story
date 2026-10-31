@@ -1,0 +1,1382 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:gen-story:cinematic-direction",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "film.cinematic-direction@1"
+    },
+    "projectId": {
+      "$ref": "urn:film-spike:common#/$defs/localId"
+    },
+    "chapterId": {
+      "$ref": "urn:film-spike:common#/$defs/localId"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0.001,
+      "maximum": 600
+    },
+    "reducedMotion": {
+      "type": "boolean"
+    },
+    "assets": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 200,
+      "propertyNames": {
+        "$ref": "urn:film-spike:common#/$defs/localId"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "asset": {
+            "type": "string",
+            "pattern": "^images/[a-z0-9][a-z0-9-]*\\.(jpg|png)$"
+          },
+          "sha256": {
+            "$ref": "urn:film-spike:common#/$defs/digest"
+          },
+          "widthPx": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000
+          },
+          "heightPx": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000
+          }
+        },
+        "required": ["asset", "sha256", "widthPx", "heightPx"]
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "urn:film-spike:common#/$defs/localId"
+          },
+          "image": {
+            "$ref": "urn:film-spike:common#/$defs/localId"
+          },
+          "t0": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600
+          },
+          "t1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600
+          },
+          "fadeIn": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 600
+          },
+          "fadeOut": {
+            "type": "number",
+            "minimum": 0.001,
+            "maximum": 600
+          },
+          "bob": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 12
+          },
+          "camera": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "p": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "fx": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "fy": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "z": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 4
+                }
+              },
+              "required": ["p", "fx", "fy", "z"]
+            },
+            "minItems": 2,
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "id",
+          "image",
+          "t0",
+          "t1",
+          "fadeIn",
+          "fadeOut",
+          "bob",
+          "camera"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 200
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cool": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "warm": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "vignette": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "rays": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "motes": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "leaves": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "speed": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "bloom": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "cool",
+        "warm",
+        "vignette",
+        "rays",
+        "motes",
+        "leaves",
+        "speed",
+        "bloom"
+      ]
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24
+        },
+        "motes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 300
+        },
+        "leaves": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 80
+        },
+        "leafColors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "light": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "coolWash": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "warmWash": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "grain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.3
+        },
+        "transitionGlow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        }
+      },
+      "required": [
+        "rays",
+        "motes",
+        "leaves",
+        "leafColors",
+        "light",
+        "coolWash",
+        "warmWash",
+        "grain",
+        "transitionGlow"
+      ]
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "t": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600
+          },
+          "surface": {
+            "enum": ["gravel", "stone", "stair"]
+          }
+        },
+        "required": ["t", "surface"]
+      },
+      "minItems": 0,
+      "maxItems": 10000
+    },
+    "captions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "t0": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600
+          },
+          "t1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "sub": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "mid": {
+            "type": "boolean"
+          }
+        },
+        "required": ["t0", "t1", "text", "sub", "mid"]
+      },
+      "minItems": 0,
+      "maxItems": 1000
+    },
+    "titleCard": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "tagline": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "taglineSub": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "minItems": 0,
+              "maxItems": 12
+            },
+            "footer": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "show": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "in": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 600
+                },
+                "fadeIn": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 600
+                },
+                "out": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 600
+                    }
+                  ]
+                },
+                "fadeOut": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 600
+                }
+              },
+              "required": ["in", "fadeIn", "out"]
+            }
+          },
+          "required": ["display", "show"]
+        }
+      ]
+    },
+    "slates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "display": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "show": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "in": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              "fadeIn": {
+                "type": "number",
+                "minimum": 0.001,
+                "maximum": 600
+              },
+              "out": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  }
+                ]
+              },
+              "fadeOut": {
+                "type": "number",
+                "minimum": 0.001,
+                "maximum": 600
+              }
+            },
+            "required": ["in", "fadeIn", "out"]
+          }
+        },
+        "required": ["display", "text", "show"]
+      },
+      "minItems": 0,
+      "maxItems": 200
+    },
+    "credits": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "tagline": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "taglineSub": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "minItems": 0,
+              "maxItems": 12
+            },
+            "footer": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "show": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "in": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 600
+                },
+                "fadeIn": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 600
+                },
+                "out": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 600
+                    }
+                  ]
+                },
+                "fadeOut": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 600
+                }
+              },
+              "required": ["in", "fadeIn", "out"]
+            }
+          },
+          "required": ["display", "show"]
+        }
+      ]
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 600
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "bird-chirp"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "freq": {
+                        "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 20,
+                          "maximum": 20000
+                        },
+                        "maxItems": 16,
+                        "minItems": 1
+                      },
+                      "count": {
+                        "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 20000
+                        },
+                        "maxItems": 16,
+                        "minItems": 1
+                      },
+                      "gain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      },
+                      "f": {
+                        "type": "number",
+                        "minimum": 20,
+                        "maximum": 20000
+                      },
+                      "n": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 600
+                      },
+                      "pan": {
+                        "type": "number",
+                        "minimum": -1,
+                        "maximum": 600
+                      }
+                    },
+                    "required": ["freq", "count", "gain", "f", "n", "pan"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "clap"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "gain": {
+                        "type": "number",
+                        "minimum": 0.05,
+                        "maximum": 1.5
+                      }
+                    },
+                    "required": ["gain"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "footstep"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "surface": {
+                        "enum": ["gravel", "stone", "stair"]
+                      },
+                      "gain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    },
+                    "required": ["surface", "gain"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "koto-pluck"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "freq": {
+                        "type": "number",
+                        "minimum": 20,
+                        "maximum": 20000
+                      },
+                      "note": {
+                        "type": "string",
+                        "maxLength": 32
+                      },
+                      "vel": {
+                        "type": "number",
+                        "minimum": 0.05,
+                        "maximum": 1
+                      },
+                      "gain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    },
+                    "required": ["freq", "note", "vel", "gain"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "low-swell"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "gain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      },
+                      "freqs": {
+                        "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 20,
+                          "maximum": 20000
+                        },
+                        "maxItems": 16,
+                        "minItems": 1
+                      }
+                    },
+                    "required": ["gain", "freqs"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "pad"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "freqs": {
+                        "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 20,
+                          "maximum": 20000
+                        },
+                        "maxItems": 16,
+                        "minItems": 1
+                      },
+                      "notes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 16
+                        },
+                        "maxItems": 16,
+                        "minItems": 1
+                      },
+                      "fadeIn": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 600
+                      },
+                      "hold": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 600
+                      },
+                      "fadeOut": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 600
+                      },
+                      "level": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "freqs",
+                      "notes",
+                      "fadeIn",
+                      "hold",
+                      "fadeOut",
+                      "level"
+                    ]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "stream"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "pan": {
+                        "type": "number",
+                        "minimum": -1,
+                        "maximum": 1
+                      }
+                    },
+                    "required": ["pan"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "suzu"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "gain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    },
+                    "required": ["gain"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "temple-bell"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "gain": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      },
+                      "pitch": {
+                        "type": "number",
+                        "minimum": 60,
+                        "maximum": 400
+                      }
+                    },
+                    "required": ["gain", "pitch"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 600
+                  },
+                  "sound": {
+                    "const": "wind"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "center": {
+                        "type": "number",
+                        "minimum": 150,
+                        "maximum": 2000
+                      }
+                    },
+                    "required": ["center"]
+                  },
+                  "i": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "sustain": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["t", "sound", "params", "i"]
+              }
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 10000
+        },
+        "beds": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "$ref": "urn:film-spike:common#/$defs/localId"
+                  },
+                  "sound": {
+                    "const": "wind"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "center": {
+                        "type": "number",
+                        "minimum": 150,
+                        "maximum": 2000
+                      }
+                    },
+                    "required": ["center"]
+                  },
+                  "curve": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 600
+                        },
+                        {
+                          "type": "number",
+                          "minimum": -2,
+                          "maximum": 2
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "minItems": 1,
+                    "maxItems": 2048
+                  },
+                  "salt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                },
+                "required": ["name", "sound", "params", "curve", "salt"]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "$ref": "urn:film-spike:common#/$defs/localId"
+                  },
+                  "sound": {
+                    "const": "stream"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "pan": {
+                        "type": "number",
+                        "minimum": -1,
+                        "maximum": 1
+                      }
+                    },
+                    "required": ["pan"]
+                  },
+                  "curve": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 600
+                        },
+                        {
+                          "type": "number",
+                          "minimum": -2,
+                          "maximum": 2
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "minItems": 1,
+                    "maxItems": 2048
+                  },
+                  "salt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                },
+                "required": ["name", "sound", "params", "curve", "salt"]
+              }
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "master": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 600
+              },
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 2048
+        },
+        "mix": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reverb": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "seconds": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 10
+                },
+                "decay": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 10
+                },
+                "wet": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["seconds", "decay", "wet"]
+            },
+            "buses": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "music": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2
+                },
+                "foley": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2
+                },
+                "ambience": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2
+                },
+                "sfx": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2
+                }
+              },
+              "required": ["music", "foley", "ambience", "sfx"]
+            }
+          },
+          "required": ["reverb", "buses"]
+        }
+      },
+      "required": ["seed", "duration", "events", "beds", "master", "mix"]
+    }
+  },
+  "required": [
+    "schema",
+    "projectId",
+    "chapterId",
+    "revision",
+    "title",
+    "seed",
+    "duration",
+    "reducedMotion",
+    "assets",
+    "scenes",
+    "params",
+    "options",
+    "steps",
+    "captions",
+    "titleCard",
+    "slates",
+    "credits",
+    "score"
+  ]
+}

@@ -1,7 +1,7 @@
+import { painterSourceDigest } from "../painter/identity.js";
 import { resolveChromePath } from "./chrome.js";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { release, platform } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -47,6 +47,6 @@ export function readFingerprint(
     ffmpeg: firstLineVersion("ffmpeg"),
     ffprobe: firstLineVersion("ffprobe"),
     os: `${platform()} ${release()}`,
-    painterDigest: sha256(readFileSync(PAINTER_SOURCE)),
+    painterDigest: painterSourceDigest(),
   };
 }

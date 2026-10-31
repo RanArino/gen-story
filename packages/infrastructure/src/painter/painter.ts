@@ -1,6 +1,7 @@
-// Trusted, import-free painter. Draws Resolved Render Plan primitives onto a Canvas 2D context at
+import { drawCinematic } from "../cinematic/visual.js";
+// Trusted painter with fixed, source-pinned cinematic helpers. Draws plan primitives at
 // time t. Capture (runtime/render.html) and preview (runtime/preview.html) load this same file, so
-// both draw the same Plan the same way. Capabilities never run here; only type imports are allowed.
+// both draw the same Plan the same way. Candidate Capability code never runs here.
 import type {
   Anim,
   Blend,
@@ -14,7 +15,7 @@ import type { DrawOptions, MeasuredText } from "./protocol.js";
 
 export type { Box, DrawOptions, MeasuredText } from "./protocol.js";
 
-export const PAINTER_ABI = "film-painter@1";
+export const PAINTER_ABI = "film-painter@2";
 
 export interface Surface {
   ctx: CanvasRenderingContext2D;
@@ -197,6 +198,21 @@ function drawNodes(
         ctx.fillRect(node.x, node.y, node.w, node.h);
         break;
       }
+      case "cinematic": {
+        out.push(
+          ...drawCinematic(
+            ctx,
+            node.direction,
+            t,
+            surface.width,
+            surface.height,
+            (asset) => surface.image(asset),
+            opts.omitRoles,
+            node.fonts,
+          ),
+        );
+        break;
+      }
       case "image": {
         const img = surface.image(node.asset);
         if (!img) throw new Error(`painter: image ${node.asset} is not loaded`);
@@ -313,6 +329,8 @@ export function imageAssets(
 ): Set<string> {
   for (const node of nodes) {
     if (node.type === "image") out.add(node.asset);
+    if (node.type === "cinematic")
+      Object.values(node.direction.assets).forEach((a) => out.add(a.asset));
     if (node.type === "group") imageAssets(node.children, out);
   }
   return out;
