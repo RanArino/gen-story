@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.effect.light-leak",
+  "version": "1.0.0",
+  "kind": "effect",
+  "trust": "system",
+  "manifestDigest": "sha256:5a93529e945af6393f291edca44ed289e3f32402f9835188043bf723e13e6968",
+  "implementationDigest": "sha256:0b2da15d1444a3b48e085e00d5f65103442e22addf00699ac5aa8e3b4d1e4d63",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.174Z"
+}

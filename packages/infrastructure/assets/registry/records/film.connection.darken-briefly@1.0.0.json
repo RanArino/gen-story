@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.connection.darken-briefly",
+  "version": "1.0.0",
+  "kind": "connection",
+  "trust": "system",
+  "manifestDigest": "sha256:6a66b901a4cf49e581ef331eb0b9bf011b165a5de59e12b54c6379234ab0896a",
+  "implementationDigest": "sha256:e3f386c1b6aa7f413e337b3a9ef02817a70d4ef8e12b625a929f5ce57d6276a8",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.175Z"
+}

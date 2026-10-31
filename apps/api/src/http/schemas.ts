@@ -47,7 +47,6 @@ export const SceneInputSchema = z.object({
   emotion: z.string(),
   cameraDirection: z.string(),
   lightingDirection: z.string(),
-  motionDirection: z.string(),
   notes: z.string().optional(),
   negativePrompt: z.string().optional(),
   // How closely image generation should follow this scene's photos: "off"
@@ -101,7 +100,6 @@ export const PreviewScenePromptSchema = z.object({
   emotion: z.string().optional(),
   cameraDirection: z.string().optional(),
   lightingDirection: z.string().optional(),
-  motionDirection: z.string().optional(),
   sceneNegativePrompt: z.string().optional(),
   projectNegativePrompt: z.string().optional(),
   commonPrompt: z.string().optional(),

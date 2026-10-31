@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.layout.pulse-split",
+  "version": "1.0.0",
+  "kind": "layout",
+  "trust": "system",
+  "manifestDigest": "sha256:e97ff14457d8897642cb2fb6f6d1a78aa8de5b595e6fc8cf143152b9d0a727fe",
+  "implementationDigest": "sha256:0a28cf0be6306764e90a2887af53f1489f15fc8aa4886e5252955313f5ba6eac",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.098Z"
+}

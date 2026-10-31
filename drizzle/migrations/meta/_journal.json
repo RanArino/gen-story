@@ -169,6 +169,13 @@
       "when": 1790402616000,
       "tag": "0023_normalize_legacy_photo_fidelity",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1793418533784,
+      "tag": "0024_film_treatments",
+      "breakpoints": true
     }
   ]
 }

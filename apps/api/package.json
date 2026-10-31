@@ -27,7 +27,8 @@
     "heic-convert": "^2.1.0",
     "openai": "^6.35.0",
     "sharp": "^0.34.5",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "@gen-story/infrastructure": "workspace:*"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

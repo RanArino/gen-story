@@ -53,7 +53,6 @@ export class LocalSceneFillGenerationAdapter implements SceneFillGenerationPort 
       emotion: normalize(tone, "Warm"),
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "Slow pan",
     };
   }
 }

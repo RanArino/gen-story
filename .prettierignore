@@ -4,3 +4,5 @@ dist/
 coverage/
 data/uploads/
 pnpm-lock.yaml
+# Preserve the exact source bytes pinned by the system Film registry.
+packages/infrastructure/src/capabilities/builtin/**/*.ts

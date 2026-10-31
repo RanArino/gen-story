@@ -705,7 +705,6 @@ export type SceneInput = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes?: string;
   negativePrompt?: string;
   photoFidelity?: Scene["photoFidelity"];
@@ -734,7 +733,6 @@ function buildScene(existingScene: Scene | null, input: SceneInput): Scene {
     emotion: input.emotion,
     cameraDirection: input.cameraDirection,
     lightingDirection: input.lightingDirection,
-    motionDirection: input.motionDirection,
     notes: input.notes ?? existingScene?.notes,
     negativePrompt: input.negativePrompt ?? existingScene?.negativePrompt,
     photoFidelity: input.photoFidelity ?? existingScene?.photoFidelity,
@@ -743,6 +741,7 @@ function buildScene(existingScene: Scene | null, input: SceneInput): Scene {
       input.adoptedGeneratedImageId ??
       existingScene?.adoptedGeneratedImageId ??
       null,
+    originalImageSelected: existingScene?.originalImageSelected ?? false,
     createdAt: existingScene?.createdAt ?? now(),
     updatedAt: now(),
   });
@@ -1662,7 +1661,6 @@ async function writeChangeProposalItem(
           emotion: after.emotion ?? scene.emotion,
           cameraDirection: after.cameraDirection ?? scene.cameraDirection,
           lightingDirection: after.lightingDirection ?? scene.lightingDirection,
-          motionDirection: after.motionDirection ?? scene.motionDirection,
           notes: after.notes ?? scene.notes,
           negativePrompt: after.negativePrompt ?? scene.negativePrompt,
         },
@@ -3357,7 +3355,7 @@ export async function markGenerationRequestCompleted(
       (image) => image.adoptedAt != null,
     );
 
-    if (scene != null && !hasAdoptedImage) {
+    if (scene != null && !hasAdoptedImage && !scene.originalImageSelected) {
       const adopted = setSceneAdoptedGeneratedImage(
         scene,
         [...sceneImages, generatedImage],
@@ -3784,7 +3782,6 @@ export type StoryboardExportScene = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes: string;
   sourcePhotoStorageKey: string | null;
   sourcePhotoMimeType: string | null;
@@ -3861,7 +3858,6 @@ export async function exportStoryboardAsJson(
         emotion: scene.emotion,
         cameraDirection: scene.cameraDirection,
         lightingDirection: scene.lightingDirection,
-        motionDirection: scene.motionDirection,
         notes: scene.notes,
         sourcePhotoStorageKey,
         sourcePhotoMimeType,
@@ -3957,6 +3953,53 @@ export async function setUserPreference(
 
     await deps.userPreferences.upsert(preference);
     return success(preference);
+  } catch (error) {
+    return validationFailure(error);
+  }
+}
+
+export async function markOriginalImageAdopted(
+  deps: ApplicationDependencies,
+  input: { sceneId: string },
+): Promise<UseCaseResult<Scene>> {
+  try {
+    const scene = await getSceneOrNotFound(deps, input.sceneId);
+    if (isFailure(scene)) return scene;
+    const primary = scene.photoAssets.find((p) => p.role === "primary");
+    const photo = primary
+      ? await deps.photoAssets.findById(primary.photoAssetId)
+      : null;
+    if (
+      !photo ||
+      photo.deletedAt !== null ||
+      photo.projectId !== scene.projectId
+    )
+      return failure(
+        "invalid_state",
+        "This scene has no available original photo.",
+      );
+    const updatedAt = now();
+    const updated = {
+      ...scene,
+      adoptedGeneratedImageId: null,
+      originalImageSelected: true,
+      updatedAt,
+    };
+    for (const image of await deps.generatedImages.findBySceneId(scene.id)) {
+      if (image.adoptedAt !== null)
+        await deps.generatedImages.save({
+          ...image,
+          adoptedAt: null,
+          updatedAt,
+        });
+    }
+    await deps.scenes.save(updated);
+    await deps.progressEvents.publish({
+      kind: "scene.original-adopted",
+      entityType: "scene",
+      entityId: scene.id,
+    });
+    return success(updated);
   } catch (error) {
     return validationFailure(error);
   }

@@ -1,0 +1,64 @@
+{
+  "schema": "film.capability-manifest@1",
+  "id": "film.sound.intentional-silence",
+  "version": "1.0.0",
+  "kind": "sound",
+  "level": 0,
+  "title": "Intentional silence",
+  "description": "No sound effects; the BGM carries the film.",
+  "tags": ["bgm-only"],
+  "rendererApi": "film-capability@1",
+  "layer": 0,
+  "media": {
+    "types": [],
+    "min": 0,
+    "max": 0
+  },
+  "profiles": ["landscape-1080p30@1"],
+  "aspectRatios": ["16:9"],
+  "analysis": [],
+  "params": {},
+  "requires": [],
+  "incompatibleWith": [],
+  "determinism": {
+    "seeded": false
+  },
+  "motionLevel": "none",
+  "budgets": {
+    "maxPrimitives": 48,
+    "maxKeyframes": 256,
+    "maxAudioEvents": 16
+  },
+  "reducedMotion": "same",
+  "fallback": null,
+  "timing": {},
+  "assets": [],
+  "fixtures": [
+    {
+      "name": "landscape",
+      "sourceAspect": "16:9",
+      "caption": "ja"
+    },
+    {
+      "name": "square",
+      "sourceAspect": "1:1",
+      "caption": "en"
+    },
+    {
+      "name": "portrait",
+      "sourceAspect": "2:3",
+      "caption": "ja"
+    },
+    {
+      "name": "ultrawide",
+      "sourceAspect": "21:9",
+      "caption": "empty"
+    }
+  ],
+  "permissions": [],
+  "provenance": {
+    "author": "film spike",
+    "source": "spikes film builtin",
+    "license": "internal"
+  }
+}

@@ -129,7 +129,6 @@ function storyboardExportData(): StoryboardExportData {
         emotion: "joy",
         cameraDirection: "wide shot",
         lightingDirection: "golden hour",
-        motionDirection: "walking",
         notes: "",
         sourcePhotoStorageKey: "data/uploads/source.jpg",
         sourcePhotoMimeType: "image/jpeg",

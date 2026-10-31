@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "beatMs": 625,
+  "files": [
+    {
+      "path": "sounds/ambience.wav",
+      "kind": "sound",
+      "sha256": "sha256:cf1c9df8d887cab60f8f65a3412c7ccbe7c027f8bb8c5ffca96d3af18dce5295",
+      "durationMs": 120000,
+      "command": [
+        "ffmpeg",
+        "-f",
+        "lavfi",
+        "-i",
+        "anoisesrc=d=120:c=pink:a=0.08:seed=11",
+        "-af",
+        "lowpass=f=900",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
+        "-c:a",
+        "pcm_s16le",
+        "-fflags",
+        "+bitexact",
+        "-flags:a",
+        "+bitexact"
+      ]
+    },
+    {
+      "path": "sounds/hit.wav",
+      "kind": "sound",
+      "sha256": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f",
+      "durationMs": 400,
+      "command": [
+        "ffmpeg",
+        "-f",
+        "lavfi",
+        "-i",
+        "aevalsrc=0.6*sin(2*PI*180*t)*exp(-14*t):d=0.4",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
+        "-c:a",
+        "pcm_s16le",
+        "-fflags",
+        "+bitexact",
+        "-flags:a",
+        "+bitexact"
+      ]
+    },
+    {
+      "path": "sounds/silence.wav",
+      "kind": "sound",
+      "sha256": "sha256:ede1f6dd33abfce7bb3a45ba79b0ab5f8baae692709dd32214a41da9af55ab13",
+      "durationMs": 1000
+    }
+  ]
+}

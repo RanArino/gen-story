@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.layout.full-frame",
+  "version": "1.0.0",
+  "kind": "layout",
+  "trust": "system",
+  "manifestDigest": "sha256:9edc650d4d0d2eef9f721eb64a79bcc76292a7b1cf7df51e8468f54ffaf24f83",
+  "implementationDigest": "sha256:494d6444d7b64d874b9aef0561291a70815499c8c78d31b3f6fddcdb25966e64",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.089Z"
+}

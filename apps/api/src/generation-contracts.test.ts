@@ -31,7 +31,6 @@ const sceneFields = {
   emotion: "Calm",
   cameraDirection: "Wide",
   lightingDirection: "Natural",
-  motionDirection: "Slow pan",
 };
 
 const photoAnalysisJson = JSON.stringify({

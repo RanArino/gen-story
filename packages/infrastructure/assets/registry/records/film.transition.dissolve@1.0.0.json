@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.transition.dissolve",
+  "version": "1.0.0",
+  "kind": "transition",
+  "trust": "system",
+  "manifestDigest": "sha256:00ab950258e10288d4ada415ae36b7dd151ff676636ca2e23379ed65685b755b",
+  "implementationDigest": "sha256:24f5d36cdc98ce0d7321cacaae8a45742f173264523a9c3a680ccc0273f15bde",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.104Z"
+}

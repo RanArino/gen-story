@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.transition.dip",
+  "version": "1.0.0",
+  "kind": "transition",
+  "trust": "system",
+  "manifestDigest": "sha256:7fa534515bdb68aacf47427230a245ecece5bf1ed1e15dfa8b8c61696942ef24",
+  "implementationDigest": "sha256:891389f937391c475fcaa0e63d744d69f98821529bbecfd6ab15e7a94d7445f3",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.106Z"
+}

@@ -179,12 +179,12 @@ export type Scene = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes: string;
   negativePrompt: string;
   photoFidelity: PhotoFidelity;
   photoAssets: ScenePhotoAsset[];
   adoptedGeneratedImageId: GeneratedImageId | null;
+  originalImageSelected?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -391,12 +391,12 @@ export type CreateSceneInput = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes?: string;
   negativePrompt?: string;
   photoFidelity?: PhotoFidelity;
   photoAssets?: ScenePhotoAsset[];
   adoptedGeneratedImageId?: GeneratedImageId | null;
+  originalImageSelected?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -592,12 +592,12 @@ export function createScene(input: CreateSceneInput): Scene {
     emotion: trimOptionalText(input.emotion),
     cameraDirection: trimOptionalText(input.cameraDirection),
     lightingDirection: trimOptionalText(input.lightingDirection),
-    motionDirection: trimOptionalText(input.motionDirection),
     notes: trimOptionalText(input.notes),
     negativePrompt: trimOptionalText(input.negativePrompt),
     photoFidelity: input.photoFidelity ?? "high",
     photoAssets: [...(input.photoAssets ?? [])],
     adoptedGeneratedImageId: input.adoptedGeneratedImageId ?? null,
+    originalImageSelected: input.originalImageSelected ?? false,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
   };
@@ -628,7 +628,6 @@ export function createTemplateScene(input: CreateTemplateSceneInput): Scene {
     emotion: "",
     cameraDirection: "",
     lightingDirection: "",
-    motionDirection: "",
     notes: "",
     negativePrompt: "",
     photoFidelity: "high",
@@ -677,7 +676,6 @@ export function createComplementScene(
     emotion: "",
     cameraDirection: "",
     lightingDirection: "",
-    motionDirection: "",
     notes: "",
     negativePrompt: "",
     photoFidelity: "high",

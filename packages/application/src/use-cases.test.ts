@@ -557,7 +557,6 @@ class InMemorySceneFillGenerationPort implements SceneFillGenerationPort {
     emotion: "Wonder",
     cameraDirection: "Medium",
     lightingDirection: "Natural",
-    motionDirection: "Slow pan",
   };
 
   async generateSceneFill(
@@ -578,7 +577,6 @@ class InMemoryComplementSceneProposalPort implements ComplementSceneProposalPort
       emotion: "Calm",
       cameraDirection: "Wide",
       lightingDirection: "Natural",
-      motionDirection: "Slow pan",
     },
   ];
 
@@ -1419,7 +1417,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
         },
         {
           sceneId: "scene_1",
@@ -1432,7 +1429,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
         },
       ],
     });
@@ -1502,7 +1498,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
           photoFidelity: "high",
         },
       ],
@@ -1531,7 +1526,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
         },
       ],
     });
@@ -1884,7 +1878,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
           createdAt: "2026-05-02T00:00:00.000Z",
           updatedAt: "2026-05-02T00:00:00.000Z",
         }),
@@ -1984,7 +1977,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
           createdAt: "2026-05-02T00:00:00.000Z",
           updatedAt: "2026-05-02T00:00:00.000Z",
         }),
@@ -2060,7 +2052,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
           createdAt: "2026-05-02T00:00:00.000Z",
           updatedAt: "2026-05-02T00:00:00.000Z",
         }),
@@ -2172,7 +2163,6 @@ describe("application use cases", () => {
           emotion: "warm",
           cameraDirection: "wide",
           lightingDirection: "soft",
-          motionDirection: "still",
           createdAt: "2026-05-02T00:00:00.000Z",
           updatedAt: "2026-05-02T00:00:00.000Z",
         }),
@@ -2286,7 +2276,6 @@ describe("application use cases", () => {
       emotion: "Wonder",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "Slow pan",
     });
     expect(scene?.updatedAt).not.toBe("2026-05-02T00:00:00.000Z");
   });
@@ -2380,7 +2369,6 @@ describe("application use cases", () => {
           emotion: "Joy",
           cameraDirection: "Wide",
           lightingDirection: "Natural",
-          motionDirection: "Static",
           photoAssets: [{ photoAssetId: "photo_full", role: "primary" }],
           createdAt: "2026-05-02T00:00:00.000Z",
           updatedAt: "2026-05-02T00:00:00.000Z",
@@ -2608,7 +2596,6 @@ describe("application use cases", () => {
           emotion: "Nostalgia",
           cameraDirection: "Medium",
           lightingDirection: "Golden hour",
-          motionDirection: "Tracking",
           photoAssets: [{ photoAssetId: "photo_written", role: "primary" }],
           createdAt: "2026-05-02T00:00:00.000Z",
           updatedAt: "2026-05-02T00:00:00.000Z",
@@ -3051,7 +3038,6 @@ describe("application use cases", () => {
         emotion: "warm",
         cameraDirection: "wide",
         lightingDirection: "soft",
-        motionDirection: "still",
         createdAt: ts,
         updatedAt: ts,
       });
@@ -3292,7 +3278,6 @@ describe("application use cases", () => {
           emotion: "",
           cameraDirection: "",
           lightingDirection: "",
-          motionDirection: "",
           createdAt: ts,
           updatedAt: ts,
         }),
@@ -3440,7 +3425,6 @@ describe("application use cases", () => {
           emotion: "",
           cameraDirection: "",
           lightingDirection: "",
-          motionDirection: "",
           createdAt: "2026-07-01T00:00:00.000Z",
           updatedAt: "2026-07-01T00:00:00.000Z",
         }),
@@ -3640,7 +3624,6 @@ describe("application use cases", () => {
           emotion: "Joy",
           cameraDirection: "Wide",
           lightingDirection: "Natural",
-          motionDirection: "Slow pan",
         },
       ],
     });
@@ -3809,7 +3792,6 @@ describe("application use cases", () => {
           emotion: "",
           cameraDirection: "",
           lightingDirection: "",
-          motionDirection: "",
           photoAssets: [
             { photoAssetId: "photo_primary", role: "primary" },
             { photoAssetId: "photo_reference", role: "reference" },
