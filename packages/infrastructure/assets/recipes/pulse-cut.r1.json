@@ -1,0 +1,131 @@
+{
+  "schema": "film.film-style-recipe@1",
+  "id": "system.pulse-cut",
+  "revision": "r1",
+  "title": "Pulse Cut",
+  "description": "Peak moments in short beat-quantized holds: split panels and punch-ins with beat-synced scale, hard cuts, minimal kinetic type, and rhythm-led sound.",
+  "scope": "system",
+  "owner": "gen-story",
+  "lineage": null,
+  "capabilities": [
+    {
+      "slot": "layout",
+      "ref": {
+        "id": "film.layout.pulse-split",
+        "version": "1.0.0",
+        "digest": "sha256:e97ff14457d8897642cb2fb6f6d1a78aa8de5b595e6fc8cf143152b9d0a727fe"
+      }
+    },
+    {
+      "slot": "motion",
+      "ref": {
+        "id": "film.motion.beat-pulse",
+        "version": "1.0.0",
+        "digest": "sha256:b2af7fe1d8d4ab597a5dd23dd06739314cd4302971b6fa2e09769728368d91dd"
+      }
+    },
+    {
+      "slot": "transition",
+      "ref": {
+        "id": "film.transition.direct-cut",
+        "version": "1.0.0",
+        "digest": "sha256:66378c5dcf8dc182e0992573a148a8a1bbce4e393ca0e012b02c96141232eccb"
+      }
+    },
+    {
+      "slot": "typography",
+      "ref": {
+        "id": "film.typography.kinetic-phrase",
+        "version": "1.1.0",
+        "digest": "sha256:db5691b8f55bf856f0b96f6f082979a524f50d5139206bf04e3bbd9ea1968ed3"
+      }
+    },
+    {
+      "slot": "sound",
+      "ref": {
+        "id": "film.sound.beat-led",
+        "version": "1.0.0",
+        "digest": "sha256:6be7e65c96da3166df48b2c703e4742052592ae2ea6c253c5ed8f42ba76cdbab"
+      }
+    },
+    {
+      "slot": "surface",
+      "ref": {
+        "id": "film.surface.no-surface",
+        "version": "1.0.0",
+        "digest": "sha256:2a28cfe3072f3005529d90cdf3f7388fb6b8c4e9a1e7f282ed992336747af32b"
+      }
+    }
+  ],
+  "effects": [],
+  "params": {},
+  "fonts": [
+    {
+      "role": "caption",
+      "ref": {
+        "id": "font.noto-sans-jp",
+        "version": "1.0.0",
+        "digest": "sha256:e6789b4c99bd3e0c8da231195c22e14c08b5feaf0ff786afc57d85e3a9477bd2"
+      }
+    },
+    {
+      "role": "title",
+      "ref": {
+        "id": "font.noto-sans-jp",
+        "version": "1.0.0",
+        "digest": "sha256:e6789b4c99bd3e0c8da231195c22e14c08b5feaf0ff786afc57d85e3a9477bd2"
+      }
+    }
+  ],
+  "palette": {
+    "family": "night-contrast",
+    "background": "#0b0b0d",
+    "text": "#f6f1e7",
+    "accent": "#ff6a3d",
+    "scrim": "#000000"
+  },
+  "curves": {
+    "energy": 0.85,
+    "intimacy": 0.35,
+    "openness": 0.6,
+    "warmth": 0.45,
+    "stillness": 0.15
+  },
+  "timing": {
+    "preferredSceneMs": 3750,
+    "minSceneMs": 1875,
+    "maxSceneMs": 7500,
+    "minHoldMs": 1250,
+    "beatQuantized": true
+  },
+  "chapterAllowlist": [
+    {
+      "field": "pacing",
+      "min": 0.9,
+      "max": 1.5
+    },
+    {
+      "field": "motionAmount",
+      "min": 0.3,
+      "max": 1
+    },
+    {
+      "field": "emphasis",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "field": "sfxLevel",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "field": "visualIntensity",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "output": {
+    "profile": "landscape-1080p30@1"
+  }
+}

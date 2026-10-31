@@ -1,0 +1,274 @@
+{
+  "film.layout.full-frame": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.layout.memory-board": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.layout.pulse-split": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.motion.static": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.motion.slow-camera": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.motion.parallax-cards": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.motion.beat-pulse": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.transition.direct-cut": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.transition.dissolve": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.transition.card-slide": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.transition.dip": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.typography.subtitle": {
+    "offered": ["1.0.0", "1.1.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      },
+      {
+        "action": "activate",
+        "version": "1.1.0"
+      }
+    ]
+  },
+  "film.typography.editorial-note": {
+    "offered": ["1.0.0", "1.1.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      },
+      {
+        "action": "activate",
+        "version": "1.1.0"
+      }
+    ]
+  },
+  "film.typography.kinetic-phrase": {
+    "offered": ["1.0.0", "1.1.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      },
+      {
+        "action": "activate",
+        "version": "1.1.0"
+      }
+    ]
+  },
+  "film.sound.intentional-silence": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.sound.ambience-led": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.sound.beat-led": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.surface.no-surface": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.surface.soft-vignette": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.surface.paper-tone": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.effect.light-leak": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.connection.darken-briefly": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "font.noto-sans-jp": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "font.noto-serif-jp": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "font.cormorant-garamond": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "film.transition.torn-reveal": {
+    "offered": ["1.0.0"],
+    "deprecated": [],
+    "history": [
+      {
+        "action": "activate",
+        "version": "1.0.0"
+      }
+    ]
+  }
+}

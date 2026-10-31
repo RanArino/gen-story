@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:review-record",
+  "type": "object",
+  "discriminator": {
+    "propertyName": "schema"
+  },
+  "oneOf": [
+    {
+      "title": "Review Record: an independent review of a candidate's evidence; it is not an approval",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "id",
+        "subjectDigest",
+        "subject",
+        "reviewer",
+        "verdict",
+        "notes",
+        "createdAt"
+      ],
+      "properties": {
+        "schema": {
+          "const": "film.review-record@1"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^rev-[0-9a-f]{12}$"
+        },
+        "subjectDigest": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "reviewer": {
+          "$ref": "urn:film-spike:common#/$defs/name"
+        },
+        "verdict": {
+          "enum": ["accept", "reject"]
+        },
+        "notes": {
+          "$ref": "urn:film-spike:common#/$defs/plainText"
+        },
+        "createdAt": {
+          "$ref": "urn:film-spike:common#/$defs/timestamp"
+        }
+      }
+    },
+    {
+      "title": "Review Record: an independent review of a candidate's evidence; it is not an approval",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "id",
+        "subjectDigest",
+        "subject",
+        "reviewer",
+        "verdict",
+        "notes",
+        "createdAt",
+        "candidate",
+        "author",
+        "requester",
+        "operator",
+        "confirmation"
+      ],
+      "properties": {
+        "schema": {
+          "const": "film.review-record@2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^rev-[0-9a-f]{12}$"
+        },
+        "subjectDigest": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "reviewer": {
+          "$ref": "urn:film-spike:common#/$defs/name"
+        },
+        "verdict": {
+          "enum": ["accept", "reject"]
+        },
+        "notes": {
+          "$ref": "urn:film-spike:common#/$defs/plainText"
+        },
+        "createdAt": {
+          "$ref": "urn:film-spike:common#/$defs/timestamp"
+        },
+        "candidate": {
+          "$ref": "urn:film-spike:common#/$defs/slug"
+        },
+        "author": {
+          "$ref": "urn:film-spike:common#/$defs/name"
+        },
+        "requester": {
+          "$ref": "urn:film-spike:common#/$defs/name"
+        },
+        "operator": {
+          "$ref": "urn:film-spike:common#/$defs/name"
+        },
+        "confirmation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value", "confirmedAt"],
+          "properties": {
+            "kind": {
+              "const": "interactive-tty"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            },
+            "confirmedAt": {
+              "$ref": "urn:film-spike:common#/$defs/timestamp"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

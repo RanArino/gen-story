@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:chapter-artifact",
+  "title": "Chapter Artifact metadata: what an independently downloadable Chapter MP4 was built from",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "chapterId",
+    "order",
+    "title",
+    "scenes",
+    "recipe",
+    "capabilityLock",
+    "fonts",
+    "bgm",
+    "planDigest",
+    "fingerprint",
+    "environment",
+    "runtimeMs",
+    "frames",
+    "files",
+    "verified"
+  ],
+  "properties": {
+    "schema": { "const": "film.chapter-artifact@1" },
+    "chapterId": { "$ref": "urn:film-spike:common#/$defs/localId" },
+    "order": { "type": "integer", "minimum": 0 },
+    "title": { "type": "string" },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sceneId", "asset", "sha256"],
+        "properties": {
+          "sceneId": { "$ref": "urn:film-spike:common#/$defs/localId" },
+          "asset": { "$ref": "urn:film-spike:common#/$defs/mediaAsset" },
+          "sha256": { "$ref": "urn:film-spike:common#/$defs/digest" }
+        }
+      }
+    },
+    "recipe": { "$ref": "urn:film-spike:common#/$defs/recipeRevisionRef" },
+    "capabilityLock": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:film-spike:resolved-render-plan#/$defs/lockedCapability"
+      }
+    },
+    "fonts": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:film-spike:resolved-render-plan#/$defs/lockedFont"
+      }
+    },
+    "bgm": { "$ref": "urn:film-spike:common#/$defs/mediaDigest" },
+    "planDigest": { "$ref": "urn:film-spike:common#/$defs/digest" },
+    "fingerprint": { "$ref": "urn:film-spike:common#/$defs/digest" },
+    "environment": { "$ref": "urn:film-spike:common#/$defs/digest" },
+    "runtimeMs": { "$ref": "urn:film-spike:common#/$defs/ms" },
+    "frames": { "type": "integer", "minimum": 1 },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mp4", "stem"],
+      "properties": {
+        "mp4": { "$ref": "#/$defs/file" },
+        "stem": { "$ref": "#/$defs/file" }
+      }
+    },
+    "verified": { "type": "boolean" }
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256", "bytes"],
+      "properties": {
+        "name": { "$ref": "urn:film-spike:common#/$defs/fileName" },
+        "sha256": { "$ref": "urn:film-spike:common#/$defs/digest" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

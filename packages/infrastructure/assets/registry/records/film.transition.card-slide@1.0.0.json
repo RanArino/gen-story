@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.transition.card-slide",
+  "version": "1.0.0",
+  "kind": "transition",
+  "trust": "system",
+  "manifestDigest": "sha256:61b0bb7d83b51b91a2157a83a0bfadea40d9fce301b5b7a73151d73e3305d179",
+  "implementationDigest": "sha256:5368ecea60db9e8df858139aa6c90f0947b86ef277f9a95961e5f42a555b880c",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.105Z"
+}

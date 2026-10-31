@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.transition.direct-cut",
+  "version": "1.0.0",
+  "kind": "transition",
+  "trust": "system",
+  "manifestDigest": "sha256:66378c5dcf8dc182e0992573a148a8a1bbce4e393ca0e012b02c96141232eccb",
+  "implementationDigest": "sha256:7787f971be59318d200ca5e18060d65513dc27c926840126f72e9ced94402a80",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.103Z"
+}

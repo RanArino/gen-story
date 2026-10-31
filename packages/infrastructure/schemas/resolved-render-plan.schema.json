@@ -1,0 +1,927 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:resolved-render-plan",
+  "title": "Resolved Render Plan: compiler-only, fully materialized renderer input for one Chapter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "chapter",
+    "profile",
+    "frameQuantization",
+    "options",
+    "timing",
+    "segments",
+    "layers",
+    "texts",
+    "audio",
+    "fonts",
+    "capabilities",
+    "lock",
+    "provenance",
+    "shared",
+    "warnings",
+    "fingerprint"
+  ],
+  "properties": {
+    "schema": {
+      "const": "film.resolved-render-plan@1"
+    },
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "index", "sceneIds"],
+      "properties": {
+        "id": {
+          "$ref": "urn:film-spike:common#/$defs/localId"
+        },
+        "title": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sceneIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "urn:film-spike:common#/$defs/localId"
+          }
+        }
+      }
+    },
+    "profile": {
+      "$ref": "urn:film-spike:common#/$defs/outputProfile"
+    },
+    "frameQuantization": {
+      "const": "round-half-up@1"
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forceLevel0", "reducedMotion"],
+      "properties": {
+        "forceLevel0": {
+          "type": "boolean"
+        },
+        "reducedMotion": {
+          "type": "boolean"
+        }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal", "proposalDigest"],
+      "properties": {
+        "proposal": {
+          "$ref": "urn:film-spike:timing-proposal"
+        },
+        "proposalDigest": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        }
+      }
+    },
+    "segments": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "sceneId", "startMs", "endMs"],
+        "properties": {
+          "kind": {
+            "enum": ["title", "scene"]
+          },
+          "sceneId": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "urn:film-spike:common#/$defs/localId"
+              }
+            ]
+          },
+          "startMs": {
+            "$ref": "urn:film-spike:common#/$defs/ms"
+          },
+          "endMs": {
+            "$ref": "urn:film-spike:common#/$defs/ms"
+          }
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "texts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "segment",
+          "role",
+          "text",
+          "font",
+          "box",
+          "startMs",
+          "endMs"
+        ],
+        "properties": {
+          "segment": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "enum": ["caption", "title"]
+          },
+          "text": {
+            "type": "string"
+          },
+          "font": {
+            "$ref": "#/$defs/fontChain"
+          },
+          "box": {
+            "$ref": "urn:film-spike:common#/$defs/rect"
+          },
+          "startMs": {
+            "$ref": "urn:film-spike:common#/$defs/ms"
+          },
+          "endMs": {
+            "$ref": "urn:film-spike:common#/$defs/ms"
+          }
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bgm", "events"],
+      "properties": {
+        "bgm": {
+          "$ref": "#/$defs/bgm"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/audioEvent"
+          }
+        }
+      }
+    },
+    "fonts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/planFont"
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slot", "requested", "active", "chain", "params"],
+        "properties": {
+          "slot": {
+            "type": "string",
+            "pattern": "^(layout|motion|transition|typography|sound|surface|connection|effect\\.[0-9]+)$"
+          },
+          "requested": {
+            "$ref": "urn:film-spike:common#/$defs/versionRef"
+          },
+          "active": {
+            "$ref": "urn:film-spike:common#/$defs/versionRef"
+          },
+          "chain": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "urn:film-spike:common#/$defs/paramValue"
+            }
+          }
+        }
+      }
+    },
+    "lock": {
+      "$ref": "#/$defs/lock"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storyGraph", "treatment", "recipe", "scenes"],
+      "properties": {
+        "projectId": { "$ref": "urn:film-spike:common#/$defs/slug" },
+        "storyGraph": {
+          "$ref": "urn:film-spike:common#/$defs/revisionRef"
+        },
+        "treatment": {
+          "$ref": "urn:film-spike:common#/$defs/revisionRef"
+        },
+        "recipe": {
+          "$ref": "urn:film-spike:common#/$defs/recipeRevisionRef"
+        },
+        "scenes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sceneId", "asset", "sha256"],
+            "properties": {
+              "sceneId": {
+                "$ref": "urn:film-spike:common#/$defs/localId"
+              },
+              "asset": {
+                "$ref": "urn:film-spike:common#/$defs/mediaAsset"
+              },
+              "sha256": {
+                "$ref": "urn:film-spike:common#/$defs/digest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "shared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worldview", "colorFamily", "typography"],
+      "properties": {
+        "worldview": {
+          "type": "string"
+        },
+        "colorFamily": {
+          "$ref": "urn:film-spike:common#/$defs/token"
+        },
+        "typography": {
+          "$ref": "urn:film-spike:common#/$defs/versionRef"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:film-spike:common#/$defs/warning"
+      }
+    },
+    "fingerprint": {
+      "$ref": "urn:film-spike:common#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "anim": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["keys"],
+          "properties": {
+            "keys": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["t", "v", "ease"],
+                "properties": {
+                  "t": {
+                    "$ref": "urn:film-spike:common#/$defs/ms"
+                  },
+                  "v": {
+                    "type": "number"
+                  },
+                  "ease": {
+                    "enum": ["linear", "ease-in-out", "step"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fontChain": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^fs-[0-9a-f]{12}$"
+      }
+    },
+    "base": {
+      "type": "object",
+      "required": ["type", "startMs", "endMs"],
+      "properties": {
+        "type": {
+          "enum": ["image", "rect", "linearGradient", "text", "group"]
+        },
+        "startMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "endMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "opacity": {
+          "$ref": "#/$defs/anim"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["image", "rect", "linearGradient", "text", "group"]
+        }
+      },
+      "discriminator": {
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/image"
+        },
+        {
+          "$ref": "#/$defs/rectNode"
+        },
+        {
+          "$ref": "#/$defs/gradient"
+        },
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "$ref": "#/$defs/group"
+        }
+      ]
+    },
+    "box": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": {
+          "$ref": "#/$defs/anim"
+        },
+        "y": {
+          "$ref": "#/$defs/anim"
+        },
+        "w": {
+          "$ref": "#/$defs/anim"
+        },
+        "h": {
+          "$ref": "#/$defs/anim"
+        }
+      }
+    },
+    "image": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base"
+        }
+      ],
+      "required": ["asset", "sha256", "src", "dst"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "asset": {
+          "$ref": "urn:film-spike:common#/$defs/mediaAsset"
+        },
+        "sha256": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "src": {
+          "$ref": "#/$defs/box"
+        },
+        "dst": {
+          "$ref": "#/$defs/box"
+        },
+        "rotateDeg": {
+          "$ref": "#/$defs/anim"
+        }
+      }
+    },
+    "rectNode": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base"
+        }
+      ],
+      "required": ["x", "y", "w", "h", "color"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": {
+          "const": "rect"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "color": {
+          "$ref": "urn:film-spike:common#/$defs/color"
+        }
+      }
+    },
+    "gradient": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base"
+        }
+      ],
+      "required": ["x", "y", "w", "h", "from", "to", "stops"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": {
+          "const": "linearGradient"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "from": {
+          "$ref": "#/$defs/point"
+        },
+        "to": {
+          "$ref": "#/$defs/point"
+        },
+        "stops": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["at", "color"],
+            "properties": {
+              "at": {
+                "$ref": "urn:film-spike:common#/$defs/unit"
+              },
+              "color": {
+                "$ref": "urn:film-spike:common#/$defs/color"
+              }
+            }
+          }
+        }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      }
+    },
+    "text": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base"
+        }
+      ],
+      "required": [
+        "role",
+        "text",
+        "font",
+        "sizePx",
+        "weight",
+        "color",
+        "letterSpacingPx",
+        "align",
+        "x",
+        "y",
+        "maxWidthPx",
+        "lineHeight"
+      ],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "role": {
+          "enum": ["caption", "title"]
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "font": {
+          "$ref": "#/$defs/fontChain"
+        },
+        "sizePx": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 400
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        },
+        "color": {
+          "$ref": "urn:film-spike:common#/$defs/color"
+        },
+        "letterSpacingPx": {
+          "type": "number"
+        },
+        "align": {
+          "enum": ["left", "center", "right"]
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "maxWidthPx": {
+          "type": "number",
+          "minimum": 1
+        },
+        "lineHeight": {
+          "type": "number",
+          "minimum": 0.8,
+          "maximum": 3
+        },
+        "translateY": {
+          "$ref": "#/$defs/anim"
+        },
+        "scrim": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["color", "opacity", "padPx"],
+          "properties": {
+            "color": {
+              "$ref": "urn:film-spike:common#/$defs/color"
+            },
+            "opacity": {
+              "$ref": "urn:film-spike:common#/$defs/unit"
+            },
+            "padPx": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "group": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base"
+        }
+      ],
+      "required": ["children"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": {
+          "const": "group"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "clipRect": {
+          "$ref": "urn:film-spike:common#/$defs/rect"
+        },
+        "clipPolygon": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y"],
+            "properties": {
+              "x": {
+                "$ref": "#/$defs/anim"
+              },
+              "y": {
+                "$ref": "#/$defs/anim"
+              }
+            }
+          }
+        },
+        "blend": {
+          "enum": ["source-over", "multiply", "screen", "soft-light"]
+        },
+        "filter": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "blur": {
+              "$ref": "#/$defs/anim"
+            },
+            "brightness": {
+              "$ref": "#/$defs/anim"
+            }
+          }
+        },
+        "translateX": {
+          "$ref": "#/$defs/anim"
+        },
+        "translateY": {
+          "$ref": "#/$defs/anim"
+        }
+      }
+    },
+    "audioEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset",
+        "sha256",
+        "startMs",
+        "durationMs",
+        "gain",
+        "loop",
+        "fadeInMs",
+        "fadeOutMs"
+      ],
+      "properties": {
+        "asset": {
+          "$ref": "urn:film-spike:common#/$defs/mediaAsset"
+        },
+        "sha256": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "startMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "durationMs": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "urn:film-spike:common#/$defs/ms"
+            }
+          ]
+        },
+        "gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "fadeInMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "fadeOutMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        }
+      }
+    },
+    "bgm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset",
+        "sha256",
+        "startMs",
+        "durationMs",
+        "gain",
+        "loop",
+        "fadeInMs",
+        "fadeOutMs",
+        "offsetMs"
+      ],
+      "properties": {
+        "asset": {
+          "$ref": "urn:film-spike:common#/$defs/mediaAsset"
+        },
+        "sha256": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "startMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "durationMs": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "urn:film-spike:common#/$defs/ms"
+            }
+          ]
+        },
+        "gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "fadeInMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "fadeOutMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        },
+        "offsetMs": {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        }
+      }
+    },
+    "planFont": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "font", "sha256", "weight", "style", "format"],
+      "properties": {
+        "alias": {
+          "type": "string",
+          "pattern": "^fs-[0-9a-f]{12}$"
+        },
+        "font": {
+          "$ref": "urn:film-spike:common#/$defs/versionRef"
+        },
+        "sha256": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "weight": {
+          "type": "integer"
+        },
+        "style": {
+          "enum": ["normal", "italic"]
+        },
+        "format": {
+          "enum": ["truetype", "opentype", "woff2"]
+        }
+      }
+    },
+    "lockedCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot",
+        "id",
+        "version",
+        "manifestDigest",
+        "implementationDigest",
+        "assetDigests"
+      ],
+      "properties": {
+        "slot": {
+          "type": "string"
+        },
+        "id": {
+          "$ref": "urn:film-spike:common#/$defs/capabilityId"
+        },
+        "version": {
+          "$ref": "urn:film-spike:common#/$defs/semver"
+        },
+        "manifestDigest": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "implementationDigest": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "urn:film-spike:common#/$defs/digest"
+            }
+          ]
+        },
+        "assetDigests": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:film-spike:common#/$defs/assetDigest"
+          }
+        }
+      }
+    },
+    "lockedFont": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "manifestDigest", "faces"],
+      "properties": {
+        "id": {
+          "$ref": "urn:film-spike:common#/$defs/fontId"
+        },
+        "version": {
+          "$ref": "urn:film-spike:common#/$defs/semver"
+        },
+        "manifestDigest": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        },
+        "faces": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:film-spike:common#/$defs/digest"
+          }
+        }
+      }
+    },
+    "lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilities",
+        "fonts",
+        "media",
+        "compiler",
+        "painter",
+        "schemaVersion",
+        "profile",
+        "environment"
+      ],
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lockedCapability"
+          }
+        },
+        "fonts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lockedFont"
+          }
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:film-spike:common#/$defs/mediaDigest"
+          }
+        },
+        "compiler": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "digest"],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "digest": {
+              "$ref": "urn:film-spike:common#/$defs/digest"
+            }
+          }
+        },
+        "painter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["abi", "digest"],
+          "properties": {
+            "abi": {
+              "type": "string"
+            },
+            "digest": {
+              "$ref": "urn:film-spike:common#/$defs/digest"
+            }
+          }
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "profile": {
+          "$ref": "urn:film-spike:common#/$defs/profileId"
+        },
+        "environment": {
+          "$ref": "urn:film-spike:common#/$defs/digest"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.motion.parallax-cards",
+  "version": "1.0.0",
+  "kind": "motion",
+  "trust": "system",
+  "manifestDigest": "sha256:a3534006eb9a485764db10e7d070f1511b5b9cf27617ce89f9b5aa2549ec8fa2",
+  "implementationDigest": "sha256:4293823aeee14e09f17f9a8e498095eeb2f0bd9d14a694ae7b30bbdbc119c723",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.101Z"
+}

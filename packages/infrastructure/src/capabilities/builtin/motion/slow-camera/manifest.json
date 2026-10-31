@@ -1,0 +1,75 @@
+{
+  "schema": "film.capability-manifest@1",
+  "id": "film.motion.slow-camera",
+  "version": "1.0.0",
+  "kind": "motion",
+  "level": 0,
+  "title": "Slow camera",
+  "description": "A slow push or pull toward the subject, kept inside the safe crop.",
+  "tags": ["ken-burns", "calm"],
+  "rendererApi": "film-capability@1",
+  "layer": 10,
+  "media": {
+    "types": ["image"],
+    "min": 1,
+    "max": 1
+  },
+  "profiles": ["landscape-1080p30@1"],
+  "aspectRatios": ["16:9"],
+  "analysis": ["subjectBounds"],
+  "params": {
+    "motionAmount": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "scope": "chapter",
+      "authority": "agent-settable",
+      "description": "How much the camera or cards move; Chapter-adjustable.",
+      "unit": "ratio"
+    }
+  },
+  "requires": [],
+  "incompatibleWith": [],
+  "determinism": {
+    "seeded": true
+  },
+  "motionLevel": "subtle",
+  "budgets": {
+    "maxPrimitives": 48,
+    "maxKeyframes": 256,
+    "maxAudioEvents": 16
+  },
+  "reducedMotion": "reduce",
+  "fallback": null,
+  "timing": {},
+  "assets": [],
+  "fixtures": [
+    {
+      "name": "landscape",
+      "sourceAspect": "16:9",
+      "caption": "ja"
+    },
+    {
+      "name": "square",
+      "sourceAspect": "1:1",
+      "caption": "en"
+    },
+    {
+      "name": "portrait",
+      "sourceAspect": "2:3",
+      "caption": "ja"
+    },
+    {
+      "name": "ultrawide",
+      "sourceAspect": "21:9",
+      "caption": "empty"
+    }
+  ],
+  "permissions": [],
+  "provenance": {
+    "author": "film spike",
+    "source": "spikes film builtin",
+    "license": "internal"
+  }
+}
