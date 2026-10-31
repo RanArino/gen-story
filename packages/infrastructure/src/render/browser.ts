@@ -5,6 +5,7 @@ import puppeteer, {
   type BrowserContext,
   type Page,
 } from "puppeteer-core";
+import { resolveChromePath } from "../env/chrome.js";
 import { fail } from "../contracts/errors.js";
 import type { DrawOptions, MeasuredText } from "../painter/protocol.js";
 
@@ -47,13 +48,7 @@ export interface PlanPage {
 }
 
 export async function launch(): Promise<Browser> {
-  const executablePath = process.env.CHROME_PATH;
-  if (!executablePath)
-    fail(
-      "FS_ENV_MISMATCH",
-      "",
-      "CHROME_PATH is not set; rendering needs the pinned Chrome",
-    );
+  const executablePath = resolveChromePath();
   return puppeteer.launch({ executablePath, headless: "shell", args: FLAGS });
 }
 

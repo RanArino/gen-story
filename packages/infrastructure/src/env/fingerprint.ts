@@ -1,3 +1,4 @@
+import { resolveChromePath } from "./chrome.js";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -36,7 +37,7 @@ function chromeVersion(path: string): string {
 }
 
 export function readFingerprint(
-  chromePath = process.env.CHROME_PATH,
+  chromePath = resolveChromePath(),
 ): EnvFingerprint {
   return {
     node: process.version,
