@@ -195,3 +195,5 @@ export {
   reviseChangeProposalItem,
   selectChangeProposalChoiceOption,
 } from "./change-proposal";
+export { FILM_RECIPES, validateFilm } from "./film";
+export type { FilmRecipe, FilmChapter, FilmTreatment, FilmJob } from "./film";

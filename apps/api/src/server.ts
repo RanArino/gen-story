@@ -157,6 +157,8 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
     console.log(`[startup] failed ${interrupted.value} interrupted AI job(s)`);
   }
 
+  await deps.film?.repository.failInterrupted();
+
   const worker = new LocalJobWorker(deps);
   worker.start();
 

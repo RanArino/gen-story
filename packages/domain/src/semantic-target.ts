@@ -171,7 +171,6 @@ export type SceneSemanticValue = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes: string;
   negativePrompt: string;
 };
@@ -185,7 +184,6 @@ export function readSceneSemanticTarget(scene: Scene): SemanticTargetSnapshot {
     emotion: scene.emotion,
     cameraDirection: scene.cameraDirection,
     lightingDirection: scene.lightingDirection,
-    motionDirection: scene.motionDirection,
     notes: scene.notes,
     negativePrompt: scene.negativePrompt,
   };

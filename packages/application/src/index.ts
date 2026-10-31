@@ -177,3 +177,9 @@ export type {
   TestGenerationBatchWithVariants,
   UpdatePhotoCurationInput,
 } from "./use-cases";
+export { saveFilmTreatment } from "./film";
+export type { FilmRepositoryPort, FilmRendererPort } from "./film";
+
+export { markOriginalImageAdopted } from "./use-cases";
+
+export { requestFilmJob } from "./film";

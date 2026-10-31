@@ -21,6 +21,8 @@ export function AppShell({ children, projectId }: Props) {
     return pathname === href || pathname.startsWith(href + "/");
   }
 
+  const isFilmPage =
+    projectId != null && isActive(`/projects/${projectId}/film`);
   const isStoryboardPage =
     projectId != null && isActive(`/projects/${projectId}/storyboard`);
   const [chatOpen, setChatOpen] = useState(isStoryboardPage);
@@ -36,7 +38,7 @@ export function AppShell({ children, projectId }: Props) {
 
   return (
     <div
-      className={`${styles.shell} ${showChatDrawer ? styles.shellWithChat : ""}`}
+      className={`${styles.shell} ${isFilmPage ? styles.filmShell : ""} ${showChatDrawer ? styles.shellWithChat : ""}`}
     >
       <nav className={styles.sidebar}>
         <div>
@@ -75,6 +77,12 @@ export function AppShell({ children, projectId }: Props) {
                 className={`${styles.stepButton} ${isActive(`/projects/${projectId}/review`) ? styles.stepButtonActive : ""}`}
               >
                 {tNav("stepReview")}
+              </Link>
+              <Link
+                href={`/projects/${projectId}/film`}
+                className={`${styles.stepButton} ${isActive(`/projects/${projectId}/film`) ? styles.stepButtonActive : ""}`}
+              >
+                {tNav("stepFilm")}
               </Link>
             </>
           )}

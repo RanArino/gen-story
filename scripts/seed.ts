@@ -1,4 +1,8 @@
-import { createProject, createScene, createStoryboard } from "@gen-story/domain";
+import {
+  createProject,
+  createScene,
+  createStoryboard,
+} from "@gen-story/domain";
 import {
   LOCAL_ORGANIZATION_ID,
   LOCAL_USER_ID,
@@ -42,11 +46,17 @@ async function main() {
     console.log(`Seeded ${SYSTEM_STYLE_PRESETS.length} system style presets.`);
 
     // Check if demo project already exists (idempotent)
-    const existingProjects = await repos.projects.findByOrganizationId(LOCAL_ORGANIZATION_ID);
-    const existing = existingProjects.find((p) => p.name === SEED_DEMO_PROJECT_NAME);
+    const existingProjects = await repos.projects.findByOrganizationId(
+      LOCAL_ORGANIZATION_ID,
+    );
+    const existing = existingProjects.find(
+      (p) => p.name === SEED_DEMO_PROJECT_NAME,
+    );
     if (existing) {
       console.log(`Seed already applied. Project id: ${existing.id}`);
-      console.log(`Visit http://localhost:3000/projects/${existing.id}/storyboard to explore.`);
+      console.log(
+        `Visit http://localhost:3000/projects/${existing.id}/storyboard to explore.`,
+      );
       return;
     }
 
@@ -79,20 +89,24 @@ async function main() {
     const sceneSpecs = [
       {
         title: "Arrival",
-        description: "The family arrives at the destination, full of excitement.",
-        imagePrompt: "A family stepping out of a car at a scenic mountain destination, golden hour light.",
+        description:
+          "The family arrives at the destination, full of excitement.",
+        imagePrompt:
+          "A family stepping out of a car at a scenic mountain destination, golden hour light.",
         emotion: "Excitement",
       },
       {
         title: "Exploration",
         description: "The children run ahead, discovering the surroundings.",
-        imagePrompt: "Children running through a sunlit meadow, candid joyful moment.",
+        imagePrompt:
+          "Children running through a sunlit meadow, candid joyful moment.",
         emotion: "Joy",
       },
       {
         title: "Together",
         description: "The family gathers around a campfire at dusk.",
-        imagePrompt: "A family sitting around a warm campfire at twilight, soft bokeh background.",
+        imagePrompt:
+          "A family sitting around a warm campfire at twilight, soft bokeh background.",
         emotion: "Gratitude",
       },
     ];
@@ -114,7 +128,6 @@ async function main() {
         emotion: spec.emotion,
         cameraDirection: "Wide",
         lightingDirection: "Golden hour",
-        motionDirection: "Slow pan",
         notes: "",
         photoAssets: [],
         adoptedGeneratedImageId: null,
@@ -128,7 +141,9 @@ async function main() {
     await repos.storyboards.save({ ...storyboard, sceneIds, updatedAt: now() });
 
     console.log(`Seed complete. Project id: ${projectId}.`);
-    console.log(`Visit http://localhost:3000/projects/${projectId}/storyboard to explore.`);
+    console.log(
+      `Visit http://localhost:3000/projects/${projectId}/storyboard to explore.`,
+    );
   } finally {
     close();
   }

@@ -2,7 +2,7 @@
 
 A locally-run demo app for turning your photos into AI-powered story visuals.
 Upload photos, build a storyboard, generate an AI image per scene, and review
-the results.
+the results, then create and download films from the Film stage.
 
 This repository is published as a **public demo**: it runs entirely on your own
 machine (local SQLite + local file storage) and needs no cloud setup. See
@@ -36,18 +36,18 @@ Copy the example env file and edit as needed:
 cp apps/api/.env.example apps/api/.env
 ```
 
-| Variable                      | Default                      | Description                                                                                                         |
-| ----------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `API_PORT`                    | `4000`                       | Port for the API server                                                                                             |
-| `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000`      | API base URL used by the web app                                                                                    |
-| `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite`      | Path to the SQLite database file                                                                                    |
-| `GEN_STORY_DEPLOY_TARGET`     | `local`                      | CLI runtimes selected in Settings require local deployment                                                          |
-| `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_         | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`)                                             |
-| `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint                                                    |
-| `OPENAI_API_KEY`              | _(none)_                     | Optional. Real image generation with GPT Image instead of mock                                                      |
+| Variable                      | Default                      | Description                                                                             |
+| ----------------------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
+| `API_PORT`                    | `4000`                       | Port for the API server                                                                 |
+| `NEXT_PUBLIC_API_BASE_URL`    | `http://localhost:4000`      | API base URL used by the web app                                                        |
+| `GEN_STORY_SQLITE_PATH`       | `data/gen-story.sqlite`      | Path to the SQLite database file                                                        |
+| `GEN_STORY_DEPLOY_TARGET`     | `local`                      | CLI runtimes selected in Settings require local deployment                              |
+| `GEN_STORY_AGENT_CHAT_MODEL`  | _(provider default)_         | Optional model for the in-app agent chat (e.g. `gpt-5-codex`, `sonnet`)                 |
+| `GEN_STORY_API_BASE_URL`      | `http://127.0.0.1:$API_PORT` | URL the chat's CLI session uses to reach this API's MCP endpoint                        |
+| `OPENAI_API_KEY`              | _(none)_                     | Optional. Real image generation with GPT Image instead of mock                          |
 | `GEMINI_API_KEY`              | _(none)_                     | Optional. Photo analysis, explicit Nano Banana generation, and Automatic image fallback |
-| `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`           | Gemini model used for project photo analysis                                                                        |
-| `GEMINI_STORY_SETUP_MODEL`    | `gemini-2.5-flash`           | Gemini model used for storyboard story setup (step 4)                                                               |
+| `GEMINI_PHOTO_ANALYSIS_MODEL` | `gemini-2.5-flash`           | Gemini model used for project photo analysis                                            |
+| `GEMINI_STORY_SETUP_MODEL`    | `gemini-2.5-flash`           | Gemini model used for storyboard story setup (step 4)                                   |
 
 Image generation defaults to **Automatic (Codex → Gemini API)** for new model selections.
 Install Codex CLI 0.164.0 or later and run `codex login` with your ChatGPT subscription
@@ -291,3 +291,17 @@ See [docs/known-limitations.md](docs/known-limitations.md) for features intentio
 ## License
 
 Released under the [MIT License](LICENSE).
+
+## Make a film
+
+After Review, open **Film**. New films start with all photos unassigned. Select several photo thumbnails and choose **New Chapter from selection** to name and create a Chapter in one action. Use **Move to Chapter** to choose a destination by its title and photo previews, or **Return to unassigned** to remove selected photos from the structure. The Unassigned and All photos filters let you organize photos in batches, including photos in previously saved Chapters. Chapter cards show their photos; choose **Edit** to see those photos in the library, adjust their order with the arrow buttons, and set their durations. Expand **Change image** on a photo to select its original or a generated image. Existing saved structures are retained; no automatic reset is performed. Empty structures and Chapters can be saved while organizing, but must contain photos before rendering. Choose Quiet Cinema, Memory Board, or Pulse Cut under **Title & film style**. Chapter style controls adjust pacing, motion amount, emphasis, sound effects, and visual intensity within the shared project identity. Enter exact scene durations in seconds or leave them automatic. Each Chapter starts with a 60-second limit; clear the limit for an unlimited Chapter.
+
+Choose **Save and check timing** to see resolved durations and preflight errors. Entered durations are preserved; impossible limits block rendering. Render each Chapter, play its MP4 in the browser, and download it. Once every current Chapter has rendered, render the complete film using the overall title. It retains Chapter titles and reuses verified Chapter outputs. Editing one Chapter invalidates that output and the complete film while other Chapters remain reusable. Previous outputs remain available and are labelled as previous versions.
+
+Film rendering runs locally at 16:9, 1920×1080, 30 fps. Install FFmpeg (`ffmpeg` and `ffprobe` on PATH) and Chrome, and set `CHROME_PATH` in `apps/api/.env` to the Chrome executable. Film rendering does not call an AI provider. Bundled system fonts and sound effects are used offline; the initial shared BGM is silence. New Recipes, user Capability code, and other output profiles are not exposed in this first delivery.
+
+Film settings and render jobs persist in SQLite. Render snapshots/cache files live under `data/film/`; downloadable MP4s live in local object storage. Interrupted queued/running jobs fail explicitly on API restart and can be rendered again. Rendering captures immutable image bytes, so an edit cannot change an already running job.
+
+The project-scoped API provides GET/PUT `/api/projects/:projectId/film`, GET `.../film/recipes`, POST `.../film/chapters/:chapterId/renders`, POST `.../film/assembly-renders`, GET `.../film/jobs/:jobId`, and GET `.../film/artifacts/:jobId`. Save requests include `expectedRevision`; render requests include `revision`. Artifact responses support byte ranges for seeking and `?download=1` for an attachment. POST `.../film/scenes/:sceneId/original` selects the original photo and clears generated-image adoption. Film routes apply the same organization authorization as other project routes.
+
+Storyboard Motion fields have been removed: still-image generation no longer accepts or emits `motionDirection`. Legacy database values are retained for recovery but are not loaded into current contracts. Film motion comes from the selected template and the reduced-motion setting.

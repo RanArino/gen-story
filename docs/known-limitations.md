@@ -161,10 +161,13 @@ any cloud setup. The following features are deliberately excluded from this vers
 
 ## Video & audio
 
-- There is **no video rendering or export**. The product builds a storyboard and
-  per-scene AI images; assembling those into a finished video is out of scope for
-  this demo.
-- No background-music (BGM) generation or audio pipeline.
+- The Film stage renders local still-image films using three system templates at
+  16:9 1080p30. Chrome and FFmpeg are required. Chapter and joined MP4s can be
+  played and downloaded. Recipe creation, new Capability authoring, and additional
+  output profiles are not part of this first integrated UI.
+- Bundled sound effects and silence as the initial BGM are supported. There is no
+  BGM generation or generative video. Film jobs run serially in the API process;
+  interrupted jobs fail explicitly and can be retried from the Film page.
 
 ## Infrastructure
 

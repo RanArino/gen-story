@@ -583,7 +583,6 @@ export type UpsertSceneInput = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes?: string;
   negativePrompt?: string;
   photoFidelity?: "off" | "low" | "high";
@@ -594,7 +593,6 @@ export type PreviewScenePromptOverrides = {
   emotion?: string;
   cameraDirection?: string;
   lightingDirection?: string;
-  motionDirection?: string;
   sceneNegativePrompt?: string;
   projectNegativePrompt?: string;
   commonPrompt?: string;
@@ -1087,4 +1085,47 @@ export async function compactAgentChatSession(
     "POST",
     `/api/agent-conversations/${conversationId}/compact`,
   );
+}
+
+export async function getFilm(
+  projectId: string,
+): Promise<import("@gen-story/shared").FilmDetailDto> {
+  return request("GET", `/api/projects/${projectId}/film`);
+}
+export async function saveFilm(
+  treatment: import("@gen-story/shared").FilmTreatment,
+): Promise<import("@gen-story/shared").FilmDetailDto> {
+  return request("PUT", `/api/projects/${treatment.projectId}/film`, {
+    ...treatment,
+    expectedRevision: treatment.revision,
+  });
+}
+export async function renderFilm(
+  projectId: string,
+  chapterId: string | null,
+  revision: number,
+): Promise<import("@gen-story/shared").FilmJob> {
+  return request(
+    "POST",
+    chapterId
+      ? `/api/projects/${projectId}/film/chapters/${chapterId}/renders`
+      : `/api/projects/${projectId}/film/assembly-renders`,
+    { revision },
+  );
+}
+export async function adoptOriginalImage(
+  projectId: string,
+  sceneId: string,
+): Promise<void> {
+  return request(
+    "POST",
+    `/api/projects/${projectId}/film/scenes/${sceneId}/original`,
+  );
+}
+export function filmArtifactUrl(
+  projectId: string,
+  jobId: string,
+  download = false,
+): string {
+  return `${apiBase()}/api/projects/${projectId}/film/artifacts/${jobId}${download ? "?download=1" : ""}`;
 }

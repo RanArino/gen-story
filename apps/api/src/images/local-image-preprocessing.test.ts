@@ -117,7 +117,6 @@ describe("LocalImagePreprocessingAdapter", () => {
               emotion: "warm",
               cameraDirection: "medium shot",
               lightingDirection: "soft light",
-              motionDirection: "still",
               photoFidelity: "high",
               photoAssets: [{ photoAssetId: "photo_1", role: "primary" }],
               createdAt: now,

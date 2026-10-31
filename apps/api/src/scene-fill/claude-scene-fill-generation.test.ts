@@ -96,7 +96,6 @@ const validSceneFillJson = JSON.stringify({
   emotion: "Joy",
   cameraDirection: "Wide",
   lightingDirection: "Soft",
-  motionDirection: "Still",
 });
 
 describe("ClaudeSceneFillGenerationAdapter", () => {

@@ -154,11 +154,16 @@ export const scenes = sqliteTable(
     emotion: text("emotion").notNull(),
     cameraDirection: text("camera_direction").notNull(),
     lightingDirection: text("lighting_direction").notNull(),
-    motionDirection: text("motion_direction").notNull(),
+    legacyMotion: text("motion_direction").notNull(),
     notes: text("notes").notNull(),
     negativePrompt: text("negative_prompt").notNull().default(""),
     photoFidelity: text("photo_fidelity").notNull().default("high"),
     adoptedGeneratedImageId: text("adopted_generated_image_id"),
+    originalImageSelected: integer("original_image_selected", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     deletedAt: text("deleted_at"),
@@ -551,4 +556,26 @@ export const testGenerationBatches = sqliteTable(
   (table) => [
     index("test_generation_batches_storyboard_id_idx").on(table.storyboardId),
   ],
+);
+
+export const filmTreatments = sqliteTable("film_treatments", {
+  projectId: text("project_id")
+    .primaryKey()
+    .references(() => projects.id),
+  revision: integer("revision").notNull(),
+  document: text("document").notNull(),
+});
+
+export const filmJobs = sqliteTable(
+  "film_jobs",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    createdAt: text("created_at").notNull(),
+    document: text("document").notNull(),
+    snapshot: text("snapshot").notNull(),
+  },
+  (table) => [index("film_jobs_project_id_idx").on(table.projectId)],
 );

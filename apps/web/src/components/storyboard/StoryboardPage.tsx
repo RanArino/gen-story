@@ -95,13 +95,6 @@ const LIGHTING_OPTIONS = [
   "Silhouette",
   "Volumetric",
 ];
-const MOTION_OPTIONS = [
-  "Slow pan",
-  "Static",
-  "Zoom in",
-  "Zoom out",
-  "Tracking",
-];
 const EMOTION_OPTIONS = [
   "Joy",
   "Nostalgia",
@@ -117,14 +110,13 @@ const DEFAULT_SCENE_FIXED = {
   emotion: "Joy",
   cameraDirection: "Wide",
   lightingDirection: "Natural",
-  motionDirection: "Slow pan",
   notes: "",
   photoFidelity: "high",
 } as const;
 
 const PHOTO_FIDELITY_OPTIONS = ["off", "low", "high"] as const;
 
-// AI scene fill is asked to keep emotion/camera/lighting/motion short,
+// AI scene fill is asked to keep emotion/camera/lighting short,
 // English, label-style values, but nothing constrains it to this exact list —
 // a value like "Peace" or "Straight-on" is a legitimate AI choice that just
 // isn't one of the fixed options below. Without this, the <select> silently
@@ -180,7 +172,6 @@ function sceneDtoToState(scene: SceneDto): SceneState {
     emotion: scene.emotion,
     cameraDirection: scene.cameraDirection,
     lightingDirection: scene.lightingDirection,
-    motionDirection: scene.motionDirection,
     notes: scene.notes,
     negativePrompt: scene.negativePrompt,
     photoFidelity: scene.photoFidelity,
@@ -1002,7 +993,6 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
           emotion: s.emotion,
           cameraDirection: s.cameraDirection,
           lightingDirection: s.lightingDirection,
-          motionDirection: s.motionDirection,
           notes: s.notes,
           negativePrompt: s.negativePrompt,
           photoFidelity: s.photoFidelity,
@@ -1118,7 +1108,6 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
               emotion: proposal.emotion,
               cameraDirection: proposal.cameraDirection,
               lightingDirection: proposal.lightingDirection,
-              motionDirection: proposal.motionDirection,
             };
           }
           return state;
@@ -2810,23 +2799,6 @@ function SceneCard({
             )}
           </select>
         </SceneField>
-
-        <SceneField label={t("fields.motion")} htmlFor={`${id}-motion`}>
-          <select
-            id={`${id}-motion`}
-            className={styles.fieldInput}
-            value={scene.motionDirection}
-            onChange={(e) => onUpdate({ motionDirection: e.target.value })}
-          >
-            {withCurrentOption(MOTION_OPTIONS, scene.motionDirection).map(
-              (o) => (
-                <option key={o} value={o}>
-                  {MOTION_OPTIONS.includes(o) ? tSel(`motion.${o}`) : o}
-                </option>
-              ),
-            )}
-          </select>
-        </SceneField>
       </div>
 
       <button
@@ -2845,7 +2817,6 @@ function SceneCard({
             emotion: scene.emotion,
             cameraDirection: scene.cameraDirection,
             lightingDirection: scene.lightingDirection,
-            motionDirection: scene.motionDirection,
             sceneNegativePrompt: scene.negativePrompt ?? "",
             projectNegativePrompt: projectNegativePromptDraft,
             commonPrompt: projectCommonPromptDraft,
