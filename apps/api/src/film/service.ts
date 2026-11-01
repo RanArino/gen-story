@@ -79,9 +79,20 @@ export class FilmService {
     };
   }
   async get(projectId: string): Promise<FilmTreatment> {
-    return (
-      (await this.repository.get(projectId)) ?? this.defaultTreatment(projectId)
+    const treatment = await this.repository.get(projectId);
+    if (!treatment) return this.defaultTreatment(projectId);
+    if (!treatment.sceneCaptions) return treatment;
+    const sceneIds = new Set(
+      (await this.scenes(projectId)).map((scene) => scene.id),
     );
+    return {
+      ...treatment,
+      sceneCaptions: Object.fromEntries(
+        Object.entries(treatment.sceneCaptions).filter(([sceneId]) =>
+          sceneIds.has(sceneId),
+        ),
+      ),
+    };
   }
   async save(treatment: FilmTreatment, expectedRevision: number) {
     return saveFilmTreatment(
@@ -187,7 +198,14 @@ export class FilmService {
         widthPx: info.width,
         heightPx: info.height,
       });
-      story.push({ id: scene.id, asset, caption: scene.title, source: key });
+      const caption = treatment.sceneCaptions?.[scene.id];
+      story.push({
+        id: scene.id,
+        asset,
+        caption: caption?.text ?? scene.title,
+        subtitle: caption?.subtext ?? "",
+        source: key,
+      });
     }
     const boards = await this.deps.storyboards.findByProjectId(
       treatment.projectId,

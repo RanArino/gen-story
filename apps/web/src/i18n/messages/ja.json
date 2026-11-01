@@ -883,7 +883,7 @@
     "unassigned": "未分類",
     "allPhotos": "すべての写真",
     "selectionHint": "写真を複数選んで、まとめてチャプターに登録できます。",
-    "editingHint": "写真を選んでまとめて移動できます。並び順や表示時間もここで調整できます。",
+    "editingHint": "各写真の横で動画に表示する言葉を編集できます。写真のまとめて移動、並び順や表示時間もここで調整できます。",
     "selectAll": "すべて選択",
     "selectedCount": "{count}枚を選択中",
     "clearSelection": "選択を解除",
@@ -903,6 +903,13 @@
     "filmSettings": "タイトルと映像スタイル",
     "finishHint": "チャプターを組み立てたら、映像の雰囲気を選びましょう。",
     "cancel": "キャンセル",
-    "createChapter": "チャプターを作成"
+    "createChapter": "チャプターを作成",
+    "caption": "字幕",
+    "captionFor": "「{title}」の字幕",
+    "secondaryCaption": "補助字幕（任意）",
+    "secondaryCaptionFor": "「{title}」の補助字幕",
+    "captionHint": "両方を空欄にすると字幕を表示しません。",
+    "resetCaption": "シーン名を使用",
+    "resetCaptionFor": "「{title}」の字幕をシーン名に戻す"
   }
 }

@@ -65,7 +65,13 @@ export interface RuntimeInput {
   recipe: RecipeName;
   reducedMotion: boolean;
   chapters: RuntimeChapter[];
-  scenes: { id: string; asset: string; caption: string; source: string }[];
+  scenes: {
+    id: string;
+    asset: string;
+    caption: string;
+    subtitle?: string;
+    source: string;
+  }[];
   media: MediaLockEntry[];
 }
 
@@ -170,7 +176,7 @@ export function compileFilm(paths: FilmRuntimePaths, input: RuntimeInput) {
           ({
             id: s.id,
             media: { asset: s.asset },
-            caption: { ja: s.caption, en: "" },
+            caption: { ja: s.caption, en: s.subtitle ?? "" },
             analysis: { subject: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 } },
             emphasis: 0.5,
             emotion: recipe.curves,

@@ -23,6 +23,7 @@ export interface FilmTreatment {
   title: string;
   recipe: FilmRecipe;
   reducedMotion: boolean;
+  sceneCaptions?: Record<string, { text: string; subtext: string }>;
   chapters: FilmChapter[];
 }
 export interface FilmJob {

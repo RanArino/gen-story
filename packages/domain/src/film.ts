@@ -23,6 +23,7 @@ export interface FilmTreatment {
   title: string;
   recipe: FilmRecipe;
   reducedMotion: boolean;
+  sceneCaptions?: Record<string, { text: string; subtext: string }>;
   chapters: FilmChapter[];
 }
 export interface FilmJob {
@@ -48,6 +49,21 @@ export function validateFilm(
   if (!treatment.title.trim()) throw new Error("Enter an overall film title.");
   if (stage === "render" && !treatment.chapters.length)
     throw new Error("Add at least one Chapter.");
+  for (const [sceneId, caption] of Object.entries(
+    treatment.sceneCaptions ?? {},
+  )) {
+    if (!sceneIds.includes(sceneId))
+      throw new Error("A caption references an unavailable project scene.");
+    if (
+      typeof caption.text !== "string" ||
+      typeof caption.subtext !== "string" ||
+      caption.text.length > 120 ||
+      caption.subtext.length > 200
+    )
+      throw new Error(
+        "Film captions must contain at most 120 primary and 200 secondary characters.",
+      );
+  }
   const chapters = new Set<string>();
   const used = new Set<string>();
   for (const chapter of treatment.chapters) {

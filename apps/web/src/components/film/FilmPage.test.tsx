@@ -121,6 +121,9 @@ describe("visual Film organization", () => {
     ).toBeTruthy();
   });
   it("moves selected photos with their exact durations and allows returning them to unassigned", async () => {
+    detail.treatment.sceneCaptions = {
+      s0: { text: "Saved words", subtext: "Second line" },
+    };
     detail.treatment.chapters = [
       {
         id: "c1",
@@ -148,6 +151,10 @@ describe("visual Film organization", () => {
       screen.getByRole("button", { name: "Save and check timing" }),
     );
     await screen.findByText("Changes saved");
+    expect(detail.treatment.sceneCaptions?.s0).toEqual({
+      text: "Saved words",
+      subtext: "Second line",
+    });
     expect(detail.treatment.chapters[0]?.scenes).toEqual([]);
     expect(detail.treatment.chapters[1]?.scenes).toEqual([
       { sceneId: "s2" },
@@ -167,6 +174,10 @@ describe("visual Film organization", () => {
       screen.getByRole("button", { name: "Save and check timing" }),
     );
     await screen.findByText("Changes saved");
+    expect(detail.treatment.sceneCaptions?.s0).toEqual({
+      text: "Saved words",
+      subtext: "Second line",
+    });
     expect(detail.treatment.chapters[1]?.scenes).toEqual([{ sceneId: "s2" }]);
     fireEvent.click(screen.getByRole("button", { name: /Unassigned/ }));
     expect(
@@ -176,4 +187,61 @@ describe("visual Film organization", () => {
       screen.getByRole("button", { name: "Select photo: Train" }),
     ).toBeTruthy();
   });
+});
+
+it("edits captions beside their photos, saves, reloads, hides and resets them", async () => {
+  const view = mount();
+  await screen.findByRole("button", { name: "Select photo: Station" });
+  await create("Departure", ["Station"]);
+  const primary = screen.getByRole("textbox", { name: "Caption for Station" });
+  expect((primary as HTMLTextAreaElement).value).toBe("Station");
+  fireEvent.change(primary, { target: { value: "Our departure" } });
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Secondary caption for Station" }),
+    { target: { value: "A new day" } },
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Save and check timing" }),
+  );
+  await screen.findByText("Changes saved");
+  expect(detail.treatment.sceneCaptions?.s0).toEqual({
+    text: "Our departure",
+    subtext: "A new day",
+  });
+  expect(detail.scenes[0]!.title).toBe("Station");
+  view.unmount();
+  mount();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Edit Chapter: Departure" }),
+  );
+  expect(
+    (
+      screen.getByRole("textbox", {
+        name: "Caption for Station",
+      }) as HTMLTextAreaElement
+    ).value,
+  ).toBe("Our departure");
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Caption for Station" }),
+    { target: { value: "" } },
+  );
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Secondary caption for Station" }),
+    { target: { value: "" } },
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Save and check timing" }),
+  );
+  await screen.findByText("Changes saved");
+  expect(detail.treatment.sceneCaptions?.s0).toEqual({ text: "", subtext: "" });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Use scene title for Station" }),
+  );
+  expect(
+    (
+      screen.getByRole("textbox", {
+        name: "Caption for Station",
+      }) as HTMLTextAreaElement
+    ).value,
+  ).toBe("Station");
 });

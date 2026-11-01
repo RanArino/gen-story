@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -132,6 +133,55 @@ const treatment = (): FilmTreatment => ({
 });
 
 describe("Film persistence and image selection", () => {
+  it("drops caption overrides for deleted scenes from the editable treatment", async () => {
+    const { service, deps } = await fixture();
+    const draft = treatment();
+    draft.sceneCaptions = { scene: { text: "Saved words", subtext: "" } };
+    await service.save(draft, 0);
+    await deps.scenes.softDelete("scene", now);
+    const loaded = await service.get("project");
+    expect(loaded.sceneCaptions).toEqual({});
+    loaded.chapters = [];
+    await expect(service.save(loaded, loaded.revision)).resolves.toMatchObject({
+      revision: 2,
+    });
+  });
+
+  it("binds saved Film captions to render snapshots without editing Storyboard titles", async () => {
+    const { service, deps } = await fixture();
+    const bytes = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: "#adc5bb" },
+    })
+      .png()
+      .toBuffer();
+    await deps.objectStorage.putObject({
+      key: "data/uploads/generated.png",
+      body: bytes,
+      contentType: "image/png",
+    });
+    const original = await service.prepare(treatment());
+    const draft = treatment();
+    draft.sceneCaptions = {
+      scene: { text: "Our departure", subtext: "A new day" },
+    };
+    const saved = await service.save(draft, 0),
+      prepared = await service.prepare(await service.get("project"));
+    expect(prepared.compiled[0]!.plan.texts.map((t) => t.text)).toEqual(
+      expect.arrayContaining(["Our departure", "A new day"]),
+    );
+    expect(prepared.compiled[0]!.plan.fingerprint).not.toBe(
+      original.compiled[0]!.plan.fingerprint,
+    );
+    expect((await deps.scenes.findById("scene"))!.title).toBe("Opening");
+    await service.save(
+      { ...saved, sceneCaptions: { scene: { text: "", subtext: "" } } },
+      1,
+    );
+    const hidden = await service.prepare(await service.get("project"));
+    expect(
+      hidden.compiled[0]!.plan.texts.filter((t) => t.role === "caption"),
+    ).toEqual([]);
+  });
   it("starts with unassigned photos instead of a catch-all Chapter", async () => {
     const { service } = await fixture();
     expect((await service.get("project")).chapters).toEqual([]);
@@ -302,6 +352,60 @@ describe("Film artifact HTTP boundary", () => {
     const address = server.address() as { port: number };
     return { ...f, base: `http://127.0.0.1:${address.port}` };
   }
+  it("round-trips captions through HTTP and rejects stale, foreign and oversized edits", async () => {
+    const { base, repository } = await serverFixture();
+    const draft = {
+      ...treatment(),
+      sceneCaptions: {
+        scene: { text: "Before we leave", subtext: "A new day" },
+      },
+    };
+    const put = (body: unknown) =>
+      fetch(`${base}/api/projects/project/film`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    expect((await put({ ...draft, expectedRevision: 0 })).status).toBe(200);
+    const detail = (await (
+      await fetch(`${base}/api/projects/project/film`)
+    ).json()) as { treatment: FilmTreatment };
+    expect(detail.treatment.sceneCaptions).toEqual(draft.sceneCaptions);
+    expect((await repository.get("project"))?.sceneCaptions).toEqual(
+      draft.sceneCaptions,
+    );
+    expect((await put({ ...draft, expectedRevision: 0 })).status).toBe(409);
+    expect(
+      (
+        await put({
+          ...draft,
+          expectedRevision: 1,
+          sceneCaptions: { foreign: { text: "No", subtext: "" } },
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await put({
+          ...draft,
+          expectedRevision: 1,
+          sceneCaptions: { scene: { text: "x".repeat(121), subtext: "" } },
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await put({
+          ...draft,
+          expectedRevision: 1,
+          sceneCaptions: { scene: { text: "", subtext: "" } },
+        })
+      ).status,
+    ).toBe(200);
+    expect((await repository.get("project"))?.sceneCaptions?.scene?.text).toBe(
+      "",
+    );
+  });
   it("accepts empty organization drafts through HTTP and keeps render validation", async () => {
     const { base } = await serverFixture();
     const draft = treatment();

@@ -114,3 +114,28 @@ describe("production Film compiler", () => {
     expect(() => compileFilm(paths, value)).toThrow();
   });
 });
+
+it("renders entered primary/secondary words and preserves explicit hidden captions", () => {
+  const value = input();
+  value.scenes[0]!.caption = "My saved words";
+  value.scenes[0]!.subtitle = "Second line";
+  const first = compileFilm(paths, value);
+  expect(first.compiled[0]!.plan.texts.map((t) => t.text)).toContain(
+    "My saved words",
+  );
+  expect(first.compiled[0]!.plan.texts.map((t) => t.text)).toContain(
+    "Second line",
+  );
+  value.scenes[0]!.caption = "";
+  value.scenes[0]!.subtitle = "";
+  const hidden = compileFilm(paths, value);
+  expect(
+    hidden.compiled[0]!.plan.texts.filter((t) => t.role === "caption"),
+  ).toEqual([]);
+  expect(hidden.compiled[0]!.plan.fingerprint).not.toBe(
+    first.compiled[0]!.plan.fingerprint,
+  );
+  expect(hidden.compiled[1]!.plan.fingerprint).toBe(
+    first.compiled[1]!.plan.fingerprint,
+  );
+});

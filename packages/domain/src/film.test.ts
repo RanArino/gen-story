@@ -50,3 +50,15 @@ describe("Film invariants", () => {
     }
   });
 });
+
+it("validates Film-only caption overrides independently of Chapter membership", () => {
+  const value = film();
+  value.sceneCaptions = { a: { text: "My words", subtext: "" } };
+  expect(() => validateFilm(value, ["a", "b", "s1"])).not.toThrow();
+  value.sceneCaptions.a!.text = "";
+  expect(() => validateFilm(value, ["a", "b", "s1"])).not.toThrow();
+  value.sceneCaptions.a!.text = "x".repeat(121);
+  expect(() => validateFilm(value, ["a", "b", "s1"])).toThrow(/120/);
+  value.sceneCaptions = { foreign: { text: "No", subtext: "" } };
+  expect(() => validateFilm(value, ["a", "b", "s1"])).toThrow(/unavailable/);
+});

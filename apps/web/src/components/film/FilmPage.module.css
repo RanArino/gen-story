@@ -545,3 +545,73 @@
     justify-content: space-between;
   }
 }
+
+.captionEditor {
+  display: grid;
+  gap: 10px;
+  padding: 8px 7px;
+}
+.captionEditor label {
+  display: grid;
+  gap: 5px;
+  color: #33483a;
+  font-size: 12px;
+}
+.captionEditor textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  padding: 9px;
+  border: 1px solid #cbd8cf;
+  border-radius: 6px;
+  font: inherit;
+  line-height: 1.5;
+  background: #fff;
+  color: #243b30;
+}
+.captionEditor textarea:focus-visible {
+  outline: 3px solid #91b69e;
+  outline-offset: 2px;
+}
+.captionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.captionActions small {
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.captionImages {
+  grid-template-columns: minmax(0, 1fr);
+}
+.captionCard {
+  display: grid;
+  grid-template-columns: minmax(100px, 160px) minmax(0, 1fr);
+  align-items: start;
+}
+.captionCard .photoSelect,
+.captionCard .photoMeta,
+.captionCard .imageSource {
+  grid-column: 1;
+}
+.captionCard .captionEditor {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+}
+.captionCard .photoTiming {
+  grid-column: 1 / -1;
+}
+@media (max-width: 600px) {
+  .captionCard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .captionCard .captionEditor {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}

@@ -883,7 +883,7 @@
     "unassigned": "Unassigned",
     "allPhotos": "All photos",
     "selectionHint": "Select photos together to create or fill a Chapter.",
-    "editingHint": "Select photos to move them together. Adjust their order and timing below.",
+    "editingHint": "Edit the words beside each photo. Select photos to move them together, or adjust their order and timing below.",
     "selectAll": "Select all",
     "selectedCount": "{count} selected",
     "clearSelection": "Clear",
@@ -903,6 +903,13 @@
     "filmSettings": "Title & film style",
     "finishHint": "Once your Chapters are arranged, choose the look of your film.",
     "cancel": "Cancel",
-    "createChapter": "Create Chapter"
+    "createChapter": "Create Chapter",
+    "caption": "Caption",
+    "captionFor": "Caption for {title}",
+    "secondaryCaption": "Secondary caption (optional)",
+    "secondaryCaptionFor": "Secondary caption for {title}",
+    "captionHint": "Leave both fields empty to hide captions.",
+    "resetCaption": "Use scene title",
+    "resetCaptionFor": "Use scene title for {title}"
   }
 }

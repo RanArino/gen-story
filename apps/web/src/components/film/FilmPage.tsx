@@ -265,7 +265,9 @@ export function FilmPage({ projectId }: { projectId: string }) {
                 </button>
               )}
             </div>
-            <div className={styles.images}>
+            <div
+              className={`${styles.images} ${editing ? styles.captionImages : ""}`}
+            >
               {visible.map((scene) => {
                 const chapter = membership.get(scene.id);
                 const entry = chapter?.scenes.find(
@@ -292,7 +294,7 @@ export function FilmPage({ projectId }: { projectId: string }) {
                 return (
                   <div
                     key={scene.id}
-                    className={`${styles.imageCard} ${selection.includes(scene.id) ? styles.selected : ""}`}
+                    className={`${styles.imageCard} ${editing ? styles.captionCard : ""} ${selection.includes(scene.id) ? styles.selected : ""}`}
                   >
                     <button
                       className={styles.photoSelect}
@@ -309,6 +311,82 @@ export function FilmPage({ projectId }: { projectId: string }) {
                     <div className={styles.photoMeta}>
                       <span>{chapter?.title ?? t("unassigned")}</span>
                     </div>
+                    {editing && (
+                      <div className={styles.captionEditor}>
+                        <label>
+                          {t("caption")}
+                          <textarea
+                            aria-label={t("captionFor", { title: scene.title })}
+                            rows={2}
+                            maxLength={120}
+                            value={
+                              draft.sceneCaptions?.[scene.id]?.text ??
+                              scene.title
+                            }
+                            onChange={(e) =>
+                              edit({
+                                sceneCaptions: {
+                                  ...draft.sceneCaptions,
+                                  [scene.id]: {
+                                    text: e.target.value,
+                                    subtext:
+                                      draft.sceneCaptions?.[scene.id]
+                                        ?.subtext ?? "",
+                                  },
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t("secondaryCaption")}
+                          <textarea
+                            aria-label={t("secondaryCaptionFor", {
+                              title: scene.title,
+                            })}
+                            rows={2}
+                            maxLength={200}
+                            value={
+                              draft.sceneCaptions?.[scene.id]?.subtext ?? ""
+                            }
+                            onChange={(e) =>
+                              edit({
+                                sceneCaptions: {
+                                  ...draft.sceneCaptions,
+                                  [scene.id]: {
+                                    text:
+                                      draft.sceneCaptions?.[scene.id]?.text ??
+                                      scene.title,
+                                    subtext: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                        <div className={styles.captionActions}>
+                          <small>{t("captionHint")}</small>
+                          <button
+                            disabled={
+                              !Object.hasOwn(
+                                draft.sceneCaptions ?? {},
+                                scene.id,
+                              )
+                            }
+                            onClick={() => {
+                              const captions = { ...draft.sceneCaptions };
+                              delete captions[scene.id];
+                              edit({ sceneCaptions: captions });
+                            }}
+                            aria-label={t("resetCaptionFor", {
+                              title: scene.title,
+                            })}
+                          >
+                            {t("resetCaption")}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <details className={styles.imageSource}>
                       <summary>{t("changeImage")}</summary>
                       <label>

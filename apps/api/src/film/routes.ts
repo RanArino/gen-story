@@ -11,6 +11,12 @@ const draftSchema = z.object({
   title: z.string().trim().min(1).max(200),
   recipe: z.enum(["quiet-cinema", "memory-board", "pulse-cut"]),
   reducedMotion: z.boolean(),
+  sceneCaptions: z
+    .record(
+      z.string().min(1),
+      z.object({ text: z.string().max(120), subtext: z.string().max(200) }),
+    )
+    .optional(),
   chapters: z.array(
     z.object({
       settings: z
