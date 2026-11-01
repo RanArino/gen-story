@@ -127,7 +127,19 @@ export function tauAt(tab, arr, t) {
 }
 
 /** Preserve arbitrary source aspect ratios while covering the output viewport. */
-export function frameForImage(vw, vh, cam, width, height) {
+export function frameForImage(vw, vh, cam, width, height, framing) {
+  if (framing === "contain") {
+    const scale =
+      Math.min(vw / width, vh / height) * Math.min(0.98, 0.88 * cam.z);
+    const W = width * scale,
+      H = height * scale;
+    return {
+      left: (vw - W) * clamp01(cam.fx),
+      top: (vh - H) * clamp01(cam.fy),
+      width: W,
+      height: H,
+    };
+  }
   if (width === height) {
     const f = frameFor(vw, vh, cam);
     return { left: f.left, top: f.top, width: f.S, height: f.S };

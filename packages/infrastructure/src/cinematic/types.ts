@@ -15,6 +15,7 @@ export interface CameraKey {
   z: number;
 }
 export interface CinematicScene {
+  framing?: "contain";
   id: string;
   image: string;
   t0: number;

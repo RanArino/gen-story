@@ -134,6 +134,9 @@
             },
             "minItems": 2,
             "maxItems": 32
+          },
+          "framing": {
+            "const": "contain"
           }
         },
         "required": [

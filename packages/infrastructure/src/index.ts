@@ -247,9 +247,11 @@ export async function renderFilmAssembly(
   ci: CompileInput,
   chapters: { plan: ResolvedRenderPlan; artifact: ChapterArtifact }[],
   jobId: string,
+  titlePlan?: ResolvedRenderPlan,
 ) {
   const plan = buildConcatPlan({
     ...ci,
+    titlePlan,
     chapters: chapters.map(({ plan, artifact }) => ({
       plan,
       planDigest: digestOf(plan),
@@ -277,3 +279,8 @@ export {
   lockCinematicMedia,
 } from "./cinematic/prepare.js";
 export type { CinematicDirection, CinematicScore } from "./cinematic/types.js";
+
+export {
+  directProjectChapter,
+  compileProjectChapter,
+} from "./cinematic/project.js";

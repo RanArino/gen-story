@@ -1,3 +1,4 @@
+import { buildConcatPlan } from "./compiler/concat.js";
 import { validateSchema } from "./contracts/schemas.js";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -5,6 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   compileFilm,
+  directProjectChapter,
+  compileProjectChapter,
   digestOf,
   recipeNames,
   runtimeRoot,
@@ -139,3 +142,101 @@ it("renders entered primary/secondary words and preserves explicit hidden captio
     first.compiled[1]!.plan.fingerprint,
   );
 });
+
+it.each(recipeNames)(
+  "directs %s project photos through the cinematic runtime with complete reusable audio",
+  (recipe) => {
+    const value = { ...input(), recipe };
+    const timing = compileFilm(paths, value);
+    const first = timing.compiled[0]!;
+    const directed = directProjectChapter(
+      value,
+      value.chapters[0]!,
+      first.plan,
+    );
+    expect(directed.direction.scenes[0]!.framing).toBe("contain");
+    expect(directed.direction.scenes[0]!.camera).toHaveLength(3);
+    expect(
+      new Set(directed.direction.scenes[0]!.camera.map((k) => k.z)).size,
+    ).toBeGreaterThan(1);
+    expect(
+      directed.direction.scenes[0]!.t1 - directed.direction.scenes[0]!.t0,
+    ).toBeCloseTo(4.123);
+    expect(directed.direction.params.rays[1]![1]).toBeGreaterThan(0);
+    expect(directed.direction.score.events.some((e) => e.sound === "pad")).toBe(
+      true,
+    );
+    const durationMs = Math.round(directed.direction.duration * 1000);
+    const score = {
+      music: {
+        path: "sounds/music.wav",
+        kind: "sound" as const,
+        sha256: digestOf("music"),
+        durationMs,
+      },
+      stem: {
+        path: "sounds/stem.wav",
+        kind: "sound" as const,
+        sha256: digestOf("stem"),
+        durationMs,
+      },
+      gainDb: 0,
+      sourceDigest: digestOf("audio"),
+      scoreDigest: digestOf(directed.direction.score),
+    };
+    const plan = compileProjectChapter(
+      paths,
+      directed.direction,
+      first.plan,
+      score,
+    );
+    expect(plan.layers[0]!.type).toBe("cinematic");
+    expect(plan.audio.events.map((e) => e.asset)).toEqual([
+      score.music.path,
+      score.stem.path,
+    ]);
+    expect(plan.audio.bgm.gain).toBe(0);
+    const concat = buildConcatPlan({
+      ...timing.input,
+      titlePlan: first.plan,
+      chapters: [
+        {
+          plan,
+          planDigest: digestOf(plan),
+          artifactSha256: digestOf("mp4"),
+          stemSha256: digestOf("stem"),
+          frames: Math.round((durationMs * 30) / 1000),
+        },
+      ],
+    });
+    expect(concat.audio.bgm.gain).toBe(0);
+    expect(concat.chapters[0]!.stemSha256).toBe(digestOf("stem"));
+    expect(concat.overallTitle.text).toBe(value.title);
+    expect(validateSchema("urn:film-spike:concat-plan", concat)).toEqual([]);
+
+    expect(validateSchema("urn:film-spike:resolved-render-plan", plan)).toEqual(
+      [],
+    );
+    const changed = structuredClone(value);
+    changed.revision++;
+    changed.scenes[0]!.caption = "New words";
+    const after = compileFilm(paths, changed);
+    expect(
+      directProjectChapter(
+        changed,
+        changed.chapters[0]!,
+        after.compiled[0]!.plan,
+      ).fingerprint,
+    ).not.toBe(directed.fingerprint);
+    expect(
+      directProjectChapter(
+        changed,
+        changed.chapters[1]!,
+        after.compiled[1]!.plan,
+      ).fingerprint,
+    ).toBe(
+      directProjectChapter(value, value.chapters[1]!, timing.compiled[1]!.plan)
+        .fingerprint,
+    );
+  },
+);

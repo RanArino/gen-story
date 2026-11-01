@@ -377,11 +377,31 @@ export function drawCinematic(
       { fx: c.fx + dx, fy: c.fy + dy, z: c.z },
       asset.widthPx,
       asset.heightPx,
+      scene.framing,
     );
     const source = image(asset.asset);
     if (!source) throw new Error("Missing cinematic source " + asset.asset);
     ctx.save();
     ctx.globalAlpha = opacity;
+    if (scene.framing === "contain") {
+      const background = frameForImage(
+        W,
+        H,
+        { fx: 0.5, fy: 0.5, z: 1.1 },
+        asset.widthPx,
+        asset.heightPx,
+      );
+      ctx.save();
+      ctx.filter = `blur(${(24 * H) / 1080}px) brightness(0.4)`;
+      ctx.drawImage(
+        source,
+        background.left,
+        background.top,
+        background.width,
+        background.height,
+      );
+      ctx.restore();
+    }
     ctx.drawImage(
       source,
       f.left,

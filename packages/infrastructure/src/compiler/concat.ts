@@ -27,6 +27,7 @@ export const CONNECTION: VersionRef = {
 };
 
 export interface ConcatInput {
+  titlePlan?: ResolvedRenderPlan;
   chapters: {
     plan: ResolvedRenderPlan;
     planDigest: string;
@@ -72,7 +73,8 @@ export function buildConcatPlan(input: ConcatInput): ConcatPlanV2 {
     ]);
   const first = input.chapters[0]!.plan;
   const profile = PROFILES[first.profile.id]!;
-  const typographyRef = first.capabilities.find(
+  const titlePlan = input.titlePlan ?? first;
+  const typographyRef = titlePlan.capabilities.find(
     (c) => c.slot === "typography",
   )!.active;
   const typography = entryOf(input.catalog, typographyRef, "/typography");
@@ -84,9 +86,11 @@ export function buildConcatPlan(input: ConcatInput): ConcatPlanV2 {
   const titleMs = typography.manifest.timing.titleMs ?? 3000;
 
   const titleAliases =
-    first.texts.find((t) => t.role === "title")?.font ??
-    first.fonts.map((f) => f.alias);
-  const usedFonts = first.fonts.filter((f) => titleAliases.includes(f.alias));
+    titlePlan.texts.find((t) => t.role === "title")?.font ??
+    titlePlan.fonts.map((f) => f.alias);
+  const usedFonts = titlePlan.fonts.filter((f) =>
+    titleAliases.includes(f.alias),
+  );
   const title = typography.run({
     abi: CAPABILITY_ABI,
     kind: "typography",
@@ -106,7 +110,7 @@ export function buildConcatPlan(input: ConcatInput): ConcatPlanV2 {
       sceneCount: 0,
     },
     curves: input.recipe.curves,
-    params: first.capabilities.find((c) => c.slot === "typography")!.params,
+    params: titlePlan.capabilities.find((c) => c.slot === "typography")!.params,
     options: { reducedMotion: first.options.reducedMotion, seed: 0 },
     theme: {
       palette: input.recipe.palette,

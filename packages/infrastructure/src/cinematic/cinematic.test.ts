@@ -229,3 +229,23 @@ describe("cinematic authored production plans", () => {
     expect([a(), a(), a()]).toEqual([b(), b(), b()]);
   });
 });
+
+it("keeps all edges of portrait, landscape and square photos inside the frame", () => {
+  for (const [width, height] of [
+    [600, 1200],
+    [1600, 900],
+    [1000, 1000],
+  ]) {
+    for (const camera of [
+      { fx: 0.25, fy: 0.3, z: 0.9 },
+      { fx: 0.75, fy: 0.7, z: 0.98 },
+    ]) {
+      const f = frameForImage(1920, 1080, camera, width!, height!, "contain");
+      expect(f.left).toBeGreaterThanOrEqual(0);
+      expect(f.top).toBeGreaterThanOrEqual(0);
+      expect(f.left + f.width).toBeLessThanOrEqual(1920);
+      expect(f.top + f.height).toBeLessThanOrEqual(1080);
+      expect(f.width / f.height).toBeCloseTo(width! / height!);
+    }
+  }
+});

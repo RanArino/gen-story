@@ -33,4 +33,5 @@ export function frameForImage(
   camera: { fx: number; fy: number; z: number },
   width: number,
   height: number,
+  framing?: "contain",
 ): { left: number; top: number; width: number; height: number };
