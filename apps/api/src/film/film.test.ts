@@ -1,7 +1,7 @@
 import sharp from "sharp";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -15,7 +15,8 @@ import {
   type FilmTreatment,
 } from "@gen-story/domain";
 import { upsertScenes, markOriginalImageAdopted } from "@gen-story/application";
-import { digestBytes } from "@gen-story/infrastructure/film";
+import * as filmRuntime from "@gen-story/infrastructure/film";
+import { digestBytes, digestOf } from "@gen-story/infrastructure/film";
 import { createInMemoryApplicationDependencies } from "../test-support/in-memory-application";
 import { seedLocalPrincipal } from "../auth/local-auth";
 import { openDatabase, migrateDatabase, createSqliteRepositories } from "../db";
@@ -26,6 +27,7 @@ import { FilmService } from "./service";
 const now = "2026-10-31T00:00:00.000Z";
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 async function fixture() {
@@ -114,7 +116,7 @@ async function fixture() {
     rmSync(directory, { recursive: true, force: true });
   });
   const service = new FilmService(deps, repository, directory);
-  return { deps, repository, service, db, project, scene, photo };
+  return { deps, repository, service, db, project, scene, photo, directory };
 }
 const treatment = (): FilmTreatment => ({
   projectId: "project",
@@ -159,18 +161,22 @@ describe("Film persistence and image selection", () => {
       body: bytes,
       contentType: "image/png",
     });
-    const original = await service.prepare(treatment());
+    const original = await service.prepare({ ...treatment(), revision: 1 });
     const draft = treatment();
     draft.sceneCaptions = {
       scene: { text: "Our departure", subtext: "A new day" },
     };
     const saved = await service.save(draft, 0),
       prepared = await service.prepare(await service.get("project"));
-    expect(prepared.compiled[0]!.plan.texts.map((t) => t.text)).toEqual(
-      expect.arrayContaining(["Our departure", "A new day"]),
+    expect(prepared.compiled[0]).toHaveProperty(
+      "direction.schema",
+      "film.cinematic-direction@1",
     );
-    expect(prepared.compiled[0]!.plan.fingerprint).not.toBe(
-      original.compiled[0]!.plan.fingerprint,
+    expect(
+      prepared.compiled[0]!.direction.captions.flatMap((t) => [t.text, t.sub]),
+    ).toEqual(expect.arrayContaining(["Our departure", "A new day"]));
+    expect(prepared.compiled[0]!.fingerprint).not.toBe(
+      original.compiled[0]!.fingerprint,
     );
     expect((await deps.scenes.findById("scene"))!.title).toBe("Opening");
     await service.save(
@@ -178,9 +184,7 @@ describe("Film persistence and image selection", () => {
       1,
     );
     const hidden = await service.prepare(await service.get("project"));
-    expect(
-      hidden.compiled[0]!.plan.texts.filter((t) => t.role === "caption"),
-    ).toEqual([]);
+    expect(hidden.compiled[0]!.direction.captions).toEqual([]);
   });
   it("starts with unassigned photos instead of a catch-all Chapter", async () => {
     const { service } = await fixture();
@@ -500,4 +504,115 @@ describe("Film artifact HTTP boundary", () => {
       ).status,
     ).toBe(404);
   });
+});
+
+it("generates missing cinematic Chapters in one complete-film job and reuses unchanged Chapters", async () => {
+  const { service, repository, deps, directory } = await fixture();
+  const bytes = await sharp({
+    create: { width: 60, height: 120, channels: 3, background: "#adc5bb" },
+  })
+    .png()
+    .toBuffer();
+  await deps.objectStorage.putObject({
+    key: "data/uploads/generated.png",
+    body: bytes,
+    contentType: "image/png",
+  });
+  const file = join(directory, "rendered.mp4");
+  writeFileSync(file, "encoded fixture");
+  vi.spyOn(filmRuntime, "prepareCinematicScore").mockImplementation(
+    async (_paths, d) => ({
+      music: {
+        path: "sounds/music.wav",
+        kind: "sound",
+        sha256: digestOf("music"),
+        durationMs: Math.round(d.duration * 1000),
+      },
+      stem: {
+        path: "sounds/stem.wav",
+        kind: "sound",
+        sha256: digestOf("stem"),
+        durationMs: Math.round(d.duration * 1000),
+      },
+      gainDb: 0,
+      sourceDigest: digestOf("audio"),
+      scoreDigest: digestOf(d.score),
+    }),
+  );
+  vi.spyOn(filmRuntime, "lockCinematicMedia").mockImplementation(() => {});
+  const capture = vi.spyOn(filmRuntime, "renderFilmChapter").mockImplementation(
+    async (_paths, plan) =>
+      ({
+        file,
+        cache: "miss",
+        artifact: {
+          runtimeMs: plan.timing.proposal.runtimeMs,
+          frames: 240,
+          verified: true,
+          files: {
+            mp4: { sha256: digestBytes(readFileSync(file)) },
+            stem: { sha256: digestOf("stem") },
+          },
+        },
+      }) as Awaited<ReturnType<typeof filmRuntime.renderFilmChapter>>,
+  );
+  const assemble = vi
+    .spyOn(filmRuntime, "renderFilmAssembly")
+    .mockResolvedValue({ file, cache: "miss", runtimeMs: 11000 });
+  const saved = await service.save(treatment(), 0);
+  const job = await service.render("project", null, saved.revision);
+  await vi.waitFor(async () =>
+    expect(
+      (await repository.jobs("project")).find((j) => j.id === job.id)?.status,
+    ).toBe("succeeded"),
+  );
+  const renderedPlan = capture.mock.calls[0]![1];
+  expect(renderedPlan.layers[0]!.type).toBe("cinematic");
+  expect(renderedPlan.audio.events.map((e) => e.asset)).toEqual([
+    "sounds/music.wav",
+    "sounds/stem.wav",
+  ]);
+  expect(assemble.mock.calls[0]![2][0]!.plan.fingerprint).toBe(
+    renderedPlan.fingerprint,
+  );
+  expect(
+    assemble.mock.calls[0]![4]?.capabilities.some(
+      (c) => c.slot === "typography",
+    ),
+  ).toBe(true);
+  const renamed = await service.save(
+    { ...saved, title: "New overall title" },
+    saved.revision,
+  );
+  const next = await service.render("project", null, renamed.revision);
+  await vi.waitFor(async () =>
+    expect(
+      (await repository.jobs("project")).find((j) => j.id === next.id)?.status,
+    ).toBe("succeeded"),
+  );
+  expect(
+    (await repository.jobs("project")).filter((j) => j.chapterId !== null),
+  ).toHaveLength(1);
+  const changed = await service.save(
+    {
+      ...renamed,
+      sceneCaptions: { scene: { text: "Changed words", subtext: "" } },
+    },
+    renamed.revision,
+  );
+  capture.mockRejectedValueOnce(new Error("Capture failed"));
+  const failed = await service.render("project", null, changed.revision);
+  await vi.waitFor(async () =>
+    expect(
+      (await repository.jobs("project")).find((j) => j.id === failed.id)
+        ?.status,
+    ).toBe("failed"),
+  );
+  expect(
+    (await repository.jobs("project")).find((j) => j.id === failed.id)
+      ?.artifactKey,
+  ).toBeNull();
+  expect(
+    (await repository.jobs("project")).find((j) => j.id === job.id)?.status,
+  ).toBe("succeeded");
 });

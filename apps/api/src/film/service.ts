@@ -15,6 +15,10 @@ import {
 import type { FilmDetailDto, FilmSceneDto } from "@gen-story/shared";
 import {
   compileFilm,
+  directProjectChapter,
+  compileProjectChapter,
+  prepareCinematicScore,
+  lockCinematicMedia,
   digestBytes,
   digestOf,
   initializeRuntime,
@@ -26,7 +30,14 @@ import {
 } from "@gen-story/infrastructure/film";
 import { SqliteFilmRepository } from "./repository";
 
-type Prepared = ReturnType<typeof compileFilm>;
+type PreparedChapter = ReturnType<typeof directProjectChapter> & {
+  timingPlan: ResolvedRenderPlan;
+  proposal: ResolvedRenderPlan["timing"]["proposal"];
+};
+type Prepared = {
+  input: ReturnType<typeof compileFilm>["input"];
+  compiled: PreparedChapter[];
+};
 type Snapshot = { plan: ResolvedRenderPlan; artifact?: ChapterArtifact };
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -210,12 +221,21 @@ export class FilmService {
     const boards = await this.deps.storyboards.findByProjectId(
       treatment.projectId,
     );
-    return compileFilm(paths, {
+    const input = {
       ...treatment,
       worldview: boards[0]?.story ?? "",
       media,
       scenes: story,
-    });
+    };
+    const timing = compileFilm(paths, input);
+    return {
+      input: timing.input,
+      compiled: timing.compiled.map((c, i) => ({
+        timingPlan: c.plan,
+        proposal: c.proposal,
+        ...directProjectChapter(input, treatment.chapters[i]!, c.plan),
+      })),
+    };
   }
   async detail(projectId: string): Promise<FilmDetailDto> {
     const treatment = await this.get(projectId);
@@ -224,26 +244,14 @@ export class FilmService {
     let preflight: FilmDetailDto["preflight"];
     try {
       const prepared = await this.prepare(treatment);
-      const artifacts = prepared.compiled.map(
-        (c) =>
-          jobs.find(
-            (j) =>
-              j.chapterId === c.plan.chapter.id &&
-              j.fingerprint === c.plan.fingerprint &&
-              j.status === "succeeded",
-          )?.artifactDigest,
+      currentAssemblyFingerprint = this.assemblyFingerprint(
+        treatment,
+        prepared,
       );
-      if (artifacts.length && artifacts.every(Boolean))
-        currentAssemblyFingerprint = digestOf({
-          chapters: artifacts,
-          title: treatment.title,
-          recipe: treatment.recipe,
-          environment: prepared.input.environmentDigest,
-        });
       preflight = prepared.compiled.map((c) => ({
-        chapterId: c.plan.chapter.id,
+        chapterId: c.direction.chapterId,
         runtimeMs: c.proposal.runtimeMs,
-        fingerprint: c.plan.fingerprint,
+        fingerprint: c.fingerprint,
         durations: c.proposal.scenes.map((s) => ({
           sceneId: s.sceneId,
           durationMs: s.durationMs,
@@ -294,45 +302,19 @@ export class FilmService {
       throw new Error("Save the current Film revision before rendering.");
     const prepared = await this.prepare(treatment);
     const chapter = chapterId
-      ? prepared.compiled.find((c) => c.plan.chapter.id === chapterId)
+      ? prepared.compiled.find((c) => c.direction.chapterId === chapterId)
       : null;
     if (chapterId && !chapter) throw new Error("Chapter not found.");
-    const jobs = await this.repository.jobs(projectId);
-    const currentChapters: Snapshot[] = [];
-    if (!chapterId) {
-      for (const c of prepared.compiled) {
-        const job = jobs.find(
-          (j) =>
-            j.chapterId === c.plan.chapter.id &&
-            j.fingerprint === c.plan.fingerprint &&
-            j.status === "succeeded",
-        );
-        if (!job)
-          throw new Error(
-            "Render every current Chapter before joining the film.",
-          );
-        const snap = JSON.parse(this.repository.snapshot(job.id)!) as Snapshot;
-        if (!snap.artifact)
-          throw new Error("Chapter output is unavailable. Render it again.");
-        currentChapters.push({ plan: c.plan, artifact: snap.artifact });
-      }
-    }
-    const fingerprint =
-      chapter?.plan.fingerprint ??
-      digestOf({
-        chapters: currentChapters.map((c) => c.artifact!.files.mp4.sha256),
-        title: treatment.title,
-        recipe: treatment.recipe,
-        environment: prepared.input.environmentDigest,
-      });
     const snapshot = chapter
-      ? { plan: chapter.plan }
-      : { treatment, chapters: currentChapters };
+      ? { chapter }
+      : { treatment, chapters: prepared.compiled };
     const requested = await requestFilmJob(
       this.repository,
       {
         prepare: async () => ({
-          fingerprint,
+          fingerprint:
+            chapter?.fingerprint ??
+            this.assemblyFingerprint(treatment, prepared),
           snapshot: JSON.stringify(snapshot),
           runtimeMs: chapter?.proposal.runtimeMs ?? null,
         }),
@@ -357,30 +339,76 @@ export class FilmService {
         let file: string;
         let runtimeMs: number;
         if (chapter) {
-          const output = await renderFilmChapter(paths, chapter.plan, job.id);
-          file = output.file;
-          runtimeMs = output.artifact.runtimeMs;
-          await this.repository.saveJob(
-            job,
-            JSON.stringify({ plan: chapter.plan, artifact: output.artifact }),
-          );
-          // The immutable snapshot update is stored explicitly; upserts preserve it below.
-          this.repository.attachSnapshot(
-            job.id,
-            JSON.stringify({ plan: chapter.plan, artifact: output.artifact }),
-          );
+          await this.renderChapter(paths, chapter, job);
+          return;
         } else {
+          const chapters: {
+            plan: ResolvedRenderPlan;
+            artifact: ChapterArtifact;
+          }[] = [];
+          for (const c of prepared.compiled) {
+            const reuse = (await this.repository.jobs(projectId)).find(
+              (j) =>
+                j.chapterId === c.direction.chapterId &&
+                j.fingerprint === c.fingerprint &&
+                j.status === "succeeded",
+            );
+            const stored = reuse ? this.repository.snapshot(reuse.id) : null;
+            const cached = stored ? (JSON.parse(stored) as Snapshot) : null;
+            if (cached?.artifact) {
+              // Revalidate cached media before reuse; the runtime repairs corrupt cache entries.
+              const checked = await renderFilmChapter(
+                paths,
+                cached.plan,
+                reuse!.id,
+              );
+              chapters.push({ plan: cached.plan, artifact: checked.artifact });
+              continue;
+            }
+            const child: FilmJob = {
+              ...job,
+              id: randomUUID(),
+              chapterId: c.direction.chapterId,
+              fingerprint: c.fingerprint,
+              runtimeMs: c.proposal.runtimeMs,
+              status: "queued",
+              createdAt: new Date().toISOString(),
+            };
+            await this.repository.saveJob(
+              child,
+              JSON.stringify({ chapter: c }),
+            );
+            try {
+              const rendered = await this.renderChapter(paths, c, child);
+              chapters.push({
+                plan: rendered.plan,
+                artifact: rendered.artifact,
+              });
+            } catch (e) {
+              await this.repository.saveJob(
+                {
+                  ...child,
+                  status: "failed",
+                  error: e instanceof Error ? e.message : String(e),
+                },
+                JSON.stringify({ chapter: c }),
+              );
+              throw e;
+            }
+          }
           const output = await renderFilmAssembly(
             paths,
             prepared.input,
-            currentChapters.map((c) => ({
-              plan: c.plan,
-              artifact: c.artifact!,
-            })),
+            chapters,
             job.id,
+            prepared.compiled[0]!.timingPlan,
           );
           file = output.file;
           runtimeMs = output.runtimeMs;
+          this.repository.attachSnapshot(
+            job.id,
+            JSON.stringify({ ...snapshot, outputs: chapters }),
+          );
         }
         const data = readFileSync(file);
         const artifactKey = `data/uploads/films/${projectId}/${job.id}.mp4`;
@@ -412,6 +440,56 @@ export class FilmService {
     });
     void this.drain();
     return job;
+  }
+  private assemblyFingerprint(treatment: FilmTreatment, prepared: Prepared) {
+    return digestOf({
+      version: "cinematic-assembly@1",
+      chapters: prepared.compiled.map((c) => c.fingerprint),
+      title: treatment.title,
+      recipe: treatment.recipe,
+      environment: prepared.input.environmentDigest,
+    });
+  }
+  private async renderChapter(
+    paths: ReturnType<typeof initializeRuntime>,
+    chapter: PreparedChapter,
+    job: FilmJob,
+  ) {
+    await this.repository.saveJob(
+      { ...job, status: "running" },
+      JSON.stringify({ chapter }),
+    );
+    const score = await prepareCinematicScore(paths, chapter.direction);
+    lockCinematicMedia(paths, chapter.direction, [score.music, score.stem]);
+    const plan = compileProjectChapter(
+      paths,
+      chapter.direction,
+      chapter.timingPlan,
+      score,
+    );
+    const output = await renderFilmChapter(paths, plan, job.id);
+    const data = readFileSync(output.file);
+    const artifactKey = `data/uploads/films/${job.projectId}/${job.id}.mp4`;
+    await this.deps.objectStorage.putObject({
+      key: artifactKey,
+      body: data,
+      contentType: "video/mp4",
+    });
+    this.repository.attachSnapshot(
+      job.id,
+      JSON.stringify({ chapter, plan, artifact: output.artifact }),
+    );
+    await this.repository.saveJob(
+      {
+        ...job,
+        status: "succeeded",
+        runtimeMs: output.artifact.runtimeMs,
+        artifactKey,
+        artifactDigest: digestBytes(data),
+      },
+      JSON.stringify({ chapter }),
+    );
+    return { ...output, plan };
   }
   private async drain() {
     if (this.running) return;

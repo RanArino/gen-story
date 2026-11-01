@@ -855,7 +855,7 @@
     "save": "Save and check timing",
     "saveFirst": "Save changes to resolve timing and enable rendering.",
     "joined": "Complete film",
-    "joinedDescription": "Render all current Chapters, then join them with the overall title. Each Chapter keeps its title.",
+    "joinedDescription": "Render the complete film in one action. Missing or changed Chapters are generated automatically; current outputs are reused, with music and each Chapter title preserved.",
     "renderJoined": "Render complete film",
     "player": "Film playback",
     "download": "Download MP4",

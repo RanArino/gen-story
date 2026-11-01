@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FilmDetailDto, FilmTreatment } from "@gen-story/shared";
 import messages from "../../i18n/messages/en.json";
 import { FilmPage } from "./FilmPage";
-import { getFilm, saveFilm } from "../../lib/api-client";
+import { getFilm, saveFilm, renderFilm } from "../../lib/api-client";
 
 vi.mock("../AppShell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => children,
@@ -245,3 +245,76 @@ it("edits captions beside their photos, saves, reloads, hides and resets them", 
     ).value,
   ).toBe("Station");
 });
+
+it("renders a saved complete film without requiring individual Chapter renders", async () => {
+  detail.treatment.revision = 1;
+  detail.treatment.chapters = [
+    {
+      id: "c1",
+      title: "Departure",
+      limitMs: null,
+      scenes: [{ sceneId: "s0" }],
+    },
+  ];
+  detail.preflight = [
+    {
+      chapterId: "c1",
+      runtimeMs: 8000,
+      fingerprint: "current",
+      durations: [{ sceneId: "s0", durationMs: 6000 }],
+      error: null,
+    },
+  ];
+  mount();
+  const button = await screen.findByRole("button", {
+    name: "Render complete film",
+  });
+  expect((button as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(button);
+  expect(renderFilm).toHaveBeenCalledWith("project", null, 1);
+});
+
+it.each(["invalid", "active"])(
+  "keeps complete-film rendering blocked while %s",
+  async (state) => {
+    detail.treatment.revision = 1;
+    detail.treatment.chapters = [
+      {
+        id: "c1",
+        title: "Departure",
+        limitMs: null,
+        scenes: [{ sceneId: "s0" }],
+      },
+    ];
+    detail.preflight = [
+      {
+        chapterId: "c1",
+        runtimeMs: 8000,
+        fingerprint: "current",
+        durations: [],
+        error: state === "invalid" ? "Choose an image" : null,
+      },
+    ];
+    if (state === "active")
+      detail.jobs = [
+        {
+          id: "job",
+          projectId: "project",
+          revision: 1,
+          chapterId: null,
+          fingerprint: "current",
+          status: "running",
+          error: null,
+          artifactKey: null,
+          artifactDigest: null,
+          runtimeMs: null,
+          createdAt: "2026-11-01T00:00:00Z",
+        },
+      ];
+    mount();
+    const button = await screen.findByRole("button", {
+      name: "Render complete film",
+    });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+  },
+);

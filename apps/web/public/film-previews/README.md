@@ -1,5 +1,7 @@
 # Film template examples
 
+These are archived examples of the earlier sparse template renderer. Current GUI exports use the cinematic runtime; these files are not its quality reference. Representative replacement previews are tracked separately.
+
 These examples use the production Film runtime with default template settings, automatic scene durations, normal motion, the same three sample photos, and the same Japanese captions. They are examples of presentation; the sample content is not added to projects. The initial runtime uses silent shared BGM and bundled template sound effects.
 
 Play the committed MP4s directly at `/film-previews/quiet-cinema.mp4`, `/film-previews/memory-board.mp4`, and `/film-previews/pulse-cut.mp4`. Browsers need no API connection or render configuration to play them.

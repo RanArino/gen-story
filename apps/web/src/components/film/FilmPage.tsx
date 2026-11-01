@@ -763,17 +763,13 @@ export function FilmPage({ projectId }: { projectId: string }) {
               busy ||
               dirty ||
               !draft.revision ||
+              detail.jobs.some(
+                (j) =>
+                  j.chapterId === null &&
+                  (j.status === "queued" || j.status === "running"),
+              ) ||
               detail.preflight.length === 0 ||
-              detail.preflight.some(
-                (p) =>
-                  p.error ||
-                  !detail.jobs.some(
-                    (j) =>
-                      j.chapterId === p.chapterId &&
-                      j.fingerprint === p.fingerprint &&
-                      j.status === "succeeded",
-                  ),
-              )
+              detail.preflight.some((p) => p.error)
             }
             onClick={() =>
               void action(async () => {
