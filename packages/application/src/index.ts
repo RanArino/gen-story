@@ -183,3 +183,15 @@ export type { FilmRepositoryPort, FilmRendererPort } from "./film";
 export { markOriginalImageAdopted } from "./use-cases";
 
 export { requestFilmJob } from "./film";
+export {
+  settlePlannedChapters,
+  updateFilmDirection,
+  approveFilmDirection,
+  currentApprovedDirection,
+} from "./film-direction";
+export type {
+  FilmDirectionRepositoryPort,
+  FilmDirectionPlannerPort,
+  FilmDirectionPlanRequest,
+  FilmDirectionPlanChapter,
+} from "./film-direction";
