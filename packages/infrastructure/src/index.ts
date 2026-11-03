@@ -64,6 +64,8 @@ export interface RuntimeInput {
   worldview: string;
   recipe: RecipeName;
   reducedMotion: boolean;
+  /** Output profile id for the rendered direction; absent means landscape-1080p30@1. */
+  outputProfile?: string;
   chapters: RuntimeChapter[];
   scenes: {
     id: string;
@@ -274,6 +276,7 @@ export async function renderFilmAssembly(
 }
 
 export { compileCinematicFilm } from "./cinematic/compile.js";
+export { ASPECT_PROFILES, PROFILES } from "./compiler/compile.js";
 export {
   prepareCinematicScore,
   lockCinematicMedia,
@@ -284,3 +287,12 @@ export {
   directProjectChapter,
   compileProjectChapter,
 } from "./cinematic/project.js";
+export {
+  directApprovedChapter,
+  cameraForMove,
+  scoreForDirection,
+} from "./cinematic/agent-direction.js";
+export type {
+  ApprovedChapterDirection,
+  ApprovedSceneDirection,
+} from "./cinematic/agent-direction.js";

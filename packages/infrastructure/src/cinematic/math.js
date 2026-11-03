@@ -128,6 +128,23 @@ export function tauAt(tab, arr, t) {
 
 /** Preserve arbitrary source aspect ratios while covering the output viewport. */
 export function frameForImage(vw, vh, cam, width, height, framing) {
+  if (framing === "follow") {
+    // z = 1 shows the whole photo; beyond that the camera keeps the focus point centered
+    // until an image edge reaches the frame, so moves can travel without cropping at rest.
+    const scale = Math.min(vw / width, vh / height) * 0.94 * Math.max(1, cam.z);
+    const W = width * scale,
+      H = height * scale;
+    const place = (viewport, size, focus) =>
+      size <= viewport
+        ? (viewport - size) / 2
+        : Math.min(0, Math.max(viewport - size, viewport / 2 - focus * size));
+    return {
+      left: place(vw, W, cam.fx),
+      top: place(vh, H, cam.fy),
+      width: W,
+      height: H,
+    };
+  }
   if (framing === "contain") {
     const scale =
       Math.min(vw / width, vh / height) * Math.min(0.98, 0.88 * cam.z);

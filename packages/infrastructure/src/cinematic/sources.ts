@@ -29,6 +29,7 @@ export function cinematicIdentity() {
         ...CINEMATIC_BROWSER_FILES,
         "compile.ts",
         "project.ts",
+        "agent-direction.ts",
         "types.ts",
         "validate.ts",
         "sources.ts",

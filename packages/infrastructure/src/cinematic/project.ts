@@ -12,22 +12,17 @@ import type {
   CurvePoint,
 } from "./types.js";
 
-/** Materialize deterministic project style data; this is not an image-aware Agent. */
-export function directProjectChapter(
+/** Scene windows, locked source images and seed shared by every Chapter direction. */
+export function chapterTimeline(
   input: RuntimeInput,
   chapter: RuntimeChapter,
   timingPlan: ResolvedRenderPlan,
-): { direction: CinematicDirection; fingerprint: string } {
+) {
   const duration = timingPlan.timing.proposal.runtimeMs / 1000;
   const seed = parseInt(digestOf(chapter.id).slice(7, 15), 16);
-  const settings = chapter.settings ?? {};
-  const intensity = settings.visualIntensity ?? 0.65;
-  const motion = settings.motionAmount ?? 0.65;
-  const emphasis = 0.6 + 0.8 * (settings.emphasis ?? 0.5);
-  const memory = input.recipe === "memory-board";
   const sources = new Map(input.scenes.map((scene) => [scene.id, scene]));
   const assets: CinematicDirection["assets"] = {};
-  const scenes = timingPlan.segments
+  const windows = timingPlan.segments
     .filter((s) => s.kind === "scene")
     .map((segment, i) => {
       const source = sources.get(segment.sceneId!)!;
@@ -39,11 +34,9 @@ export function directProjectChapter(
         widthPx: media.widthPx!,
         heightPx: media.heightPx!,
       };
-      const reverse = i % 2 === 1;
       return {
         id: source.id,
         image,
-        framing: "contain" as const,
         t0: segment.startMs / 1000,
         t1: segment.endMs / 1000,
         fadeIn: Math.max(0.1, timingPlan.timing.proposal.overlapMs / 1000),
@@ -51,24 +44,110 @@ export function directProjectChapter(
           i === chapter.scenes.length - 1
             ? 0.6
             : Math.max(0.1, timingPlan.timing.proposal.overlapMs / 1000),
-        bob: 0,
-        camera: [
-          {
-            p: 0,
-            fx: reverse ? 0.5 + 0.18 * motion : 0.5 - 0.18 * motion,
-            fy: 0.5 - 0.05 * motion,
-            z: reverse ? 1 + motion * 0.12 : 1,
-          },
-          { p: 0.45, fx: 0.5, fy: 0.5 + 0.05 * motion, z: 1 + motion * 0.055 },
-          {
-            p: 1,
-            fx: reverse ? 0.5 - 0.18 * motion : 0.5 + 0.18 * motion,
-            fy: 0.5 - 0.02 * motion,
-            z: reverse ? 1 : 1 + motion * 0.12,
-          },
-        ],
       };
     });
+  return { duration, seed, sources, assets, windows };
+}
+
+/** Burned-in caption windows and the Chapter title card. */
+export function chapterCopy(
+  input: RuntimeInput,
+  chapter: RuntimeChapter,
+  scenes: { id: string; t0: number; t1: number }[],
+): Pick<CinematicDirection, "captions" | "titleCard"> {
+  const sources = new Map(input.scenes.map((scene) => [scene.id, scene]));
+  return {
+    captions: scenes.flatMap((scene) => {
+      const source = sources.get(scene.id)!;
+      return source.caption || source.subtitle
+        ? [
+            {
+              t0: scene.t0 + 0.45,
+              t1: scene.t1 - 0.25,
+              text: source.caption,
+              sub: source.subtitle ?? "",
+              mid: false,
+            },
+          ]
+        : [];
+    }),
+    titleCard: {
+      display: chapter.title,
+      show: {
+        in: 0.15,
+        fadeIn: 0.6,
+        out: Math.max(0.8, scenes[0]!.t0 - 0.4),
+        fadeOut: 0.5,
+      },
+    },
+  };
+}
+
+/** Validates a materialized direction and binds it to the exact toolchain identity. */
+export function sealDirection(
+  direction: CinematicDirection,
+  timingPlan: ResolvedRenderPlan,
+): { direction: CinematicDirection; fingerprint: string } {
+  validateDirection(direction);
+  return {
+    direction,
+    fingerprint: digestOf({
+      direction: { ...direction, revision: 0 },
+      compiler: cinematicIdentity(),
+      environment: timingPlan.lock.environment,
+      painter: timingPlan.lock.painter,
+      fonts: timingPlan.lock.fonts,
+    }),
+  };
+}
+
+/**
+ * Materialize deterministic project style data; this is not an image-aware Agent.
+ * New renders use approved Agent direction; this remains to reproduce historical jobs.
+ */
+export function directProjectChapter(
+  input: RuntimeInput,
+  chapter: RuntimeChapter,
+  timingPlan: ResolvedRenderPlan,
+): { direction: CinematicDirection; fingerprint: string } {
+  const { duration, seed, assets, windows } = chapterTimeline(
+    input,
+    chapter,
+    timingPlan,
+  );
+  const settings = chapter.settings ?? {};
+  const intensity = settings.visualIntensity ?? 0.65;
+  const motion = settings.motionAmount ?? 0.65;
+  const emphasis = 0.6 + 0.8 * (settings.emphasis ?? 0.5);
+  const memory = input.recipe === "memory-board";
+  const scenes = windows.map((window, i) => {
+    const reverse = i % 2 === 1;
+    return {
+      id: window.id,
+      image: window.image,
+      framing: "contain" as const,
+      t0: window.t0,
+      t1: window.t1,
+      fadeIn: window.fadeIn,
+      fadeOut: window.fadeOut,
+      bob: 0,
+      camera: [
+        {
+          p: 0,
+          fx: reverse ? 0.5 + 0.18 * motion : 0.5 - 0.18 * motion,
+          fy: 0.5 - 0.05 * motion,
+          z: reverse ? 1 + motion * 0.12 : 1,
+        },
+        { p: 0.45, fx: 0.5, fy: 0.5 + 0.05 * motion, z: 1 + motion * 0.055 },
+        {
+          p: 1,
+          fx: reverse ? 0.5 - 0.18 * motion : 0.5 + 0.18 * motion,
+          fy: 0.5 - 0.02 * motion,
+          z: reverse ? 1 : 1 + motion * 0.12,
+        },
+      ],
+    };
+  });
   const curve = (a: number, b: number, c: number): CurvePoint[] => [
     [0, a],
     [duration * 0.45, b],
@@ -168,6 +247,7 @@ export function directProjectChapter(
     seed,
     duration,
     reducedMotion: input.reducedMotion,
+    profile: input.outputProfile ?? "landscape-1080p30@1",
     assets,
     scenes,
     params: {
@@ -192,44 +272,12 @@ export function directProjectChapter(
       transitionGlow: 0.1 * intensity,
     },
     steps: [],
-    captions: scenes.flatMap((scene) => {
-      const source = sources.get(scene.id)!;
-      return source.caption || source.subtitle
-        ? [
-            {
-              t0: scene.t0 + 0.45,
-              t1: scene.t1 - 0.25,
-              text: source.caption,
-              sub: source.subtitle ?? "",
-              mid: false,
-            },
-          ]
-        : [];
-    }),
-    titleCard: {
-      display: chapter.title,
-      show: {
-        in: 0.15,
-        fadeIn: 0.6,
-        out: Math.max(0.8, scenes[0]!.t0 - 0.4),
-        fadeOut: 0.5,
-      },
-    },
+    ...chapterCopy(input, chapter, scenes),
     slates: [],
     credits: null,
     score,
   };
-  validateDirection(direction);
-  return {
-    direction,
-    fingerprint: digestOf({
-      direction: { ...direction, revision: 0 },
-      compiler: cinematicIdentity(),
-      environment: timingPlan.lock.environment,
-      painter: timingPlan.lock.painter,
-      fonts: timingPlan.lock.fonts,
-    }),
-  };
+  return sealDirection(direction, timingPlan);
 }
 
 /** Reusable Chapter stems include music as well as effects; concatenation preserves both. */
