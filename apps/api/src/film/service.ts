@@ -3,19 +3,38 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import type { ApplicationDependencies } from "@gen-story/application";
-import { requestFilmJob, saveFilmTreatment } from "@gen-story/application";
+import type {
+  ApplicationDependencies,
+  FilmDirectionPlannerPort,
+  FilmDirectionPlanRequest,
+  FilmDirectionRepositoryPort,
+} from "@gen-story/application";
 import {
+  approveFilmDirection,
+  currentApprovedDirection,
+  requestFilmJob,
+  saveFilmTreatment,
+  settlePlannedChapters,
+  updateFilmDirection,
+} from "@gen-story/application";
+import {
+  directionLocks,
   isVisibleInSceneHistory,
+  transitionDirection,
+  type FilmDirectionProposal,
+  normalizeSceneCaptions,
+  subtitleLines,
   validateFilm,
   type FilmJob,
+  type FilmSubtitleMode,
   type FilmTreatment,
   type Scene,
 } from "@gen-story/domain";
 import type { FilmDetailDto, FilmSceneDto } from "@gen-story/shared";
 import {
+  ASPECT_PROFILES,
   compileFilm,
-  directProjectChapter,
+  directApprovedChapter,
   compileProjectChapter,
   prepareCinematicScore,
   lockCinematicMedia,
@@ -30,14 +49,44 @@ import {
 } from "@gen-story/infrastructure/film";
 import { SqliteFilmRepository } from "./repository";
 
-type PreparedChapter = ReturnType<typeof directProjectChapter> & {
+type PreparedChapter = ReturnType<typeof directApprovedChapter> & {
   timingPlan: ResolvedRenderPlan;
   proposal: ResolvedRenderPlan["timing"]["proposal"];
 };
 type Prepared = {
   input: ReturnType<typeof compileFilm>["input"];
+  /** Chapters with a current approved AI direction, ready to render. */
   compiled: PreparedChapter[];
+  /** Every Chapter's timing, including Chapters still waiting for approval. */
+  timing: {
+    chapterId: string;
+    proposal: ResolvedRenderPlan["timing"]["proposal"];
+    blocked: string | null;
+  }[];
+  inputDigests: Record<string, string>;
 };
+type ResolvedImage = {
+  sceneId: string;
+  title: string;
+  key: string;
+  asset: string;
+  sha256: string;
+};
+const APPROVAL_REQUIRED =
+  "Approve the AI direction for this Chapter before rendering.";
+/** Used when no planner is wired (tests that never request direction). */
+class MemoryFilmDirectionRepository implements FilmDirectionRepositoryPort {
+  private rows = new Map<string, FilmDirectionProposal>();
+  async list(projectId: string) {
+    return [...this.rows.values()]
+      .filter((p) => p.projectId === projectId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  async save(proposal: FilmDirectionProposal) {
+    this.rows.set(proposal.id, proposal);
+  }
+  async failInterrupted() {}
+}
 type Snapshot = { plan: ResolvedRenderPlan; artifact?: ChapterArtifact };
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -62,6 +111,19 @@ export class FilmService {
     >,
     readonly repository: SqliteFilmRepository,
     private root = resolve(repositoryRoot, "data/film"),
+    readonly direction: {
+      repository: FilmDirectionRepositoryPort & {
+        failInterrupted(): Promise<void>;
+      };
+      planner: FilmDirectionPlannerPort;
+    } = {
+      repository: new MemoryFilmDirectionRepository(),
+      planner: {
+        plan: async () => {
+          throw new Error("AI film direction is not configured.");
+        },
+      },
+    },
   ) {}
   private runtime(projectId: string) {
     // Project IDs are validated at the HTTP boundary; hash them again for filesystem isolation.
@@ -90,9 +152,13 @@ export class FilmService {
     };
   }
   async get(projectId: string): Promise<FilmTreatment> {
-    const treatment = await this.repository.get(projectId);
-    if (!treatment) return this.defaultTreatment(projectId);
-    if (!treatment.sceneCaptions) return treatment;
+    const stored = await this.repository.get(projectId);
+    if (!stored) return this.defaultTreatment(projectId);
+    if (!stored.sceneCaptions) return stored;
+    const treatment = {
+      ...stored,
+      sceneCaptions: normalizeSceneCaptions(stored.sceneCaptions) ?? {},
+    };
     const sceneIds = new Set(
       (await this.scenes(projectId)).map((scene) => scene.id),
     );
@@ -155,15 +221,14 @@ export class FilmService {
       }),
     );
   }
-  async prepare(treatment: FilmTreatment): Promise<Prepared> {
-    const scenes = await this.scenes(treatment.projectId);
-    validateFilm(
-      treatment,
-      scenes.map((s) => s.id),
-    );
+  /** Resolves, normalizes and locks every assigned scene's rendered image. */
+  private async resolveImages(
+    treatment: FilmTreatment,
+    scenes: Scene[],
+  ): Promise<{ images: ResolvedImage[]; media: MediaLockEntry[] }> {
     const paths = this.runtime(treatment.projectId);
     const media: MediaLockEntry[] = [];
-    const story = [];
+    const images: ResolvedImage[] = [];
     const used = new Set(
       treatment.chapters.flatMap((c) => c.scenes.map((s) => s.sceneId)),
     );
@@ -209,54 +274,404 @@ export class FilmService {
         widthPx: info.width,
         heightPx: info.height,
       });
-      const caption = treatment.sceneCaptions?.[scene.id];
-      story.push({
-        id: scene.id,
+      images.push({
+        sceneId: scene.id,
+        title: scene.title,
+        key,
         asset,
-        caption: caption?.text ?? scene.title,
-        subtitle: caption?.subtext ?? "",
-        source: key,
+        sha256: hash,
       });
     }
+    return { images, media };
+  }
+  /** What an AI direction was made for: exact images, their order, and the output size. */
+  private directionInputDigest(
+    treatment: FilmTreatment,
+    chapterId: string,
+    images: ResolvedImage[],
+  ): string {
+    const chapter = treatment.chapters.find((c) => c.id === chapterId)!;
+    return digestOf({
+      version: "film-direction-input@1",
+      aspect: treatment.outputAspect ?? "16:9",
+      scenes: chapter.scenes.map(({ sceneId }) => [
+        sceneId,
+        images.find((i) => i.sceneId === sceneId)?.sha256 ?? null,
+      ]),
+    });
+  }
+  async prepare(
+    treatment: FilmTreatment,
+    subtitles: FilmSubtitleMode = "both",
+  ): Promise<Prepared> {
+    const scenes = await this.scenes(treatment.projectId);
+    validateFilm(
+      treatment,
+      scenes.map((s) => s.id),
+    );
+    const paths = this.runtime(treatment.projectId);
+    const { images, media } = await this.resolveImages(treatment, scenes);
+    const story = images.map((image) => {
+      // A missing entry means the Storyboard title as the Japanese line.
+      const lines = subtitleLines(
+        treatment.sceneCaptions?.[image.sceneId] ?? { ja: image.title, en: "" },
+        subtitles,
+      );
+      return {
+        id: image.sceneId,
+        asset: image.asset,
+        caption: lines.text,
+        subtitle: lines.sub,
+        source: image.key,
+      };
+    });
     const boards = await this.deps.storyboards.findByProjectId(
       treatment.projectId,
     );
     const input = {
       ...treatment,
       worldview: boards[0]?.story ?? "",
+      outputProfile: ASPECT_PROFILES[treatment.outputAspect ?? "16:9"],
       media,
       scenes: story,
     };
     const timing = compileFilm(paths, input);
+    const proposals = await this.direction.repository.list(treatment.projectId);
+    const compiled: PreparedChapter[] = [];
+    const chapters = timing.compiled.map((c, i) => {
+      const chapter = treatment.chapters[i]!;
+      const approved = currentApprovedDirection(
+        proposals,
+        chapter.id,
+        this.directionInputDigest(treatment, chapter.id, images),
+      );
+      if (approved)
+        compiled.push({
+          timingPlan: c.plan,
+          proposal: c.proposal,
+          ...directApprovedChapter(input, chapter, c.plan, approved.content!),
+        });
+      return {
+        chapterId: chapter.id,
+        proposal: c.proposal,
+        blocked: approved ? null : APPROVAL_REQUIRED,
+      };
+    });
     return {
       input: timing.input,
-      compiled: timing.compiled.map((c, i) => ({
-        timingPlan: c.plan,
-        proposal: c.proposal,
-        ...directProjectChapter(input, treatment.chapters[i]!, c.plan),
-      })),
+      compiled,
+      timing: chapters,
+      inputDigests: Object.fromEntries(
+        treatment.chapters.map((c) => [
+          c.id,
+          this.directionInputDigest(treatment, c.id, images),
+        ]),
+      ),
     };
   }
-  async detail(projectId: string): Promise<FilmDetailDto> {
+
+  /** Non-superseded directions plus the digests that decide whether each is still current. */
+  private async directionState(
+    treatment: FilmTreatment,
+    inputDigests?: Record<string, string>,
+  ): Promise<Pick<FilmDetailDto, "directions" | "directionInputDigests">> {
+    let digests = inputDigests;
+    if (!digests) {
+      try {
+        const { images } = await this.resolveImages(
+          treatment,
+          await this.scenes(treatment.projectId),
+        );
+        digests = Object.fromEntries(
+          treatment.chapters.map((c) => [
+            c.id,
+            this.directionInputDigest(treatment, c.id, images),
+          ]),
+        );
+      } catch {
+        digests = {};
+      }
+    }
+    return {
+      directions: (
+        await this.direction.repository.list(treatment.projectId)
+      ).filter((p) => p.status !== "superseded"),
+      directionInputDigests: digests,
+    };
+  }
+
+  /**
+   * Starts AI direction for one Chapter or the whole film. Unless `regenerate` is set, a direction
+   * already made for the same photos/order/size is returned instead of calling the Agent again.
+   * Returns immediately; planning runs in the background and its status is persisted.
+   */
+  async requestDirection(
+    projectId: string,
+    options: {
+      scope: "film" | "chapter";
+      chapterId?: string;
+      regenerate: boolean;
+      /** Regenerate only this photo of the Chapter's latest proposal. */
+      sceneId?: string;
+    },
+  ): Promise<FilmDirectionProposal[]> {
+    const treatment = await this.get(projectId);
+    if (treatment.revision === 0)
+      throw new Error("Save the Film before asking the AI for direction.");
+    const targets =
+      options.scope === "film"
+        ? treatment.chapters.filter((c) => c.scenes.length)
+        : treatment.chapters.filter((c) => c.id === options.chapterId);
+    if (!targets.length)
+      throw new Error(
+        options.scope === "film"
+          ? "Add photos to a Chapter before asking the AI for direction."
+          : "Chapter not found.",
+      );
+    if (targets.some((c) => !c.scenes.length))
+      throw new Error(
+        "Add photos to this Chapter before asking the AI for direction.",
+      );
+    const scenes = await this.scenes(projectId);
+    const { images } = await this.resolveImages(treatment, scenes);
+    const digests = new Map(
+      targets.map((c) => [
+        c.id,
+        this.directionInputDigest(treatment, c.id, images),
+      ]),
+    );
+    const existing = await this.direction.repository.list(projectId);
+    const latest = (chapterId: string) =>
+      existing.find(
+        (p) =>
+          p.chapterId === chapterId &&
+          ["generating", "proposed", "approved"].includes(p.status),
+      );
+    if (!options.regenerate) {
+      const cached = targets.map((c) => latest(c.id));
+      if (
+        cached.every(
+          (p, i) => p && p.inputDigest === digests.get(targets[i]!.id),
+        )
+      )
+        return cached as FilmDirectionProposal[];
+    }
+    if (targets.some((c) => latest(c.id)?.status === "generating"))
+      throw new Error("The AI is already working on this direction.");
+    const base = options.sceneId
+      ? existing.find(
+          (p) =>
+            p.chapterId === options.chapterId &&
+            (p.status === "proposed" || p.status === "approved") &&
+            p.content,
+        )
+      : undefined;
+    if (options.sceneId && (!base || options.scope !== "chapter"))
+      throw new Error("Ask the AI for this Chapter's direction first.");
+    const now = new Date().toISOString();
+    const requestId = randomUUID();
+    const proposals: FilmDirectionProposal[] = targets.map((c) => ({
+      id: randomUUID(),
+      projectId,
+      chapterId: c.id,
+      requestId,
+      scope: options.scope,
+      status: "generating",
+      inputDigest: digests.get(c.id)!,
+      model: null,
+      error: null,
+      content: null,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    for (const proposal of proposals)
+      await this.direction.repository.save(proposal);
+    const index = (id: string) =>
+      treatment.chapters.findIndex((c) => c.id === id);
+    const music = (chapterId: string | undefined) =>
+      chapterId ? (latest(chapterId)?.content?.music ?? null) : null;
+    const first = index(targets[0]!.id),
+      last = index(targets.at(-1)!.id);
+    const boards = await this.deps.storyboards.findByProjectId(projectId);
+    const request: FilmDirectionPlanRequest = {
+      scope: options.scope,
+      filmTitle: treatment.title,
+      story: boards[0]?.story ?? "",
+      outputAspect: treatment.outputAspect ?? "16:9",
+      neighbors:
+        options.scope === "film"
+          ? []
+          : [
+              ...(first > 0
+                ? [
+                    {
+                      position: "previous" as const,
+                      title: treatment.chapters[first - 1]!.title,
+                      music: music(treatment.chapters[first - 1]!.id),
+                    },
+                  ]
+                : []),
+              ...(last < treatment.chapters.length - 1
+                ? [
+                    {
+                      position: "next" as const,
+                      title: treatment.chapters[last + 1]!.title,
+                      music: music(treatment.chapters[last + 1]!.id),
+                    },
+                  ]
+                : []),
+            ],
+      chapters: targets.map((c) => ({
+        chapterId: c.id,
+        title: c.title,
+        locks: directionLocks(treatment, c.id, existing),
+        scenes: c.scenes.map(({ sceneId }) => {
+          const image = images.find((i) => i.sceneId === sceneId)!;
+          return {
+            sceneId,
+            storyboardTitle: image.title,
+            imageKey: image.key,
+            keep:
+              base && sceneId !== options.sceneId
+                ? (base.content!.scenes.find((s) => s.sceneId === sceneId) ??
+                  null)
+                : null,
+          };
+        }),
+      })),
+    };
+    void this.runDirection(request, proposals);
+    return proposals;
+  }
+  private async runDirection(
+    request: FilmDirectionPlanRequest,
+    proposals: FilmDirectionProposal[],
+  ) {
+    const finish = async (
+      proposal: FilmDirectionProposal,
+      result:
+        | { content: FilmDirectionProposal["content"]; model: string }
+        | { error: string },
+    ) => {
+      const now = new Date().toISOString();
+      if ("error" in result) {
+        await this.direction.repository.save({
+          ...transitionDirection(proposal, "failed", now),
+          error: result.error,
+        });
+        return;
+      }
+      // Only one open proposal per Chapter: older unapproved ones are replaced.
+      for (const older of await this.direction.repository.list(
+        proposal.projectId,
+      ))
+        if (
+          older.chapterId === proposal.chapterId &&
+          older.status === "proposed" &&
+          older.id !== proposal.id
+        )
+          await this.direction.repository.save(
+            transitionDirection(older, "superseded", now),
+          );
+      await this.direction.repository.save({
+        ...transitionDirection(proposal, "proposed", now),
+        content: result.content,
+        model: result.model,
+      });
+    };
+    try {
+      const result = await this.direction.planner.plan(request);
+      const settled = settlePlannedChapters(request, result);
+      for (const proposal of proposals) {
+        const outcome = settled.get(proposal.chapterId)!;
+        await finish(
+          proposal,
+          "content" in outcome
+            ? { content: outcome.content, model: result.model }
+            : outcome,
+        );
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      for (const proposal of proposals)
+        await finish(proposal, {
+          error: `The AI direction failed: ${message}`,
+        });
+    }
+  }
+  async updateDirection(projectId: string, id: string, content: unknown) {
+    const treatment = await this.get(projectId);
+    const proposal = (await this.direction.repository.list(projectId)).find(
+      (p) => p.id === id,
+    );
+    const chapter = treatment.chapters.find(
+      (c) => c.id === proposal?.chapterId,
+    );
+    if (!proposal || !chapter) throw new Error("AI direction not found.");
+    return updateFilmDirection(this.direction.repository, {
+      projectId,
+      id,
+      content,
+      sceneIds: chapter.scenes.map((s) => s.sceneId),
+      now: new Date().toISOString(),
+    });
+  }
+  async approveDirection(
+    projectId: string,
+    id: string,
+    expectedRevision: number,
+  ) {
+    const treatment = await this.get(projectId);
+    const proposal = (await this.direction.repository.list(projectId)).find(
+      (p) => p.id === id,
+    );
+    const chapter = treatment.chapters.find(
+      (c) => c.id === proposal?.chapterId,
+    );
+    if (!proposal || !chapter) throw new Error("AI direction not found.");
+    const { images } = await this.resolveImages(
+      treatment,
+      await this.scenes(projectId),
+    );
+    return approveFilmDirection(this.direction.repository, this.repository, {
+      projectId,
+      id,
+      currentInputDigest: this.directionInputDigest(
+        treatment,
+        chapter.id,
+        images,
+      ),
+      sceneIds: chapter.scenes.map((s) => s.sceneId),
+      expectedRevision,
+      now: new Date().toISOString(),
+    });
+  }
+  async detail(
+    projectId: string,
+    subtitles: FilmSubtitleMode = "both",
+  ): Promise<FilmDetailDto> {
     const treatment = await this.get(projectId);
     const jobs = await this.repository.jobs(projectId);
     let currentAssemblyFingerprint: string | null = null;
     let preflight: FilmDetailDto["preflight"];
+    let inputDigests: Record<string, string> | undefined;
     try {
-      const prepared = await this.prepare(treatment);
-      currentAssemblyFingerprint = this.assemblyFingerprint(
-        treatment,
-        prepared,
-      );
-      preflight = prepared.compiled.map((c) => ({
-        chapterId: c.direction.chapterId,
+      const prepared = await this.prepare(treatment, subtitles);
+      inputDigests = prepared.inputDigests;
+      currentAssemblyFingerprint = prepared.timing.some((c) => c.blocked)
+        ? null
+        : this.assemblyFingerprint(treatment, prepared);
+      preflight = prepared.timing.map((c) => ({
+        chapterId: c.chapterId,
         runtimeMs: c.proposal.runtimeMs,
-        fingerprint: c.fingerprint,
+        fingerprint:
+          prepared.compiled.find((r) => r.direction.chapterId === c.chapterId)
+            ?.fingerprint ?? "",
         durations: c.proposal.scenes.map((s) => ({
           sceneId: s.sceneId,
           durationMs: s.durationMs,
         })),
-        error: null,
+        error: c.blocked,
       }));
     } catch (e) {
       preflight = treatment.chapters.map((c) => ({
@@ -273,12 +688,14 @@ export class FilmService {
       jobs,
       currentAssemblyFingerprint,
       preflight,
+      ...(await this.directionState(treatment, inputDigests)),
     };
   }
   async render(
     projectId: string,
     chapterId: string | null,
     revision: number,
+    subtitles: FilmSubtitleMode = "both",
   ): Promise<FilmJob> {
     const previous = this.submissions;
     let release!: () => void;
@@ -287,7 +704,7 @@ export class FilmService {
     });
     await previous;
     try {
-      return await this.createRender(projectId, chapterId, revision);
+      return await this.createRender(projectId, chapterId, revision, subtitles);
     } finally {
       release();
     }
@@ -296,11 +713,21 @@ export class FilmService {
     projectId: string,
     chapterId: string | null,
     revision: number,
+    subtitles: FilmSubtitleMode,
   ): Promise<FilmJob> {
     const treatment = await this.get(projectId);
     if (treatment.revision !== revision || revision === 0)
       throw new Error("Save the current Film revision before rendering.");
-    const prepared = await this.prepare(treatment);
+    const prepared = await this.prepare(treatment, subtitles);
+    const blocked = prepared.timing.find(
+      (c) => c.blocked && (chapterId === null || c.chapterId === chapterId),
+    );
+    if (blocked)
+      throw new Error(
+        chapterId
+          ? blocked.blocked!
+          : "Approve the AI direction for every Chapter before rendering the whole film.",
+      );
     const chapter = chapterId
       ? prepared.compiled.find((c) => c.direction.chapterId === chapterId)
       : null;

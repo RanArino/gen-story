@@ -14,7 +14,12 @@ import {
   createTestGenerationBatch,
   type FilmTreatment,
 } from "@gen-story/domain";
-import { upsertScenes, markOriginalImageAdopted } from "@gen-story/application";
+import {
+  upsertScenes,
+  markOriginalImageAdopted,
+  type FilmDirectionPlannerPort,
+  type FilmDirectionPlanRequest,
+} from "@gen-story/application";
 import * as filmRuntime from "@gen-story/infrastructure/film";
 import { digestBytes, digestOf } from "@gen-story/infrastructure/film";
 import { createInMemoryApplicationDependencies } from "../test-support/in-memory-application";
@@ -22,7 +27,70 @@ import { seedLocalPrincipal } from "../auth/local-auth";
 import { openDatabase, migrateDatabase, createSqliteRepositories } from "../db";
 import { buildRouter } from "../http/routes";
 import { SqliteFilmRepository } from "./repository";
+import { SqliteFilmDirectionRepository } from "./direction-repository";
 import { FilmService } from "./service";
+
+/** A deterministic stand-in for the Agent: only these tests may use it; it is not integration. */
+const stubContent = (
+  chapter: FilmDirectionPlanRequest["chapters"][number],
+) => ({
+  chapterName: "AI chapter name",
+  nameReason: "Stub",
+  music: {
+    mood: "calm",
+    tempoBpm: 72,
+    key: "D",
+    mode: "minor",
+    instruments: ["pad", "koto-pluck"],
+    melody: "sparse",
+    arc: "rise",
+    fromPrevious: "continue",
+  },
+  scenes: chapter.scenes.map((scene) => ({
+    sceneId: scene.sceneId,
+    observation: "Stub observation",
+    camera: {
+      move: "climb",
+      focus: { x: 0.5, y: 0.3 },
+      speed: 0.6,
+      reason: "Stub",
+    },
+    effects: { rays: 0.3, motes: 0.2, leaves: 0, warmth: 0.2 },
+    footsteps: "stair",
+    ambience: { wind: 0.3, stream: 0 },
+    sounds: [{ sound: "bird-chirp", at: 0.5, gain: 0.5 }],
+    captions: { ja: "AIの字幕", en: "AI caption" },
+  })),
+});
+const stubPlanner = () => {
+  const plan = vi.fn<FilmDirectionPlannerPort["plan"]>(async (request) => ({
+    model: "stub",
+    chapters: request.chapters.map((chapter) => ({
+      chapterId: chapter.chapterId,
+      content: stubContent(chapter),
+    })),
+  }));
+  return { plan };
+};
+/** Requests whole-film direction, waits for it and approves every Chapter. */
+async function approveAll(service: FilmService) {
+  const requested = await service.requestDirection("project", {
+    scope: "film",
+    regenerate: false,
+  });
+  await vi.waitFor(async () => {
+    const list = await service.direction.repository.list("project");
+    for (const p of requested)
+      expect(list.find((x) => x.id === p.id)?.status).not.toBe("generating");
+  });
+  for (const p of requested)
+    await service.approveDirection(
+      "project",
+      p.id,
+      (await service.get("project")).revision,
+    );
+  return service.get("project");
+}
 
 const now = "2026-10-31T00:00:00.000Z";
 const cleanups: (() => void | Promise<void>)[] = [];
@@ -115,8 +183,22 @@ async function fixture() {
     db.close();
     rmSync(directory, { recursive: true, force: true });
   });
-  const service = new FilmService(deps, repository, directory);
-  return { deps, repository, service, db, project, scene, photo, directory };
+  const planner = stubPlanner();
+  const service = new FilmService(deps, repository, directory, {
+    repository: new SqliteFilmDirectionRepository(db.db),
+    planner,
+  });
+  return {
+    deps,
+    repository,
+    service,
+    db,
+    project,
+    scene,
+    photo,
+    directory,
+    planner,
+  };
 }
 const treatment = (): FilmTreatment => ({
   projectId: "project",
@@ -138,7 +220,7 @@ describe("Film persistence and image selection", () => {
   it("drops caption overrides for deleted scenes from the editable treatment", async () => {
     const { service, deps } = await fixture();
     const draft = treatment();
-    draft.sceneCaptions = { scene: { text: "Saved words", subtext: "" } };
+    draft.sceneCaptions = { scene: { ja: "Saved words", en: "" } };
     await service.save(draft, 0);
     await deps.scenes.softDelete("scene", now);
     const loaded = await service.get("project");
@@ -161,13 +243,23 @@ describe("Film persistence and image selection", () => {
       body: bytes,
       contentType: "image/png",
     });
-    const original = await service.prepare({ ...treatment(), revision: 1 });
     const draft = treatment();
     draft.sceneCaptions = {
-      scene: { text: "Our departure", subtext: "A new day" },
+      scene: { ja: "Our departure", en: "A new day" },
     };
-    const saved = await service.save(draft, 0),
-      prepared = await service.prepare(await service.get("project"));
+    await service.save(draft, 0);
+    const saved = await approveAll(service);
+    // The user's own words are locks: approval keeps them instead of the AI's captions.
+    expect(saved.sceneCaptions?.scene).toEqual({
+      ja: "Our departure",
+      en: "A new day",
+    });
+    expect(saved.chapters[0]!.title).toBe("Opening");
+    const original = await service.prepare({
+      ...saved,
+      sceneCaptions: { scene: { ja: "Other", en: "" } },
+    });
+    const prepared = await service.prepare(await service.get("project"));
     expect(prepared.compiled[0]).toHaveProperty(
       "direction.schema",
       "film.cinematic-direction@1",
@@ -180,8 +272,8 @@ describe("Film persistence and image selection", () => {
     );
     expect((await deps.scenes.findById("scene"))!.title).toBe("Opening");
     await service.save(
-      { ...saved, sceneCaptions: { scene: { text: "", subtext: "" } } },
-      1,
+      { ...saved, sceneCaptions: { scene: { ja: "", en: "" } } },
+      saved.revision,
     );
     const hidden = await service.prepare(await service.get("project"));
     expect(hidden.compiled[0]!.direction.captions).toEqual([]);
@@ -361,7 +453,7 @@ describe("Film artifact HTTP boundary", () => {
     const draft = {
       ...treatment(),
       sceneCaptions: {
-        scene: { text: "Before we leave", subtext: "A new day" },
+        scene: { ja: "Before we leave", en: "A new day" },
       },
     };
     const put = (body: unknown) =>
@@ -384,7 +476,7 @@ describe("Film artifact HTTP boundary", () => {
         await put({
           ...draft,
           expectedRevision: 1,
-          sceneCaptions: { foreign: { text: "No", subtext: "" } },
+          sceneCaptions: { foreign: { ja: "No", en: "" } },
         })
       ).status,
     ).toBe(422);
@@ -393,7 +485,7 @@ describe("Film artifact HTTP boundary", () => {
         await put({
           ...draft,
           expectedRevision: 1,
-          sceneCaptions: { scene: { text: "x".repeat(121), subtext: "" } },
+          sceneCaptions: { scene: { ja: "x".repeat(121), en: "" } },
         })
       ).status,
     ).toBe(422);
@@ -402,11 +494,11 @@ describe("Film artifact HTTP boundary", () => {
         await put({
           ...draft,
           expectedRevision: 1,
-          sceneCaptions: { scene: { text: "", subtext: "" } },
+          sceneCaptions: { scene: { ja: "", en: "" } },
         })
       ).status,
     ).toBe(200);
-    expect((await repository.get("project"))?.sceneCaptions?.scene?.text).toBe(
+    expect((await repository.get("project"))?.sceneCaptions?.scene?.ja).toBe(
       "",
     );
   });
@@ -559,7 +651,11 @@ it("generates missing cinematic Chapters in one complete-film job and reuses unc
   const assemble = vi
     .spyOn(filmRuntime, "renderFilmAssembly")
     .mockResolvedValue({ file, cache: "miss", runtimeMs: 11000 });
-  const saved = await service.save(treatment(), 0);
+  await service.save(treatment(), 0);
+  await expect(service.render("project", null, 1)).rejects.toThrow(
+    /Approve the AI direction for every Chapter/,
+  );
+  const saved = await approveAll(service);
   const job = await service.render("project", null, saved.revision);
   await vi.waitFor(async () =>
     expect(
@@ -596,7 +692,7 @@ it("generates missing cinematic Chapters in one complete-film job and reuses unc
   const changed = await service.save(
     {
       ...renamed,
-      sceneCaptions: { scene: { text: "Changed words", subtext: "" } },
+      sceneCaptions: { scene: { ja: "Changed words", en: "" } },
     },
     renamed.revision,
   );
@@ -615,4 +711,234 @@ it("generates missing cinematic Chapters in one complete-film job and reuses unc
   expect(
     (await repository.jobs("project")).find((j) => j.id === job.id)?.status,
   ).toBe("succeeded");
+});
+
+describe("AI film direction", () => {
+  async function ready() {
+    const context = await fixture();
+    const bytes = await sharp({
+      create: { width: 64, height: 96, channels: 3, background: "#adc5bb" },
+    })
+      .png()
+      .toBuffer();
+    await context.deps.objectStorage.putObject({
+      key: "data/uploads/generated.png",
+      body: bytes,
+      contentType: "image/png",
+    });
+    const draft = treatment();
+    draft.chapters[0]!.title = "チャプター 1";
+    await context.service.save(draft, 0);
+    return context;
+  }
+  const settledList = async (service: FilmService) => {
+    await vi.waitFor(async () =>
+      expect(
+        (await service.direction.repository.list("project")).some(
+          (p) => p.status === "generating",
+        ),
+      ).toBe(false),
+    );
+    return service.direction.repository.list("project");
+  };
+
+  it("reuses a direction for unchanged photos and calls the Agent again only on regenerate", async () => {
+    const { service, planner } = await ready();
+    const first = await service.requestDirection("project", {
+      scope: "film",
+      regenerate: false,
+    });
+    await settledList(service);
+    const again = await service.requestDirection("project", {
+      scope: "film",
+      regenerate: false,
+    });
+    expect(again.map((p) => p.id)).toEqual(first.map((p) => p.id));
+    expect(planner.plan).toHaveBeenCalledTimes(1);
+    const request = planner.plan.mock.calls[0]![0];
+    expect(request.chapters[0]!.locks.chapterName).toBeNull();
+    expect(request.chapters[0]!.scenes[0]!.imageKey).toBe(
+      "data/uploads/generated.png",
+    );
+    await service.requestDirection("project", {
+      scope: "chapter",
+      chapterId: treatment().chapters[0]!.id,
+      regenerate: true,
+    });
+    const list = await settledList(service);
+    expect(planner.plan).toHaveBeenCalledTimes(2);
+    expect(list.filter((p) => p.status === "proposed")).toHaveLength(1);
+    expect(list.find((p) => p.id === first[0]!.id)!.status).toBe("superseded");
+  });
+
+  it("shows planner failures and invalid output instead of rendering generic direction", async () => {
+    const { service, planner } = await ready();
+    planner.plan.mockRejectedValueOnce(new Error("runtime unavailable"));
+    await service.requestDirection("project", {
+      scope: "film",
+      regenerate: false,
+    });
+    let [latest] = await settledList(service);
+    expect(latest).toMatchObject({ status: "failed" });
+    expect(latest!.error).toMatch(/runtime unavailable/);
+    planner.plan.mockResolvedValueOnce({
+      model: "stub",
+      chapters: [
+        {
+          chapterId: treatment().chapters[0]!.id,
+          content: { chapterName: "x", scenes: [] },
+        },
+      ],
+    });
+    await service.requestDirection("project", {
+      scope: "film",
+      regenerate: true,
+    });
+    [latest] = await settledList(service);
+    expect(latest).toMatchObject({ status: "failed" });
+    expect(latest!.error).toMatch(/invalid/);
+    const detail = await service.detail("project");
+    expect(detail.preflight[0]!.error).toMatch(/Approve the AI direction/);
+    expect(detail.currentAssemblyFingerprint).toBeNull();
+  });
+
+  it("names a default-named Chapter, then goes stale when the video size changes", async () => {
+    const { service } = await ready();
+    const approved = await approveAll(service);
+    expect(approved.chapters[0]!.title).toBe("AI chapter name");
+    expect(approved.sceneCaptions?.scene).toEqual({
+      ja: "AIの字幕",
+      en: "AI caption",
+    });
+    const before = await service.detail("project");
+    expect(before.preflight[0]!.error).toBeNull();
+    expect(before.directions[0]!.inputDigest).toBe(
+      before.directionInputDigests[approved.chapters[0]!.id],
+    );
+    const portrait = await service.save(
+      { ...approved, outputAspect: "9:16" },
+      approved.revision,
+    );
+    const after = await service.detail("project");
+    expect(after.preflight[0]!.error).toMatch(/Approve the AI direction/);
+    expect(after.directions[0]!.inputDigest).not.toBe(
+      after.directionInputDigests[portrait.chapters[0]!.id],
+    );
+    await expect(
+      service.render("project", portrait.chapters[0]!.id, portrait.revision),
+    ).rejects.toThrow(/Approve the AI direction/);
+  });
+
+  it("binds the export subtitle mode into Chapter fingerprints and burned-in lines", async () => {
+    const { service } = await ready();
+    const approved = await approveAll(service);
+    const modes = ["both", "ja", "en", "none"] as const;
+    const prints = new Set<string>();
+    for (const mode of modes) {
+      const prepared = await service.prepare(approved, mode);
+      prints.add(prepared.compiled[0]!.fingerprint);
+      const lines = prepared.compiled[0]!.direction.captions.map((c) => [
+        c.text,
+        c.sub,
+      ]);
+      expect(lines).toEqual(
+        {
+          both: [["AIの字幕", "AI caption"]],
+          ja: [["AIの字幕", ""]],
+          en: [["AI caption", ""]],
+          none: [],
+        }[mode],
+      );
+    }
+    expect(prints.size).toBe(4);
+    const detail = await service.detail("project", "en");
+    expect(detail.preflight[0]!.fingerprint).toBe(
+      (await service.prepare(approved, "en")).compiled[0]!.fingerprint,
+    );
+  });
+
+  it("requests, edits and approves direction over HTTP and refuses unapproved renders", async () => {
+    const { service, deps } = await ready();
+    const router = buildRouter({ ...deps, film: service });
+    const server: Server = createServer((req, res) => {
+      void router.handle(req, res).then((handled) => {
+        if (!handled) {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    cleanups.push(
+      () =>
+        new Promise<void>((resolve, reject) =>
+          server.close((e) => (e ? reject(e) : resolve())),
+        ),
+    );
+    const address = server.address() as { port: number };
+    const base = `http://127.0.0.1:${address.port}/api/projects/project/film`;
+    const post = (path: string, body: unknown, method = "POST") =>
+      fetch(`${base}${path}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    expect(
+      (
+        await post(`/chapters/${treatment().chapters[0]!.id}/renders`, {
+          revision: 1,
+          subtitles: "en",
+        })
+      ).status,
+    ).toBe(409);
+    expect((await post("/directions", { scope: "chapter" })).status).toBe(422);
+    const requested = await post("/directions", {
+      scope: "chapter",
+      chapterId: treatment().chapters[0]!.id,
+    });
+    expect(requested.status).toBe(202);
+    const [proposal] = (await requested.json()) as { id: string }[];
+    const [settled] = await settledList(service);
+    const edited = structuredClone(settled!.content!);
+    edited.scenes[0]!.captions.en = "Edited by me";
+    edited.scenes[0]!.camera.move = "pan-left";
+    expect(
+      (
+        await post(
+          `/directions/${proposal!.id}`,
+          { content: { ...edited, scenes: [] } },
+          "PATCH",
+        )
+      ).status,
+    ).toBe(422);
+    expect(
+      (await post(`/directions/${proposal!.id}`, { content: edited }, "PATCH"))
+        .status,
+    ).toBe(200);
+    const approved = await post(`/directions/${proposal!.id}/approve`, {
+      expectedRevision: 1,
+    });
+    expect(approved.status).toBe(200);
+    const detail = (await approved.json()) as {
+      treatment: FilmTreatment;
+      directions: {
+        status: string;
+        content: { scenes: { camera: { move: string } }[] };
+      }[];
+    };
+    expect(detail.treatment.sceneCaptions?.scene?.en).toBe("Edited by me");
+    expect(detail.directions[0]!.status).toBe("approved");
+    expect(detail.directions[0]!.content.scenes[0]!.camera.move).toBe(
+      "pan-left",
+    );
+    expect(
+      (
+        await post(`/directions/${proposal!.id}/approve`, {
+          expectedRevision: 1,
+        })
+      ).status,
+    ).toBe(409);
+  });
 });

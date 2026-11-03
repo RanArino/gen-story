@@ -11,10 +11,11 @@ const draftSchema = z.object({
   title: z.string().trim().min(1).max(200),
   recipe: z.enum(["quiet-cinema", "memory-board", "pulse-cut"]),
   reducedMotion: z.boolean(),
+  outputAspect: z.enum(["16:9", "9:16", "1:1"]).optional(),
   sceneCaptions: z
     .record(
       z.string().min(1),
-      z.object({ text: z.string().max(120), subtext: z.string().max(200) }),
+      z.object({ ja: z.string().max(120), en: z.string().max(200) }),
     )
     .optional(),
   chapters: z.array(
@@ -40,7 +41,22 @@ const draftSchema = z.object({
     }),
   ),
 });
-const revisionSchema = z.object({ revision: z.number().int().positive() });
+const subtitleModeSchema = z.enum(["both", "ja", "en", "none"]);
+const directionRequestSchema = z.object({
+  scope: z.enum(["film", "chapter"]),
+  chapterId: z.string().uuid().optional(),
+  regenerate: z.boolean().default(false),
+  sceneId: z.string().min(1).optional(),
+});
+// Content is validated against the Chapter's photos by the domain rules.
+const directionUpdateSchema = z.object({ content: z.unknown() });
+const directionApproveSchema = z.object({
+  expectedRevision: z.number().int().positive(),
+});
+const revisionSchema = z.object({
+  revision: z.number().int().positive(),
+  subtitles: subtitleModeSchema.default("both"),
+});
 
 export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
   const service = deps.film;
@@ -84,7 +100,10 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
         sendJson(
           res,
           message.includes("another editor") ||
-            message.includes("revision before rendering")
+            message.includes("revision before rendering") ||
+            message.includes("Approve the AI direction") ||
+            message.includes("changed after this direction") ||
+            message.includes("already working")
             ? 409
             : 422,
           { error: { code: "invalid_state", message } },
@@ -94,8 +113,14 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
   router.add(
     "GET",
     base,
-    guarded(async (_req, res, _params, id) => {
-      sendJson(res, 200, await service.detail(id));
+    guarded(async (req, res, _params, id) => {
+      const subtitles = subtitleModeSchema
+        .default("both")
+        .parse(
+          new URL(req.url!, "http://localhost").searchParams.get("subtitles") ??
+            undefined,
+        );
+      sendJson(res, 200, await service.detail(id, subtitles));
     }),
   );
   router.add(
@@ -129,7 +154,12 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
       sendJson(
         res,
         202,
-        await service.render(id, getParam(params, "chapterId"), body.revision),
+        await service.render(
+          id,
+          getParam(params, "chapterId"),
+          body.revision,
+          body.subtitles,
+        ),
       );
     }),
   );
@@ -138,7 +168,50 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
     `${base}/assembly-renders`,
     guarded(async (req, res, _params, id) => {
       const body = revisionSchema.parse(await readJsonBody(req));
-      sendJson(res, 202, await service.render(id, null, body.revision));
+      sendJson(
+        res,
+        202,
+        await service.render(id, null, body.revision, body.subtitles),
+      );
+    }),
+  );
+  router.add(
+    "POST",
+    `${base}/directions`,
+    guarded(async (req, res, _params, id) => {
+      const body = directionRequestSchema.parse(await readJsonBody(req));
+      if (body.scope === "chapter" && !body.chapterId)
+        throw new Error("Choose a Chapter for AI direction.");
+      sendJson(res, 202, await service.requestDirection(id, body));
+    }),
+  );
+  router.add(
+    "PATCH",
+    `${base}/directions/:directionId`,
+    guarded(async (req, res, params, id) => {
+      const body = directionUpdateSchema.parse(await readJsonBody(req));
+      sendJson(
+        res,
+        200,
+        await service.updateDirection(
+          id,
+          getParam(params, "directionId"),
+          body.content,
+        ),
+      );
+    }),
+  );
+  router.add(
+    "POST",
+    `${base}/directions/:directionId/approve`,
+    guarded(async (req, res, params, id) => {
+      const body = directionApproveSchema.parse(await readJsonBody(req));
+      await service.approveDirection(
+        id,
+        getParam(params, "directionId"),
+        body.expectedRevision,
+      );
+      sendJson(res, 200, await service.detail(id));
     }),
   );
   router.add(

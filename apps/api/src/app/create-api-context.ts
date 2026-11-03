@@ -1,5 +1,7 @@
 import { FilmService } from "../film/service";
 import { SqliteFilmRepository } from "../film/repository";
+import { SqliteFilmDirectionRepository } from "../film/direction-repository";
+import { AgentFilmDirectionPlanner } from "../film/direction-planner";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -327,6 +329,15 @@ export function createApiContext(
     film: new FilmService(
       { ...repos, objectStorage },
       new SqliteFilmRepository(client.db),
+      undefined,
+      {
+        repository: new SqliteFilmDirectionRepository(client.db),
+        // Reads the live selection so a Settings change applies to the next request.
+        planner: new AgentFilmDirectionPlanner(
+          objectStorage,
+          () => agentRuntime.selection,
+        ),
+      },
     ),
     objectStorage,
     imagePreprocessing,
