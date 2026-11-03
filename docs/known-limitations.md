@@ -161,14 +161,13 @@ any cloud setup. The following features are deliberately excluded from this vers
 
 ## Video & audio
 
-- The Film stage renders local still-image films using three system templates at
-  16:9 1080p30. Chrome and FFmpeg are required. Chapter and joined MP4s can be
-  played and downloaded. Recipe creation, new Capability authoring, and additional
-  output profiles are not part of this first integrated UI.
-- The current Film UI uses bundled sound effects and silence as the initial BGM.
-  The authored cinematic runtime additionally supports local procedural music/sound
-  for quality-recovery comparisons, but is not yet wired to user project Agent
-  planning or the UI. No external BGM provider or generative video is integrated.
+- The Film stage renders local still-image films at 1080p30 in 16:9, 9:16, or 1:1.
+  Chrome and FFmpeg are required. Chapter and joined MP4s can be played and
+  downloaded. Recipe creation and new Capability authoring are not part of the UI.
+- Each Chapter needs an AI direction, approved by the user, before rendering. AI
+  direction runs on the Claude or Codex runtime only (not the API runtime). Camera
+  moves, sounds, and instruments come from a fixed vocabulary of local procedural
+  sounds; there is no external BGM provider or generative video.
   Film jobs run serially in the API process;
   interrupted jobs fail explicitly and can be retried from the Film page.
 
