@@ -34,6 +34,9 @@
     "reducedMotion": {
       "type": "boolean"
     },
+    "profile": {
+      "$ref": "urn:film-spike:common#/$defs/profileId"
+    },
     "assets": {
       "type": "object",
       "minProperties": 1,
@@ -136,7 +139,7 @@
             "maxItems": 32
           },
           "framing": {
-            "const": "contain"
+            "enum": ["contain", "follow"]
           }
         },
         "required": [

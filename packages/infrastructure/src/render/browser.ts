@@ -31,7 +31,11 @@ interface PageGlobals {
   };
   document: {
     documentElement: { dataset: Record<string, string | undefined> };
-    getElementById(id: string): { toDataURL(type: string): string };
+    getElementById(id: string): {
+      toDataURL(type: string): string;
+      width: number;
+      height: number;
+    };
   };
 }
 
@@ -108,6 +112,15 @@ export async function openPlan(
       "",
       `painter failed to load ${planPath}: ${error ?? errors.join("; ")}`,
     );
+  // The painter sizes the canvas from the plan's output profile; capture exactly that frame.
+  const size = await page.evaluate(() => {
+    const canvas = (
+      globalThis as unknown as PageGlobals
+    ).document.getElementById("frame");
+    return { width: canvas.width, height: canvas.height };
+  });
+  if (size.width !== 1920 || size.height !== 1080)
+    await page.setViewport({ ...size, deviceScaleFactor: 1 });
   const { digest, runtimeMs } = await page.evaluate(() => {
     const p = (globalThis as unknown as PageGlobals).__painter;
     return { digest: p.digest, runtimeMs: p.runtimeMs };

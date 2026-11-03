@@ -139,6 +139,28 @@ describe("cinematic authored production plans", () => {
     expect(p.lock.painter.abi).toBe("film-painter@2");
     expect([...imageAssets(p.layers)]).toEqual(["images/photo.png"]);
   });
+  it("compiles the selected output size into the plan profile and lock", () => {
+    const sizes = {
+      "landscape-1080p30@1": [1920, 1080],
+      "portrait-1080p30@1": [1080, 1920],
+      "square-1080p30@1": [1080, 1080],
+    } as const;
+    const fingerprints = new Set<string>();
+    for (const [id, [width, height]] of Object.entries(sizes)) {
+      const d = { ...fixture(), profile: id };
+      const p = compileCinematicFilm(paths, d, score(d));
+      expect(p.profile).toMatchObject({ id, widthPx: width, heightPx: height });
+      expect(p.lock.profile).toBe(id);
+      for (const text of p.texts) {
+        expect(text.box.x + text.box.w).toBeLessThanOrEqual(width);
+        expect(text.box.y + text.box.h).toBeLessThanOrEqual(height);
+      }
+      fingerprints.add(p.fingerprint);
+    }
+    expect(fingerprints.size).toBe(3);
+    const d = { ...fixture(), profile: "cinema-4k@1" };
+    expect(() => compileCinematicFilm(paths, d, score(d))).toThrow();
+  });
   it("changes the fingerprint for direction changes but preserves identical revisions", () => {
     const d = fixture(),
       a = compileCinematicFilm(paths, d, score(d));
@@ -230,22 +252,27 @@ describe("cinematic authored production plans", () => {
   });
 });
 
-it("keeps all edges of portrait, landscape and square photos inside the frame", () => {
-  for (const [width, height] of [
-    [600, 1200],
-    [1600, 900],
-    [1000, 1000],
-  ]) {
-    for (const camera of [
-      { fx: 0.25, fy: 0.3, z: 0.9 },
-      { fx: 0.75, fy: 0.7, z: 0.98 },
+it("keeps all edges of portrait, landscape and square photos inside every output frame", () => {
+  for (const [vw, vh] of [
+    [1920, 1080],
+    [1080, 1920],
+    [1080, 1080],
+  ])
+    for (const [width, height] of [
+      [600, 1200],
+      [1600, 900],
+      [1000, 1000],
     ]) {
-      const f = frameForImage(1920, 1080, camera, width!, height!, "contain");
-      expect(f.left).toBeGreaterThanOrEqual(0);
-      expect(f.top).toBeGreaterThanOrEqual(0);
-      expect(f.left + f.width).toBeLessThanOrEqual(1920);
-      expect(f.top + f.height).toBeLessThanOrEqual(1080);
-      expect(f.width / f.height).toBeCloseTo(width! / height!);
+      for (const camera of [
+        { fx: 0.25, fy: 0.3, z: 0.9 },
+        { fx: 0.75, fy: 0.7, z: 0.98 },
+      ]) {
+        const f = frameForImage(vw!, vh!, camera, width!, height!, "contain");
+        expect(f.left).toBeGreaterThanOrEqual(0);
+        expect(f.top).toBeGreaterThanOrEqual(0);
+        expect(f.left + f.width).toBeLessThanOrEqual(vw!);
+        expect(f.top + f.height).toBeLessThanOrEqual(vh!);
+        expect(f.width / f.height).toBeCloseTo(width! / height!);
+      }
     }
-  }
 });

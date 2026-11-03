@@ -15,7 +15,7 @@ export interface CameraKey {
   z: number;
 }
 export interface CinematicScene {
-  framing?: "contain";
+  framing?: "contain" | "follow";
   id: string;
   image: string;
   t0: number;
@@ -85,6 +85,8 @@ export interface CinematicDirection {
   seed: number;
   duration: number;
   reducedMotion: boolean;
+  /** Output profile id; absent means the original landscape-1080p30@1. */
+  profile?: string;
   assets: Record<
     string,
     { asset: string; sha256: string; widthPx: number; heightPx: number }

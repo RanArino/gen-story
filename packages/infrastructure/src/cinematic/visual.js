@@ -383,7 +383,7 @@ export function drawCinematic(
     if (!source) throw new Error("Missing cinematic source " + asset.asset);
     ctx.save();
     ctx.globalAlpha = opacity;
-    if (scene.framing === "contain") {
+    if (scene.framing === "contain" || scene.framing === "follow") {
       const background = frameForImage(
         W,
         H,
@@ -419,14 +419,20 @@ export function drawCinematic(
 }
 
 function drawCopy(ctx, d, t, W, H, omit, aliases) {
-  const measurements = [],
-    scaleX = W / 1280,
-    scaleY = H / 720;
+  // Uniform scale: landscape keeps the 1280x720 reference layout exactly. Portrait and square
+  // frames use a narrower logical canvas (800 / 1000 wide) so captions stay readable on phones.
+  const scale =
+      W / H >= 16 / 9 - 0.01
+        ? Math.min(W / 1280, H / 720)
+        : W / (H > W ? 800 : 1000),
+    measurements = [],
+    scaleX = scale,
+    scaleY = scale;
   let role = "caption";
   ctx.save();
-  ctx.scale(W / 1280, H / 720);
-  W = 1280;
-  H = 720;
+  ctx.scale(scale, scale);
+  W = W / scale;
+  H = H / scale;
   const latin = `"${aliases.latin}", "${aliases.serif}"`,
     serif = `"${aliases.serif}"`;
   function text(
@@ -499,38 +505,68 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
     for (const c of visible) {
       const a =
           smooth((t - c.t0) / 0.6) * (1 - smooth((t - (c.t1 - 1.1)) / 1.1)),
+        // Caption sizes follow the 1280-wide reference, not the logical canvas width.
         size = Math.max(
           17.6,
-          Math.min(W * (c.mid ? 0.03 : 0.026), c.mid ? 43.2 : 36.8),
+          Math.min(1280 * (c.mid ? 0.03 : 0.026), c.mid ? 43.2 : 36.8),
         );
       const y = c.mid ? H * 0.48 : H * 0.8;
-      const words = c.text.split(" ");
       ctx.font = "italic 400 " + size + "px " + latin;
       const space = ctx.measureText(" ").width;
-      let x =
-        (W -
-          words.reduce((n, w) => n + ctx.measureText(w).width, 0) -
-          space * (words.length - 1)) /
-        2;
-      for (let i = 0; i < words.length; i++) {
-        const wa = smooth((t - c.t0 - i * 0.11) / 0.9);
-        text(
-          words[i],
-          x,
-          y + (1 - wa) * size * 0.35 * (d.reducedMotion ? 0 : 1),
-          size,
-          "italic 400",
-          a * wa,
-          "#f4efe4",
-          "left",
-        );
-        x += ctx.measureText(words[i]).width + space;
+      // Text without spaces (Japanese) breaks by character when it is wider than the frame.
+      const words = c.text.split(" ").flatMap((word) => {
+        if (ctx.measureText(word).width <= W * 0.86) return [word];
+        const parts = [""];
+        for (const ch of word) {
+          if (
+            parts.at(-1) &&
+            ctx.measureText(parts.at(-1) + ch).width > W * 0.86
+          )
+            parts.push("");
+          parts[parts.length - 1] += ch;
+        }
+        return parts;
+      });
+      // Wrap the word-revealed line within the frame; the last line keeps the original baseline.
+      const lines = [[]];
+      let lineWidth = 0;
+      for (const word of words) {
+        const w = ctx.measureText(word).width;
+        if (lines.at(-1).length && lineWidth + space + w > W * 0.86) {
+          lines.push([]);
+          lineWidth = 0;
+        }
+        lineWidth += (lines.at(-1).length ? space : 0) + w;
+        lines.at(-1).push(word);
       }
+      let index = 0;
+      lines.forEach((line, row) => {
+        const ly = y - (lines.length - 1 - row) * size * 1.3;
+        let x =
+          (W -
+            line.reduce((n, w) => n + ctx.measureText(w).width, 0) -
+            space * (line.length - 1)) /
+          2;
+        for (const word of line) {
+          const wa = smooth((t - c.t0 - index++ * 0.11) / 0.9);
+          text(
+            word,
+            x,
+            ly + (1 - wa) * size * 0.35 * (d.reducedMotion ? 0 : 1),
+            size,
+            "italic 400",
+            a * wa,
+            "#f4efe4",
+            "left",
+          );
+          x += ctx.measureText(word).width + space;
+        }
+      });
       text(
         c.sub,
         W / 2,
         y + size * 1.5,
-        Math.max(12.8, Math.min(W * 0.015, 19.2)),
+        Math.max(12.8, Math.min(1280 * 0.015, 19.2)),
         "400",
         a * smooth((t - c.t0 - 0.7) / 1.1),
         "#c4bfb5",

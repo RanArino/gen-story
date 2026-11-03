@@ -16,6 +16,7 @@ import { cinematicIdentity } from "./sources.js";
 import { validateDirection } from "./validate.js";
 import type { CinematicDirection } from "./types.js";
 import type { PreparedScore } from "./prepare.js";
+import { PROFILES } from "../compiler/compile.js";
 
 // Immutable r1 style identity; per-project options remain in the direction snapshot.
 const CINEMATIC_PROFILE = {
@@ -50,6 +51,16 @@ export function compileCinematicFilm(
     throw new Error("Score duration does not match this direction");
   const direction = structuredClone(input),
     registry = new Registry(paths.state);
+  const profile = PROFILES[direction.profile ?? "landscape-1080p30@1"];
+  if (!profile) throw new Error("Unsupported cinematic output profile");
+  // Caption boxes were authored for 1920x1080; map them with the painter's uniform scale.
+  const scale = Math.min(profile.widthPx / 1280, profile.heightPx / 720) / 1.5;
+  const box = (x: number, y: number, w: number, h: number) => ({
+    x: x * scale,
+    y: (y / 1080) * profile.heightPx,
+    w: w * scale,
+    h: h * scale,
+  });
   const registered = ["noto-serif-jp", "cormorant-garamond"].map(
     (name) =>
       registry
@@ -145,14 +156,7 @@ export function compileCinematicFilm(
       index: 0,
       sceneIds: direction.scenes.map((s) => s.id),
     },
-    profile: {
-      id: "landscape-1080p30@1",
-      widthPx: 1920,
-      heightPx: 1080,
-      fps: 30,
-      video: "h264-high-yuv420p",
-      audio: "aac-48000-stereo",
-    },
+    profile: { ...profile },
     frameQuantization: "round-half-up@1",
     options: { forceLevel0: false, reducedMotion: direction.reducedMotion },
     timing: { proposal, proposalDigest: digestOf(proposal) },
@@ -179,7 +183,7 @@ export function compileCinematicFilm(
         role: "caption" as const,
         text: c.text,
         font: [fonts[1]!.alias, fonts[0]!.alias],
-        box: { x: 153.6, y: c.mid ? 480 : 820, w: 1612.8, h: 80 },
+        box: box(153.6, c.mid ? 480 : 820, 1612.8, 80),
         startMs: Math.round(c.t0 * 1000),
         endMs: Math.round(c.t1 * 1000),
       },
@@ -188,7 +192,7 @@ export function compileCinematicFilm(
         role: "caption" as const,
         text: c.sub,
         font: [fonts[0]!.alias],
-        box: { x: 153.6, y: c.mid ? 550 : 900, w: 1612.8, h: 60 },
+        box: box(153.6, c.mid ? 550 : 900, 1612.8, 60),
         startMs: Math.round(c.t0 * 1000),
         endMs: Math.round(c.t1 * 1000),
       },
@@ -232,7 +236,7 @@ export function compileCinematicFilm(
       compiler: cinematicIdentity(),
       painter: painterIdentity(),
       schemaVersion: "film-schemas@3",
-      profile: "landscape-1080p30@1",
+      profile: profile.id,
       environment: digestOf(readFingerprint()),
     },
     provenance: {

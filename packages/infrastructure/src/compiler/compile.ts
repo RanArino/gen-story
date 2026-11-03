@@ -61,7 +61,31 @@ export const PROFILES: Record<string, OutputProfile> = {
     video: "h264-high-yuv420p",
     audio: "aac-48000-stereo",
   },
+  "portrait-1080p30@1": {
+    id: "portrait-1080p30@1",
+    widthPx: 1080,
+    heightPx: 1920,
+    fps: 30,
+    video: "h264-high-yuv420p",
+    audio: "aac-48000-stereo",
+  },
+  "square-1080p30@1": {
+    id: "square-1080p30@1",
+    widthPx: 1080,
+    heightPx: 1080,
+    fps: 30,
+    video: "h264-high-yuv420p",
+    audio: "aac-48000-stereo",
+  },
 };
+
+/** Project-facing aspect choices mapped to their exact output profile. */
+export const ASPECT_PROFILES = {
+  "16:9": "landscape-1080p30@1",
+  "9:16": "portrait-1080p30@1",
+  "1:1": "square-1080p30@1",
+} as const;
+export type FilmAspect = keyof typeof ASPECT_PROFILES;
 
 export interface FontEntry {
   record: RegistryRecord;
