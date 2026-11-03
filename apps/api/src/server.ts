@@ -158,6 +158,7 @@ export async function startServer(port = Number(process.env.API_PORT ?? 4000)) {
   }
 
   await deps.film?.repository.failInterrupted();
+  await deps.film?.direction.repository.failInterrupted();
 
   const worker = new LocalJobWorker(deps);
   worker.start();

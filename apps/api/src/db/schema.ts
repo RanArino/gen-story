@@ -579,3 +579,20 @@ export const filmJobs = sqliteTable(
   },
   (table) => [index("film_jobs_project_id_idx").on(table.projectId)],
 );
+
+// Agent-proposed, user-approved Film direction per Chapter. The document is the domain
+// FilmDirectionProposal; approved rows are immutable render inputs.
+export const filmDirections = sqliteTable(
+  "film_directions",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    chapterId: text("chapter_id").notNull(),
+    status: text("status").notNull(),
+    createdAt: text("created_at").notNull(),
+    document: text("document").notNull(),
+  },
+  (table) => [index("film_directions_project_id_idx").on(table.projectId)],
+);
