@@ -904,12 +904,162 @@
     "finishHint": "Once your Chapters are arranged, choose the look of your film.",
     "cancel": "Cancel",
     "createChapter": "Create Chapter",
-    "caption": "Caption",
-    "captionFor": "Caption for {title}",
-    "secondaryCaption": "Secondary caption (optional)",
-    "secondaryCaptionFor": "Secondary caption for {title}",
-    "captionHint": "Leave both fields empty to hide captions.",
+    "caption": "Japanese subtitle",
+    "captionFor": "Japanese subtitle for {title}",
+    "secondaryCaption": "English subtitle",
+    "secondaryCaptionFor": "English subtitle for {title}",
+    "captionHint": "At export you choose both, Japanese only, English only, or none.",
     "resetCaption": "Use scene title",
-    "resetCaptionFor": "Use scene title for {title}"
+    "resetCaptionFor": "Use scene title for {title}",
+    "videoSize": "Video size",
+    "aspects": {
+      "16x9": "16:9 landscape",
+      "9x16": "9:16 vertical",
+      "1x1": "1:1 square"
+    },
+    "exportStep": "Export",
+    "exportTitle": "Subtitles and export",
+    "subtitles": "Subtitles",
+    "subtitleModes": {
+      "both": "Both",
+      "ja": "Japanese only",
+      "en": "English only",
+      "none": "None"
+    },
+    "noSubtitles": "The video will be exported without subtitles.",
+    "subtitleReview": "These are the subtitles that will be burned in. Edit and save them here before exporting.",
+    "direction": {
+      "step": "AI direction",
+      "title": "AI direction",
+      "hint": "The AI looks at your photos and proposes Chapter names, camera work, sound effects, music and Japanese/English subtitles. Only Chapters you review and approve can be exported.",
+      "saveFirst": "Save your changes before asking the AI for direction.",
+      "directFilm": "Ask the AI to direct the whole film",
+      "or": "or",
+      "chapterForDirection": "Chapter to direct",
+      "directChapter": "Direct only this Chapter",
+      "approveAll": "Approve all {count} Chapters",
+      "reviewFor": "Direction for {title}",
+      "reviewTitle": "Review direction: {number} {title}",
+      "status": {
+        "generating": "Working",
+        "proposed": "Proposed",
+        "approved": "Approved",
+        "failed": "Failed",
+        "superseded": "Replaced",
+        "stale": "Photos changed"
+      },
+      "generating": "The AI is looking at the photos and planning the direction…",
+      "failed": "The AI direction failed.",
+      "previousStillUsed": "Your previously approved direction is still used.",
+      "retry": "Ask again",
+      "staleHint": "The photos, their order or the video size changed after this direction was made. Ask the AI again.",
+      "regenerateChapter": "Regenerate Chapter",
+      "regenerateScene": "Regenerate only this photo",
+      "approve": "Approve",
+      "madeBy": "Made by {model}",
+      "chapterName": "Chapter name",
+      "music": "Music",
+      "mood": "Mood",
+      "tempo": "Tempo (BPM)",
+      "key": "Key",
+      "mode": "Major/minor",
+      "modes": {
+        "major": "Major",
+        "minor": "Minor"
+      },
+      "melody": "Melody",
+      "melodies": {
+        "sparse": "Sparse",
+        "medium": "Medium",
+        "flowing": "Flowing"
+      },
+      "arc": "Shape",
+      "arcs": {
+        "steady": "Steady",
+        "rise": "Rising",
+        "fall": "Settling",
+        "swell": "Swell and return"
+      },
+      "fromPrevious": "From the previous Chapter",
+      "joins": {
+        "continue": "Continue",
+        "lift": "Lift",
+        "settle": "Settle",
+        "contrast": "Change mood"
+      },
+      "instruments": "Instruments",
+      "instrumentNames": {
+        "pad": "Pad (harmony)",
+        "koto-pluck": "Koto",
+        "low-swell": "Low swell"
+      },
+      "setFocus": "Set the focus point of photo {number}",
+      "focusHint": "Click the photo to set where the camera focuses.",
+      "observed": "Photo {number}:",
+      "camera": "Camera",
+      "moves": {
+        "hold": "Hold",
+        "push-in": "Push in",
+        "pull-out": "Pull out",
+        "pan-left": "Pan left",
+        "pan-right": "Pan right",
+        "tilt-up": "Tilt up",
+        "tilt-down": "Tilt down",
+        "climb": "Climb (rise with walking sway)",
+        "walk-in": "Walk in (with sway)",
+        "reveal": "Reveal from detail"
+      },
+      "speed": "Amount of motion",
+      "footsteps": "Footsteps",
+      "surfaces": {
+        "none": "None",
+        "gravel": "Gravel",
+        "stone": "Stone",
+        "stair": "Stairs"
+      },
+      "sounds": "Sound effects",
+      "soundNames": {
+        "bird-chirp": "Birdsong",
+        "suzu": "Suzu bell",
+        "clap": "Shrine clap",
+        "temple-bell": "Temple bell",
+        "low-swell": "Low swell"
+      },
+      "removeSound": "Remove {name}",
+      "silence": "None (silence)",
+      "addSound": "Add a sound",
+      "lookAndAmbience": "Light, effects and ambience",
+      "effects": {
+        "rays": "Light rays",
+        "motes": "Light particles",
+        "leaves": "Falling leaves",
+        "warmth": "Color (cool ↔ warm)"
+      },
+      "ambience": {
+        "wind": "Wind",
+        "stream": "Water"
+      },
+      "captionJa": "Japanese subtitle",
+      "captionEn": "English subtitle",
+      "confirmTitle": "Ask the AI for direction?",
+      "runtime": "AI runtime",
+      "runtimes": {
+        "claude": "Claude (subscription)",
+        "codex": "Codex (subscription)",
+        "api": "API"
+      },
+      "runtimeUnknown": "Unknown",
+      "photos": "Photos",
+      "photoCount": "{count, plural, one {# photo} other {# photos}}",
+      "estimate": "Estimated time",
+      "minutes": "About {count, plural, one {# minute} other {# minutes}}",
+      "confirmHint": "Reading the photos uses your AI allowance. The result is saved and reused next time for the same photos.",
+      "runtimeUnsupported": "AI direction runs on Claude or Codex. Switch the AI runtime in Settings.",
+      "cancel": "Cancel",
+      "create": "Create",
+      "approvalNeeded": "Approve the AI direction to export this Chapter."
+    },
+    "exportJaFor": "Exported Japanese subtitle for {title}",
+    "exportEnFor": "Exported English subtitle for {title}"
   }
 }

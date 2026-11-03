@@ -1,7 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { FilmDetailDto, FilmTreatment, FilmJob } from "@gen-story/shared";
+import {
+  FILM_ASPECTS,
+  FILM_SUBTITLE_MODES,
+  type FilmDetailDto,
+  type FilmTreatment,
+  type FilmJob,
+  type FilmSubtitleMode,
+} from "@gen-story/shared";
 import {
   getFilm,
   saveFilm,
@@ -14,6 +21,15 @@ import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
 import styles from "./FilmPage.module.css";
+import panel from "./FilmDirectionPanel.module.css";
+import { FilmDirectionPanel } from "./FilmDirectionPanel";
+
+const APPROVAL_NEEDED = "Approve the AI direction";
+const ASPECT_SHAPES = {
+  "16:9": { width: 22, height: 12 },
+  "9:16": { width: 12, height: 22 },
+  "1:1": { width: 16, height: 16 },
+} as const;
 
 export function FilmPage({ projectId }: { projectId: string }) {
   const t = useTranslations("film");
@@ -26,22 +42,23 @@ export function FilmPage({ projectId }: { projectId: string }) {
   const [filter, setFilter] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"create" | "move" | null>(null);
   const [chapterName, setChapterName] = useState("");
+  const [subtitles, setSubtitles] = useState<FilmSubtitleMode>("both");
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (dialog) dialogRef.current?.showModal();
     else dialogRef.current?.close();
   }, [dialog]);
   const load = useCallback(async () => {
-    const value = await getFilm(projectId);
+    const value = await getFilm(projectId, subtitles);
     setDetail(value);
     setDraft((current) => current ?? value.treatment);
-  }, [projectId]);
+  }, [projectId, subtitles]);
   useEffect(() => {
     void load().catch((e) => setError(String(e)));
   }, [load]);
-  const active = detail?.jobs.some(
-    (j) => j.status === "queued" || j.status === "running",
-  );
+  const active =
+    detail?.jobs.some((j) => j.status === "queued" || j.status === "running") ||
+    detail?.directions.some((d) => d.status === "generating");
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => {
@@ -121,6 +138,13 @@ export function FilmPage({ projectId }: { projectId: string }) {
     setSelection((ids) =>
       ids.includes(id) ? ids.filter((s) => s !== id) : [...ids, id],
     );
+  }
+  function imageUrl(id: string) {
+    const scene = detail!.scenes.find((s) => s.id === id);
+    const image = scene?.selectedImageId
+      ? scene.images.find((i) => i.id === scene.selectedImageId)
+      : scene?.original;
+    return image ? storageKeyToUrl(image.storageKey) : null;
   }
   function thumbnail(id: string, className?: string) {
     const scene = detail!.scenes.find((s) => s.id === id);
@@ -320,18 +344,16 @@ export function FilmPage({ projectId }: { projectId: string }) {
                             rows={2}
                             maxLength={120}
                             value={
-                              draft.sceneCaptions?.[scene.id]?.text ??
-                              scene.title
+                              draft.sceneCaptions?.[scene.id]?.ja ?? scene.title
                             }
                             onChange={(e) =>
                               edit({
                                 sceneCaptions: {
                                   ...draft.sceneCaptions,
                                   [scene.id]: {
-                                    text: e.target.value,
-                                    subtext:
-                                      draft.sceneCaptions?.[scene.id]
-                                        ?.subtext ?? "",
+                                    ja: e.target.value,
+                                    en:
+                                      draft.sceneCaptions?.[scene.id]?.en ?? "",
                                   },
                                 },
                               })
@@ -346,18 +368,16 @@ export function FilmPage({ projectId }: { projectId: string }) {
                             })}
                             rows={2}
                             maxLength={200}
-                            value={
-                              draft.sceneCaptions?.[scene.id]?.subtext ?? ""
-                            }
+                            value={draft.sceneCaptions?.[scene.id]?.en ?? ""}
                             onChange={(e) =>
                               edit({
                                 sceneCaptions: {
                                   ...draft.sceneCaptions,
                                   [scene.id]: {
-                                    text:
-                                      draft.sceneCaptions?.[scene.id]?.text ??
+                                    ja:
+                                      draft.sceneCaptions?.[scene.id]?.ja ??
                                       scene.title,
-                                    subtext: e.target.value,
+                                    en: e.target.value,
                                   },
                                 },
                               })
@@ -681,9 +701,15 @@ export function FilmPage({ projectId }: { projectId: string }) {
                       </details>
                     </div>
                   )}
-                  {!dirty && preflight?.error && (
-                    <ErrorAlert message={preflight.error} />
-                  )}
+                  {!dirty &&
+                    preflight?.error &&
+                    (preflight.error.startsWith(APPROVAL_NEEDED) ? (
+                      <p className={styles.runtime}>
+                        {t("direction.approvalNeeded")}
+                      </p>
+                    ) : (
+                      <ErrorAlert message={preflight.error} />
+                    ))}
                   {!dirty && !!preflight?.runtimeMs && (
                     <p className={styles.runtime}>
                       {t("runtime", { seconds: preflight.runtimeMs / 1000 })}
@@ -702,7 +728,12 @@ export function FilmPage({ projectId }: { projectId: string }) {
                     }
                     onClick={() =>
                       void action(async () => {
-                        await renderFilm(projectId, chapter.id, draft.revision);
+                        await renderFilm(
+                          projectId,
+                          chapter.id,
+                          draft.revision,
+                          subtitles,
+                        );
                         await load();
                       })
                     }
@@ -753,8 +784,127 @@ export function FilmPage({ projectId }: { projectId: string }) {
               />
               {t("reducedMotion")}
             </label>
+            <fieldset className={panel.sizeOptions}>
+              <legend>{t("videoSize")}</legend>
+              {FILM_ASPECTS.map((aspect) => (
+                <label key={aspect} className={panel.sizeOption}>
+                  <input
+                    type="radio"
+                    name="film-aspect"
+                    value={aspect}
+                    checked={(draft.outputAspect ?? "16:9") === aspect}
+                    onChange={() => edit({ outputAspect: aspect })}
+                  />
+                  <span
+                    className={panel.sizeShape}
+                    style={ASPECT_SHAPES[aspect]}
+                    aria-hidden
+                  />
+                  {t(`aspects.${aspect.replace(":", "x")}`)}
+                </label>
+              ))}
+            </fieldset>
           </div>
           {dirty && <p>{t("saveFirst")}</p>}
+          <FilmDirectionPanel
+            projectId={projectId}
+            detail={detail}
+            dirty={dirty}
+            busy={busy}
+            action={(fn) => void action(fn)}
+            onDetail={(value) => {
+              setDetail(value);
+              setDraft(value.treatment);
+              setDirty(false);
+            }}
+            reload={load}
+            imageUrl={imageUrl}
+            thumbnail={(id) => thumbnail(id)}
+          />
+          <div className={panel.panel}>
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className={styles.eyebrow}>{t("exportStep")}</p>
+                <h3>{t("exportTitle")}</h3>
+              </div>
+            </div>
+            <fieldset className={panel.sizeOptions}>
+              <legend>{t("subtitles")}</legend>
+              {FILM_SUBTITLE_MODES.map((mode) => (
+                <label key={mode} className={panel.sizeOption}>
+                  <input
+                    type="radio"
+                    name="film-subtitles"
+                    value={mode}
+                    checked={subtitles === mode}
+                    onChange={() => setSubtitles(mode)}
+                  />
+                  {t(`subtitleModes.${mode}`)}
+                </label>
+              ))}
+            </fieldset>
+            {subtitles === "none" ? (
+              <p className={panel.note}>{t("noSubtitles")}</p>
+            ) : (
+              <>
+                <p className={panel.note}>{t("subtitleReview")}</p>
+                <ol className={panel.subtitleList}>
+                  {draft.chapters.flatMap((chapter) =>
+                    chapter.scenes.map(({ sceneId }) => {
+                      const scene = detail.scenes.find((s) => s.id === sceneId);
+                      const caption = draft.sceneCaptions?.[sceneId] ?? {
+                        ja: scene?.title ?? "",
+                        en: "",
+                      };
+                      const set = (key: "ja" | "en", value: string) =>
+                        edit({
+                          sceneCaptions: {
+                            ...draft.sceneCaptions,
+                            [sceneId]: { ...caption, [key]: value },
+                          },
+                        });
+                      return (
+                        <li
+                          key={sceneId}
+                          className={`${panel.subtitleItem} ${subtitles === "both" ? "" : panel.single}`}
+                        >
+                          {thumbnail(sceneId)}
+                          {subtitles !== "en" && (
+                            <label>
+                              {t("caption")}
+                              <textarea
+                                rows={2}
+                                maxLength={120}
+                                aria-label={t("exportJaFor", {
+                                  title: scene?.title ?? "",
+                                })}
+                                value={caption.ja}
+                                onChange={(e) => set("ja", e.target.value)}
+                              />
+                            </label>
+                          )}
+                          {subtitles !== "ja" && (
+                            <label>
+                              {t("secondaryCaption")}
+                              <textarea
+                                rows={2}
+                                maxLength={200}
+                                aria-label={t("exportEnFor", {
+                                  title: scene?.title ?? "",
+                                })}
+                                value={caption.en}
+                                onChange={(e) => set("en", e.target.value)}
+                              />
+                            </label>
+                          )}
+                        </li>
+                      );
+                    }),
+                  )}
+                </ol>
+              </>
+            )}
+          </div>
           <h3>{t("joined")}</h3>
           <p>{t("joinedDescription")}</p>
           <button
@@ -773,7 +923,7 @@ export function FilmPage({ projectId }: { projectId: string }) {
             }
             onClick={() =>
               void action(async () => {
-                await renderFilm(projectId, null, draft.revision);
+                await renderFilm(projectId, null, draft.revision, subtitles);
                 await load();
               })
             }

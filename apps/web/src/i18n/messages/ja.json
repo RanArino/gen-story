@@ -904,12 +904,162 @@
     "finishHint": "チャプターを組み立てたら、映像の雰囲気を選びましょう。",
     "cancel": "キャンセル",
     "createChapter": "チャプターを作成",
-    "caption": "字幕",
-    "captionFor": "「{title}」の字幕",
-    "secondaryCaption": "補助字幕（任意）",
-    "secondaryCaptionFor": "「{title}」の補助字幕",
-    "captionHint": "両方を空欄にすると字幕を表示しません。",
+    "caption": "日本語字幕",
+    "captionFor": "「{title}」の日本語字幕",
+    "secondaryCaption": "英語字幕",
+    "secondaryCaptionFor": "「{title}」の英語字幕",
+    "captionHint": "書き出し時に、両方／日本語のみ／英語のみ／なしから選べます。",
     "resetCaption": "シーン名を使用",
-    "resetCaptionFor": "「{title}」の字幕をシーン名に戻す"
+    "resetCaptionFor": "「{title}」の字幕をシーン名に戻す",
+    "videoSize": "動画サイズ",
+    "aspects": {
+      "16x9": "16:9 横",
+      "9x16": "9:16 縦",
+      "1x1": "1:1 正方形"
+    },
+    "exportStep": "書き出し",
+    "exportTitle": "字幕と書き出し",
+    "subtitles": "字幕",
+    "subtitleModes": {
+      "both": "両方",
+      "ja": "日本語のみ",
+      "en": "英語のみ",
+      "none": "なし"
+    },
+    "noSubtitles": "字幕なしで書き出します。",
+    "subtitleReview": "書き出す字幕の文面です。ここで直して保存すると、そのまま動画に入ります。",
+    "direction": {
+      "step": "AI演出",
+      "title": "AI演出",
+      "hint": "AIが写真を見て、チャプター名・カメラワーク・効果音・音楽・日英字幕を提案します。内容を確認・編集して承認したチャプターだけ書き出せます。",
+      "saveFirst": "AI演出を依頼する前に、変更を保存してください。",
+      "directFilm": "動画全体をAIに演出してもらう",
+      "or": "または",
+      "chapterForDirection": "演出するチャプター",
+      "directChapter": "このチャプターだけ演出してもらう",
+      "approveAll": "{count}チャプターをまとめて承認",
+      "reviewFor": "「{title}」の演出案",
+      "reviewTitle": "演出案の確認: {number} {title}",
+      "status": {
+        "generating": "作成中",
+        "proposed": "提案中",
+        "approved": "承認済み",
+        "failed": "失敗",
+        "superseded": "置き換え済み",
+        "stale": "写真が変わりました"
+      },
+      "generating": "AIが写真を見て演出を考えています…",
+      "failed": "AI演出に失敗しました。",
+      "previousStillUsed": "前に承認した演出はそのまま使えます。",
+      "retry": "もう一度依頼する",
+      "staleHint": "この演出案を作った後に、写真・並び順・動画サイズが変わりました。作り直してください。",
+      "regenerateChapter": "チャプターを再生成",
+      "regenerateScene": "この写真だけ再生成",
+      "approve": "この内容で承認",
+      "madeBy": "作成: {model}",
+      "chapterName": "チャプター名",
+      "music": "音楽",
+      "mood": "ムード",
+      "tempo": "テンポ (BPM)",
+      "key": "調",
+      "mode": "長調/短調",
+      "modes": {
+        "major": "長調",
+        "minor": "短調"
+      },
+      "melody": "旋律",
+      "melodies": {
+        "sparse": "まばら",
+        "medium": "ふつう",
+        "flowing": "流れるように"
+      },
+      "arc": "展開",
+      "arcs": {
+        "steady": "一定",
+        "rise": "高まる",
+        "fall": "静まる",
+        "swell": "盛り上がって戻る"
+      },
+      "fromPrevious": "前のチャプターから",
+      "joins": {
+        "continue": "そのまま続く",
+        "lift": "持ち上げる",
+        "settle": "落ち着かせる",
+        "contrast": "雰囲気を変える"
+      },
+      "instruments": "楽器",
+      "instrumentNames": {
+        "pad": "パッド（和音）",
+        "koto-pluck": "琴",
+        "low-swell": "低いうねり"
+      },
+      "setFocus": "写真{number}の注目点を指定",
+      "focusHint": "写真をクリックすると、カメラの注目点を指定できます。",
+      "observed": "写真{number}:",
+      "camera": "カメラ",
+      "moves": {
+        "hold": "静止",
+        "push-in": "寄る",
+        "pull-out": "引く",
+        "pan-left": "左へパン",
+        "pan-right": "右へパン",
+        "tilt-up": "上へティルト",
+        "tilt-down": "下へティルト",
+        "climb": "登る（上昇＋歩く揺れ）",
+        "walk-in": "歩いて近づく（揺れ）",
+        "reveal": "細部から全体へ"
+      },
+      "speed": "動きの大きさ",
+      "footsteps": "足音",
+      "surfaces": {
+        "none": "なし",
+        "gravel": "砂利",
+        "stone": "石畳",
+        "stair": "階段"
+      },
+      "sounds": "効果音",
+      "soundNames": {
+        "bird-chirp": "鳥のさえずり",
+        "suzu": "鈴",
+        "clap": "柏手",
+        "temple-bell": "鐘",
+        "low-swell": "低いうねり"
+      },
+      "removeSound": "{name}を削除",
+      "silence": "なし（静けさ）",
+      "addSound": "効果音を追加",
+      "lookAndAmbience": "光・効果・環境音",
+      "effects": {
+        "rays": "光芒",
+        "motes": "光の粒",
+        "leaves": "落ち葉",
+        "warmth": "色温度（寒色↔暖色）"
+      },
+      "ambience": {
+        "wind": "風",
+        "stream": "水音"
+      },
+      "captionJa": "日本語字幕",
+      "captionEn": "英語字幕",
+      "confirmTitle": "AIに演出を依頼しますか？",
+      "runtime": "使うAI",
+      "runtimes": {
+        "claude": "Claude（サブスクリプション）",
+        "codex": "Codex（サブスクリプション）",
+        "api": "API"
+      },
+      "runtimeUnknown": "確認できません",
+      "photos": "写真",
+      "photoCount": "{count}枚",
+      "estimate": "目安の時間",
+      "minutes": "約{count}分",
+      "confirmHint": "AIが写真を読み取るため、利用枠を消費します。結果は保存され、同じ写真なら次回は再利用します。",
+      "runtimeUnsupported": "AI演出はClaudeまたはCodexで動きます。設定でAIの実行方法を切り替えてください。",
+      "cancel": "キャンセル",
+      "create": "作成する",
+      "approvalNeeded": "このチャプターを書き出すには、AI演出を承認してください。"
+    },
+    "exportJaFor": "書き出す日本語字幕（{title}）",
+    "exportEnFor": "書き出す英語字幕（{title}）"
   }
 }

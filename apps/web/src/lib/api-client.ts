@@ -1089,8 +1089,12 @@ export async function compactAgentChatSession(
 
 export async function getFilm(
   projectId: string,
+  subtitles: import("@gen-story/shared").FilmSubtitleMode = "both",
 ): Promise<import("@gen-story/shared").FilmDetailDto> {
-  return request("GET", `/api/projects/${projectId}/film`);
+  return request(
+    "GET",
+    `/api/projects/${projectId}/film?subtitles=${subtitles}`,
+  );
 }
 export async function saveFilm(
   treatment: import("@gen-story/shared").FilmTreatment,
@@ -1104,13 +1108,46 @@ export async function renderFilm(
   projectId: string,
   chapterId: string | null,
   revision: number,
+  subtitles: import("@gen-story/shared").FilmSubtitleMode = "both",
 ): Promise<import("@gen-story/shared").FilmJob> {
   return request(
     "POST",
     chapterId
       ? `/api/projects/${projectId}/film/chapters/${chapterId}/renders`
       : `/api/projects/${projectId}/film/assembly-renders`,
-    { revision },
+    { revision, subtitles },
+  );
+}
+/** Starts (or reuses) AI direction; an Agent call happens only for new photos or regenerate. */
+export async function requestFilmDirection(
+  projectId: string,
+  body: {
+    scope: "film" | "chapter";
+    chapterId?: string;
+    regenerate: boolean;
+    sceneId?: string;
+  },
+): Promise<import("@gen-story/shared").FilmDirectionDto[]> {
+  return request("POST", `/api/projects/${projectId}/film/directions`, body);
+}
+export async function updateFilmDirection(
+  projectId: string,
+  id: string,
+  content: import("@gen-story/shared").FilmDirectionContentDto,
+): Promise<import("@gen-story/shared").FilmDirectionDto> {
+  return request("PATCH", `/api/projects/${projectId}/film/directions/${id}`, {
+    content,
+  });
+}
+export async function approveFilmDirection(
+  projectId: string,
+  id: string,
+  expectedRevision: number,
+): Promise<import("@gen-story/shared").FilmDetailDto> {
+  return request(
+    "POST",
+    `/api/projects/${projectId}/film/directions/${id}/approve`,
+    { expectedRevision },
   );
 }
 export async function adoptOriginalImage(
