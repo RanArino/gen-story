@@ -4,6 +4,15 @@ export const FILM_RECIPES = [
   "pulse-cut",
 ] as const;
 export type FilmRecipe = (typeof FILM_RECIPES)[number];
+export const FILM_ASPECTS = ["16:9", "9:16", "1:1"] as const;
+export type FilmAspect = (typeof FILM_ASPECTS)[number];
+/** Which caption lines are burned in; chosen per export, never stored on the treatment. */
+export const FILM_SUBTITLE_MODES = ["both", "ja", "en", "none"] as const;
+export type FilmSubtitleMode = (typeof FILM_SUBTITLE_MODES)[number];
+export interface FilmSceneCaption {
+  ja: string;
+  en: string;
+}
 export interface FilmChapter {
   id: string;
   title: string;
@@ -23,7 +32,9 @@ export interface FilmTreatment {
   title: string;
   recipe: FilmRecipe;
   reducedMotion: boolean;
-  sceneCaptions?: Record<string, { text: string; subtext: string }>;
+  /** Absent means 16:9. */
+  outputAspect?: FilmAspect;
+  sceneCaptions?: Record<string, FilmSceneCaption>;
   chapters: FilmChapter[];
 }
 export interface FilmJob {
@@ -46,6 +57,11 @@ export function validateFilm(
 ): void {
   if (!FILM_RECIPES.includes(treatment.recipe))
     throw new Error("Choose a supported film template.");
+  if (
+    treatment.outputAspect !== undefined &&
+    !FILM_ASPECTS.includes(treatment.outputAspect)
+  )
+    throw new Error("Choose a supported video size.");
   if (!treatment.title.trim()) throw new Error("Enter an overall film title.");
   if (stage === "render" && !treatment.chapters.length)
     throw new Error("Add at least one Chapter.");
@@ -55,13 +71,13 @@ export function validateFilm(
     if (!sceneIds.includes(sceneId))
       throw new Error("A caption references an unavailable project scene.");
     if (
-      typeof caption.text !== "string" ||
-      typeof caption.subtext !== "string" ||
-      caption.text.length > 120 ||
-      caption.subtext.length > 200
+      typeof caption.ja !== "string" ||
+      typeof caption.en !== "string" ||
+      caption.ja.length > 120 ||
+      caption.en.length > 200
     )
       throw new Error(
-        "Film captions must contain at most 120 primary and 200 secondary characters.",
+        "Film captions must contain at most 120 Japanese and 200 English characters.",
       );
   }
   const chapters = new Set<string>();
@@ -107,4 +123,36 @@ export function validateFilm(
         throw new Error("Scene durations must be positive milliseconds.");
     }
   }
+}
+
+/** Reads captions saved before 2026-11-03 ({text, subtext}) as Japanese and English lines. */
+export function normalizeSceneCaptions(
+  captions: Record<string, unknown> | undefined,
+): Record<string, FilmSceneCaption> | undefined {
+  if (!captions) return undefined;
+  return Object.fromEntries(
+    Object.entries(captions).map(([sceneId, value]) => {
+      const c = (value ?? {}) as Record<string, unknown>;
+      const ja = typeof c.ja === "string" ? c.ja : c.text;
+      const en = typeof c.en === "string" ? c.en : c.subtext;
+      return [
+        sceneId,
+        {
+          ja: typeof ja === "string" ? ja : "",
+          en: typeof en === "string" ? en : "",
+        },
+      ];
+    }),
+  );
+}
+
+/** Lines actually burned in for one scene under an export subtitle mode. */
+export function subtitleLines(
+  caption: FilmSceneCaption,
+  mode: FilmSubtitleMode,
+): { text: string; sub: string } {
+  if (mode === "both") return { text: caption.ja, sub: caption.en };
+  if (mode === "ja") return { text: caption.ja, sub: "" };
+  if (mode === "en") return { text: caption.en, sub: "" };
+  return { text: "", sub: "" };
 }
