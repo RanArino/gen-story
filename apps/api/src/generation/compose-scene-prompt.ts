@@ -22,7 +22,6 @@ export type ComposeScenePromptOverrides = {
   emotion?: string;
   cameraDirection?: string;
   lightingDirection?: string;
-  motionDirection?: string;
   commonPrompt?: string;
   story?: string;
   sceneNegativePrompt?: string;
@@ -113,7 +112,6 @@ export async function composeScenePrompt(
     cameraDirection: overrides.cameraDirection ?? scene.cameraDirection ?? "",
     lightingDirection:
       overrides.lightingDirection ?? scene.lightingDirection ?? "",
-    motionDirection: overrides.motionDirection ?? scene.motionDirection ?? "",
     tone: storyboard.tone ?? "",
     stylePresetPrompt: stylePreset?.prompt ?? null,
     commonPrompt: overrides.commonPrompt ?? storyboard.commonPrompt ?? "",

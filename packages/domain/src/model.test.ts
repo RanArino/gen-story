@@ -47,7 +47,6 @@ describe("domain factories", () => {
         emotion: "warmth",
         cameraDirection: "wide shot",
         lightingDirection: "golden hour",
-        motionDirection: "gentle camera drift",
         createdAt: "2026-05-02T00:00:00.000Z",
         updatedAt: "2026-05-02T00:00:00.000Z",
       }),
@@ -58,7 +57,6 @@ describe("domain factories", () => {
       emotion: "warmth",
       cameraDirection: "wide shot",
       lightingDirection: "golden hour",
-      motionDirection: "gentle camera drift",
       status: "draft",
       photoAssets: [],
       adoptedGeneratedImageId: null,
@@ -78,7 +76,6 @@ describe("domain factories", () => {
       emotion: "",
       cameraDirection: "",
       lightingDirection: "",
-      motionDirection: "",
       createdAt: "2026-05-02T00:00:00.000Z",
       updatedAt: "2026-05-02T00:00:00.000Z",
     };

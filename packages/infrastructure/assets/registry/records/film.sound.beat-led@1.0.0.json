@@ -1,0 +1,20 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.sound.beat-led",
+  "version": "1.0.0",
+  "kind": "sound",
+  "trust": "system",
+  "manifestDigest": "sha256:6be7e65c96da3166df48b2c703e4742052592ae2ea6c253c5ed8f42ba76cdbab",
+  "implementationDigest": "sha256:9df033ca2924b39e769eb1d430ecc13ae9b9d98257f98647e6bc6dd826e6534d",
+  "assetDigests": [
+    {
+      "name": "hit",
+      "digest": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f"
+    }
+  ],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.170Z"
+}

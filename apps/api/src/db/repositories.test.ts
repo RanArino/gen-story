@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -275,7 +275,7 @@ describe("SQLite persistence", () => {
   });
 
   it("upgrades legacy off photo fidelity values to high", async () => {
-    await withDatabase(async ({ client, db, repositories }) => {
+    await withDatabase(async ({ client, repositories }) => {
       await seedBase(repositories);
       await repositories.storyboards.save(buildStoryboard());
       await repositories.scenes.save({
@@ -283,10 +283,16 @@ describe("SQLite persistence", () => {
         photoFidelity: "off",
       });
 
-      client.sqlite
-        .prepare("delete from __drizzle_migrations where created_at = ?")
-        .run(1790402616000);
-      migrateDatabase(db);
+      // Exercise this historical data migration independently of later migrations.
+      client.sqlite.exec(
+        readFileSync(
+          new URL(
+            "../../../../drizzle/migrations/0023_normalize_legacy_photo_fidelity.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
 
       await expect(
         repositories.scenes.findById("scene_legacy"),
@@ -924,7 +930,6 @@ function buildScene(
     emotion: "nostalgic",
     cameraDirection: "medium shot",
     lightingDirection: "soft window light",
-    motionDirection: "still",
     photoAssets,
     createdAt: now,
     updatedAt: now,

@@ -1,0 +1,66 @@
+{
+  "schema": "film.capability-manifest@1",
+  "id": "film.typography.kinetic-phrase",
+  "version": "1.1.0",
+  "kind": "typography",
+  "level": 0,
+  "title": "Kinetic phrase",
+  "description": "Large phrases that rise into place, on a 0.6 scrim with both caption lines in the text color.",
+  "tags": ["kinetic", "bold", "energetic"],
+  "rendererApi": "film-capability@1",
+  "layer": 30,
+  "media": {
+    "types": [],
+    "min": 0,
+    "max": 0
+  },
+  "profiles": ["landscape-1080p30@1"],
+  "aspectRatios": ["16:9"],
+  "analysis": [],
+  "params": {},
+  "requires": [],
+  "incompatibleWith": [],
+  "determinism": {
+    "seeded": false
+  },
+  "motionLevel": "moderate",
+  "budgets": {
+    "maxPrimitives": 48,
+    "maxKeyframes": 256,
+    "maxAudioEvents": 16
+  },
+  "reducedMotion": "reduce",
+  "fallback": null,
+  "timing": {
+    "titleMs": 2500
+  },
+  "assets": [],
+  "fixtures": [
+    {
+      "name": "landscape",
+      "sourceAspect": "16:9",
+      "caption": "ja"
+    },
+    {
+      "name": "square",
+      "sourceAspect": "1:1",
+      "caption": "en"
+    },
+    {
+      "name": "portrait",
+      "sourceAspect": "2:3",
+      "caption": "ja"
+    },
+    {
+      "name": "ultrawide",
+      "sourceAspect": "21:9",
+      "caption": "empty"
+    }
+  ],
+  "permissions": [],
+  "provenance": {
+    "author": "film spike",
+    "source": "spikes film builtin",
+    "license": "internal"
+  }
+}

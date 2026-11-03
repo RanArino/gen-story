@@ -9,7 +9,6 @@ describe("composeImagePrompt", () => {
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "",
       tone: "warm",
       stylePresetPrompt: "photorealistic cinematic film still",
       commonPrompt: "Overall emotional tone: Reflective.",
@@ -25,7 +24,6 @@ describe("composeImagePrompt", () => {
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "",
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
@@ -41,7 +39,6 @@ describe("composeImagePrompt", () => {
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "Slow pan",
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
@@ -60,7 +57,6 @@ describe("composeImagePrompt", () => {
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "",
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
@@ -70,45 +66,12 @@ describe("composeImagePrompt", () => {
     expect(prompt).not.toContain("multi-generation family story");
   });
 
-  it("includes the motion direction descriptor for a known value", () => {
-    const prompt = composeImagePrompt({
-      imagePrompt: "a child running through a field",
-      emotion: "Joy",
-      cameraDirection: "Medium",
-      lightingDirection: "Natural",
-      motionDirection: "Slow pan",
-      tone: "warm",
-      stylePresetPrompt: null,
-      commonPrompt: "",
-      story: "",
-    });
-
-    expect(prompt).toContain("slow lateral camera sweep");
-  });
-
-  it("omits the motion direction segment when the value is empty or unknown", () => {
-    const prompt = composeImagePrompt({
-      imagePrompt: "a child running through a field",
-      emotion: "Joy",
-      cameraDirection: "Medium",
-      lightingDirection: "Natural",
-      motionDirection: "",
-      tone: "warm",
-      stylePresetPrompt: null,
-      commonPrompt: "",
-      story: "",
-    });
-
-    expect(prompt).not.toContain("camera sweep");
-  });
-
   it("appends a trailing avoid clause when a negative prompt is provided", () => {
     const prompt = composeImagePrompt({
       imagePrompt: "a family at the beach",
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "",
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
@@ -125,7 +88,6 @@ describe("composeImagePrompt", () => {
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "",
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",
@@ -137,7 +99,6 @@ describe("composeImagePrompt", () => {
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "",
       tone: "warm",
       stylePresetPrompt: null,
       commonPrompt: "",

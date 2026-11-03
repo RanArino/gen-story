@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:story-graph",
+  "title": "Story Graph: ordered scenes and story meaning, independent of Chapters, duration, and style",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "revision", "title", "scenes", "facts"],
+  "properties": {
+    "schema": { "const": "film.story-graph@1" },
+    "id": { "$ref": "urn:film-spike:common#/$defs/slug" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "title": { "$ref": "urn:film-spike:common#/$defs/name" },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "media",
+          "caption",
+          "analysis",
+          "emphasis",
+          "emotion",
+          "lineage"
+        ],
+        "properties": {
+          "id": { "$ref": "urn:film-spike:common#/$defs/localId" },
+          "media": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["asset"],
+            "properties": {
+              "asset": { "$ref": "urn:film-spike:common#/$defs/mediaAsset" }
+            }
+          },
+          "caption": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ja", "en"],
+            "properties": {
+              "ja": {
+                "allOf": [
+                  { "$ref": "urn:film-spike:common#/$defs/plainText" },
+                  { "maxLength": 120 }
+                ]
+              },
+              "en": {
+                "allOf": [
+                  { "$ref": "urn:film-spike:common#/$defs/plainText" },
+                  { "maxLength": 200 }
+                ]
+              },
+              "claim": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["factId"],
+                "properties": {
+                  "factId": { "$ref": "urn:film-spike:common#/$defs/localId" }
+                }
+              }
+            }
+          },
+          "analysis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["subject"],
+            "properties": {
+              "subject": { "$ref": "urn:film-spike:common#/$defs/unitRect" }
+            }
+          },
+          "emphasis": { "$ref": "urn:film-spike:common#/$defs/unit" },
+          "emotion": { "$ref": "urn:film-spike:common#/$defs/curves" },
+          "lineage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "note"],
+            "properties": {
+              "source": {
+                "enum": ["fixture-copy", "fixture-synthetic", "project"]
+              },
+              "note": { "$ref": "urn:film-spike:common#/$defs/plainText" }
+            }
+          }
+        }
+      }
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "text", "confirmed"],
+        "properties": {
+          "id": { "$ref": "urn:film-spike:common#/$defs/localId" },
+          "text": { "$ref": "urn:film-spike:common#/$defs/plainText" },
+          "confirmed": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

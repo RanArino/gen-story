@@ -195,3 +195,51 @@ export {
   reviseChangeProposalItem,
   selectChangeProposalChoiceOption,
 } from "./change-proposal";
+export {
+  FILM_RECIPES,
+  FILM_ASPECTS,
+  FILM_SUBTITLE_MODES,
+  validateFilm,
+  normalizeSceneCaptions,
+  subtitleLines,
+} from "./film";
+export type {
+  FilmRecipe,
+  FilmAspect,
+  FilmSubtitleMode,
+  FilmSceneCaption,
+  FilmChapter,
+  FilmTreatment,
+  FilmJob,
+} from "./film";
+export {
+  FILM_CAMERA_MOVES,
+  FILM_WALKING_MOVES,
+  FILM_FOOTSTEP_SURFACES,
+  FILM_SCENE_SOUNDS,
+  FILM_MUSIC_INSTRUMENTS,
+  FILM_MUSIC_KEYS,
+  FILM_MELODY_DENSITIES,
+  FILM_MUSIC_ARCS,
+  FILM_MUSIC_JOINS,
+  isDefaultChapterTitle,
+  directionContentProblems,
+  validateDirectionContent,
+  directionLocks,
+  enforceDirectionLocks,
+  applyApprovedDirection,
+  transitionDirection,
+  isDirectionStale,
+} from "./film-direction";
+export type {
+  FilmCameraMove,
+  FilmFootstepSurface,
+  FilmSceneSound,
+  FilmMusicInstrument,
+  FilmMusicKey,
+  FilmSceneDirection,
+  FilmDirectionContent,
+  FilmDirectionStatus,
+  FilmDirectionProposal,
+  FilmDirectionLocks,
+} from "./film-direction";

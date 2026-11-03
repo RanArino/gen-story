@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.surface.soft-vignette",
+  "version": "1.0.0",
+  "kind": "surface",
+  "trust": "system",
+  "manifestDigest": "sha256:13ba7dd0ed50bee59be1fbfc92d434ee4dffb2e0d9e93513520b9ceab2838ba2",
+  "implementationDigest": "sha256:c3fabf48bd3d4d931ccf2dadd3c12158bd8eda4674f3c9bd2eaeba833024231c",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.172Z"
+}

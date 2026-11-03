@@ -1,3 +1,7 @@
+import { FilmService } from "../film/service";
+import { SqliteFilmRepository } from "../film/repository";
+import { SqliteFilmDirectionRepository } from "../film/direction-repository";
+import { AgentFilmDirectionPlanner } from "../film/direction-planner";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -86,6 +90,7 @@ export type TextVisionGenerationPorts = Pick<
 // The router needs the concrete emitter, not just the port, because the SSE
 // route subscribes to it.
 export type ApiDependencies = ApplicationDependencies & {
+  film?: FilmService;
   progressEvents: LocalProgressEvents;
   agentRuntime: ApiAgentRuntimeInfo;
   // MCP tool-call audit. Not an application port: the MCP layer records calls
@@ -321,6 +326,19 @@ export function createApiContext(
 
   return {
     ...repos,
+    film: new FilmService(
+      { ...repos, objectStorage },
+      new SqliteFilmRepository(client.db),
+      undefined,
+      {
+        repository: new SqliteFilmDirectionRepository(client.db),
+        // Reads the live selection so a Settings change applies to the next request.
+        planner: new AgentFilmDirectionPlanner(
+          objectStorage,
+          () => agentRuntime.selection,
+        ),
+      },
+    ),
     objectStorage,
     imagePreprocessing,
     imageGeneration,

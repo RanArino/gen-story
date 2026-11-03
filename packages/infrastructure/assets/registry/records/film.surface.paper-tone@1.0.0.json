@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.surface.paper-tone",
+  "version": "1.0.0",
+  "kind": "surface",
+  "trust": "system",
+  "manifestDigest": "sha256:60003811ab71339281bb22c06ccb0f10ffd793fd573b3a96dca087eb95593a8e",
+  "implementationDigest": "sha256:86ebafe8da225dc4effd883979c7b9fd51144832654d0772d5b38213dc56005f",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.173Z"
+}

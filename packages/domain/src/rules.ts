@@ -29,7 +29,6 @@ export const SCENE_FILL_FIELDS = [
   "emotion",
   "cameraDirection",
   "lightingDirection",
-  "motionDirection",
 ] as const satisfies ReadonlyArray<keyof Scene>;
 
 export type SceneFillField = (typeof SCENE_FILL_FIELDS)[number];
@@ -243,6 +242,7 @@ export function setSceneAdoptedGeneratedImage(
     scene: {
       ...scene,
       adoptedGeneratedImageId: generatedImageId,
+      originalImageSelected: false,
       updatedAt,
     },
     generatedImages: generatedImages.map((generatedImage) => {
@@ -465,8 +465,7 @@ export function appendAdjustmentsToCommonPrompt(
 // person) or "background_only" (the safe default otherwise); it never suggests
 // "featured", since promising a story is "about" a character is a real
 // commitment the user makes explicitly, not something to infer from a caption.
-const NO_PEOPLE_PATTERN =
-  /^(no\s+(one|people|person)|none|n\/a|nobody)\b/i;
+const NO_PEOPLE_PATTERN = /^(no\s+(one|people|person)|none|n\/a|nobody)\b/i;
 
 export function suggestCharacterPolicy(
   photoInsights: PhotoInsight[],

@@ -1,0 +1,24 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.sound.ambience-led",
+  "version": "1.0.0",
+  "kind": "sound",
+  "trust": "system",
+  "manifestDigest": "sha256:85820a2d0393775b4d97a1cc31e2b2833187106363350341062cea177158d797",
+  "implementationDigest": "sha256:5504cde989e2216202bd470b5748fc15e7a344832d16f1f7084bdb143e2329ef",
+  "assetDigests": [
+    {
+      "name": "ambience",
+      "digest": "sha256:cf1c9df8d887cab60f8f65a3412c7ccbe7c027f8bb8c5ffca96d3af18dce5295"
+    },
+    {
+      "name": "hit",
+      "digest": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f"
+    }
+  ],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.147Z"
+}

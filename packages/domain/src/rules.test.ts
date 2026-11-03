@@ -63,7 +63,6 @@ describe("domain rules", () => {
         emotion: "warm",
         cameraDirection: "wide",
         lightingDirection: "soft",
-        motionDirection: "still",
         createdAt: "2026-05-02T00:00:00.000Z",
         updatedAt: "2026-05-02T00:00:00.000Z",
       }),
@@ -78,7 +77,6 @@ describe("domain rules", () => {
         emotion: "warm",
         cameraDirection: "wide",
         lightingDirection: "soft",
-        motionDirection: "still",
         createdAt: "2026-05-02T00:00:00.000Z",
         updatedAt: "2026-05-02T00:00:00.000Z",
       }),
@@ -93,7 +91,6 @@ describe("domain rules", () => {
         emotion: "warm",
         cameraDirection: "wide",
         lightingDirection: "soft",
-        motionDirection: "still",
         createdAt: "2026-05-02T00:00:00.000Z",
         updatedAt: "2026-05-02T00:00:00.000Z",
       }),
@@ -140,7 +137,6 @@ describe("domain rules", () => {
       emotion: "warm",
       cameraDirection: "wide",
       lightingDirection: "soft",
-      motionDirection: "still",
       createdAt: "2026-05-02T00:00:00.000Z",
       updatedAt: "2026-05-02T00:00:00.000Z",
     });
@@ -169,7 +165,6 @@ describe("domain rules", () => {
       emotion: "warm",
       cameraDirection: "wide",
       lightingDirection: "soft",
-      motionDirection: "still",
       createdAt: "2026-05-02T00:00:00.000Z",
       updatedAt: "2026-05-02T00:00:00.000Z",
     });
@@ -511,7 +506,6 @@ describe("computeStoryboardSetupStep", () => {
       emotion: "Nostalgia",
       cameraDirection: "Medium",
       lightingDirection: "Golden hour",
-      motionDirection: "Static",
       ...overrides,
     };
   }
@@ -615,7 +609,6 @@ describe("computeStoryboardSetupStep", () => {
             emotion: "Joy",
             cameraDirection: "Wide",
             lightingDirection: "Natural",
-            motionDirection: "Slow pan",
           }),
         ],
       }),

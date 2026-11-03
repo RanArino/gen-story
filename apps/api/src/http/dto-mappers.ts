@@ -105,7 +105,6 @@ export function toComplementSceneProposalDto(
     emotion: proposal.emotion,
     cameraDirection: proposal.cameraDirection,
     lightingDirection: proposal.lightingDirection,
-    motionDirection: proposal.motionDirection,
   };
 }
 
@@ -223,7 +222,6 @@ export function toSceneDto(scene: Scene): SceneDto {
     emotion: scene.emotion,
     cameraDirection: scene.cameraDirection,
     lightingDirection: scene.lightingDirection,
-    motionDirection: scene.motionDirection,
     notes: scene.notes,
     negativePrompt: scene.negativePrompt,
     photoFidelity: scene.photoFidelity,

@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.layout.memory-board",
+  "version": "1.0.0",
+  "kind": "layout",
+  "trust": "system",
+  "manifestDigest": "sha256:9a9547075fec3a8d32295d81f0b988af15649340a9a386620fafc45be8f14b86",
+  "implementationDigest": "sha256:47f5fee4b35a3ddf31e099b2ecd9b54f18ff36c55c8535b64a352f74a0e5ddfa",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.096Z"
+}

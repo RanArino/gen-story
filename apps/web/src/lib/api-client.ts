@@ -583,7 +583,6 @@ export type UpsertSceneInput = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes?: string;
   negativePrompt?: string;
   photoFidelity?: "off" | "low" | "high";
@@ -594,7 +593,6 @@ export type PreviewScenePromptOverrides = {
   emotion?: string;
   cameraDirection?: string;
   lightingDirection?: string;
-  motionDirection?: string;
   sceneNegativePrompt?: string;
   projectNegativePrompt?: string;
   commonPrompt?: string;
@@ -1087,4 +1085,84 @@ export async function compactAgentChatSession(
     "POST",
     `/api/agent-conversations/${conversationId}/compact`,
   );
+}
+
+export async function getFilm(
+  projectId: string,
+  subtitles: import("@gen-story/shared").FilmSubtitleMode = "both",
+): Promise<import("@gen-story/shared").FilmDetailDto> {
+  return request(
+    "GET",
+    `/api/projects/${projectId}/film?subtitles=${subtitles}`,
+  );
+}
+export async function saveFilm(
+  treatment: import("@gen-story/shared").FilmTreatment,
+): Promise<import("@gen-story/shared").FilmDetailDto> {
+  return request("PUT", `/api/projects/${treatment.projectId}/film`, {
+    ...treatment,
+    expectedRevision: treatment.revision,
+  });
+}
+export async function renderFilm(
+  projectId: string,
+  chapterId: string | null,
+  revision: number,
+  subtitles: import("@gen-story/shared").FilmSubtitleMode = "both",
+): Promise<import("@gen-story/shared").FilmJob> {
+  return request(
+    "POST",
+    chapterId
+      ? `/api/projects/${projectId}/film/chapters/${chapterId}/renders`
+      : `/api/projects/${projectId}/film/assembly-renders`,
+    { revision, subtitles },
+  );
+}
+/** Starts (or reuses) AI direction; an Agent call happens only for new photos or regenerate. */
+export async function requestFilmDirection(
+  projectId: string,
+  body: {
+    scope: "film" | "chapter";
+    chapterId?: string;
+    regenerate: boolean;
+    sceneId?: string;
+  },
+): Promise<import("@gen-story/shared").FilmDirectionDto[]> {
+  return request("POST", `/api/projects/${projectId}/film/directions`, body);
+}
+export async function updateFilmDirection(
+  projectId: string,
+  id: string,
+  content: import("@gen-story/shared").FilmDirectionContentDto,
+): Promise<import("@gen-story/shared").FilmDirectionDto> {
+  return request("PATCH", `/api/projects/${projectId}/film/directions/${id}`, {
+    content,
+  });
+}
+export async function approveFilmDirection(
+  projectId: string,
+  id: string,
+  expectedRevision: number,
+): Promise<import("@gen-story/shared").FilmDetailDto> {
+  return request(
+    "POST",
+    `/api/projects/${projectId}/film/directions/${id}/approve`,
+    { expectedRevision },
+  );
+}
+export async function adoptOriginalImage(
+  projectId: string,
+  sceneId: string,
+): Promise<void> {
+  return request(
+    "POST",
+    `/api/projects/${projectId}/film/scenes/${sceneId}/original`,
+  );
+}
+export function filmArtifactUrl(
+  projectId: string,
+  jobId: string,
+  download = false,
+): string {
+  return `${apiBase()}/api/projects/${projectId}/film/artifacts/${jobId}${download ? "?download=1" : ""}`;
 }

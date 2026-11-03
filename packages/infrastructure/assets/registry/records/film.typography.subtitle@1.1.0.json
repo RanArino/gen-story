@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.typography.subtitle",
+  "version": "1.1.0",
+  "kind": "typography",
+  "trust": "system",
+  "manifestDigest": "sha256:74df9bc4d9354173630b6a5d83b141ac6549aedf34a3b9312210fe17b4b46f4b",
+  "implementationDigest": "sha256:037184491d4434ee42e65de156d7ae7eddb1d182977a459d6ded201ddb982598",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-22T10:07:17.010Z"
+}

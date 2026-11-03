@@ -1,0 +1,3 @@
+# Film registry blobs and built-in sources must retain their digest-pinned bytes.
+packages/infrastructure/assets/registry/blobs/sha256/* binary
+packages/infrastructure/src/capabilities/builtin/** -text

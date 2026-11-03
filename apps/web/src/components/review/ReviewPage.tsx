@@ -11,6 +11,7 @@ import type {
 } from "@gen-story/shared";
 import {
   adoptGeneratedImage,
+  adoptOriginalImage,
   createGenerationRequest,
   exportStoryboardAssetBundle,
   exportStoryboardUrl,
@@ -53,8 +54,9 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   const [filter, setFilter] = useState<"all" | "original" | "generated">("all");
   const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
   const [assetExportPath, setAssetExportPath] = useState<string | null>(null);
-  const [assetSelection, setAssetSelection] =
-    useState<AssetSelection | null>(null);
+  const [assetSelection, setAssetSelection] = useState<AssetSelection | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     const [storyboards, photoList] = await Promise.all([
@@ -122,10 +124,11 @@ export function ReviewPage({ projectId }: { projectId: string }) {
     return () => window.clearInterval(interval);
   }, [load, reviews]);
 
-  async function handleAdopt(sceneId: string, imageId: string) {
+  async function handleAdopt(sceneId: string, imageId: string | null) {
     setError(null);
     try {
-      await adoptGeneratedImage(sceneId, imageId);
+      if (imageId === null) await adoptOriginalImage(projectId, sceneId);
+      else await adoptGeneratedImage(sceneId, imageId);
       await load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("errors.adopt"));
@@ -166,7 +169,6 @@ export function ReviewPage({ projectId }: { projectId: string }) {
         overrides.emotion !== base.emotion ||
         overrides.cameraDirection !== base.cameraDirection ||
         overrides.lightingDirection !== base.lightingDirection ||
-        overrides.motionDirection !== base.motionDirection ||
         overrides.photoFidelity !== base.photoFidelity
       ) {
         await upsertScenes(storyboardId, [
@@ -179,7 +181,6 @@ export function ReviewPage({ projectId }: { projectId: string }) {
             emotion: overrides.emotion,
             cameraDirection: overrides.cameraDirection,
             lightingDirection: overrides.lightingDirection,
-            motionDirection: overrides.motionDirection,
             notes: scene.notes ?? "",
             photoFidelity: overrides.photoFidelity,
           },
@@ -221,6 +222,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       <div className="screen-header">
         <h2>{t("title")}</h2>
         <p>{t("subtitle")}</p>
+        <Link href={`/projects/${projectId}/film`}>{t("makeFilm")}</Link>
       </div>
 
       {error && <ErrorAlert message={error} />}
@@ -382,7 +384,7 @@ function SceneReviewCard({
   review: SceneReview;
   projectId: string;
   filter: "all" | "original" | "generated";
-  onAdopt: (sceneId: string, imageId: string) => void;
+  onAdopt: (sceneId: string, imageId: string | null) => void;
   onRetry: (requestId: string) => void;
   onRegen: () => void;
 }) {
@@ -422,6 +424,14 @@ function SceneReviewCard({
         {filter !== "generated" && (
           <div className={styles.comparisonCol}>
             <p className={styles.colLabel}>{t("card.sourcePhoto")}</p>
+            {primaryPhoto && (
+              <button
+                onClick={() => onAdopt(scene.id, null)}
+                disabled={!scene.adoptedGeneratedImageId}
+              >
+                {t("useOriginal")}
+              </button>
+            )}
             <div className={styles.imgBox}>
               {primaryPhoto ? (
                 <img
@@ -601,7 +611,6 @@ type RegenFields = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   photoFidelity: "off" | "low" | "high";
   model: string;
   promptOverride?: string;
@@ -654,13 +663,6 @@ const LIGHTING_OPTIONS = [
   "Silhouette",
   "Volumetric",
 ];
-const MOTION_OPTIONS = [
-  "Slow pan",
-  "Static",
-  "Zoom in",
-  "Zoom out",
-  "Tracking",
-];
 
 function RegenModal({
   scene,
@@ -679,7 +681,6 @@ function RegenModal({
     emotion: scene.emotion ?? "",
     cameraDirection: scene.cameraDirection ?? "",
     lightingDirection: scene.lightingDirection ?? "",
-    motionDirection: scene.motionDirection ?? "",
     photoFidelity: scene.photoFidelity ?? "high",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -771,24 +772,6 @@ function RegenModal({
                 ))}
               </select>
             </label>
-
-            <label className={styles.modalLabel}>
-              {t("motion")}
-              <select
-                className={styles.modalSelect}
-                value={fields.motionDirection}
-                onChange={(e) => set("motionDirection", e.target.value)}
-              >
-                <option value="">—</option>
-                {withCurrentOption(MOTION_OPTIONS, fields.motionDirection).map(
-                  (o) => (
-                    <option key={o} value={o}>
-                      {MOTION_OPTIONS.includes(o) ? tSel(`motion.${o}`) : o}
-                    </option>
-                  ),
-                )}
-              </select>
-            </label>
           </div>
 
           <label className={styles.modalLabel}>
@@ -826,7 +809,6 @@ function RegenModal({
             emotion: fields.emotion,
             cameraDirection: fields.cameraDirection,
             lightingDirection: fields.lightingDirection,
-            motionDirection: fields.motionDirection,
             photoFidelity: fields.photoFidelity,
           }}
           onChange={({ prompt, negativePrompt }) => {

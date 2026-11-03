@@ -12,7 +12,6 @@ const ProposalSchema = z.object({
   emotion: z.string().min(1),
   cameraDirection: z.string().min(1),
   lightingDirection: z.string().min(1),
-  motionDirection: z.string().min(1),
 });
 
 const ProposalsSchema = z.object({
@@ -26,7 +25,6 @@ const sceneProperties = {
   emotion: { type: "string" },
   cameraDirection: { type: "string" },
   lightingDirection: { type: "string" },
-  motionDirection: { type: "string" },
 } as const;
 
 export const COMPLEMENT_SCENE_RESPONSE_JSON_SCHEMA = {
@@ -52,7 +50,7 @@ function languageDirective(
   language: ComplementSceneProposalInput["language"],
 ): string {
   if (language === "ja") {
-    return 'Respond in Japanese. All title, description, image prompt, and any free-text fields MUST be written in natural Japanese. Selection enum values such as cameraDirection, lightingDirection, motionDirection, and emotion MUST remain in English (e.g., "Wide", "Close-up", "Joy").';
+    return 'Respond in Japanese. All title, description, image prompt, and any free-text fields MUST be written in natural Japanese. Selection enum values such as cameraDirection, lightingDirection and emotion MUST remain in English (e.g., "Wide", "Close-up", "Joy").';
   }
   return "Respond in English. All title, description, image prompt, and any free-text fields MUST be English.";
 }
@@ -74,7 +72,7 @@ export function buildComplementScenePrompt(
       : "Visual style: AI's choice, consistent with the tone.",
     `Bridge from scene "${input.fromScene.title || "(untitled)"}": ${input.fromScene.description || "(no description)"}`,
     `Bridge to scene "${input.toScene.title || "(untitled)"}": ${input.toScene.description || "(no description)"}`,
-    "emotion/cameraDirection/lightingDirection/motionDirection should be short label-style values (always English).",
+    "emotion/cameraDirection/lightingDirection should be short label-style values (always English).",
   ].join("\n");
 }
 

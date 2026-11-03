@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.motion.beat-pulse",
+  "version": "1.0.0",
+  "kind": "motion",
+  "trust": "system",
+  "manifestDigest": "sha256:b2af7fe1d8d4ab597a5dd23dd06739314cd4302971b6fa2e09769728368d91dd",
+  "implementationDigest": "sha256:6112a28b4eec865a8f414292d3788b89ed337645b3db560baedb586c34afc7e5",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.102Z"
+}

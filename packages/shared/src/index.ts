@@ -185,7 +185,6 @@ export type SceneDto = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
   notes: string;
   negativePrompt: string;
   photoFidelity: "off" | "low" | "high";
@@ -202,7 +201,6 @@ export type ComplementSceneProposalDto = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
 };
 
 export type StylePresetDto = {
@@ -505,3 +503,30 @@ export {
   isGeminiImageModel,
 } from "./image-generation-models";
 export type { ImageGenerationModelOption } from "./image-generation-models";
+
+export {
+  FILM_ASPECTS,
+  FILM_SUBTITLE_MODES,
+  FILM_CAMERA_MOVES,
+  FILM_FOOTSTEP_SURFACES,
+  FILM_SCENE_SOUNDS,
+  FILM_MUSIC_INSTRUMENTS,
+  FILM_MUSIC_KEYS,
+  FILM_MELODY_DENSITIES,
+  FILM_MUSIC_ARCS,
+  FILM_MUSIC_JOINS,
+} from "./film";
+export type {
+  FilmRecipe,
+  FilmAspect,
+  FilmSubtitleMode,
+  FilmSceneCaption,
+  FilmChapter,
+  FilmTreatment,
+  FilmJob,
+  FilmSceneDto,
+  FilmDetailDto,
+  FilmDirectionDto,
+  FilmDirectionContentDto,
+  FilmSceneDirectionDto,
+} from "./film";

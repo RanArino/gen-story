@@ -161,10 +161,15 @@ any cloud setup. The following features are deliberately excluded from this vers
 
 ## Video & audio
 
-- There is **no video rendering or export**. The product builds a storyboard and
-  per-scene AI images; assembling those into a finished video is out of scope for
-  this demo.
-- No background-music (BGM) generation or audio pipeline.
+- The Film stage renders local still-image films at 1080p30 in 16:9, 9:16, or 1:1.
+  Chrome and FFmpeg are required. Chapter and joined MP4s can be played and
+  downloaded. Recipe creation and new Capability authoring are not part of the UI.
+- Each Chapter needs an AI direction, approved by the user, before rendering. AI
+  direction runs on the Claude or Codex runtime only (not the API runtime). Camera
+  moves, sounds, and instruments come from a fixed vocabulary of local procedural
+  sounds; there is no external BGM provider or generative video.
+  Film jobs run serially in the API process;
+  interrupted jobs fail explicitly and can be retried from the Film page.
 
 ## Infrastructure
 

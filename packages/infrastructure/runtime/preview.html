@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Film preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font:
+          14px/1.4 system-ui,
+          sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #111;
+        color: #ddd;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        max-width: 1280px;
+        height: auto;
+        background: #000;
+      }
+      .bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        max-width: 1280px;
+        margin-top: 8px;
+      }
+      .bar input[type="range"] {
+        flex: 1;
+      }
+      .meta {
+        max-width: 1280px;
+        margin-top: 8px;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        color: #999;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="frame" width="1920" height="1080"></canvas>
+    <div class="bar">
+      <button id="play" type="button">Play</button>
+      <input
+        id="scrub"
+        type="range"
+        min="0"
+        max="0"
+        step="1"
+        value="0"
+        aria-label="Time"
+      />
+      <span id="time">0.000 s</span>
+    </div>
+    <div class="meta">Plan <span id="digest">loading…</span></div>
+    <script type="module" src="/runtime/painter.js"></script>
+    <script type="module">
+      // Preview controls only choose t; the painter draws exactly what capture draws at that t.
+      const ready = () =>
+        new Promise((resolve) => {
+          const check = () =>
+            window.__painter
+              ? resolve(window.__painter)
+              : setTimeout(check, 20);
+          check();
+        });
+      const painter = await ready();
+      const scrub = document.getElementById("scrub");
+      const time = document.getElementById("time");
+      const play = document.getElementById("play");
+      document.getElementById("digest").textContent = painter.digest;
+      scrub.max = String(painter.runtimeMs - 1);
+      let playing = false;
+      let origin = 0;
+      const show = (t) => {
+        painter.draw(t);
+        scrub.value = String(Math.round(t));
+        time.textContent = `${(t / 1000).toFixed(3)} s`;
+      };
+      scrub.addEventListener("input", () => {
+        playing = false;
+        play.textContent = "Play";
+        show(Number(scrub.value));
+      });
+      play.addEventListener("click", () => {
+        playing = !playing;
+        play.textContent = playing ? "Pause" : "Play";
+        origin = performance.now() - Number(scrub.value);
+        const tick = () => {
+          if (!playing) return;
+          const t = performance.now() - origin;
+          if (t >= painter.runtimeMs) {
+            playing = false;
+            play.textContent = "Play";
+            return;
+          }
+          show(t);
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    </script>
+  </body>
+</html>

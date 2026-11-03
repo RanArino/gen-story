@@ -1,0 +1,26 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "font",
+  "id": "font.noto-serif-jp",
+  "version": "1.0.0",
+  "kind": "font",
+  "trust": "promoted",
+  "manifestDigest": "sha256:e1fbbd028eca1fe001795e46ad03120433c5e083be31a87a23fa6173b855e8e6",
+  "implementationDigest": null,
+  "assetDigests": [
+    {
+      "name": "face-0",
+      "digest": "sha256:2fd527ba12b6a44ec30d796d633360da0aeba6c5d4af1304ce12bb4dc15a7dfc"
+    },
+    {
+      "name": "license",
+      "digest": "sha256:5e0da210fb04058a8c0087985d2d456b931c2579811a49655721d3cf0c36b6d6"
+    }
+  ],
+  "validationReportDigests": [
+    "sha256:ad86c495153a06fbb1dad37ba0e9eab1a02d54f03a1fa412fc556bc98f8f07ca"
+  ],
+  "approvalIds": ["appr-707e40ec101b"],
+  "reviewId": null,
+  "createdAt": "2026-10-21T15:09:27.786Z"
+}

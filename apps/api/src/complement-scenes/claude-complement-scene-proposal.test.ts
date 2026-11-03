@@ -38,7 +38,6 @@ function scene(id: string, orderIndex: number) {
     emotion: "warm",
     cameraDirection: "wide",
     lightingDirection: "soft",
-    motionDirection: "still",
     createdAt: ts,
     updatedAt: ts,
   });
@@ -94,7 +93,6 @@ const validProposalsJson = JSON.stringify({
       emotion: "Calm",
       cameraDirection: "Wide",
       lightingDirection: "Natural",
-      motionDirection: "Slow pan",
     },
   ],
 });

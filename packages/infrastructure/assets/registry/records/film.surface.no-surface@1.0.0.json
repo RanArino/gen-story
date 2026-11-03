@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.surface.no-surface",
+  "version": "1.0.0",
+  "kind": "surface",
+  "trust": "system",
+  "manifestDigest": "sha256:2a28cfe3072f3005529d90cdf3f7388fb6b8c4e9a1e7f282ed992336747af32b",
+  "implementationDigest": "sha256:d75714d214a1efd9095c9adc1b9263baca958e7049d154a77152b32d38c74f9b",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.171Z"
+}

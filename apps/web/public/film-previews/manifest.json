@@ -1,0 +1,467 @@
+[
+  {
+    "recipe": "quiet-cinema",
+    "fingerprint": "sha256:e867f1e8c5980f6779a7a66b15a73516bfd67ceaee7876b2f3773a765a8571b7",
+    "artifact": {
+      "schema": "film.chapter-artifact@1",
+      "chapterId": "coastal-day",
+      "order": 0,
+      "title": "海辺の一日",
+      "scenes": [
+        {
+          "sceneId": "coastal-train",
+          "asset": "images/coastal-train.jpg",
+          "sha256": "sha256:5f0e27b3a8587606aed45759ed50ed74bfab54616f511eacdfb9453ac91ad11e"
+        },
+        {
+          "sceneId": "harbor-cafe",
+          "asset": "images/harbor-cafe.jpg",
+          "sha256": "sha256:c8b8c8e98213a39408f7c2766b82bcbad245b21b70142ca801d3418f8a4cc017"
+        },
+        {
+          "sceneId": "sunset-walk",
+          "asset": "images/sunset-walk.jpg",
+          "sha256": "sha256:82fdedb8ec62886a90cc6b224f35418c4875fcaf8700d613baf5cfe0b01897b7"
+        }
+      ],
+      "recipe": {
+        "id": "system.quiet-cinema",
+        "revision": "r1",
+        "digest": "sha256:d96cdece80985b7a05fd75ba7b7200d2746dc8f39515875dd8123a76e0a0db63"
+      },
+      "capabilityLock": [
+        {
+          "slot": "layout",
+          "id": "film.layout.full-frame",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:9edc650d4d0d2eef9f721eb64a79bcc76292a7b1cf7df51e8468f54ffaf24f83",
+          "implementationDigest": "sha256:494d6444d7b64d874b9aef0561291a70815499c8c78d31b3f6fddcdb25966e64",
+          "assetDigests": []
+        },
+        {
+          "slot": "motion",
+          "id": "film.motion.slow-camera",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:53b103fce42146e448f59d3e22b76181d31486a19c361b2bec87f9a0d6a9783f",
+          "implementationDigest": "sha256:c8b35965790bf73112d81d1782b1049d7b88700179bc3965b97118942c4ff946",
+          "assetDigests": []
+        },
+        {
+          "slot": "transition",
+          "id": "film.transition.dissolve",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:00ab950258e10288d4ada415ae36b7dd151ff676636ca2e23379ed65685b755b",
+          "implementationDigest": "sha256:24f5d36cdc98ce0d7321cacaae8a45742f173264523a9c3a680ccc0273f15bde",
+          "assetDigests": []
+        },
+        {
+          "slot": "typography",
+          "id": "film.typography.subtitle",
+          "version": "1.1.0",
+          "manifestDigest": "sha256:74df9bc4d9354173630b6a5d83b141ac6549aedf34a3b9312210fe17b4b46f4b",
+          "implementationDigest": "sha256:037184491d4434ee42e65de156d7ae7eddb1d182977a459d6ded201ddb982598",
+          "assetDigests": []
+        },
+        {
+          "slot": "sound",
+          "id": "film.sound.ambience-led",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:85820a2d0393775b4d97a1cc31e2b2833187106363350341062cea177158d797",
+          "implementationDigest": "sha256:5504cde989e2216202bd470b5748fc15e7a344832d16f1f7084bdb143e2329ef",
+          "assetDigests": [
+            {
+              "name": "ambience",
+              "digest": "sha256:cf1c9df8d887cab60f8f65a3412c7ccbe7c027f8bb8c5ffca96d3af18dce5295"
+            },
+            {
+              "name": "hit",
+              "digest": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f"
+            }
+          ]
+        },
+        {
+          "slot": "surface",
+          "id": "film.surface.soft-vignette",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:13ba7dd0ed50bee59be1fbfc92d434ee4dffb2e0d9e93513520b9ceab2838ba2",
+          "implementationDigest": "sha256:c3fabf48bd3d4d931ccf2dadd3c12158bd8eda4674f3c9bd2eaeba833024231c",
+          "assetDigests": []
+        },
+        {
+          "slot": "effect.0",
+          "id": "film.effect.light-leak",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:5a93529e945af6393f291edca44ed289e3f32402f9835188043bf723e13e6968",
+          "implementationDigest": "sha256:0b2da15d1444a3b48e085e00d5f65103442e22addf00699ac5aa8e3b4d1e4d63",
+          "assetDigests": []
+        }
+      ],
+      "fonts": [
+        {
+          "id": "font.noto-sans-jp",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:e6789b4c99bd3e0c8da231195c22e14c08b5feaf0ff786afc57d85e3a9477bd2",
+          "faces": [
+            "sha256:c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f"
+          ]
+        },
+        {
+          "id": "font.noto-serif-jp",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:e1fbbd028eca1fe001795e46ad03120433c5e083be31a87a23fa6173b855e8e6",
+          "faces": [
+            "sha256:2fd527ba12b6a44ec30d796d633360da0aeba6c5d4af1304ce12bb4dc15a7dfc"
+          ]
+        }
+      ],
+      "bgm": {
+        "asset": "sounds/silence.wav",
+        "sha256": "sha256:ede1f6dd33abfce7bb3a45ba79b0ab5f8baae692709dd32214a41da9af55ab13"
+      },
+      "planDigest": "sha256:1d63013b12569cc27de73af4aad3f25f1c4cfb09054963dbad6b6964114a3b6a",
+      "fingerprint": "sha256:e867f1e8c5980f6779a7a66b15a73516bfd67ceaee7876b2f3773a765a8571b7",
+      "environment": "sha256:c5465222cc48c6b586df8a979b4a3d0b452c4924ffdf02a2e5d854983324cd05",
+      "runtimeMs": 27600,
+      "frames": 828,
+      "files": {
+        "mp4": {
+          "name": "coastal-day.mp4",
+          "sha256": "sha256:351bc45c905a8af9ab32a81a42461f0140c2f4bb2a523da57b76e841b747a734",
+          "bytes": 32335508
+        },
+        "stem": {
+          "name": "coastal-day.stem.wav",
+          "sha256": "sha256:19b5b062d4b79335b83ed05e91c945c95f72c576f2e6c503115fc402f3cd87f2",
+          "bytes": 5299244
+        }
+      },
+      "verified": true
+    },
+    "photos": [
+      {
+        "path": "images/coastal-train.jpg",
+        "kind": "image",
+        "sha256": "sha256:5f0e27b3a8587606aed45759ed50ed74bfab54616f511eacdfb9453ac91ad11e",
+        "widthPx": 1672,
+        "heightPx": 941
+      },
+      {
+        "path": "images/harbor-cafe.jpg",
+        "kind": "image",
+        "sha256": "sha256:c8b8c8e98213a39408f7c2766b82bcbad245b21b70142ca801d3418f8a4cc017",
+        "widthPx": 1672,
+        "heightPx": 941
+      },
+      {
+        "path": "images/sunset-walk.jpg",
+        "kind": "image",
+        "sha256": "sha256:82fdedb8ec62886a90cc6b224f35418c4875fcaf8700d613baf5cfe0b01897b7",
+        "widthPx": 1672,
+        "heightPx": 941
+      }
+    ],
+    "preview": {
+      "sha256": "sha256:05d48271649c3972c1f100a66a3e86f01ab1f2d488b5fa637ee6cc8ee27991f4",
+      "width": 1280,
+      "height": 720
+    }
+  },
+  {
+    "recipe": "memory-board",
+    "fingerprint": "sha256:d2ec48793edd39520dbb583fcd1d002bbff78bcd0a731e9ee77448520a6234c9",
+    "artifact": {
+      "schema": "film.chapter-artifact@1",
+      "chapterId": "coastal-day",
+      "order": 0,
+      "title": "海辺の一日",
+      "scenes": [
+        {
+          "sceneId": "coastal-train",
+          "asset": "images/coastal-train.jpg",
+          "sha256": "sha256:5f0e27b3a8587606aed45759ed50ed74bfab54616f511eacdfb9453ac91ad11e"
+        },
+        {
+          "sceneId": "harbor-cafe",
+          "asset": "images/harbor-cafe.jpg",
+          "sha256": "sha256:c8b8c8e98213a39408f7c2766b82bcbad245b21b70142ca801d3418f8a4cc017"
+        },
+        {
+          "sceneId": "sunset-walk",
+          "asset": "images/sunset-walk.jpg",
+          "sha256": "sha256:82fdedb8ec62886a90cc6b224f35418c4875fcaf8700d613baf5cfe0b01897b7"
+        }
+      ],
+      "recipe": {
+        "id": "system.memory-board",
+        "revision": "r1",
+        "digest": "sha256:9ddc276950ea2c3727c1a0ae4cd596747f35fd80641dab3de51f4051bfd7742d"
+      },
+      "capabilityLock": [
+        {
+          "slot": "layout",
+          "id": "film.layout.memory-board",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:9a9547075fec3a8d32295d81f0b988af15649340a9a386620fafc45be8f14b86",
+          "implementationDigest": "sha256:47f5fee4b35a3ddf31e099b2ecd9b54f18ff36c55c8535b64a352f74a0e5ddfa",
+          "assetDigests": []
+        },
+        {
+          "slot": "motion",
+          "id": "film.motion.parallax-cards",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:a3534006eb9a485764db10e7d070f1511b5b9cf27617ce89f9b5aa2549ec8fa2",
+          "implementationDigest": "sha256:4293823aeee14e09f17f9a8e498095eeb2f0bd9d14a694ae7b30bbdbc119c723",
+          "assetDigests": []
+        },
+        {
+          "slot": "transition",
+          "id": "film.transition.card-slide",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:61b0bb7d83b51b91a2157a83a0bfadea40d9fce301b5b7a73151d73e3305d179",
+          "implementationDigest": "sha256:5368ecea60db9e8df858139aa6c90f0947b86ef277f9a95961e5f42a555b880c",
+          "assetDigests": []
+        },
+        {
+          "slot": "typography",
+          "id": "film.typography.editorial-note",
+          "version": "1.1.0",
+          "manifestDigest": "sha256:28fd47b578b6874e935b399640019aecdfb6ba2280031dbc700c19e61da9c8c4",
+          "implementationDigest": "sha256:d91e7d7acb20d76e0f982fe01d1b8d92262dff8fb7d0461aed21bb9a295f386a",
+          "assetDigests": []
+        },
+        {
+          "slot": "sound",
+          "id": "film.sound.ambience-led",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:85820a2d0393775b4d97a1cc31e2b2833187106363350341062cea177158d797",
+          "implementationDigest": "sha256:5504cde989e2216202bd470b5748fc15e7a344832d16f1f7084bdb143e2329ef",
+          "assetDigests": [
+            {
+              "name": "ambience",
+              "digest": "sha256:cf1c9df8d887cab60f8f65a3412c7ccbe7c027f8bb8c5ffca96d3af18dce5295"
+            },
+            {
+              "name": "hit",
+              "digest": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f"
+            }
+          ]
+        },
+        {
+          "slot": "surface",
+          "id": "film.surface.paper-tone",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:60003811ab71339281bb22c06ccb0f10ffd793fd573b3a96dca087eb95593a8e",
+          "implementationDigest": "sha256:86ebafe8da225dc4effd883979c7b9fd51144832654d0772d5b38213dc56005f",
+          "assetDigests": []
+        }
+      ],
+      "fonts": [
+        {
+          "id": "font.noto-sans-jp",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:e6789b4c99bd3e0c8da231195c22e14c08b5feaf0ff786afc57d85e3a9477bd2",
+          "faces": [
+            "sha256:c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f"
+          ]
+        }
+      ],
+      "bgm": {
+        "asset": "sounds/silence.wav",
+        "sha256": "sha256:ede1f6dd33abfce7bb3a45ba79b0ab5f8baae692709dd32214a41da9af55ab13"
+      },
+      "planDigest": "sha256:ee567813968095eb9a28ed5bdf0ee1e8b47736c97bbbf367b6f2ffe8e46f3e79",
+      "fingerprint": "sha256:d2ec48793edd39520dbb583fcd1d002bbff78bcd0a731e9ee77448520a6234c9",
+      "environment": "sha256:c5465222cc48c6b586df8a979b4a3d0b452c4924ffdf02a2e5d854983324cd05",
+      "runtimeMs": 19400,
+      "frames": 582,
+      "files": {
+        "mp4": {
+          "name": "coastal-day.mp4",
+          "sha256": "sha256:f318adc43c4b64afbc78bcc9f4c788dfad2a5edb630bedd156d87a44819658b4",
+          "bytes": 9737305
+        },
+        "stem": {
+          "name": "coastal-day.stem.wav",
+          "sha256": "sha256:10aeec7d8bbf1994a3b7d91aa88be09c0d0e868976c3758429c882eb617f7a51",
+          "bytes": 3724844
+        }
+      },
+      "verified": true
+    },
+    "photos": [
+      {
+        "path": "images/coastal-train.jpg",
+        "kind": "image",
+        "sha256": "sha256:5f0e27b3a8587606aed45759ed50ed74bfab54616f511eacdfb9453ac91ad11e",
+        "widthPx": 1672,
+        "heightPx": 941
+      },
+      {
+        "path": "images/harbor-cafe.jpg",
+        "kind": "image",
+        "sha256": "sha256:c8b8c8e98213a39408f7c2766b82bcbad245b21b70142ca801d3418f8a4cc017",
+        "widthPx": 1672,
+        "heightPx": 941
+      },
+      {
+        "path": "images/sunset-walk.jpg",
+        "kind": "image",
+        "sha256": "sha256:82fdedb8ec62886a90cc6b224f35418c4875fcaf8700d613baf5cfe0b01897b7",
+        "widthPx": 1672,
+        "heightPx": 941
+      }
+    ],
+    "preview": {
+      "sha256": "sha256:2f7d1cd8908bf5e364b7e3ec1db9522435e074314ce299ee3ba4c029b30edb40",
+      "width": 1280,
+      "height": 720
+    }
+  },
+  {
+    "recipe": "pulse-cut",
+    "fingerprint": "sha256:0eaf8cf9b6dc5812f9b54d2128a67723de3cfc6b606a7bd7467f791db7b81162",
+    "artifact": {
+      "schema": "film.chapter-artifact@1",
+      "chapterId": "coastal-day",
+      "order": 0,
+      "title": "海辺の一日",
+      "scenes": [
+        {
+          "sceneId": "coastal-train",
+          "asset": "images/coastal-train.jpg",
+          "sha256": "sha256:5f0e27b3a8587606aed45759ed50ed74bfab54616f511eacdfb9453ac91ad11e"
+        },
+        {
+          "sceneId": "harbor-cafe",
+          "asset": "images/harbor-cafe.jpg",
+          "sha256": "sha256:c8b8c8e98213a39408f7c2766b82bcbad245b21b70142ca801d3418f8a4cc017"
+        },
+        {
+          "sceneId": "sunset-walk",
+          "asset": "images/sunset-walk.jpg",
+          "sha256": "sha256:82fdedb8ec62886a90cc6b224f35418c4875fcaf8700d613baf5cfe0b01897b7"
+        }
+      ],
+      "recipe": {
+        "id": "system.pulse-cut",
+        "revision": "r1",
+        "digest": "sha256:b3a746a32e5836adad1dfb3ed46ae497bdc88362b178b437a0f32d70d5b8b4a1"
+      },
+      "capabilityLock": [
+        {
+          "slot": "layout",
+          "id": "film.layout.pulse-split",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:e97ff14457d8897642cb2fb6f6d1a78aa8de5b595e6fc8cf143152b9d0a727fe",
+          "implementationDigest": "sha256:0a28cf0be6306764e90a2887af53f1489f15fc8aa4886e5252955313f5ba6eac",
+          "assetDigests": []
+        },
+        {
+          "slot": "motion",
+          "id": "film.motion.beat-pulse",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:b2af7fe1d8d4ab597a5dd23dd06739314cd4302971b6fa2e09769728368d91dd",
+          "implementationDigest": "sha256:6112a28b4eec865a8f414292d3788b89ed337645b3db560baedb586c34afc7e5",
+          "assetDigests": []
+        },
+        {
+          "slot": "transition",
+          "id": "film.transition.direct-cut",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:66378c5dcf8dc182e0992573a148a8a1bbce4e393ca0e012b02c96141232eccb",
+          "implementationDigest": "sha256:7787f971be59318d200ca5e18060d65513dc27c926840126f72e9ced94402a80",
+          "assetDigests": []
+        },
+        {
+          "slot": "typography",
+          "id": "film.typography.kinetic-phrase",
+          "version": "1.1.0",
+          "manifestDigest": "sha256:db5691b8f55bf856f0b96f6f082979a524f50d5139206bf04e3bbd9ea1968ed3",
+          "implementationDigest": "sha256:fe1341576ccb7bf5131c9d369c798306cbed5b50560a77a681952d4e30efcf4b",
+          "assetDigests": []
+        },
+        {
+          "slot": "sound",
+          "id": "film.sound.beat-led",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:6be7e65c96da3166df48b2c703e4742052592ae2ea6c253c5ed8f42ba76cdbab",
+          "implementationDigest": "sha256:9df033ca2924b39e769eb1d430ecc13ae9b9d98257f98647e6bc6dd826e6534d",
+          "assetDigests": [
+            {
+              "name": "hit",
+              "digest": "sha256:ccee3ee747ffc80e3d17762b11a828eac4f2ac4baa7d381e1b83ed8294f29d6f"
+            }
+          ]
+        },
+        {
+          "slot": "surface",
+          "id": "film.surface.no-surface",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:2a28cfe3072f3005529d90cdf3f7388fb6b8c4e9a1e7f282ed992336747af32b",
+          "implementationDigest": "sha256:d75714d214a1efd9095c9adc1b9263baca958e7049d154a77152b32d38c74f9b",
+          "assetDigests": []
+        }
+      ],
+      "fonts": [
+        {
+          "id": "font.noto-sans-jp",
+          "version": "1.0.0",
+          "manifestDigest": "sha256:e6789b4c99bd3e0c8da231195c22e14c08b5feaf0ff786afc57d85e3a9477bd2",
+          "faces": [
+            "sha256:c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f"
+          ]
+        }
+      ],
+      "bgm": {
+        "asset": "sounds/silence.wav",
+        "sha256": "sha256:ede1f6dd33abfce7bb3a45ba79b0ab5f8baae692709dd32214a41da9af55ab13"
+      },
+      "planDigest": "sha256:f74577438f3dc8d98b127f418c61ccb8bdd14da6e993012c73a2804f350c77c7",
+      "fingerprint": "sha256:0eaf8cf9b6dc5812f9b54d2128a67723de3cfc6b606a7bd7467f791db7b81162",
+      "environment": "sha256:c5465222cc48c6b586df8a979b4a3d0b452c4924ffdf02a2e5d854983324cd05",
+      "runtimeMs": 13750,
+      "frames": 413,
+      "files": {
+        "mp4": {
+          "name": "coastal-day.mp4",
+          "sha256": "sha256:c18f17b6f69024b18560183d3851ba643ab99a3a29acf9b35a44fa09ad08628e",
+          "bytes": 7715148
+        },
+        "stem": {
+          "name": "coastal-day.stem.wav",
+          "sha256": "sha256:a4728ec1434a3412308c4d9dda6c3da1a542a298f354787157f06a5460566011",
+          "bytes": 2640044
+        }
+      },
+      "verified": true
+    },
+    "photos": [
+      {
+        "path": "images/coastal-train.jpg",
+        "kind": "image",
+        "sha256": "sha256:5f0e27b3a8587606aed45759ed50ed74bfab54616f511eacdfb9453ac91ad11e",
+        "widthPx": 1672,
+        "heightPx": 941
+      },
+      {
+        "path": "images/harbor-cafe.jpg",
+        "kind": "image",
+        "sha256": "sha256:c8b8c8e98213a39408f7c2766b82bcbad245b21b70142ca801d3418f8a4cc017",
+        "widthPx": 1672,
+        "heightPx": 941
+      },
+      {
+        "path": "images/sunset-walk.jpg",
+        "kind": "image",
+        "sha256": "sha256:82fdedb8ec62886a90cc6b224f35418c4875fcaf8700d613baf5cfe0b01897b7",
+        "widthPx": 1672,
+        "heightPx": 941
+      }
+    ],
+    "preview": {
+      "sha256": "sha256:8ee29d3a4440e502a09f1b3628b6adb03265271a191b3823c97b02556952f8a6",
+      "width": 1280,
+      "height": 720
+    }
+  }
+]

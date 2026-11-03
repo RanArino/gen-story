@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:timing-proposal",
+  "title": "Timing Proposal: user-entered and resolved scene durations for one Chapter, approved by digest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "chapterId",
+    "limitMs",
+    "titleMs",
+    "overlapMs",
+    "gapMs",
+    "runtimeMs",
+    "remainingMs",
+    "scenes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "film.timing-proposal@1"
+    },
+    "chapterId": {
+      "$ref": "urn:film-spike:common#/$defs/localId"
+    },
+    "limitMs": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        }
+      ]
+    },
+    "titleMs": {
+      "$ref": "urn:film-spike:common#/$defs/ms"
+    },
+    "overlapMs": {
+      "$ref": "urn:film-spike:common#/$defs/ms"
+    },
+    "gapMs": {
+      "$ref": "urn:film-spike:common#/$defs/ms"
+    },
+    "runtimeMs": {
+      "$ref": "urn:film-spike:common#/$defs/ms"
+    },
+    "remainingMs": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "urn:film-spike:common#/$defs/ms"
+        }
+      ]
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sceneId", "source", "durationMs", "minMs"],
+        "properties": {
+          "sceneId": {
+            "$ref": "urn:film-spike:common#/$defs/localId"
+          },
+          "source": {
+            "enum": ["user", "resolved"]
+          },
+          "durationMs": {
+            "$ref": "urn:film-spike:common#/$defs/ms"
+          },
+          "minMs": {
+            "$ref": "urn:film-spike:common#/$defs/ms"
+          }
+        }
+      }
+    },
+    "authoredWindows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sceneId": {
+            "$ref": "urn:film-spike:common#/$defs/localId"
+          },
+          "startMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "endMs": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": ["sceneId", "startMs", "endMs"]
+      },
+      "minItems": 1,
+      "maxItems": 200
+    },
+    "endingMs": {
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}

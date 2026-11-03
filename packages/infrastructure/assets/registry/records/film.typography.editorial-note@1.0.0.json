@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.typography.editorial-note",
+  "version": "1.0.0",
+  "kind": "typography",
+  "trust": "system",
+  "manifestDigest": "sha256:ff746ff506403d97dafc97a447787f82926ba90d723c50800ea5c468ab61151e",
+  "implementationDigest": "sha256:fa484adf34757beef728f243eccbbdcb22cae5f3bd405f6c45b520317be9c161",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.108Z"
+}

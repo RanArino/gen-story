@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:film-spike:film-treatment",
+  "title": "Film Treatment: one Recipe revision applied to a project, with shared settings and per-Chapter states",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "revision",
+    "projectId",
+    "recipe",
+    "storyGraph",
+    "shared",
+    "overallTitle",
+    "projectFonts",
+    "chapters"
+  ],
+  "properties": {
+    "schema": { "const": "film.film-treatment@1" },
+    "id": { "$ref": "urn:film-spike:common#/$defs/slug" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "projectId": { "$ref": "urn:film-spike:common#/$defs/slug" },
+    "recipe": { "$ref": "urn:film-spike:common#/$defs/recipeRevisionRef" },
+    "storyGraph": { "$ref": "urn:film-spike:common#/$defs/revisionRef" },
+    "shared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "worldview",
+        "bgm",
+        "typography",
+        "colorFamily",
+        "outputProfile"
+      ],
+      "properties": {
+        "worldview": { "$ref": "urn:film-spike:common#/$defs/plainText" },
+        "bgm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["asset", "sha256", "gain"],
+          "properties": {
+            "asset": { "$ref": "urn:film-spike:common#/$defs/mediaAsset" },
+            "sha256": { "$ref": "urn:film-spike:common#/$defs/digest" },
+            "gain": { "type": "number", "minimum": 0, "maximum": 2 }
+          }
+        },
+        "typography": { "$ref": "urn:film-spike:common#/$defs/fontRef" },
+        "colorFamily": { "$ref": "urn:film-spike:common#/$defs/token" },
+        "outputProfile": { "$ref": "urn:film-spike:common#/$defs/profileId" }
+      }
+    },
+    "overallTitle": { "$ref": "urn:film-spike:common#/$defs/name" },
+    "projectFonts": {
+      "type": "array",
+      "items": { "$ref": "urn:film-spike:common#/$defs/fontRef" }
+    },
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["chapterId", "settings"],
+        "properties": {
+          "chapterId": { "$ref": "urn:film-spike:common#/$defs/localId" },
+          "settings": { "$ref": "urn:film-spike:common#/$defs/chapterSettings" }
+        }
+      }
+    }
+  }
+}

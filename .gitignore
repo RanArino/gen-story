@@ -27,3 +27,7 @@ internal/
 
 # Private film reference project (supplied separately, not for public release)
 film-making-idea/
+
+# Local Film render snapshots, verified media, and caches.
+/data/film/
+/apps/web/test-results/

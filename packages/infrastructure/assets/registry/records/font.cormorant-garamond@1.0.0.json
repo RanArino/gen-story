@@ -1,0 +1,26 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "font",
+  "id": "font.cormorant-garamond",
+  "version": "1.0.0",
+  "kind": "font",
+  "trust": "promoted",
+  "manifestDigest": "sha256:0235e709283d78255041e72ed59542507eb32ff8c316ba491e7a37e1cd217b63",
+  "implementationDigest": null,
+  "assetDigests": [
+    {
+      "name": "face-0",
+      "digest": "sha256:b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0"
+    },
+    {
+      "name": "license",
+      "digest": "sha256:60700d351cac4650c51f3f9db318d2a420f8b45052dba2715eb5fec41f0f6956"
+    }
+  ],
+  "validationReportDigests": [
+    "sha256:427115109989501252b84699977fd3b441f5a8fe703ba2e6d2df96266b506f00"
+  ],
+  "approvalIds": ["appr-b29bba53a3e3"],
+  "reviewId": null,
+  "createdAt": "2026-10-21T15:09:43.102Z"
+}

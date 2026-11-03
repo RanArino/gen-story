@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.typography.kinetic-phrase",
+  "version": "1.0.0",
+  "kind": "typography",
+  "trust": "system",
+  "manifestDigest": "sha256:0eda88245427e09db994c97a129df47f310ec44a206362a3cec83a59d09b1a4a",
+  "implementationDigest": "sha256:9885e1bc40c19aa2224474edac9271ee26ae689f3a2e3c99a1b422f85cab32ae",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.109Z"
+}

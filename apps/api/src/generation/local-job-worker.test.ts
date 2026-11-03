@@ -57,7 +57,6 @@ function makeDeps(
     emotion: "calm",
     cameraDirection: "wide",
     lightingDirection: "natural",
-    motionDirection: "slow pan",
     createdAt: now(),
     updatedAt: now(),
   });

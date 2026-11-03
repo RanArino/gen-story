@@ -1,0 +1,76 @@
+{
+  "schema": "film.capability-manifest@1",
+  "id": "film.transition.dip",
+  "version": "1.0.0",
+  "kind": "transition",
+  "level": 0,
+  "title": "Dip",
+  "description": "The image dips briefly to a solid colour between scenes.",
+  "tags": ["dip", "pause"],
+  "rendererApi": "film-capability@1",
+  "layer": 0,
+  "media": {
+    "types": [],
+    "min": 0,
+    "max": 0
+  },
+  "profiles": ["landscape-1080p30@1"],
+  "aspectRatios": ["16:9"],
+  "analysis": [],
+  "params": {
+    "color": {
+      "type": "enum",
+      "default": "black",
+      "values": ["black", "paper"],
+      "scope": "project",
+      "authority": "user-exposable",
+      "description": "Colour the image dips to."
+    }
+  },
+  "requires": [],
+  "incompatibleWith": [],
+  "determinism": {
+    "seeded": false
+  },
+  "motionLevel": "subtle",
+  "budgets": {
+    "maxPrimitives": 48,
+    "maxKeyframes": 256,
+    "maxAudioEvents": 16
+  },
+  "reducedMotion": "same",
+  "fallback": null,
+  "timing": {
+    "overlapMs": 0,
+    "gapMs": 500
+  },
+  "assets": [],
+  "fixtures": [
+    {
+      "name": "landscape",
+      "sourceAspect": "16:9",
+      "caption": "ja"
+    },
+    {
+      "name": "square",
+      "sourceAspect": "1:1",
+      "caption": "en"
+    },
+    {
+      "name": "portrait",
+      "sourceAspect": "2:3",
+      "caption": "ja"
+    },
+    {
+      "name": "ultrawide",
+      "sourceAspect": "21:9",
+      "caption": "empty"
+    }
+  ],
+  "permissions": [],
+  "provenance": {
+    "author": "film spike",
+    "source": "spikes film builtin",
+    "license": "internal"
+  }
+}

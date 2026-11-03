@@ -342,7 +342,6 @@ export type SceneFillSuggestion = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
 };
 
 export type SceneFillGenerationInput = {
@@ -376,7 +375,6 @@ export type ComplementSceneProposal = {
   emotion: string;
   cameraDirection: string;
   lightingDirection: string;
-  motionDirection: string;
 };
 
 export type ComplementSceneProposalInput = {

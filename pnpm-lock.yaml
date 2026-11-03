@@ -44,6 +44,9 @@ importers:
       '@gen-story/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@gen-story/infrastructure':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure
       '@gen-story/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -129,6 +132,18 @@ importers:
         version: link:../domain
 
   packages/domain: {}
+
+  packages/infrastructure:
+    dependencies:
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      puppeteer-core:
+        specifier: 25.15.0
+        version: 25.15.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   packages/shared: {}
 

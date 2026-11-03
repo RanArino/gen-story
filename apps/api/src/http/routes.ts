@@ -1,3 +1,4 @@
+import { registerFilmRoutes } from "../film/routes";
 import { createReadStream, existsSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve, sep } from "node:path";
@@ -296,6 +297,7 @@ async function confirmedTestRequestIds(
 
 export function buildRouter(deps: ApiDependencies): Router {
   const router = new Router();
+  registerFilmRoutes(router, deps);
 
   // GET /api/me
   router.add("GET", "/api/me", async (_req, res) => {
@@ -1099,7 +1101,6 @@ export function buildRouter(deps: ApiDependencies): Router {
         emotion: s.emotion,
         cameraDirection: s.cameraDirection,
         lightingDirection: s.lightingDirection,
-        motionDirection: s.motionDirection,
         notes: s.notes,
         negativePrompt: s.negativePrompt,
         photoFidelity: s.photoFidelity,

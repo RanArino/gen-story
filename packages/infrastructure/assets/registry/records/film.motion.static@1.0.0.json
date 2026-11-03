@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.motion.static",
+  "version": "1.0.0",
+  "kind": "motion",
+  "trust": "system",
+  "manifestDigest": "sha256:5b8065e3e23f28e461006d9465ded2d6c0b61fad21aa64f03dba28117e330319",
+  "implementationDigest": "sha256:3b6ed3aee97b9ec5fdc5f02d4a468cd7e271a5f76b59f6233bd9add89bdf1d64",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.099Z"
+}

@@ -1,0 +1,135 @@
+{
+  "schema": "film.film-style-recipe@1",
+  "id": "system.memory-board",
+  "revision": "r1",
+  "title": "Memory Board",
+  "description": "Associative memories at a medium pace: photo cards on a paper board with gentle parallax, card slides, editorial notes, and tactile hits.",
+  "scope": "system",
+  "owner": "gen-story",
+  "lineage": null,
+  "capabilities": [
+    {
+      "slot": "layout",
+      "ref": {
+        "id": "film.layout.memory-board",
+        "version": "1.0.0",
+        "digest": "sha256:9a9547075fec3a8d32295d81f0b988af15649340a9a386620fafc45be8f14b86"
+      }
+    },
+    {
+      "slot": "motion",
+      "ref": {
+        "id": "film.motion.parallax-cards",
+        "version": "1.0.0",
+        "digest": "sha256:a3534006eb9a485764db10e7d070f1511b5b9cf27617ce89f9b5aa2549ec8fa2"
+      }
+    },
+    {
+      "slot": "transition",
+      "ref": {
+        "id": "film.transition.card-slide",
+        "version": "1.0.0",
+        "digest": "sha256:61b0bb7d83b51b91a2157a83a0bfadea40d9fce301b5b7a73151d73e3305d179"
+      }
+    },
+    {
+      "slot": "typography",
+      "ref": {
+        "id": "film.typography.editorial-note",
+        "version": "1.1.0",
+        "digest": "sha256:28fd47b578b6874e935b399640019aecdfb6ba2280031dbc700c19e61da9c8c4"
+      }
+    },
+    {
+      "slot": "sound",
+      "ref": {
+        "id": "film.sound.ambience-led",
+        "version": "1.0.0",
+        "digest": "sha256:85820a2d0393775b4d97a1cc31e2b2833187106363350341062cea177158d797"
+      }
+    },
+    {
+      "slot": "surface",
+      "ref": {
+        "id": "film.surface.paper-tone",
+        "version": "1.0.0",
+        "digest": "sha256:60003811ab71339281bb22c06ccb0f10ffd793fd573b3a96dca087eb95593a8e"
+      }
+    }
+  ],
+  "effects": [],
+  "params": {
+    "film.sound.ambience-led": {
+      "hits": true
+    }
+  },
+  "fonts": [
+    {
+      "role": "caption",
+      "ref": {
+        "id": "font.noto-sans-jp",
+        "version": "1.0.0",
+        "digest": "sha256:e6789b4c99bd3e0c8da231195c22e14c08b5feaf0ff786afc57d85e3a9477bd2"
+      }
+    },
+    {
+      "role": "title",
+      "ref": {
+        "id": "font.noto-sans-jp",
+        "version": "1.0.0",
+        "digest": "sha256:e6789b4c99bd3e0c8da231195c22e14c08b5feaf0ff786afc57d85e3a9477bd2"
+      }
+    }
+  ],
+  "palette": {
+    "family": "paper-warm",
+    "background": "#16130f",
+    "text": "#f6f1e7",
+    "accent": "#d9a35f",
+    "scrim": "#000000"
+  },
+  "curves": {
+    "energy": 0.45,
+    "intimacy": 0.7,
+    "openness": 0.55,
+    "warmth": 0.7,
+    "stillness": 0.5
+  },
+  "timing": {
+    "preferredSceneMs": 6000,
+    "minSceneMs": 3000,
+    "maxSceneMs": 10000,
+    "minHoldMs": 1500,
+    "beatQuantized": false
+  },
+  "chapterAllowlist": [
+    {
+      "field": "pacing",
+      "min": 0.8,
+      "max": 1.25
+    },
+    {
+      "field": "motionAmount",
+      "min": 0.2,
+      "max": 0.9
+    },
+    {
+      "field": "emphasis",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "field": "sfxLevel",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "field": "visualIntensity",
+      "min": 0.2,
+      "max": 1
+    }
+  ],
+  "output": {
+    "profile": "landscape-1080p30@1"
+  }
+}

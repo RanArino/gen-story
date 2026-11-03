@@ -88,7 +88,6 @@ function baseFixture(
         emotion: "Joy",
         cameraDirection: "Medium",
         lightingDirection: "Natural",
-        motionDirection: "Static",
         photoFidelity,
         photoAssets: hasPhoto
           ? [{ photoAssetId: "photo_1", role: "primary" }]

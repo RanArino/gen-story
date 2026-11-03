@@ -66,7 +66,6 @@ function input() {
       emotion: "",
       cameraDirection: "",
       lightingDirection: "",
-      motionDirection: "",
       createdAt: ts,
       updatedAt: ts,
     }),
@@ -87,7 +86,6 @@ const validResponse = {
     emotion: "Warm",
     cameraDirection: "Medium",
     lightingDirection: "Natural",
-    motionDirection: "Slow pan",
   }),
 };
 
@@ -110,7 +108,6 @@ describe("GeminiSceneFillGenerationAdapter", () => {
     const result = await adapter.generateSceneFill(input());
 
     expect(result.title).toBe("Morning Light");
-    expect(result.motionDirection).toBe("Slow pan");
   });
 
   it("throws a clear error when GEMINI_API_KEY is unset", async () => {

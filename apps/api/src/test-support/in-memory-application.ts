@@ -626,7 +626,6 @@ class InMemorySceneFillGeneration implements SceneFillGenerationPort {
       emotion: "Joy",
       cameraDirection: "Medium",
       lightingDirection: "Natural",
-      motionDirection: "Slow pan",
     };
   }
 }
@@ -643,7 +642,6 @@ class InMemoryComplementSceneProposal implements ComplementSceneProposalPort {
         emotion: "Calm",
         cameraDirection: "Wide",
         lightingDirection: "Natural",
-        motionDirection: "Slow pan",
       },
     ];
   }

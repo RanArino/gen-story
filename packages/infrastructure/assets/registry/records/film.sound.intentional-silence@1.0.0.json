@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.sound.intentional-silence",
+  "version": "1.0.0",
+  "kind": "sound",
+  "trust": "system",
+  "manifestDigest": "sha256:1ca4c431972e6e9e22d8efe41d7eeb7527f78517d3d407202cb59c55c32f50cd",
+  "implementationDigest": "sha256:c9087d86a0b1d45782db49aff6ab1a728f5cf558e399e867d9054a713bfe518d",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.110Z"
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "film.registry-record@1",
+  "entity": "capability",
+  "id": "film.motion.slow-camera",
+  "version": "1.0.0",
+  "kind": "motion",
+  "trust": "system",
+  "manifestDigest": "sha256:53b103fce42146e448f59d3e22b76181d31486a19c361b2bec87f9a0d6a9783f",
+  "implementationDigest": "sha256:c8b35965790bf73112d81d1782b1049d7b88700179bc3965b97118942c4ff946",
+  "assetDigests": [],
+  "validationReportDigests": [],
+  "approvalIds": [],
+  "reviewId": null,
+  "createdAt": "2026-10-20T22:08:19.100Z"
+}
