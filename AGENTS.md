@@ -54,6 +54,7 @@ Default local URLs:
 - MUST keep REST request and response shapes explicit; never expose ORM schemas, SDK responses, or framework objects across boundaries.
 - MUST run `pnpm typecheck` after code changes unless dependencies or environment issues make it impossible.
 - MUST update docs when commands, setup, environment variables, APIs, configuration, or user-visible behavior changes.
+- MUST use `web-ui-design` for web UI work and read `docs/ui-design.md` for this app's UI conventions.
 - MUST update `internal/gap-analysis.md` whenever work starts, is planned with an ExecPlan, or is completed for any requirement tracked there. If an ExecPlan targets a `❌ Not yet implemented` requirement, change that requirement to `🟡 In progress` in the same change as the plan. (`internal/` is gitignored and not part of the public release.)
 - MUST use `apps/api/.env.example` for documented local environment variables. It is the single environment template for the repository; the real values live in `apps/api/.env`.
 - NEVER commit `.env` files, secrets, credentials, or private tokens.

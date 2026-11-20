@@ -68,6 +68,7 @@ data/            Local SQLite DB and uploaded files (gitignored)
 - Write all code, comments, task names, PR text, and docs in **English**.
 - `pnpm typecheck` after every code change.
 - Update `docs/` when commands, env vars, APIs, or user-visible behavior changes.
+- Use `/web-ui-design` for web UI work and read `docs/ui-design.md` for this app's UI conventions.
 - Update `internal/gap-analysis.md` whenever work starts, is planned with an ExecPlan, or is completed for any requirement tracked there. If an ExecPlan targets a `❌ Not yet implemented` requirement, change that requirement to `🟡 In progress` in the same change as the plan. (`internal/` is gitignored and excluded from the public release.)
 - Use `apps/api/.env.example` to document new env vars; never commit `apps/api/.env` or secrets.
 - Never edit generated files: `node_modules`, `.next`, `dist`, `*.tsbuildinfo`.
