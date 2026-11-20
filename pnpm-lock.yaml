@@ -20,6 +20,9 @@ importers:
       globals:
         specifier: ^16.0.0
         version: 16.5.0
+      modern-web-guidance:
+        specifier: 1.0.1
+        version: 1.0.1
       prettier:
         specifier: ^3.0.0
         version: 3.8.3
@@ -2359,6 +2362,11 @@ packages:
   modern-tar@0.8.6:
     resolution: {integrity: sha512-LYSks0tNVqbtez/9OB0YFP6qLRSqkdAxJWOQpVaR67lNTbj2zNLyYpowkRMia5lXLCZKzxwoxkxH2MbbBR2aEg==}
     engines: {node: '>=18.0.0'}
+
+  modern-web-guidance@1.0.1:
+    resolution: {integrity: sha512-5ztUh5F1p2PewnSkA6EhsGUXqomaZY9qe6iWJCU4JbIQxHTky7s5lMJcPE4EbD1uhbQZIhl0HROH0+s6fIiGzg==}
+    engines: {node: '>=22.0.0', vscode: ^1.90.0}
+    hasBin: true
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -4913,6 +4921,8 @@ snapshots:
   mkdirp-classic@0.5.3: {}
 
   modern-tar@0.8.6: {}
+
+  modern-web-guidance@1.0.1: {}
 
   ms@2.1.3: {}
 

@@ -288,6 +288,8 @@ data/            Local SQLite DB and uploaded files (gitignored)
 
 See [docs/known-limitations.md](docs/known-limitations.md) for features intentionally excluded from this local version.
 
+See [docs/ui-design.md](docs/ui-design.md) for web UI conventions and design tooling.
+
 ## License
 
 Released under the [MIT License](LICENSE).
