@@ -1,4 +1,4 @@
-// Single source of truth for the nine built-in (system-scope) style presets.
+// Single source of truth for the ten built-in (system-scope) style presets.
 // Imported by scripts/seed.ts (to seed the style_presets table) and by
 // scripts/generate-style-previews.ts (to render preview images).
 //
@@ -77,6 +77,14 @@ export const SYSTEM_STYLE_PRESETS: SystemStylePreset[] = [
       "Stylized 3D animated film look with soft lighting and tactile materials.",
     prompt:
       "A stylized 3D animated film still with appealing shapes, soft global illumination, tactile materials, and clear depth. Use cinematic camera placement, readable posing, gentle subsurface skin lighting, and polished but not plastic surfaces. Keep character models, costumes, and props consistent across scenes.",
+  },
+  {
+    id: "system-ukiyoe-woodblock",
+    name: "Ukiyo-e Woodblock",
+    description:
+      "Hand-printed Japanese woodblock look with flat color planes, a single ink contour, and golden mist.",
+    prompt:
+      "A refined Japanese ukiyo-e woodblock print, as if carved and printed by hand. A single confident sumi contour of even weight defines every form; colors are flat, solid, opaque planes with no photographic shading and no gradient modeling on skin or clothing. Faces are reduced to a few elegant lines in the manner of classical bijin-ga with flat warm paper-toned skin; clothing uses flat color with only a few sweeping fold lines or simple woven patterns. Build the background from layered decorative flat planes: bands of golden mist, bold geometric structure, and a bokashi gradient only in the sky. Add a large stylized maple branch with crimson leaves cutting across a corner, with a few leaves drifting in the air. Use generous empty space, a limited palette of indigo, vermilion, gold-ochre, and cream, slight color-block misregistration, and visible washi fibers. Simplify forms for graphic impact while keeping recurring characters and key props recognizable. Avoid crosshatching, engraving or etching lines, realistic skin shading, soft digital gradients, and photorealistic highlights. Do not imitate any specific named artist or copyrighted artwork.",
   },
   {
     id: "system-ai-auto",

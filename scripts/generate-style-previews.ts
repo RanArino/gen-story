@@ -1,16 +1,16 @@
-// Generates the nine style-preview images for the storyboard style gallery.
+// Generates the ten style-preview images for the storyboard style gallery.
 //
 // ONE base image is generated (text-to-image), then restyled into every other
-// style via image-to-image editing — so all nine previews show the SAME person
+// style via image-to-image editing — so all ten previews show the SAME person
 // in the SAME pose and composition, differing only by visual style. This is
 // OpenAI's recommended "character anchor" pattern (gpt-image prompting guide).
 //
 // The base image is cached to data/style-preview-base.png so re-runs do not
-// regenerate it. You can also regenerate a single style instead of all nine.
+// regenerate it. You can also regenerate a single style instead of all ten.
 //
 // Usage (from the repository root):
 //   OPENAI_API_KEY=... pnpm tsx scripts/generate-style-previews.ts
-//     -> renders all nine previews (reusing the cached base if present)
+//     -> renders all ten previews (reusing the cached base if present)
 //   pnpm tsx scripts/generate-style-previews.ts "Anime Movie" "Film Photo"
 //     -> regenerates only the named styles (base reused, no waste)
 //   pnpm tsx scripts/generate-style-previews.ts --fresh-base
