@@ -471,7 +471,9 @@
   "imageModel": {
     "label": "画像生成モデル",
     "automatic": "自動（Codex → Gemini API）",
-    "automaticDescription": "まずCodexサブスクリプションを使用します。失敗した画像は設定済みのGemini APIで生成され、API利用料金が発生します。"
+    "automaticDescription": "まずCodexサブスクリプションを使用します。失敗した画像は設定済みのGemini APIで生成され、API利用料金が発生します。",
+    "automaticCodexOnly": "自動（Codexのみ）",
+    "automaticCodexOnlyDescription": "Ukiyo-e Woodblock の画風を揃えるため、Codex を使用します。Codex が利用できない場合は再試行できます。"
   },
   "generate": {
     "title": "生成",

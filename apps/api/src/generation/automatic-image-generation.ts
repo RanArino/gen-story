@@ -1,5 +1,8 @@
 import type { ImageGenerationPort } from "@gen-story/application";
-import { DEFAULT_GEMINI_IMAGE_MODEL } from "@gen-story/shared";
+import {
+  DEFAULT_GEMINI_IMAGE_MODEL,
+  UKIYO_E_STYLE_PRESET_ID,
+} from "@gen-story/shared";
 
 import {
   collectSensitiveEnvironmentValues,
@@ -34,6 +37,12 @@ export class AutomaticImageGenerationAdapter implements ImageGenerationPort {
       } catch (error) {
         codexError = message(error);
       }
+    }
+
+    if (input.inputJson.stylePresetId === UKIYO_E_STYLE_PRESET_ID) {
+      const detail = `Ukiyo-e Woodblock uses Codex for Automatic generation. Codex: ${codexError}. Check Codex and retry.`;
+      console.log(`[Image generation] ${input.requestId}: failed; ${detail}`);
+      throw new Error(detail);
     }
 
     if (

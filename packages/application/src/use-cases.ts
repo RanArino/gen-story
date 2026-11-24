@@ -3152,6 +3152,15 @@ export async function retryFailedGenerationRequest(
       now(),
       now(),
     );
+    if (retryRequest.inputJson.stylePresetId === undefined) {
+      const storyboard = await deps.storyboards.findById(
+        retryRequest.storyboardId,
+      );
+      retryRequest.inputJson = {
+        ...retryRequest.inputJson,
+        stylePresetId: storyboard?.stylePresetId ?? null,
+      };
+    }
 
     await deps.generationRequests.save(retryRequest);
 
@@ -3598,7 +3607,13 @@ export async function applyAdjustmentToTestVariant(
       projectId: variant.projectId,
       storyboardId: input.storyboardId,
       sceneId: variant.sceneId,
-      inputJson: { testBatchId, testVariant: inputJson.testVariant },
+      inputJson: {
+        testBatchId,
+        testVariant: inputJson.testVariant,
+        ...(typeof inputJson.model === "string"
+          ? { model: inputJson.model }
+          : {}),
+      },
       commonPromptOverride: effectiveCommonPrompt,
     });
 

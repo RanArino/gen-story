@@ -500,6 +500,7 @@ export {
   IMAGE_GENERATION_MODELS,
   DEFAULT_IMAGE_GENERATION_MODEL,
   DEFAULT_GEMINI_IMAGE_MODEL,
+  UKIYO_E_STYLE_PRESET_ID,
   isGeminiImageModel,
 } from "./image-generation-models";
 export type { ImageGenerationModelOption } from "./image-generation-models";

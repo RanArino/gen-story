@@ -471,7 +471,9 @@
   "imageModel": {
     "label": "Image model",
     "automatic": "Automatic (Codex → Gemini API)",
-    "automaticDescription": "Uses your Codex subscription first. If it fails, this image uses the configured Gemini API billing."
+    "automaticDescription": "Uses your Codex subscription first. If it fails, this image uses the configured Gemini API billing.",
+    "automaticCodexOnly": "Automatic (Codex only)",
+    "automaticCodexOnlyDescription": "Ukiyo-e Woodblock uses Codex for a consistent look. If Codex is unavailable, you can retry."
   },
   "generate": {
     "title": "Generate",

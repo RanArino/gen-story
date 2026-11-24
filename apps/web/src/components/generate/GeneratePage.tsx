@@ -57,6 +57,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
   const t = useTranslations("generate");
   const tCommon = useTranslations("common");
   const [progress, setProgress] = useState<SceneProgress[]>([]);
+  const [stylePresetId, setStylePresetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
     const storyboards = await listStoryboards(projectId);
     if (storyboards.length === 0) return;
     const sb = storyboards[0]!;
+    setStylePresetId(sb.stylePresetId);
     const scenes = await listScenes(sb.id);
     if (scenes.length === 0) return;
 
@@ -260,6 +262,7 @@ export function GeneratePage({ projectId }: { projectId: string }) {
           value={imageModel}
           onChange={setImageModel}
           disabled={launching}
+          stylePresetId={stylePresetId}
         />
         {unstarted > 0 && (
           <button

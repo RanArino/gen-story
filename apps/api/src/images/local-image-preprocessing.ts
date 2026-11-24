@@ -41,6 +41,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
   }): Promise<Record<string, unknown>> {
     const {
       scene,
+      storyboard,
       prompt: composedPrompt,
       negativePrompt,
     } = await composeScenePrompt(this.deps, {
@@ -139,6 +140,7 @@ export class LocalImagePreprocessingAdapter implements ImagePreprocessingPort {
       // a batch id, wrote to an "unknown-project" directory.
       projectId: input.projectId,
       sceneId: input.sceneId,
+      stylePresetId: storyboard.stylePresetId,
       normalizedInputImages,
       photoFidelity: scene.photoFidelity,
       prompt: applyNegativePromptOverride(
