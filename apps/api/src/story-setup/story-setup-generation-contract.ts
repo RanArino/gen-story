@@ -74,6 +74,9 @@ export function buildStorySetupPrompt(
     "",
     "story: 3-5 sentences describing the narrative arc and world of this video — who it is about, what it moves through, and how it should feel by the end. Concrete, not generic.",
     "commonPrompt: one paragraph of image-generation direction applied to EVERY scene. Cover the visual treatment, palette, and mood that hold the series together. Do not describe any single scene.",
+    input.stylePreset
+      ? "Treat the chosen visual style as the rendering authority. Express project mood and palette through its medium and techniques, and avoid incompatible rendering cues from the source photos or story purpose. Keep motifs and framing specific to each scene."
+      : undefined,
     `negativePrompt: comma-separated phrases to keep OUT of every image, chosen for this tone and style. Do NOT include text, captions, letters, numbers, or any instruction that suppresses visible place names, station names, building names, signs, or other location-identifying text. Start from these and add what this specific project needs: ${RECOMMENDED_NEGATIVE_FENCE}`,
   ]
     .filter((line) => line !== undefined)
