@@ -17,6 +17,8 @@
 //     -> forces the base image to be regenerated
 //
 // OPENAI_API_KEY may also live in a repo-root .env / .env.local file.
+// Ukiyo-e restyles the shared base through the local Codex subscription.
+// With a cached base, a Ukiyo-e-only run needs just the Codex login.
 //
 // Output: apps/web/public/style-previews/<derived-name>.jpg for each preset.
 
@@ -24,12 +26,14 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { runCodexImageGeneration } from "../apps/api/src/agent-runtime/stateless/codex-image-generation.ts";
 import {
   generateBaseImage,
   restyleImage,
   toPreviewJpeg,
 } from "../apps/api/src/generation/style-preview-renderer.ts";
 import { loadEnvFile } from "../apps/api/src/server.ts";
+import { UKIYO_E_STYLE_PRESET_ID } from "../packages/shared/src/image-generation-models.ts";
 import {
   SYSTEM_STYLE_PRESETS,
   stylePreviewFileName,
@@ -144,8 +148,15 @@ function selectPresets(selectors: string[]): SystemStylePreset[] {
 
 async function main(): Promise<void> {
   loadEnv();
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  const args = process.argv.slice(2);
+  const freshBase = args.includes("--fresh-base");
+  const targets = selectPresets(args.filter((a) => !a.startsWith("--")));
+  const reuseBase = !freshBase && (await fileExists(BASE_CACHE_PATH));
+  const needsOpenAi =
+    !reuseBase ||
+    targets.some((preset) => preset.id !== UKIYO_E_STYLE_PRESET_ID);
+  const apiKey = process.env.OPENAI_API_KEY ?? "";
+  if (needsOpenAi && !apiKey) {
     console.error(
       "OPENAI_API_KEY is not set. Set it in .env / .env.local at the repo " +
         "root, or pass it inline: OPENAI_API_KEY=... pnpm tsx " +
@@ -153,10 +164,6 @@ async function main(): Promise<void> {
     );
     process.exit(1);
   }
-
-  const args = process.argv.slice(2);
-  const freshBase = args.includes("--fresh-base");
-  const targets = selectPresets(args.filter((a) => !a.startsWith("--")));
 
   await mkdir(OUT_DIR, { recursive: true });
 
@@ -168,7 +175,7 @@ async function main(): Promise<void> {
   // 1. Obtain the shared base image: reuse the cache unless --fresh-base or no
   //    cache exists. The base is required even when only restyles are targeted.
   let baseImage: Buffer;
-  if (!freshBase && (await fileExists(BASE_CACHE_PATH))) {
+  if (reuseBase) {
     baseImage = await readFile(BASE_CACHE_PATH);
     console.log(`Reusing cached base image: ${BASE_CACHE_PATH}`);
   } else {
@@ -188,14 +195,19 @@ async function main(): Promise<void> {
     const fileName = stylePreviewFileName(preset.name);
     process.stdout.write(`Rendering ${preset.name} -> ${fileName} ... `);
 
-    const fullImage =
-      preset.id === BASE_PRESET_ID
-        ? baseImage
-        : await restyleImage({
-            apiKey,
-            baseImage,
-            prompt: buildRestylePrompt(previewStyleText(preset)),
-          });
+    let fullImage = baseImage;
+    const prompt = buildRestylePrompt(previewStyleText(preset));
+    if (preset.id === UKIYO_E_STYLE_PRESET_ID) {
+      fullImage = Buffer.from(
+        await runCodexImageGeneration({
+          prompt,
+          images: [baseImage],
+          repositoryRoot: REPO_ROOT,
+        }),
+      );
+    } else if (preset.id !== BASE_PRESET_ID) {
+      fullImage = await restyleImage({ apiKey, baseImage, prompt });
+    }
 
     const bytes = await toPreviewJpeg(fullImage);
     await writeFile(join(OUT_DIR, fileName), bytes);

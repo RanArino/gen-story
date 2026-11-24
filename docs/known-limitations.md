@@ -29,16 +29,15 @@ any cloud setup. The following features are deliberately excluded from this vers
   `interrupted by restart` on the next startup; they are not resumed.
 - The image model is chosen per run with the "Image model" selector on the
   Generate screen, the test-generation modal and the Review regenerate modal
-  (the choice is remembered in the browser). The default is Nano Banana 2
-  (`gemini-3.1-flash-image`), which uses `GEMINI_API_KEY`, or Vertex AI when
-  `GEMINI_USE_VERTEXAI=true`. The Gemini API free tier allows zero image
-  requests, so a free key fails with a rate-limit error; Vertex AI bills the
-  GCP project instead. GPT Image 2.5 (`gpt-image-2.5-flare-2026-09-08`, uses
-  `OPENAI_API_KEY`) is the alternative. When the selected provider's key is
-  unset, that provider falls back to a **mock adapter** that returns
-  placeholder images. Requests created before the selector existed carry no
-  model, so retrying one uses the Nano Banana default. Character reference
-  sheets and style previews still always use OpenAI.
+  (the choice is remembered in the browser). Automatic uses local Codex and
+  falls back to Nano Banana 2 through Gemini API or Vertex AI. Ukiyo-e
+  Woodblock Automatic uses Codex alone for test and scene images. A Codex
+  failure is shown as a retryable job failure. Codex output can still vary
+  between runs. An explicit Nano Banana 2 or GPT Image 2.5 selection uses the
+  selected API, and an unconfigured explicit option uses placeholder images.
+  Older requests with no model use Automatic when retried. Character sheets
+  use the standard Automatic policy. The Ukiyo-e preview uses Codex, and the
+  other previews use the OpenAI API.
 - Each scene has a "Follow source photo" control (Off / Low / High), default
   Off, on its card in the storyboard. Off is the long-standing behavior:
   prompt-only, the photo is never sent to the image model. Low and High send

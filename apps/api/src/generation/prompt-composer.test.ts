@@ -108,4 +108,26 @@ describe("composeImagePrompt", () => {
     expect(withEmpty).not.toContain("avoid:");
     expect(withAbsent).not.toContain("avoid:");
   });
+  it("keeps Ukiyo-e scene direction without adding lens or color-grade effects", () => {
+    const prompt = composeImagePrompt({
+      imagePrompt: "A station window and a traveler",
+      emotion: "Pride",
+      cameraDirection: "Close-up",
+      lightingDirection: "Golden hour",
+      tone: "cinematic",
+      stylePresetPrompt: "Fine carved ink lines",
+      stylePresetId: "system-ukiyoe-woodblock",
+      commonPrompt: "Afternoon train departure",
+      story: "",
+    });
+
+    expect(prompt).toContain("Fine carved ink lines");
+    expect(prompt).toContain("Afternoon train departure");
+    expect(prompt).toContain("Close-up");
+    expect(prompt).toContain("Golden hour");
+    expect(prompt).toContain("Pride");
+    expect(prompt).not.toMatch(
+      /bokeh|depth of field|sunset bloom|teal and orange/,
+    );
+  });
 });

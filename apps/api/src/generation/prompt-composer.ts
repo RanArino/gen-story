@@ -1,3 +1,5 @@
+import { UKIYO_E_STYLE_PRESET_ID } from "@gen-story/shared";
+
 const CAMERA_DESCRIPTORS: Record<string, string> = {
   Wide: "extreme wide shot, high camera angle, overwhelming scale, deep atmospheric perspective",
   "Extreme Wide":
@@ -76,6 +78,7 @@ export function composeImagePrompt(input: {
   cameraDirection: string;
   lightingDirection: string;
   tone: string;
+  stylePresetId?: string | null;
   stylePresetPrompt: string | null;
   commonPrompt: string;
   story: string;
@@ -90,6 +93,7 @@ export function composeImagePrompt(input: {
     cameraDirection,
     lightingDirection,
     tone,
+    stylePresetId,
     stylePresetPrompt,
     commonPrompt,
     story,
@@ -101,16 +105,24 @@ export function composeImagePrompt(input: {
   if (stylePresetPrompt) segments.push(stylePresetPrompt);
   if (commonPrompt.trim()) segments.push(commonPrompt.trim());
   if (story.trim()) segments.push(story.trim());
-  segments.push(CAMERA_DESCRIPTORS[cameraDirection] ?? "cinematic framing");
-  if (imagePrompt) segments.push(imagePrompt);
-  segments.push(
-    EMOTION_DESCRIPTORS[emotion] ?? "emotional cinematic atmosphere",
-  );
-  segments.push(
-    LIGHTING_DESCRIPTORS[lightingDirection] ?? "cinematic lighting",
-  );
-  segments.push(depthSuffix(cameraDirection));
-  if (TONE_COLOR_MODIFIERS[tone]) segments.push(TONE_COLOR_MODIFIERS[tone]);
+  if (stylePresetId === UKIYO_E_STYLE_PRESET_ID) {
+    if (cameraDirection) segments.push(`Framing: ${cameraDirection}`);
+    if (imagePrompt) segments.push(imagePrompt);
+    if (emotion) segments.push(`Emotion: ${emotion}`);
+    if (lightingDirection) segments.push(`Light: ${lightingDirection}`);
+    if (tone) segments.push(`Tone: ${tone}`);
+  } else {
+    segments.push(CAMERA_DESCRIPTORS[cameraDirection] ?? "cinematic framing");
+    if (imagePrompt) segments.push(imagePrompt);
+    segments.push(
+      EMOTION_DESCRIPTORS[emotion] ?? "emotional cinematic atmosphere",
+    );
+    segments.push(
+      LIGHTING_DESCRIPTORS[lightingDirection] ?? "cinematic lighting",
+    );
+    segments.push(depthSuffix(cameraDirection));
+    if (TONE_COLOR_MODIFIERS[tone]) segments.push(TONE_COLOR_MODIFIERS[tone]);
+  }
 
   if (negativePrompt && negativePrompt.trim()) {
     segments.push(`avoid: ${negativePrompt.trim()}`);

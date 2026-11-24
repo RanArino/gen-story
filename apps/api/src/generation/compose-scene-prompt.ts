@@ -113,6 +113,7 @@ export async function composeScenePrompt(
     lightingDirection:
       overrides.lightingDirection ?? scene.lightingDirection ?? "",
     tone: storyboard.tone ?? "",
+    stylePresetId: storyboard.stylePresetId,
     stylePresetPrompt: stylePreset?.prompt ?? null,
     commonPrompt: overrides.commonPrompt ?? storyboard.commonPrompt ?? "",
     story: overrides.story ?? storyboard.story ?? "",
