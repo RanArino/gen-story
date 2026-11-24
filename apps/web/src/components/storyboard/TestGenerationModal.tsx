@@ -19,6 +19,7 @@ import { AdjustmentChips } from "./AdjustmentChips";
 type Props = {
   storyboardId: string;
   sceneId: string;
+  stylePresetId: string | null;
   onConfirmed: () => void;
   onClose: () => void;
 };
@@ -43,6 +44,7 @@ function formatBatchTime(iso: string): string {
 export function TestGenerationModal({
   storyboardId,
   sceneId,
+  stylePresetId,
   onConfirmed,
   onClose,
 }: Props) {
@@ -230,6 +232,7 @@ export function TestGenerationModal({
             value={imageModel}
             onChange={setImageModel}
             disabled={starting}
+            stylePresetId={stylePresetId}
           />
         </div>
 
@@ -423,6 +426,11 @@ export function TestGenerationModal({
                           ? t("stateFailed")
                           : t("stateGenerating")}
                       </div>
+                    )}
+                    {req.status === "failed" && req.errorMessage && (
+                      <p style={{ fontSize: 13, overflowWrap: "anywhere" }}>
+                        {req.errorMessage}
+                      </p>
                     )}
                     {canAdjustBatch && (
                       <div style={{ marginTop: 8 }}>

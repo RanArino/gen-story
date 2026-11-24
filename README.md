@@ -64,6 +64,12 @@ Explicit Gemini and GPT Image selections retain the existing API/mock behavior;
 previous saved selections are preserved. The image selection is independent of
 the text/vision runtime in Settings. Character sheets always use Automatic.
 
+For **Ukiyo-e Woodblock**, Automatic uses Codex alone for scene images and test
+samples, including retries and regeneration. If Codex is unavailable or times
+out, the image fails and can be retried. Use the model selector to explicitly
+choose an API model. Run the seed command below to refresh a previously seeded
+Ukiyo-e preset in place. Existing images and saved project prompts are preserved.
+
 The app works without a Gemini key for photo analysis and story setup using
 deterministic local fallbacks. Explicit API image choices without their provider's
 credentials generate placeholder images. Style-preview scripts retain their API path.
@@ -110,31 +116,35 @@ Populate the database with a demo project and three scenes to explore the UI wit
 pnpm --filter @gen-story/api db:seed
 ```
 
-The script prints the project URL when complete. It also seeds the nine
+The script prints the project URL when complete. It also seeds the ten
 built-in image style presets (idempotent — safe to re-run).
 
 ## Generate Style Preview Images (Optional)
 
 The storyboard style gallery shows a preview image per style preset. The script
 generates one base image, then restyles that same image into every other style
-(OpenAI's "character anchor" pattern), so all nine previews show the same
+(OpenAI's "character anchor" pattern), so all ten previews show the same
 subject and differ only by visual style.
 
 ```sh
-# Render all nine previews
+# Render all ten previews
 OPENAI_API_KEY=... pnpm tsx scripts/generate-style-previews.ts
 
-# Regenerate only specific styles (base image is reused — no extra cost)
+# Regenerate only specific styles using the cached base
 pnpm tsx scripts/generate-style-previews.ts "Anime Movie" "Film Photo"
+
+# Regenerate the Ukiyo-e preview with a local Codex subscription
+pnpm tsx scripts/generate-style-previews.ts ukiyo-e-woodblock
 
 # Force the base image to be regenerated
 pnpm tsx scripts/generate-style-previews.ts --fresh-base
 ```
 
 This writes JPEG files to `apps/web/public/style-previews/`. The base image is
-cached at `data/style-preview-base.png` so re-runs do not regenerate it. The
-script requires `OPENAI_API_KEY` (read from `apps/api/.env`);
-without it the gallery simply shows no preview thumbnails.
+cached at `data/style-preview-base.png` so re-runs do not regenerate it.
+Creating the base and rendering the other presets requires `OPENAI_API_KEY`
+(read from `apps/api/.env`). The Ukiyo-e restyle uses Codex and can run without
+an API key when the base is already cached.
 
 ## Running Tests
 
@@ -263,8 +273,9 @@ API terminal logs each request in structured format:
 
 **Automatic image generation failed** — Check `codex login status` reports ChatGPT
 and Codex CLI is at least 0.164.0. If Codex is unavailable or its limits are reached,
-Automatic needs a paid `GEMINI_API_KEY` or configured Vertex AI for fallback. The
-job error names both provider failures. Each retry attempts Codex again.
+Ukiyo-e Automatic displays the Codex error and can be retried when Codex is
+available again. For other styles, Automatic needs a paid `GEMINI_API_KEY` or
+configured Vertex AI for fallback. Each local retry attempts Codex again.
 
 **Placeholder images instead of real ones** — An explicit API model is selected
 without its credentials. Nano Banana needs a paid `GEMINI_API_KEY` or Vertex AI

@@ -27,19 +27,14 @@ async function main() {
     const repos = createSqliteRepositories(db);
     await seedLocalPrincipal(repos);
 
-    // Seed/refresh the nine system style presets (idempotent, matched by id).
+    // Seed/refresh the ten system style presets (idempotent, matched by id).
     // Done before the demo-project early-return so prompt revisions still
     // propagate when re-seeding an existing database.
     const presetTs = now();
     for (const preset of SYSTEM_STYLE_PRESETS) {
-      const existing = await repos.stylePresets.findById(preset.id);
-      await repos.stylePresets.save({
-        id: preset.id,
-        scope: "system",
-        name: preset.name,
-        description: preset.description,
-        prompt: preset.prompt,
-        createdAt: existing?.createdAt ?? presetTs,
+      await repos.stylePresets.seedSystemPreset({
+        ...preset,
+        createdAt: presetTs,
         updatedAt: presetTs,
       });
     }

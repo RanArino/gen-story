@@ -50,6 +50,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [storyboardId, setStoryboardId] = useState<string | null>(null);
+  const [stylePresetId, setStylePresetId] = useState<string | null>(null);
   const [view, setView] = useState<"card" | "timeline" | "table">("card");
   const [filter, setFilter] = useState<"all" | "original" | "generated">("all");
   const [regenSceneId, setRegenSceneId] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
     if (storyboards.length === 0) return;
     const sb = storyboards[0]!;
     setStoryboardId(sb.id);
+    setStylePresetId(sb.stylePresetId);
     const scenes = await listScenes(sb.id);
 
     const reviewData = await Promise.all(
@@ -365,6 +367,7 @@ export function ReviewPage({ projectId }: { projectId: string }) {
       {regenReview && (
         <RegenModal
           scene={regenReview.scene}
+          stylePresetId={stylePresetId}
           onConfirm={(fields) => handleRegen(regenReview.scene, fields)}
           onClose={() => setRegenSceneId(null)}
         />
@@ -666,10 +669,12 @@ const LIGHTING_OPTIONS = [
 
 function RegenModal({
   scene,
+  stylePresetId,
   onConfirm,
   onClose,
 }: {
   scene: SceneDto;
+  stylePresetId: string | null;
   onConfirm: (fields: RegenFields) => void;
   onClose: () => void;
 }) {
@@ -799,6 +804,7 @@ function RegenModal({
             value={imageModel}
             onChange={setImageModel}
             disabled={submitting}
+            stylePresetId={stylePresetId}
           />
         </div>
 

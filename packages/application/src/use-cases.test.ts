@@ -2113,7 +2113,7 @@ describe("application use cases", () => {
     ]);
   });
 
-  it("retries a failed generation request as a fresh queued request", async () => {
+  it.each([undefined, null])("retries with preset %s", async (presetId) => {
     const deps = createDependencies({
       users: [
         createUser({
@@ -2147,6 +2147,7 @@ describe("application use cases", () => {
           id: "storyboard_1",
           projectId: "project_1",
           tone: "Reflective",
+          stylePresetId: "system-ukiyoe-woodblock",
           createdAt: "2026-05-02T00:00:00.000Z",
           updatedAt: "2026-05-02T00:00:00.000Z",
         }),
@@ -2173,7 +2174,7 @@ describe("application use cases", () => {
           projectId: "project_1",
           storyboardId: "storyboard_1",
           sceneId: "scene_1",
-          inputJson: { prompt: "prompt" },
+          inputJson: { prompt: "prompt", stylePresetId: presetId },
           status: "failed",
           errorMessage: "timed out",
           createdAt: "2026-05-02T00:00:00.000Z",
@@ -2191,6 +2192,11 @@ describe("application use cases", () => {
     if (result.ok) {
       expect(result.value.status).toBe("queued");
       expect(result.value.sourceGenerationRequestId).toBe("request_1");
+      expect(result.value.inputJson).toEqual({
+        prompt: "prompt",
+        stylePresetId:
+          presetId === undefined ? "system-ukiyoe-woodblock" : presetId,
+      });
     }
     expect(await deps.generationRequests.findQueued()).toHaveLength(1);
     expect(deps.jobQueue.jobs).toHaveLength(0);
@@ -3296,7 +3302,11 @@ describe("application use cases", () => {
           projectId: "p1",
           storyboardId: "sb1",
           sceneId: "s1",
-          inputJson: { testBatchId: "batch_1", testVariant: 0 },
+          inputJson: {
+            testBatchId: "batch_1",
+            testVariant: 0,
+            model: "gemini-3.1-flash-image",
+          },
           appliedAdjustments: opts?.adjustments ?? [],
           // A sample is only confirmable once its image exists, and the batch
           // link is now a field rather than something read back out of inputJson.
@@ -3327,6 +3337,7 @@ describe("application use cases", () => {
         ]);
         expect(result.value.sourceGenerationRequestId).toBe("variant_1");
         expect(result.value.status).toBe("queued");
+        expect(result.value.inputJson.model).toBe("gemini-3.1-flash-image");
       }
     });
 

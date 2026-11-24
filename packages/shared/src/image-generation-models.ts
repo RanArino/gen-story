@@ -25,6 +25,7 @@ export const IMAGE_GENERATION_MODELS: readonly ImageGenerationModelOption[] = [
 
 export const DEFAULT_IMAGE_GENERATION_MODEL = "auto";
 export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image";
+export const UKIYO_E_STYLE_PRESET_ID = "system-ukiyoe-woodblock";
 
 export function isGeminiImageModel(model: string): boolean {
   return model.startsWith("gemini-");

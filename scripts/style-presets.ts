@@ -1,10 +1,19 @@
-// Single source of truth for the nine built-in (system-scope) style presets.
+// Single source of truth for the ten built-in (system-scope) style presets.
 // Imported by scripts/seed.ts (to seed the style_presets table) and by
 // scripts/generate-style-previews.ts (to render preview images).
 //
 // Each preset uses a fixed, stable id so re-seeding is idempotent. The preview
 // image filename is derived from `name` by the API (toStylePresetDto):
 //   /style-previews/<name lowercased, spaces -> dashes>.jpg
+//
+// When authoring a preset prompt, describe the medium, observable rendering
+// techniques, and where their effects apply. Leave subjects, motifs, and framing
+// to each scene. Treat source photos as references for scene content.
+// Verify the gallery preview and first-pass storyboard images from different
+// subjects with the preset's intended provider. Check the provider and effective
+// inputs before attributing style drift across runs to the prompt.
+
+import { UKIYO_E_STYLE_PRESET_ID } from "../packages/shared/src/image-generation-models.ts";
 
 export type SystemStylePreset = {
   id: string;
@@ -77,6 +86,14 @@ export const SYSTEM_STYLE_PRESETS: SystemStylePreset[] = [
       "Stylized 3D animated film look with soft lighting and tactile materials.",
     prompt:
       "A stylized 3D animated film still with appealing shapes, soft global illumination, tactile materials, and clear depth. Use cinematic camera placement, readable posing, gentle subsurface skin lighting, and polished but not plastic surfaces. Keep character models, costumes, and props consistent across scenes.",
+  },
+  {
+    id: UKIYO_E_STYLE_PRESET_ID,
+    name: "Ukiyo-e Woodblock",
+    description:
+      "Hand-printed Japanese woodblock with layered pigment, fine carved lines, and textured washi.",
+    prompt:
+      "Render the entire scene as a finely carved, hand-printed Japanese ukiyo-e color woodblock print. Layer broad, flat blocks of ink and earthy pigment on warm washi. Show fine paper fibers, lightly worn ink, and uneven pigment transfer across the print, including the sky and large color fields. Use thin, restrained sumi outlines and small carved marks for scene-specific details such as rice stalks, grasses, roof tiles, or woven fabric. Use a limited palette of indigo, gold-ochre, muted greens, warm paper cream, and vermilion accents where they fit. Use bokashi only in open sky and build depth elsewhere through overlapping shapes and changes of ink color. Give faces and garments simple flat color and delicate linework. Include maple leaves or bands of mist only when they belong in the scene. Carry the subject, setting, composition, time of day, and emotion from the scene and its references. Use this woodblock technique when other directions describe a different rendering treatment. Represent light with printed color shapes and keep detail legible at every depth. Avoid heavy outlines, crosshatching, hard comic borders, photographic shading, lens blur, and smooth digital gradients outside the sky.",
   },
   {
     id: "system-ai-auto",

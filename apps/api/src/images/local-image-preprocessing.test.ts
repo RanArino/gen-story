@@ -85,6 +85,7 @@ describe("LocalImagePreprocessingAdapter", () => {
               id: "storyboard_1",
               projectId: "project_1",
               tone: "warm",
+              stylePresetId: "system-ukiyoe-woodblock",
               createdAt: now,
               updatedAt: now,
             }),
@@ -155,6 +156,7 @@ describe("LocalImagePreprocessingAdapter", () => {
         storyboardId: "storyboard_1",
         sceneId: "scene_1",
         inputJson: {
+          stylePresetId: "caller-supplied",
           promptOverride: "Draw the station sign exactly as written.",
           negativePromptOverride: "watermark",
         },
@@ -188,6 +190,7 @@ describe("LocalImagePreprocessingAdapter", () => {
       expect(generationRequest?.inputJson).toMatchObject({
         projectId: "project_1",
         sceneId: "scene_1",
+        stylePresetId: "system-ukiyoe-woodblock",
         // Carried through unmodified so the image-generation adapter can
         // decide generate vs. edit without a second lookup of the scene.
         photoFidelity: "high",

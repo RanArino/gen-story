@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import {
   DEFAULT_IMAGE_GENERATION_MODEL,
   IMAGE_GENERATION_MODELS,
+  UKIYO_E_STYLE_PRESET_ID,
 } from "@gen-story/shared";
 
 const IMAGE_MODEL_STORAGE_KEY = "gen-story:image-model";
@@ -43,13 +44,16 @@ export function ImageModelSelect({
   value,
   onChange,
   disabled,
+  stylePresetId,
 }: {
   value: string;
   onChange: (model: string) => void;
   disabled?: boolean;
+  stylePresetId?: string | null;
 }) {
   const t = useTranslations("imageModel");
   const descriptionId = useId();
+  const codexOnly = stylePresetId === UKIYO_E_STYLE_PRESET_ID;
   return (
     <label
       style={{
@@ -68,13 +72,19 @@ export function ImageModelSelect({
       >
         {IMAGE_GENERATION_MODELS.map((option) => (
           <option key={option.id} value={option.id}>
-            {option.id === "auto" ? t("automatic") : option.label}
+            {option.id === "auto"
+              ? t(codexOnly ? "automaticCodexOnly" : "automatic")
+              : option.label}
           </option>
         ))}
       </select>
       {value === "auto" && (
         <span id={descriptionId} style={{ fontSize: 12 }}>
-          {t("automaticDescription")}
+          {t(
+            codexOnly
+              ? "automaticCodexOnlyDescription"
+              : "automaticDescription",
+          )}
         </span>
       )}
     </label>

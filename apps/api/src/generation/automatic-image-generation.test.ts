@@ -28,11 +28,17 @@ describe("Automatic image generation", () => {
     await router.generate(input);
     await router.generate({
       ...input,
-      inputJson: { model: "gemini-3.1-flash-image" },
+      inputJson: {
+        model: "gemini-3.1-flash-image",
+        stylePresetId: "system-ukiyoe-woodblock",
+      },
     });
     await router.generate({
       ...input,
-      inputJson: { model: "gpt-image-2.5-flare-2026-09-08" },
+      inputJson: {
+        model: "gpt-image-2.5-flare-2026-09-08",
+        stylePresetId: "system-ukiyoe-woodblock",
+      },
     });
     expect(automatic.generate).toHaveBeenCalledOnce();
     expect(gemini.generate).toHaveBeenCalledOnce();
@@ -46,6 +52,29 @@ describe("Automatic image generation", () => {
     expect(await adapter.generate(input)).toEqual(result);
     expect(gemini.generate).not.toHaveBeenCalled();
   });
+
+  it.each(["timed out", "not logged in", "disabled outside local deployment"])(
+    "keeps Automatic Ukiyo-e on Codex when it is %s",
+    async (reason) => {
+      const codex = provider();
+      codex.generate.mockRejectedValueOnce(new Error(reason));
+      const gemini = provider();
+      const adapter = new AutomaticImageGenerationAdapter(
+        reason.startsWith("disabled") ? null : codex,
+        gemini,
+      );
+      await expect(
+        adapter.generate({
+          ...input,
+          inputJson: {
+            ...input.inputJson,
+            stylePresetId: "system-ukiyoe-woodblock",
+          },
+        }),
+      ).rejects.toThrow(reason);
+      expect(gemini.generate).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     "missing CLI",

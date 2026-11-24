@@ -2407,6 +2407,7 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
         <TestGenerationModal
           storyboardId={storyboard.id}
           sceneId={scenes[0].id ?? ""}
+          stylePresetId={storyboard.stylePresetId}
           onConfirmed={() => {
             setShowTestModal(false);
             load().catch(() => undefined);

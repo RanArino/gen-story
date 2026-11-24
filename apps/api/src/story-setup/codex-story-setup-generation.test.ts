@@ -71,4 +71,29 @@ describe("CodexStorySetupGenerationAdapter", () => {
       } as StorySetupGenerationInput),
     ).rejects.toThrow();
   });
+
+  it("keeps the selected preset authoritative when drafting a common prompt", async () => {
+    const adapter = new CodexStorySetupGenerationAdapter(
+      async (request, parse) => {
+        expect(request.prompt).toContain(
+          "Treat the chosen visual style as the rendering authority",
+        );
+        expect(request.prompt).toContain(
+          "Keep motifs and framing specific to each scene",
+        );
+        return parse(validStorySetupJson, "codex-test");
+      },
+    );
+
+    await adapter.generateStorySetup({
+      language: "en",
+      project: { name: "Tokyo memories" },
+      storyboard: { tone: "nostalgic" },
+      stylePreset: {
+        name: "Ukiyo-e Woodblock",
+        prompt: "Fine ink lines on washi.",
+      },
+      photoAnalysis: null,
+    } as StorySetupGenerationInput);
+  });
 });
