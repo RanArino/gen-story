@@ -719,6 +719,24 @@ describe("SQLite persistence", () => {
         }),
       ).rejects.toThrow("System style presets cannot be edited directly.");
 
+      await repositories.stylePresets.seedSystemPreset({
+        id: systemPreset.id,
+        name: systemPreset.name,
+        description: "Refreshed preset",
+        prompt: "Revised prompt",
+        createdAt: later,
+        updatedAt: later,
+      });
+      await expect(
+        repositories.stylePresets.findById(systemPreset.id),
+      ).resolves.toMatchObject({
+        scope: "system",
+        description: "Refreshed preset",
+        prompt: "Revised prompt",
+        createdAt: now,
+        updatedAt: later,
+      });
+
       const userPreset = createStylePreset({
         id: "style_user",
         scope: "user",

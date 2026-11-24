@@ -1047,6 +1047,14 @@ export class SqliteStylePresetRepository implements StylePresetRepositoryPort {
       throw new Error("System style presets cannot be edited directly.");
     }
 
+    await this.upsert(stylePreset);
+  }
+
+  async seedSystemPreset(preset: Omit<StylePreset, "scope">): Promise<void> {
+    await this.upsert({ ...preset, scope: "system" });
+  }
+
+  private async upsert(stylePreset: StylePreset): Promise<void> {
     await this.db
       .insert(stylePresets)
       .values({
