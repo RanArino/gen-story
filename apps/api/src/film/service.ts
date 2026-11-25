@@ -18,10 +18,13 @@ import {
   updateFilmDirection,
 } from "@gen-story/application";
 import {
+  directionBase,
   directionLocks,
   isVisibleInSceneHistory,
   transitionDirection,
   type FilmDirectionProposal,
+  type FilmDirectionField,
+  type FilmDirectionResolution,
   normalizeSceneCaptions,
   subtitleLines,
   validateFilm,
@@ -481,6 +484,7 @@ export class FilmService {
       model: null,
       error: null,
       content: null,
+      base: directionBase(treatment, c.id),
       createdAt: now,
       updatedAt: now,
     }));
@@ -620,6 +624,7 @@ export class FilmService {
     projectId: string,
     id: string,
     expectedRevision: number,
+    resolutions?: Partial<Record<FilmDirectionField, FilmDirectionResolution>>,
   ) {
     const treatment = await this.get(projectId);
     const proposal = (await this.direction.repository.list(projectId)).find(
@@ -644,6 +649,7 @@ export class FilmService {
       sceneIds: chapter.scenes.map((s) => s.sceneId),
       expectedRevision,
       now: new Date().toISOString(),
+      resolutions,
     });
   }
   async detail(

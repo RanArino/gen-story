@@ -857,6 +857,71 @@ describe("AI film direction", () => {
     );
   });
 
+  it("reports a manual edit made after the request as a conflict instead of overwriting it", async () => {
+    const { service, deps } = await ready();
+    const router = buildRouter({ ...deps, film: service });
+    const server: Server = createServer((req, res) => {
+      void router.handle(req, res).then((handled) => {
+        if (!handled) {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    cleanups.push(
+      () =>
+        new Promise<void>((resolve, reject) =>
+          server.close((e) => (e ? reject(e) : resolve())),
+        ),
+    );
+    const address = server.address() as { port: number };
+    const url = `http://127.0.0.1:${address.port}/api/projects/project/film`;
+    const [requested] = await service.requestDirection("project", {
+      scope: "film",
+      regenerate: false,
+    });
+    await settledList(service);
+    // The user names the Chapter and blanks the subtitle while the draft waits for review.
+    const current = await service.get("project");
+    await service.save(
+      {
+        ...current,
+        chapters: [{ ...current.chapters[0]!, title: "私の章" }],
+        sceneCaptions: { scene: { ja: "", en: "" } },
+      },
+      current.revision,
+    );
+    const approve = (body: unknown) =>
+      fetch(`${url}/directions/${requested!.id}/approve`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const refused = await approve({ expectedRevision: current.revision + 1 });
+    expect(refused.status).toBe(409);
+    const error = (
+      (await refused.json()) as {
+        error: { code: string; conflicts: { field: string }[] };
+      }
+    ).error;
+    expect(error.code).toBe("direction_conflict");
+    expect(error.conflicts.map((c) => c.field)).toEqual([
+      "chapterName",
+      "caption:scene",
+    ]);
+    expect((await service.get("project")).chapters[0]!.title).toBe("私の章");
+    const resolved = await approve({
+      expectedRevision: current.revision + 1,
+      resolutions: { chapterName: "mine", "caption:scene": "mine" },
+    });
+    expect(resolved.status).toBe(200);
+    const saved = await service.get("project");
+    expect(saved.chapters[0]!.title).toBe("私の章");
+    expect(saved.sceneCaptions?.scene).toEqual({ ja: "", en: "" });
+  });
   it("requests, edits and approves direction over HTTP and refuses unapproved renders", async () => {
     const { service, deps } = await ready();
     const router = buildRouter({ ...deps, film: service });

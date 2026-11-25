@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { markOriginalImageAdopted } from "@gen-story/application";
+import {
+  FilmDirectionConflictError,
+  type FilmDirectionField,
+} from "@gen-story/domain";
 import { digestBytes } from "@gen-story/infrastructure/film";
 import type { ApiDependencies } from "../app/create-api-context";
 import type { Router } from "../http/router";
@@ -52,6 +56,12 @@ const directionRequestSchema = z.object({
 const directionUpdateSchema = z.object({ content: z.unknown() });
 const directionApproveSchema = z.object({
   expectedRevision: z.number().int().positive(),
+  resolutions: z
+    .record(
+      z.string().regex(/^(chapterName|caption:.+)$/),
+      z.enum(["mine", "draft"]),
+    )
+    .optional(),
 });
 const revisionSchema = z.object({
   revision: z.number().int().positive(),
@@ -96,6 +106,16 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
       try {
         await handler(req, res, params, projectId);
       } catch (e) {
+        if (e instanceof FilmDirectionConflictError) {
+          sendJson(res, 409, {
+            error: {
+              code: "direction_conflict",
+              message: e.message,
+              conflicts: e.conflicts,
+            },
+          });
+          return;
+        }
         const message = e instanceof Error ? e.message : String(e);
         sendJson(
           res,
@@ -210,6 +230,9 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
         id,
         getParam(params, "directionId"),
         body.expectedRevision,
+        body.resolutions as
+          | Partial<Record<FilmDirectionField, "mine" | "draft">>
+          | undefined,
       );
       sendJson(res, 200, await service.detail(id));
     }),
