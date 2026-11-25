@@ -48,9 +48,18 @@ Keep the existing look; extend it rather than introducing a new style.
   changing them so Escape and focus return work natively.
 - **Copy:** every user-visible string goes through `next-intl`; add both `en.json`
   and `ja.json` entries.
-- **Light theme only:** there is no dark mode or `prefers-reduced-motion`
-  handling yet. Do not add one-off dark styles; dark mode would be its own
-  change.
+- **Light theme only:** there is no dark mode. Do not add one-off dark styles;
+  dark mode would be its own change.
+- **Reduced motion:** only the Film workspace handles
+  `prefers-reduced-motion` (camera samples open as a still frame comparison and
+  never autoplay). Previews of rendered motion must honour the Film's own
+  reduced-motion setting the same way the renderer does.
+- **Film workspace:** `film/FilmPage.tsx` keeps the title, save status and next
+  actions in a sticky top bar, a player plus Chapter/scene strip, and one
+  inspector for the selection (a bottom sheet below 760px). Give each editable
+  value one control there; dialogs (`CameraAudition`, `FilmExportDialog`) hold
+  choices, not duplicate editors. Camera previews use
+  `@gen-story/infrastructure/camera-preview`, the renderer's own camera path.
 
 ## Modern Web Guidance
 
