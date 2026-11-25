@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./film": "./src/index.ts"
+    "./film": "./src/index.ts",
+    "./camera-preview": "./src/cinematic/camera-preview.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -11,6 +11,7 @@ import {
 } from "./agent-direction.js";
 import { camAt, frameForImage } from "./math.js";
 import { validateDirection } from "./validate.js";
+import { previewFrame } from "./camera-preview.js";
 
 const scene = (
   sceneId: string,
@@ -240,6 +241,51 @@ describe("approved Agent direction", () => {
       scenes: [approved().scenes[0]!, scene("sea")],
     });
     expect(other.fingerprint).not.toBe(fingerprint);
+  });
+  it("previews the same photo placement the rendered chapter paints", () => {
+    const { direction } = directApprovedChapter(
+      input,
+      chapter,
+      timingPlan,
+      approved(),
+    );
+    const rendered = direction.scenes[1]!;
+    const view = { width: 1080, height: 1920 };
+    for (const p of [0, 0.25, 0.5, 0.75, 1]) {
+      const t = rendered.t0 + p * (rendered.t1 - rendered.t0);
+      const expected = frameForImage(
+        view.width,
+        view.height,
+        camAt(rendered, t),
+        1600,
+        1200,
+        "follow",
+      );
+      const preview = previewFrame(approved().scenes[1]!.camera, p, view, {
+        width: 1600,
+        height: 1200,
+      });
+      for (const key of ["left", "top", "width", "height"] as const)
+        expect(preview[key]).toBeCloseTo(expected[key], 6);
+    }
+    // Reduced motion holds the opening frame, like the painter.
+    expect(
+      previewFrame(
+        approved().scenes[1]!.camera,
+        0.8,
+        view,
+        {
+          width: 1600,
+          height: 1200,
+        },
+        true,
+      ),
+    ).toEqual(
+      previewFrame(approved().scenes[1]!.camera, 0, view, {
+        width: 1600,
+        height: 1200,
+      }),
+    );
   });
   it("refuses a direction made for different photos", () => {
     expect(() =>
