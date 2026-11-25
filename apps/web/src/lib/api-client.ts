@@ -33,6 +33,8 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
+    /** The parsed `error` body, for codes that carry structured details. */
+    public readonly details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -69,16 +71,18 @@ async function request<T>(
   if (!res.ok) {
     let code = "UNKNOWN";
     let message = res.statusText;
+    let details: Record<string, unknown> = {};
     try {
       const json = (await res.json()) as {
-        error?: { code?: string; message?: string };
+        error?: { code?: string; message?: string } & Record<string, unknown>;
       };
       code = json.error?.code ?? code;
       message = json.error?.message ?? message;
+      details = json.error ?? {};
     } catch {
       // ignore parse failure
     }
-    throw new ApiError(res.status, code, message);
+    throw new ApiError(res.status, code, message, details);
   }
 
   if (res.status === 204) return undefined as T;
@@ -1143,11 +1147,12 @@ export async function approveFilmDirection(
   projectId: string,
   id: string,
   expectedRevision: number,
+  resolutions?: Record<string, "mine" | "draft">,
 ): Promise<import("@gen-story/shared").FilmDetailDto> {
   return request(
     "POST",
     `/api/projects/${projectId}/film/directions/${id}/approve`,
-    { expectedRevision },
+    { expectedRevision, ...(resolutions ? { resolutions } : {}) },
   );
 }
 export async function adoptOriginalImage(
