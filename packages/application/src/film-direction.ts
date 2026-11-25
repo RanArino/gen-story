@@ -7,6 +7,8 @@ import {
   validateDirectionContent,
   type FilmAspect,
   type FilmDirectionContent,
+  type FilmDirectionField,
+  type FilmDirectionResolution,
   type FilmDirectionLocks,
   type FilmDirectionProposal,
   type FilmSceneDirection,
@@ -96,7 +98,7 @@ export function settlePlannedChapters(
   return settled;
 }
 
-/** Applies a user's edits to a proposal that has not been approved yet. */
+/** Applies a user's edits to a proposal under review, or a manual revision of an applied one. */
 export async function updateFilmDirection(
   repository: FilmDirectionRepositoryPort,
   input: {
@@ -111,12 +113,25 @@ export async function updateFilmDirection(
     (p) => p.id === input.id,
   );
   if (!proposal) throw new Error("AI direction not found.");
-  if (proposal.status !== "proposed")
-    throw new Error("Only a proposed AI direction can be edited.");
+  if (proposal.status !== "proposed" && proposal.status !== "approved")
+    throw new Error("Only a proposed or applied AI direction can be edited.");
   validateDirectionContent(input.content, input.sceneIds);
+  // After approval the saved treatment owns the Chapter name and captions, so a manual revision
+  // of an applied direction changes only camera, light and sound and keeps the reviewed text.
+  const content: FilmDirectionContent =
+    proposal.status === "approved" && proposal.content
+      ? {
+          ...input.content,
+          chapterName: proposal.content.chapterName,
+          scenes: input.content.scenes.map((scene, i) => ({
+            ...scene,
+            captions: proposal.content!.scenes[i]!.captions,
+          })),
+        }
+      : input.content;
   const updated = {
     ...proposal,
-    content: input.content,
+    content,
     updatedAt: input.now,
   };
   await repository.save(updated);
@@ -137,6 +152,8 @@ export async function approveFilmDirection(
     sceneIds: string[];
     expectedRevision: number;
     now: string;
+    /** Choices for values that both the draft and a newer manual edit changed. */
+    resolutions?: Partial<Record<FilmDirectionField, FilmDirectionResolution>>;
   },
 ): Promise<{ proposal: FilmDirectionProposal; treatment: FilmTreatment }> {
   const all = await repository.list(input.projectId);
@@ -152,7 +169,7 @@ export async function approveFilmDirection(
     throw new Error("Film changed in another editor. Reload before approving.");
   const approved = transitionDirection(proposal, "approved", input.now);
   const updated = {
-    ...applyApprovedDirection(treatment, approved),
+    ...applyApprovedDirection(treatment, approved, input.resolutions),
     revision: treatment.revision + 1,
   };
   if (!(await films.save(updated, treatment.revision)))

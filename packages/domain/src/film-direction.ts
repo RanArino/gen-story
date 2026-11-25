@@ -116,6 +116,12 @@ export interface FilmDirectionProposal {
   model: string | null;
   error: string | null;
   content: FilmDirectionContent | null;
+  /**
+   * The saved Chapter name and captions when the request started (null = no caption entry).
+   * Approval compares against it so newer manual edits are never silently overwritten.
+   * Missing on proposals created before this field existed.
+   */
+  base?: FilmDirectionBase;
   createdAt: string;
   updatedAt: string;
 }
@@ -302,23 +308,140 @@ export function enforceDirectionLocks(
   };
 }
 
+export interface FilmDirectionBase {
+  chapterName: string;
+  captions: Record<string, FilmSceneCaption | null>;
+}
+/** Captures the user-owned text a new proposal starts from. */
+export function directionBase(
+  treatment: FilmTreatment,
+  chapterId: string,
+): FilmDirectionBase {
+  const chapter = treatment.chapters.find((c) => c.id === chapterId);
+  if (!chapter) throw new Error("Chapter not found.");
+  return {
+    chapterName: chapter.title,
+    captions: Object.fromEntries(
+      chapter.scenes.map(({ sceneId }) => [
+        sceneId,
+        treatment.sceneCaptions?.[sceneId] ?? null,
+      ]),
+    ),
+  };
+}
+
+/** `chapterName` or `caption:<sceneId>`. */
+export type FilmDirectionField = "chapterName" | `caption:${string}`;
+export type FilmDirectionResolution = "mine" | "draft";
+export interface FilmDirectionConflict {
+  field: FilmDirectionField;
+  mine: string | FilmSceneCaption | null;
+  draft: string | FilmSceneCaption;
+}
+export class FilmDirectionConflictError extends Error {
+  constructor(readonly conflicts: FilmDirectionConflict[]) {
+    super(
+      "The film was edited after this AI draft was made. Choose which version to keep.",
+    );
+  }
+}
+
+const sameCaption = (
+  a: FilmSceneCaption | null | undefined,
+  b: FilmSceneCaption | null | undefined,
+) =>
+  (a ?? null) === (b ?? null) || (!!a && !!b && a.ja === b.ja && a.en === b.en);
+
+/**
+ * Three-way merge of a reviewed draft into the saved treatment. A value the user did not change
+ * since the request takes the draft; a value the draft did not change keeps the user's; a value
+ * both changed differently is a conflict that needs an explicit resolution.
+ */
+export function mergeApprovedDirection(
+  treatment: FilmTreatment,
+  proposal: FilmDirectionProposal,
+  resolutions: Partial<
+    Record<FilmDirectionField, FilmDirectionResolution>
+  > = {},
+): { treatment: FilmTreatment; conflicts: FilmDirectionConflict[] } {
+  if (!proposal.content) throw new Error("The AI direction has no content.");
+  const content = proposal.content;
+  const chapter = treatment.chapters.find((c) => c.id === proposal.chapterId);
+  if (!chapter) throw new Error("Chapter not found.");
+  const conflicts: FilmDirectionConflict[] = [];
+  /** Without a recorded base, only a default title or a missing caption is known to be untouched. */
+  const decide = <T>(
+    field: FilmDirectionField,
+    mine: T,
+    draft: Exclude<T, null>,
+    untouched: boolean,
+    draftUnchanged: boolean,
+    same: (a: T, b: T) => boolean,
+  ): T => {
+    if (same(mine, draft) || untouched) return draft;
+    if (draftUnchanged) return mine;
+    const choice = resolutions[field];
+    if (choice === "mine") return mine;
+    if (choice === "draft") return draft;
+    conflicts.push({
+      field,
+      mine: mine as FilmDirectionConflict["mine"],
+      draft: draft as FilmDirectionConflict["draft"],
+    });
+    return mine;
+  };
+  const base = proposal.base;
+  const title = decide<string>(
+    "chapterName",
+    chapter.title,
+    content.chapterName,
+    base
+      ? chapter.title === base.chapterName
+      : isDefaultChapterTitle(chapter.title),
+    !!base && content.chapterName === base.chapterName,
+    (a, b) => a === b,
+  );
+  const captions = { ...treatment.sceneCaptions };
+  for (const scene of content.scenes) {
+    const mine = treatment.sceneCaptions?.[scene.sceneId] ?? null;
+    const known = base && scene.sceneId in base.captions;
+    const next = decide<FilmSceneCaption | null>(
+      `caption:${scene.sceneId}`,
+      mine,
+      scene.captions,
+      known ? sameCaption(mine, base.captions[scene.sceneId]) : mine === null,
+      !!known && sameCaption(scene.captions, base.captions[scene.sceneId]),
+      sameCaption,
+    );
+    if (next) captions[scene.sceneId] = next;
+    else delete captions[scene.sceneId];
+  }
+  return {
+    conflicts,
+    treatment: {
+      ...treatment,
+      sceneCaptions: captions,
+      chapters: treatment.chapters.map((c) =>
+        c.id === proposal.chapterId ? { ...c, title } : c,
+      ),
+    },
+  };
+}
+
 /** Writes an approved proposal's reviewed Chapter name and captions into the treatment. */
 export function applyApprovedDirection(
   treatment: FilmTreatment,
   proposal: FilmDirectionProposal,
+  resolutions: Partial<
+    Record<FilmDirectionField, FilmDirectionResolution>
+  > = {},
 ): FilmTreatment {
   if (proposal.status !== "approved" || !proposal.content)
     throw new Error("Only an approved direction can be applied.");
-  const content = proposal.content;
-  const captions = { ...treatment.sceneCaptions };
-  for (const scene of content.scenes) captions[scene.sceneId] = scene.captions;
-  return {
-    ...treatment,
-    sceneCaptions: captions,
-    chapters: treatment.chapters.map((c) =>
-      c.id === proposal.chapterId ? { ...c, title: content.chapterName } : c,
-    ),
-  };
+  const merged = mergeApprovedDirection(treatment, proposal, resolutions);
+  if (merged.conflicts.length)
+    throw new FilmDirectionConflictError(merged.conflicts);
+  return merged.treatment;
 }
 
 const TRANSITIONS: Record<FilmDirectionStatus, FilmDirectionStatus[]> = {

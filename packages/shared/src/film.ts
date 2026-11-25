@@ -150,8 +150,20 @@ export interface FilmDirectionDto {
   model: string | null;
   error: string | null;
   content: FilmDirectionContentDto | null;
+  /** Saved Chapter name and captions when the request started; absent on older proposals. */
+  base?: {
+    chapterName: string;
+    captions: Record<string, FilmSceneCaption | null>;
+  };
   createdAt: string;
   updatedAt: string;
+}
+/** A value that both an AI draft and a newer manual edit changed (409 `direction_conflict`). */
+export interface FilmDirectionConflictDto {
+  /** `chapterName` or `caption:<sceneId>`. */
+  field: string;
+  mine: string | FilmSceneCaption | null;
+  draft: string | FilmSceneCaption;
 }
 export interface FilmDetailDto {
   currentAssemblyFingerprint: string | null;

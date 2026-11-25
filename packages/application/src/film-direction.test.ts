@@ -177,7 +177,7 @@ describe("reviewing and approving", () => {
         now: "t1",
       }),
     ).rejects.toThrow();
-    s.proposals.set("d1", proposal({ status: "approved" }));
+    s.proposals.set("d1", proposal({ status: "superseded" }));
     await expect(
       updateFilmDirection(s.directions, {
         projectId: "p",
@@ -187,6 +187,23 @@ describe("reviewing and approving", () => {
         now: "t1",
       }),
     ).rejects.toThrow(/proposed/);
+  });
+  it("revises an applied camera without changing its reviewed text", async () => {
+    const s = stores([proposal({ status: "approved" })]);
+    const next = content("別の字幕");
+    next.chapterName = "別の名前";
+    next.scenes[0]!.camera = { ...next.scenes[0]!.camera, move: "pan-left" };
+    const revised = await updateFilmDirection(s.directions, {
+      projectId: "p",
+      id: "d1",
+      content: next,
+      sceneIds: ["a", "b"],
+      now: "t1",
+    });
+    expect(revised.status).toBe("approved");
+    expect(revised.content!.scenes[0]!.camera.move).toBe("pan-left");
+    expect(revised.content!.chapterName).toBe("港の朝");
+    expect(revised.content!.scenes[0]!.captions.ja).toBe("海へ");
   });
   it("approves, writes name and captions, and supersedes the previous approval", async () => {
     const s = stores([
@@ -239,5 +256,78 @@ describe("reviewing and approving", () => {
       }),
     ).rejects.toThrow(/another editor/);
     expect(s.proposals.get("d1")!.status).toBe("proposed");
+  });
+});
+
+describe("approving an older proposal after manual edits", () => {
+  // The proposal was requested while the Chapter had its default title and no captions.
+  const older = () =>
+    proposal({
+      base: { chapterName: "チャプター 1", captions: { a: null, b: null } },
+    });
+  const editManually = async (s: ReturnType<typeof stores>) => {
+    const film = s.film();
+    await s.films.save(
+      {
+        ...film,
+        revision: 3,
+        chapters: [{ ...film.chapters[0]!, title: "私の章" }],
+        // A deliberately blank caption is a manual choice, not a missing value.
+        sceneCaptions: { a: { ja: "", en: "" } },
+      },
+      2,
+    );
+  };
+  const approve = (
+    s: ReturnType<typeof stores>,
+    resolutions?: Record<string, "mine" | "draft">,
+  ) =>
+    approveFilmDirection(s.directions, s.films, {
+      projectId: "p",
+      id: "d1",
+      currentInputDigest: "sha256:current",
+      sceneIds: ["a", "b"],
+      expectedRevision: 3,
+      now: "t3",
+      ...(resolutions ? { resolutions } : {}),
+    });
+
+  it("refuses to overwrite newer manual values and reports each conflict", async () => {
+    const s = stores([older()]);
+    await editManually(s);
+    await expect(approve(s)).rejects.toMatchObject({
+      conflicts: [
+        { field: "chapterName", mine: "私の章", draft: "港の朝" },
+        {
+          field: "caption:a",
+          mine: { ja: "", en: "" },
+          draft: { ja: "海へ", en: "To the sea" },
+        },
+      ],
+    });
+    expect(s.film().chapters[0]!.title).toBe("私の章");
+    expect(s.film().sceneCaptions?.a).toEqual({ ja: "", en: "" });
+    expect(s.proposals.get("d1")!.status).toBe("proposed");
+  });
+  it("applies explicit resolutions and untouched draft values", async () => {
+    const s = stores([older()]);
+    await editManually(s);
+    await approve(s, { chapterName: "mine", "caption:a": "mine" });
+    expect(s.film().chapters[0]!.title).toBe("私の章");
+    expect(s.film().sceneCaptions?.a).toEqual({ ja: "", en: "" });
+    // Scene b was not edited manually, so the reviewed draft applies.
+    expect(s.film().sceneCaptions?.b).toEqual({ ja: "海へ", en: "To the sea" });
+    expect(s.proposals.get("d1")!.status).toBe("approved");
+  });
+  it("keeps a newer manual value the draft did not change", async () => {
+    const s = stores([
+      proposal({
+        base: { chapterName: "港の朝", captions: { a: null, b: null } },
+      }),
+    ]);
+    await editManually(s);
+    await approve(s, { "caption:a": "draft" });
+    expect(s.film().chapters[0]!.title).toBe("私の章");
+    expect(s.film().sceneCaptions?.a).toEqual({ ja: "海へ", en: "To the sea" });
   });
 });

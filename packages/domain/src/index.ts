@@ -228,6 +228,9 @@ export {
   directionLocks,
   enforceDirectionLocks,
   applyApprovedDirection,
+  mergeApprovedDirection,
+  directionBase,
+  FilmDirectionConflictError,
   transitionDirection,
   isDirectionStale,
 } from "./film-direction";
@@ -242,4 +245,8 @@ export type {
   FilmDirectionStatus,
   FilmDirectionProposal,
   FilmDirectionLocks,
+  FilmDirectionBase,
+  FilmDirectionField,
+  FilmDirectionResolution,
+  FilmDirectionConflict,
 } from "./film-direction";
