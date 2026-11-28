@@ -1,0 +1,74 @@
+{
+  "model": "claude-opus-5-5",
+  "inputDigest": "sha256:7868732549235c42a69187b55a01fd534222c81d4d0ecc3c1050a0c84391ac84",
+  "content": {
+    "chapterName": "海辺の一日",
+    "nameReason": "ロックされたタイトル。列車・港・夕陽の三枚がひとつの海辺の旅の一日を描いている。",
+    "music": {
+      "mood": "温かく懐かしい、穏やかな旅情",
+      "key": "D",
+      "mode": "major",
+      "melody": "medium",
+      "arc": "steady",
+      "fromPrevious": "continue",
+      "instruments": ["pad", "koto-pluck"],
+      "tempoBpm": 66
+    },
+    "scenes": [
+      {
+        "sceneId": "coastal-train",
+        "observation": "海沿いの木造ホームに赤い一両列車が入ってくる。左奥には低い太陽と光る海。",
+        "camera": {
+          "move": "push-in",
+          "focus": { "x": 0.72, "y": 0.47 },
+          "speed": 0.3,
+          "reason": "到着する赤い列車へ寄り、旅の始まりの高揚を出す。"
+        },
+        "effects": { "rays": 0.3, "motes": 0.15, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.4, "stream": 0.5 },
+        "sounds": [{ "sound": "bird-chirp", "at": 0.2, "gain": 0.35 }],
+        "captions": {
+          "ja": "小さな駅に、海の光ごと列車が着いた。",
+          "en": "The little train pulled in, carrying the sea's light with it."
+        }
+      },
+      {
+        "sceneId": "harbor-cafe",
+        "observation": "窓辺の木のテーブルにコーヒーとクロワッサン。窓の外には漁船の並ぶ港と灯台。",
+        "camera": {
+          "move": "pan-right",
+          "focus": { "x": 0.6, "y": 0.55 },
+          "speed": 0.2,
+          "reason": "カップからクロワッサン、港の景色へと視線をゆっくり運ぶ。"
+        },
+        "effects": { "rays": 0.15, "motes": 0.25, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.1, "stream": 0.2 },
+        "sounds": [{ "sound": "suzu", "at": 0.6, "gain": 0.2 }],
+        "captions": {
+          "ja": "港を眺めながら、急がない朝ごはん。",
+          "en": "Breakfast with a view of the harbor, and nowhere to hurry."
+        }
+      },
+      {
+        "sceneId": "sunset-walk",
+        "observation": "崖沿いの小道と古いベンチ。島々の向こうに夕陽が沈み、海に光の道ができている。",
+        "camera": {
+          "move": "pull-out",
+          "focus": { "x": 0.82, "y": 0.35 },
+          "speed": 0.15,
+          "reason": "夕陽と光の道から始め、ベンチと小道を含む全景へ広げて一日を閉じる。"
+        },
+        "effects": { "rays": 0.3, "motes": 0.15, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.5, "stream": 0.4 },
+        "sounds": [{ "sound": "low-swell", "at": 0.45, "gain": 0.5 }],
+        "captions": {
+          "ja": "沈む陽を見送って、今日がやさしく終わる。",
+          "en": "We watched the sun go down, and the day ended gently."
+        }
+      }
+    ]
+  }
+}
