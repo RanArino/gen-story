@@ -151,6 +151,7 @@ beforeEach(() => {
       original: { storageKey: `${title}.png` },
       images: [],
     })),
+    templates: [],
     currentAssemblyFingerprint: null,
     jobs: [],
     preflight: [],

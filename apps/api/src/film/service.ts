@@ -8,6 +8,7 @@ import type {
   FilmDirectionPlannerPort,
   FilmDirectionPlanRequest,
   FilmDirectionRepositoryPort,
+  FilmTemplateCatalogPort,
 } from "@gen-story/application";
 import {
   approveFilmDirection,
@@ -18,7 +19,10 @@ import {
   updateFilmDirection,
 } from "@gen-story/application";
 import {
+  clampDirectionToTemplate,
   directionBase,
+  FILM_ASPECTS,
+  frameLayoutFor,
   directionLocks,
   isVisibleInSceneHistory,
   transitionDirection,
@@ -33,7 +37,11 @@ import {
   type FilmTreatment,
   type Scene,
 } from "@gen-story/domain";
-import type { FilmDetailDto, FilmSceneDto } from "@gen-story/shared";
+import type {
+  FilmDetailDto,
+  FilmSceneDto,
+  FilmTemplateDto,
+} from "@gen-story/shared";
 import {
   ASPECT_PROFILES,
   compileFilm,
@@ -44,6 +52,7 @@ import {
   digestBytes,
   digestOf,
   initializeRuntime,
+  loadFilmTemplateCatalog,
   renderFilmChapter,
   renderFilmAssembly,
   type ChapterArtifact,
@@ -96,6 +105,12 @@ const repositoryRoot = resolve(
   "../../../..",
 );
 
+export class InvalidFilmTemplateError extends Error {
+  constructor() {
+    super("Choose an available Film template.");
+  }
+}
+
 export class FilmService {
   private pending: (() => Promise<void>)[] = [];
   private running = false;
@@ -127,7 +142,57 @@ export class FilmService {
         },
       },
     },
+    private readonly templates: FilmTemplateCatalogPort = loadFilmTemplateCatalog(),
   ) {}
+  listTemplates(): FilmTemplateDto[] {
+    return this.templates
+      .list()
+      .map(
+        ({
+          id,
+          revision,
+          offered,
+          name,
+          description,
+          facts,
+          bounds,
+          fixed,
+          frame,
+        }) => ({
+          id,
+          revision,
+          offered,
+          name,
+          description,
+          facts,
+          bounds,
+          layout: fixed?.layout ?? "full-frame",
+          frame: Object.fromEntries(
+            FILM_ASPECTS.map((aspect) => [
+              aspect,
+              frameLayoutFor(frame, aspect),
+            ]),
+          ) as FilmTemplateDto["frame"],
+          hasFixedStyle: Boolean(fixed),
+        }),
+      );
+  }
+  private template(id: string) {
+    const template = this.templates.get(id);
+    if (!template) throw new Error("Choose a supported Film template.");
+    return template;
+  }
+  private async canSelectTemplate(
+    projectId: string,
+    id: string,
+  ): Promise<boolean> {
+    const template = this.templates.get(id);
+    return Boolean(
+      template &&
+      (template.offered ||
+        (await this.repository.get(projectId))?.recipe === id),
+    );
+  }
   private runtime(projectId: string) {
     // Project IDs are validated at the HTTP boundary; hash them again for filesystem isolation.
     const paths = initializeRuntime(
@@ -157,24 +222,30 @@ export class FilmService {
   async get(projectId: string): Promise<FilmTreatment> {
     const stored = await this.repository.get(projectId);
     if (!stored) return this.defaultTreatment(projectId);
-    if (!stored.sceneCaptions) return stored;
-    const treatment = {
-      ...stored,
-      sceneCaptions: normalizeSceneCaptions(stored.sceneCaptions) ?? {},
-    };
+    if (!stored.sceneCaptions && !stored.sceneLayouts) return stored;
     const sceneIds = new Set(
       (await this.scenes(projectId)).map((scene) => scene.id),
     );
+    // Captions and per-photo layouts of deleted scenes are dropped.
+    const present = <T>(entries: Record<string, T>) =>
+      Object.fromEntries(
+        Object.entries(entries).filter(([sceneId]) => sceneIds.has(sceneId)),
+      );
     return {
-      ...treatment,
-      sceneCaptions: Object.fromEntries(
-        Object.entries(treatment.sceneCaptions).filter(([sceneId]) =>
-          sceneIds.has(sceneId),
+      ...stored,
+      ...(stored.sceneCaptions && {
+        sceneCaptions: present(
+          normalizeSceneCaptions(stored.sceneCaptions) ?? {},
         ),
-      ),
+      }),
+      ...(stored.sceneLayouts && {
+        sceneLayouts: present(stored.sceneLayouts),
+      }),
     };
   }
   async save(treatment: FilmTreatment, expectedRevision: number) {
+    if (!(await this.canSelectTemplate(treatment.projectId, treatment.recipe)))
+      throw new InvalidFilmTemplateError();
     return saveFilmTreatment(
       this.repository,
       treatment,
@@ -338,7 +409,8 @@ export class FilmService {
       media,
       scenes: story,
     };
-    const timing = compileFilm(paths, input);
+    const template = this.template(treatment.recipe);
+    const timing = compileFilm(paths, input, template.recipe);
     const proposals = await this.direction.repository.list(treatment.projectId);
     const compiled: PreparedChapter[] = [];
     const chapters = timing.compiled.map((c, i) => {
@@ -352,7 +424,13 @@ export class FilmService {
         compiled.push({
           timingPlan: c.plan,
           proposal: c.proposal,
-          ...directApprovedChapter(input, chapter, c.plan, approved.content!),
+          ...directApprovedChapter(
+            input,
+            chapter,
+            c.plan,
+            approved.content!,
+            template,
+          ),
         });
       return {
         chapterId: chapter.id,
@@ -497,9 +575,14 @@ export class FilmService {
     const first = index(targets[0]!.id),
       last = index(targets.at(-1)!.id);
     const boards = await this.deps.storyboards.findByProjectId(projectId);
+    const template = this.template(treatment.recipe);
+    const retained = base?.content
+      ? clampDirectionToTemplate(base.content, template.bounds)
+      : null;
     const request: FilmDirectionPlanRequest = {
       scope: options.scope,
       filmTitle: treatment.title,
+      template,
       story: boards[0]?.story ?? "",
       outputAspect: treatment.outputAspect ?? "16:9",
       neighbors:
@@ -536,9 +619,8 @@ export class FilmService {
             storyboardTitle: image.title,
             imageKey: image.key,
             keep:
-              base && sceneId !== options.sceneId
-                ? (base.content!.scenes.find((s) => s.sceneId === sceneId) ??
-                  null)
+              retained && sceneId !== options.sceneId
+                ? (retained.scenes.find((s) => s.sceneId === sceneId) ?? null)
                 : null,
           };
         }),
@@ -617,6 +699,7 @@ export class FilmService {
       id,
       content,
       sceneIds: chapter.scenes.map((s) => s.sceneId),
+      bounds: this.template(treatment.recipe).bounds,
       now: new Date().toISOString(),
     });
   }
@@ -689,6 +772,7 @@ export class FilmService {
       }));
     }
     return {
+      templates: this.listTemplates(),
       treatment,
       scenes: await this.sceneDetails(projectId),
       jobs,

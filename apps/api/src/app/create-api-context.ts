@@ -1,3 +1,4 @@
+import { loadFilmTemplateCatalog } from "@gen-story/infrastructure/film";
 import { FilmService } from "../film/service";
 import { SqliteFilmRepository } from "../film/repository";
 import { SqliteFilmDirectionRepository } from "../film/direction-repository";
@@ -338,6 +339,7 @@ export function createApiContext(
           () => agentRuntime.selection,
         ),
       },
+      loadFilmTemplateCatalog(),
     ),
     objectStorage,
     imagePreprocessing,

@@ -220,6 +220,7 @@ export interface FilmTemplateDto {
   };
 }
 export interface FilmDetailDto {
+  templates: FilmTemplateDto[];
   currentAssemblyFingerprint: string | null;
   treatment: FilmTreatment;
   scenes: FilmSceneDto[];
