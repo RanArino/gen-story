@@ -35,3 +35,85 @@ export function frameForImage(
   height: number,
   framing?: "contain" | "follow",
 ): { left: number; top: number; width: number; height: number };
+export function wrapBalanced(
+  text: string,
+  maxWidth: number,
+  measure: (text: string) => number,
+  maxLines?: number,
+): string[];
+export interface PaperNoteInput {
+  text: string;
+  sub: string;
+  /** Width of `text` set at `size`, in the same units as the frame. */
+  measure: (text: string, size: number) => number;
+}
+export interface PaperNote {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  main: string[];
+  sub: string[];
+  size: number;
+  subSize: number;
+  lineHeight: number;
+  gapLines: number;
+  padY: number;
+}
+export function paperCardFrame(
+  width: number,
+  height: number,
+  camera: { fx: number; fy: number; z: number },
+  imageWidth: number,
+  imageHeight: number,
+  index: number,
+  note?: PaperNoteInput | null,
+): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  border: number;
+  rotation: number;
+  note?: PaperNote;
+};
+export interface FrameBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  crop?: "16:9" | "9:16" | "1:1";
+}
+export interface FramePlace {
+  x: number;
+  y: number;
+  size: number;
+}
+export function photoBox(
+  width: number,
+  height: number,
+  box: FrameBox,
+): FrameBox & { left: number; top: number };
+export function paperCardBox(
+  width: number,
+  height: number,
+  box: FrameBox,
+  index: number,
+): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  outerWidth: number;
+  outerHeight: number;
+  border: number;
+  rotation: number;
+};
+export function paperNoteFrame(
+  width: number,
+  height: number,
+  place: FramePlace,
+  note: PaperNoteInput | null | undefined,
+  cardWidth?: number,
+): PaperNote | null;
