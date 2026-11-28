@@ -1,3 +1,6 @@
+import type { FilmLayoutOverride } from "./film-layout";
+import { layoutOverrideError } from "./film-layout";
+
 export const FILM_RECIPES = [
   "quiet-cinema",
   "memory-board",
@@ -35,6 +38,10 @@ export interface FilmTreatment {
   /** Absent means 16:9. */
   outputAspect?: FilmAspect;
   sceneCaptions?: Record<string, FilmSceneCaption>;
+  /** The user's photo and caption placement for every photo; absent parts use the template's. */
+  layout?: FilmLayoutOverride;
+  /** Per-photo placement that replaces the Film layout for that photo only. */
+  sceneLayouts?: Record<string, FilmLayoutOverride>;
   chapters: FilmChapter[];
 }
 export interface FilmJob {
@@ -79,6 +86,18 @@ export function validateFilm(
       throw new Error(
         "Film captions must contain at most 120 Japanese and 200 English characters.",
       );
+  }
+  if (treatment.layout !== undefined) {
+    const error = layoutOverrideError(treatment.layout);
+    if (error) throw new Error(error);
+  }
+  for (const [sceneId, layout] of Object.entries(
+    treatment.sceneLayouts ?? {},
+  )) {
+    if (!sceneIds.includes(sceneId))
+      throw new Error("A layout references an unavailable project scene.");
+    const error = layoutOverrideError(layout);
+    if (error) throw new Error(error);
   }
   const chapters = new Set<string>();
   const used = new Set<string>();

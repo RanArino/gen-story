@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import {
+  clampDirectionToTemplate,
+  validateDirectionTemplateBounds,
+  type FilmTemplateBounds,
+} from "./film-template";
 import type { FilmTreatment } from "./film";
 import {
   applyApprovedDirection,
@@ -76,6 +81,39 @@ const proposal = (
 });
 
 describe("film direction content", () => {
+  it("clamps template choices without mutating approved direction or locked copy", () => {
+    const bounds: FilmTemplateBounds = {
+      cameraMoves: ["hold", "push-in"],
+      defaultMove: "hold",
+      maxSpeed: 0.5,
+      maxEffects: { rays: 0.25, motes: 0.1, leaves: 0 },
+      sounds: ["suzu"],
+      musicKeys: ["G"],
+      musicArcs: ["steady"],
+    };
+    const original = content();
+    const clamped = clampDirectionToTemplate(original, bounds);
+    expect(clamped.music).toMatchObject({ key: "G", arc: "steady" });
+    expect(clamped.scenes[0]).toMatchObject({
+      camera: {
+        move: "hold",
+        speed: 0.5,
+        focus: original.scenes[0]!.camera.focus,
+      },
+      effects: { rays: 0.25, motes: 0.1, leaves: 0, warmth: 0.3 },
+      sounds: [],
+      captions: original.scenes[0]!.captions,
+    });
+    expect(original.scenes[0]!.camera.move).toBe("climb");
+    expect(() => validateDirectionTemplateBounds(original, bounds)).toThrow(
+      /outside/,
+    );
+    expect(() =>
+      validateDirectionTemplateBounds(clamped, bounds),
+    ).not.toThrow();
+    expect(clampDirectionToTemplate(clamped, bounds)).toEqual(clamped);
+  });
+
   it("accepts a complete proposal for exactly the Chapter's photos", () => {
     expect(directionContentProblems(content(), ["a", "b"])).toEqual([]);
   });

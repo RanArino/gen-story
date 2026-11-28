@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./film-template": "./src/film-template.ts",
+    "./film-layout": "./src/film-layout.ts",
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
