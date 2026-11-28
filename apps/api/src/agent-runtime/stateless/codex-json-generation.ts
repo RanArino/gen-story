@@ -144,6 +144,7 @@ async function invokeCodexOnce(
 export async function runCodexJsonGeneration<T>(
   input: CodexJsonGenerationInput,
   parse: (text: string, model: string) => T,
+  maxAttempts = MAX_GENERATION_ATTEMPTS,
 ): Promise<T> {
   const detectionRoot = input.repositoryRoot ?? process.cwd();
   const detection = await detectAgentRuntime({
@@ -160,7 +161,7 @@ export async function runCodexJsonGeneration<T>(
 
   let lastError: unknown;
   let lastRawOutput = "";
-  for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const attemptInput =
       attempt === 1
         ? input
@@ -178,7 +179,7 @@ export async function runCodexJsonGeneration<T>(
   }
 
   throw new CodexGenerationError(
-    `Codex CLI output did not match the expected schema after ${MAX_GENERATION_ATTEMPTS} attempt(s): ${String(lastError)}`,
+    `Codex CLI output did not match the expected schema after ${maxAttempts} attempt(s): ${String(lastError)}`,
     lastRawOutput,
   );
 }
