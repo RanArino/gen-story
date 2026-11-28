@@ -57,9 +57,29 @@ Keep the existing look; extend it rather than introducing a new style.
 - **Film workspace:** `film/FilmPage.tsx` keeps the title, save status and next
   actions in a sticky top bar, a player plus Chapter/scene strip, and one
   inspector for the selection (a bottom sheet below 760px). Give each editable
-  value one control there; dialogs (`CameraAudition`, `FilmExportDialog`) hold
-  choices, not duplicate editors. Camera previews use
-  `@gen-story/infrastructure/camera-preview`, the renderer's own camera path.
+  value one control there; dialogs (`CameraAudition`, `TemplatePicker`,
+  `FilmExportDialog`) hold choices, not duplicate editors. Camera and paper-card
+  previews use `@gen-story/infrastructure/camera-preview`, the renderer's own
+  camera and frame layout path (`previewLayout`): the photo box, the card and
+  the Memory Board note come from the same `math.js` helpers and line wrapping
+  as the export, so do not position them in CSS. **Adjust layout** on the
+  player edits the frame layout by drag, corner handle or keyboard; the scope
+  (all photos / this photo), the photo shape (16:9 / 9:16 / 1:1 crop) and resets
+  sit in the bar above the frame. Template samples are pre-rendered production exports
+  (`public/film-previews/templates/manifest.json`), loaded on demand
+  (`preload="none"`, poster, no autoplay); the picker and inspector list only
+  templates and choices from the API catalog, so a new template needs no UI code.
+  Film settings (template, video size, motion) sit in one row of labelled
+  groups that wrap as whole units; the action that opens a dialog sits next to
+  the value it changes.
+- **Film controls:** match the Film's forest-green and paper palette
+  (`#294f3d`, `#536b5c`, `#dce3df`, focus `#91b69e`) in
+  `FilmWorkspace.module.css`. Use a switch (`role="switch"` checkbox) for an
+  on/off setting, a segmented control for a short single choice whose options
+  should all stay visible, toggle chips for multi-select, and native `<select>`
+  and `<input type="range">` restyled with CSS (chevron, thin filled track,
+  round thumb; `Range` sets `--fill`). Keep native inputs underneath for
+  keyboard and screen reader behaviour.
 
 ## Modern Web Guidance
 
