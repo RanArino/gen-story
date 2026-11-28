@@ -5,6 +5,10 @@ import {
   curve,
   camAt,
   frameForImage,
+  paperCardFrame,
+  paperCardBox,
+  paperNoteFrame,
+  photoBox,
   bobAt,
   sceneOpacity,
   showAlpha,
@@ -328,6 +332,139 @@ function createAtmosphere(ctx) {
   };
 }
 
+function paperTexture(seed) {
+  return sprite(384, (ctx, size) => {
+    const random = rngFor(seed, 56);
+    ctx.fillStyle = "#e9dfcb";
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 11000; i++) {
+      ctx.fillStyle = i % 2 ? "#6a503b" : "#fff9eb";
+      ctx.globalAlpha = 0.025 + random() * 0.12;
+      ctx.fillRect(random() * size, random() * size, 0.4 + random() * 1.7, 0.7);
+    }
+  });
+}
+
+/** The caption a Memory Board card carries: the first one that starts during its scene. */
+function cardCaption(data, index) {
+  return data.captions.find(
+    (c) => data.scenes.findLastIndex((scene) => scene.t0 <= c.t0) === index,
+  );
+}
+
+function noteFace(data, aliases) {
+  const serif = `"${aliases.serif}"`;
+  return data.captionStyle?.font === "sans"
+    ? `"${aliases.sans}", ${serif}`
+    : serif;
+}
+
+function drawPaperCards(ctx, data, t, W, H, image, paper, omit, aliases) {
+  const notes =
+    data.captionStyle?.position === "note" && !omit.includes("caption");
+  ctx.fillStyle = ctx.createPattern(paper, "repeat");
+  ctx.fillRect(0, 0, W, H);
+  for (const [i, scene] of data.scenes.entries()) {
+    if (t < scene.t0 || t >= scene.t1) continue;
+    const previous = data.scenes[i - 1];
+    const next = data.scenes[i + 1];
+    const overlap = previous ? Math.max(0, previous.t1 - scene.t0) : 0;
+    const slide = data.transition === "card-slide" && overlap > 0;
+    const progress = slide ? clamp01((t - scene.t0) / overlap) : 1;
+    const nextOverlap = next ? Math.max(0, scene.t1 - next.t0) : 0;
+    const nextProgress =
+      nextOverlap > 0 ? clamp01((t - next.t0) / nextOverlap) : 0;
+    const slidesOut = data.transition === "card-slide" && nextOverlap > 0;
+    const opacity =
+      data.reducedMotion && data.transition === "card-slide"
+        ? (slide && progress < 0.5) || (slidesOut && nextProgress >= 0.5)
+          ? 0
+          : 1
+        : (slide ? 1 : smooth((t - scene.t0) / scene.fadeIn)) *
+          (slidesOut
+            ? 1 - smooth((nextProgress - 0.8) / 0.2)
+            : 1 - smooth((t - scene.t1 + scene.fadeOut) / scene.fadeOut));
+    if (opacity <= 0.001) continue;
+    const asset = data.assets[scene.image];
+    const source = image(asset.asset);
+    if (!source) throw new Error("Missing cinematic source " + asset.asset);
+    const camera = camAt(scene, data.reducedMotion ? scene.t0 : t);
+    if (scene.frame) {
+      const card = paperCardBox(W, H, scene.frame.photo, i);
+      const fill = frameForImage(
+        card.width,
+        card.height,
+        camera,
+        asset.widthPx,
+        asset.heightPx,
+      );
+      const offset = data.reducedMotion ? 0 : W * 1.08 * (1 - smooth(progress));
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.translate(card.x + offset, card.y);
+      ctx.rotate(card.rotation);
+      ctx.shadowColor = "rgba(51,37,25,0.42)";
+      ctx.shadowBlur = card.border * 1.55;
+      ctx.shadowOffsetY = card.border * 0.45;
+      ctx.fillStyle = "#fff9ee";
+      ctx.fillRect(
+        -card.outerWidth / 2,
+        -card.outerHeight / 2,
+        card.outerWidth,
+        card.outerHeight,
+      );
+      ctx.shadowColor = "transparent";
+      ctx.beginPath();
+      ctx.rect(-card.width / 2, -card.height / 2, card.width, card.height);
+      ctx.clip();
+      ctx.drawImage(
+        source,
+        -card.width / 2 + fill.left,
+        -card.height / 2 + fill.top,
+        fill.width,
+        fill.height,
+      );
+      ctx.restore();
+      continue;
+    }
+    const card = paperCardFrame(
+      W,
+      H,
+      camera,
+      asset.widthPx,
+      asset.heightPx,
+      i,
+      notes
+        ? noteInput(ctx, cardCaption(data, i), noteFace(data, aliases))
+        : null,
+    );
+    const offset = data.reducedMotion ? 0 : W * 1.08 * (1 - smooth(progress));
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.translate(card.x + offset, card.y);
+    ctx.rotate(card.rotation);
+    ctx.shadowColor = "rgba(51,37,25,0.42)";
+    ctx.shadowBlur = card.border * 1.55;
+    ctx.shadowOffsetY = card.border * 0.45;
+    ctx.fillStyle = "#fff9ee";
+    ctx.fillRect(
+      -card.width / 2 - card.border,
+      -card.height / 2 - card.border,
+      card.width + card.border * 2,
+      card.height + card.border * 2,
+    );
+    ctx.shadowColor = "transparent";
+    ctx.drawImage(
+      source,
+      -card.width / 2,
+      -card.height / 2,
+      card.width,
+      card.height,
+    );
+    ctx.restore();
+  }
+}
+
 /** Data-only primitive; it has no player, UI, network loading, or independent rendering loop. */
 export function drawCinematic(
   ctx,
@@ -355,7 +492,12 @@ export function drawCinematic(
       rng: (salt) => rngFor(data.seed, salt),
     });
     fx.resize({ width: W, height: H, dpr: 1 });
-    saved = { W, H, fx };
+    saved = {
+      W,
+      H,
+      fx,
+      paper: data.layout === "paper-cards" ? paperTexture(data.seed) : null,
+    };
     cache.set(data, saved);
   }
   ctx.save();
@@ -364,58 +506,131 @@ export function drawCinematic(
   ctx.clip();
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
-  for (const scene of data.scenes) {
-    const opacity = sceneOpacity(scene, t);
-    if (opacity <= 0.001) continue;
-    const c = camAt(scene, data.reducedMotion ? scene.t0 : t);
-    const dx = data.reducedMotion ? 0 : Math.sin(t * 0.37 + scene.t0) * 0.0025,
-      dy = data.reducedMotion ? 0 : Math.cos(t * 0.29 + scene.t0) * 0.002;
-    const asset = data.assets[scene.image];
-    const f = frameForImage(
-      W,
-      H,
-      { fx: c.fx + dx, fy: c.fy + dy, z: c.z },
-      asset.widthPx,
-      asset.heightPx,
-      scene.framing,
-    );
-    const source = image(asset.asset);
-    if (!source) throw new Error("Missing cinematic source " + asset.asset);
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    if (scene.framing === "contain" || scene.framing === "follow") {
-      const background = frameForImage(
+  if (saved.paper)
+    drawPaperCards(ctx, data, t, W, H, image, saved.paper, omitRoles, aliases);
+  else
+    for (const scene of data.scenes) {
+      const opacity = sceneOpacity(scene, t);
+      if (opacity <= 0.001) continue;
+      const c = camAt(scene, data.reducedMotion ? scene.t0 : t);
+      const dx = data.reducedMotion
+          ? 0
+          : Math.sin(t * 0.37 + scene.t0) * 0.0025,
+        dy = data.reducedMotion ? 0 : Math.cos(t * 0.29 + scene.t0) * 0.002;
+      const asset = data.assets[scene.image];
+      if (scene.frame) {
+        const box = photoBox(W, H, scene.frame.photo);
+        const source = image(asset.asset);
+        if (!source) throw new Error("Missing cinematic source " + asset.asset);
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        if (
+          box.left > 0.5 ||
+          box.top > 0.5 ||
+          box.left + box.width < W - 0.5 ||
+          box.top + box.height < H - 0.5
+        ) {
+          const background = frameForImage(
+            W,
+            H,
+            { fx: 0.5, fy: 0.5, z: 1.1 },
+            asset.widthPx,
+            asset.heightPx,
+          );
+          ctx.save();
+          ctx.filter = `blur(${(24 * H) / 1080}px) brightness(0.4)`;
+          ctx.drawImage(
+            source,
+            background.left,
+            background.top,
+            background.width,
+            background.height,
+          );
+          ctx.restore();
+        }
+        const fill = frameForImage(
+          box.width,
+          box.height,
+          { fx: c.fx + dx, fy: c.fy + dy, z: c.z },
+          asset.widthPx,
+          asset.heightPx,
+        );
+        ctx.beginPath();
+        ctx.rect(box.left, box.top, box.width, box.height);
+        ctx.clip();
+        ctx.drawImage(
+          source,
+          box.left + fill.left,
+          box.top +
+            fill.top +
+            bobAt(data.steps, t, scene.bob, data.reducedMotion) * (H / 900),
+          fill.width,
+          fill.height,
+        );
+        ctx.restore();
+        continue;
+      }
+      const f = frameForImage(
         W,
         H,
-        { fx: 0.5, fy: 0.5, z: 1.1 },
+        { fx: c.fx + dx, fy: c.fy + dy, z: c.z },
         asset.widthPx,
         asset.heightPx,
+        scene.framing,
       );
+      const source = image(asset.asset);
+      if (!source) throw new Error("Missing cinematic source " + asset.asset);
       ctx.save();
-      ctx.filter = `blur(${(24 * H) / 1080}px) brightness(0.4)`;
+      ctx.globalAlpha = opacity;
+      if (scene.framing === "contain" || scene.framing === "follow") {
+        const background = frameForImage(
+          W,
+          H,
+          { fx: 0.5, fy: 0.5, z: 1.1 },
+          asset.widthPx,
+          asset.heightPx,
+        );
+        ctx.save();
+        ctx.filter = `blur(${(24 * H) / 1080}px) brightness(0.4)`;
+        ctx.drawImage(
+          source,
+          background.left,
+          background.top,
+          background.width,
+          background.height,
+        );
+        ctx.restore();
+      }
       ctx.drawImage(
         source,
-        background.left,
-        background.top,
-        background.width,
-        background.height,
+        f.left,
+        f.top + bobAt(data.steps, t, scene.bob, data.reducedMotion) * (H / 900),
+        f.width,
+        f.height,
       );
       ctx.restore();
     }
-    ctx.drawImage(
-      source,
-      f.left,
-      f.top + bobAt(data.steps, t, scene.bob, data.reducedMotion) * (H / 900),
-      f.width,
-      f.height,
-    );
-    ctx.restore();
-  }
   saved.fx.render(t);
   saved.fx.compose(ctx, W, H, t);
   const measurements = drawCopy(ctx, data, t, W, H, omitRoles, aliases);
   ctx.restore();
   return measurements;
+}
+
+/** Caption text for a Memory Board note, measured in the caller's canvas units. */
+function noteInput(ctx, caption, face) {
+  if (!caption || !(caption.text || caption.sub)) return null;
+  return {
+    text: caption.text,
+    sub: caption.sub,
+    measure: (value, size) => {
+      ctx.save();
+      ctx.font = `400 ${size}px ${face}`;
+      const width = ctx.measureText(value).width;
+      ctx.restore();
+      return width;
+    },
+  };
 }
 
 function drawCopy(ctx, d, t, W, H, omit, aliases) {
@@ -435,6 +650,10 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
   H = H / scale;
   const latin = `"${aliases.latin}", "${aliases.serif}"`,
     serif = `"${aliases.serif}"`;
+  const note = d.captionStyle?.position === "note";
+  const captionFace =
+    d.captionStyle?.font === "sans" ? `"${aliases.sans}", ${serif}` : null;
+  const titleInk = d.layout === "paper-cards" ? "#45372c" : "#f4efe4";
   function text(
     value,
     x,
@@ -452,14 +671,19 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     ctx.font =
-      font + " " + size + "px " + (font.startsWith("italic") ? latin : serif);
+      font +
+      " " +
+      size +
+      "px " +
+      ((role === "caption" && captionFace) ||
+        (font.startsWith("italic") ? latin : serif));
     ctx.textAlign = align;
     ctx.textBaseline = "middle";
     ctx.letterSpacing = spacing + "px";
     if (glow) {
       ctx.shadowColor = "rgba(233,196,106,.28)";
       ctx.shadowBlur = 60;
-    } else if (role === "caption") {
+    } else if (role === "caption" && !note) {
       ctx.shadowColor = "rgba(0,0,0,.55)";
       ctx.shadowBlur = 18;
       ctx.shadowOffsetY = 2;
@@ -485,7 +709,70 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
     ctx.restore();
   }
   const visible = d.captions.filter((c) => t >= c.t0 && t <= c.t1);
-  if (!omit.includes("caption")) {
+  if (!omit.includes("caption") && note && visible.length) {
+    const c = visible.at(-1);
+    const a = smooth((t - c.t0) / 0.35) * (1 - smooth((t - c.t1 + 0.3) / 0.3));
+    const cardIndex = d.scenes.findLastIndex((scene) => scene.t0 <= c.t0);
+    const scene = d.scenes[cardIndex];
+    const photo = d.assets[scene.image];
+    const face = noteFace(d, aliases);
+    const box = scene.frame
+      ? paperNoteFrame(
+          W,
+          H,
+          scene.frame.caption,
+          noteInput(ctx, c, face),
+          paperCardBox(W, H, scene.frame.photo, cardIndex).outerWidth,
+        )
+      : paperCardFrame(
+          W,
+          H,
+          camAt(scene, d.reducedMotion ? scene.t0 : t),
+          photo.widthPx,
+          photo.heightPx,
+          cardIndex,
+          noteInput(ctx, c, face),
+        ).note;
+    if (box) {
+      ctx.save();
+      ctx.translate(box.x, box.y);
+      ctx.rotate(box.rotation);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#fff6cf";
+      ctx.shadowColor = "rgba(64,45,22,0.25)";
+      ctx.shadowBlur = box.size * 0.3;
+      ctx.shadowOffsetY = box.size * 0.1;
+      ctx.fillRect(-box.width / 2, -box.height / 2, box.width, box.height);
+      ctx.shadowColor = "transparent";
+      ctx.fillStyle = "rgba(176,151,101,0.34)";
+      ctx.fillRect(
+        -box.size * 0.8,
+        -box.height / 2 - box.size * 0.22,
+        box.size * 1.6,
+        box.size * 0.44,
+      );
+      ctx.restore();
+      // Lines stay upright (the paper tilts only 1.4°) so measured boxes stay axis-aligned.
+      let y = box.y - box.height / 2 + box.padY;
+      const lines = [
+        ...box.main.map((line) => [line, box.size, "#403629"]),
+        ...box.sub.map((line) => [line, box.subSize, "#524535"]),
+      ];
+      lines.forEach(([line, size, color], i) => {
+        if (i === box.main.length && i > 0) y += box.gapLines;
+        y += (size * box.lineHeight) / 2;
+        text(line, box.x, y, size, "400", a, color);
+        y += (size * box.lineHeight) / 2;
+      });
+    }
+  } else if (!omit.includes("caption") && !note) {
+    // A photo with a frame places its caption (top edge, size); older directions keep 0.8 H.
+    const unit = Math.min(W, H);
+    const placeOf = (c) =>
+      c.mid
+        ? null
+        : (d.scenes[d.scenes.findLastIndex((s) => s.t0 <= c.t0)]?.frame
+            ?.caption ?? null);
     let a = 0;
     for (const c of visible)
       if (!c.mid)
@@ -493,24 +780,40 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
           a,
           smooth((t - c.t0) / 0.6) * (1 - smooth((t - (c.t1 - 1.1)) / 1.1)),
         );
-    const g = ctx.createLinearGradient(0, H, 0, H * 0.54);
+    const anchor = visible.map(placeOf).find(Boolean);
+    // The scrim darkens the frame edge nearest the caption.
+    const top = anchor ? anchor.y * H : H * 0.54;
+    const bottom = anchor ? top + anchor.size * unit * 3.2 : H;
+    const low = (top + bottom) / 2 >= H / 2;
+    const from = low ? H : 0,
+      to = anchor
+        ? low
+          ? Math.max(0, top - H * 0.22)
+          : Math.min(H, bottom + H * 0.22)
+        : H * 0.54;
+    const g = ctx.createLinearGradient(0, from, 0, to);
     g.addColorStop(0, "rgba(0,0,0,.66)");
     g.addColorStop(0.55, "rgba(0,0,0,.28)");
     g.addColorStop(1, "transparent");
     ctx.save();
     ctx.globalAlpha = a * 0.9;
     ctx.fillStyle = g;
-    ctx.fillRect(0, H * 0.54, W, H * 0.46);
+    ctx.fillRect(0, Math.min(from, to), W, Math.abs(to - from));
     ctx.restore();
     for (const c of visible) {
+      const place = placeOf(c);
       const a =
           smooth((t - c.t0) / 0.6) * (1 - smooth((t - (c.t1 - 1.1)) / 1.1)),
         // Caption sizes follow the 1280-wide reference, not the logical canvas width.
-        size = Math.max(
-          17.6,
-          Math.min(1280 * (c.mid ? 0.03 : 0.026), c.mid ? 43.2 : 36.8),
-        );
-      const y = c.mid ? H * 0.48 : H * 0.8;
+        size = place
+          ? place.size * unit
+          : Math.max(
+              17.6,
+              Math.min(1280 * (c.mid ? 0.03 : 0.026), c.mid ? 43.2 : 36.8),
+            ),
+        subSize = place
+          ? size * 0.58
+          : Math.max(12.8, Math.min(1280 * 0.015, 19.2));
       ctx.font = "italic 400 " + size + "px " + latin;
       const space = ctx.measureText(" ").width;
       // Text without spaces (Japanese) breaks by character when it is wider than the frame.
@@ -539,14 +842,26 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
         lineWidth += (lines.at(-1).length ? space : 0) + w;
         lines.at(-1).push(word);
       }
+      const widthOf = (line) =>
+        line.reduce((n, w) => n + ctx.measureText(w).width, 0) +
+        space * (line.length - 1);
+      let cx = W / 2,
+        y = c.mid ? H * 0.48 : H * 0.8;
+      if (place) {
+        const widest = Math.max(...lines.map(widthOf));
+        const edge = W * 0.03;
+        cx = Math.min(
+          W - edge - widest / 2,
+          Math.max(edge + widest / 2, place.x * W),
+        );
+        y = place.y * H + size * 0.65 + (lines.length - 1) * size * 1.3;
+        const end = y + (c.sub ? size * 1.5 + subSize * 0.6 : size * 0.5);
+        if (end > H * 0.97) y -= end - H * 0.97;
+      }
       let index = 0;
       lines.forEach((line, row) => {
         const ly = y - (lines.length - 1 - row) * size * 1.3;
-        let x =
-          (W -
-            line.reduce((n, w) => n + ctx.measureText(w).width, 0) -
-            space * (line.length - 1)) /
-          2;
+        let x = cx - widthOf(line) / 2;
         for (const word of line) {
           const wa = smooth((t - c.t0 - index++ * 0.11) / 0.9);
           text(
@@ -564,9 +879,9 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
       });
       text(
         c.sub,
-        W / 2,
+        cx,
         y + size * 1.5,
-        Math.max(12.8, Math.min(1280 * 0.015, 19.2)),
+        subSize,
         "400",
         a * smooth((t - c.t0 - 0.7) / 1.1),
         "#c4bfb5",
@@ -621,10 +936,10 @@ function drawCopy(ctx, d, t, W, H, omit, aliases) {
         ending ? Math.min(W * 0.08, 83.2) : Math.min(W * 0.15, 160),
         "500",
         a,
-        "#f4efe4",
+        titleInk,
         "center",
         ending ? 28.3 : 54.4,
-        !ending,
+        !ending && d.layout !== "paper-cards",
       );
       text(
         c.name,

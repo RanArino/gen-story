@@ -1,0 +1,74 @@
+{
+  "model": "claude-opus-5-5",
+  "inputDigest": "sha256:aaaba5da0c695b845b2fd20ec38abed8afe4e1fe35651238cb3e9d6eada49e6b",
+  "content": {
+    "chapterName": "海辺の一日",
+    "nameReason": "指定どおりのタイトルです。列車・港・夕陽という海辺の一日の流れをそのまま表しています。",
+    "music": {
+      "mood": "穏やかな旅情、夕暮れのぬくもり",
+      "key": "D",
+      "mode": "major",
+      "melody": "flowing",
+      "arc": "fall",
+      "fromPrevious": "continue",
+      "instruments": ["koto-pluck"],
+      "tempoBpm": 91
+    },
+    "scenes": [
+      {
+        "sceneId": "coastal-train",
+        "observation": "左に低い太陽と光る海、右手の木造ホームに赤い列車が停まっている。手すりと線路が奥へ続く横長の構図。",
+        "camera": {
+          "move": "pan-right",
+          "focus": { "x": 0.72, "y": 0.47 },
+          "speed": 0.4,
+          "reason": "海の光から右の赤い列車へ横に移動し、旅の始まりへ視線を運ぶ。"
+        },
+        "effects": { "rays": 0.14, "motes": 0.08, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.4, "stream": 0.5 },
+        "sounds": [{ "sound": "bird-chirp", "at": 0.2, "gain": 0.3 }],
+        "captions": {
+          "ja": "朝の光に誘われて、海沿いの駅へ。",
+          "en": "Drawn by the morning light, we arrive at a station by the sea."
+        }
+      },
+      {
+        "sceneId": "harbor-cafe",
+        "observation": "窓際の木のテーブルにコーヒーとクロワッサン。開いた窓の外に漁船と灯台のある港がきらめいている。",
+        "camera": {
+          "move": "reveal",
+          "focus": { "x": 0.3, "y": 0.73 },
+          "speed": 0.25,
+          "reason": "手元のコーヒーカップから始め、窓の外の港へ開いてくつろぎの時間を見せる。"
+        },
+        "effects": { "rays": 0.08, "motes": 0.12, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.15, "stream": 0.2 },
+        "sounds": [{ "sound": "bird-chirp", "at": 0.6, "gain": 0.2 }],
+        "captions": {
+          "ja": "港を眺めながら、ゆっくり一杯。",
+          "en": "A slow cup of coffee, watching the harbor drift by."
+        }
+      },
+      {
+        "sceneId": "sunset-walk",
+        "observation": "崖の上の小径と古いベンチ。島々の向こうに夕陽が沈み、海に光の道が伸びている。",
+        "camera": {
+          "move": "push-in",
+          "focus": { "x": 0.82, "y": 0.3 },
+          "speed": 0.3,
+          "reason": "小径を歩くように夕陽へ近づき、一日の終わりを静かに迎える。"
+        },
+        "effects": { "rays": 0.16, "motes": 0.1, "leaves": 0, "warmth": 0 },
+        "footsteps": "gravel",
+        "ambience": { "wind": 0.5, "stream": 0.4 },
+        "sounds": [],
+        "captions": {
+          "ja": "夕陽の道を歩けば、今日がやさしく閉じていく。",
+          "en": "Walking the sunset path, the day gently comes to a close."
+        }
+      }
+    ]
+  }
+}

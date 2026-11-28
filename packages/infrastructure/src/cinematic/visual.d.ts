@@ -8,5 +8,5 @@ export function drawCinematic(
   height: number,
   image: (asset: string) => CanvasImageSource | undefined,
   omitRoles: string[] | undefined,
-  aliases: { serif: string; latin: string },
+  aliases: { serif: string; latin: string; sans?: string },
 ): MeasuredText[];

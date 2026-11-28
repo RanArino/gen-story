@@ -1,0 +1,74 @@
+{
+  "model": "claude-opus-5-5",
+  "inputDigest": "sha256:aaaba5da0c695b845b2fd20ec38abed8afe4e1fe35651238cb3e9d6eada49e6b",
+  "content": {
+    "chapterName": "海辺の一日",
+    "nameReason": "タイトルは固定されているため、そのまま使用。列車・港・夕日という一日の流れにも合っている。",
+    "music": {
+      "mood": "穏やかで温かく、少し郷愁を帯びた旅情",
+      "key": "D",
+      "mode": "major",
+      "melody": "medium",
+      "arc": "fall",
+      "fromPrevious": "continue",
+      "instruments": ["pad", "koto-pluck"],
+      "tempoBpm": 66
+    },
+    "scenes": [
+      {
+        "sceneId": "coastal-train",
+        "observation": "低い太陽に照らされた海沿いの木造ホームに、赤い一両編成の列車が止まっている。左側には海と光の道が広がる。",
+        "camera": {
+          "move": "pan-right",
+          "focus": { "x": 0.7, "y": 0.47 },
+          "speed": 0.3,
+          "reason": "左の太陽と海から右の列車へ視線を運び、旅の始まりを示すため。"
+        },
+        "effects": { "rays": 0.3, "motes": 0.15, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.35, "stream": 0.4 },
+        "sounds": [{ "sound": "bird-chirp", "at": 0.2, "gain": 0.35 }],
+        "captions": {
+          "ja": "小さな赤い列車が、海へ連れていってくれた。",
+          "en": "A small red train carried us to the sea."
+        }
+      },
+      {
+        "sceneId": "harbor-cafe",
+        "observation": "窓辺の木のテーブルにコーヒーとクロワッサン。窓の外には漁船と灯籠のある港がきらめいている。",
+        "camera": {
+          "move": "push-in",
+          "focus": { "x": 0.6, "y": 0.33 },
+          "speed": 0.2,
+          "reason": "手前のテーブルから窓の向こうの港へゆっくり近づき、ひと休みの穏やかさを描くため。"
+        },
+        "effects": { "rays": 0.2, "motes": 0.25, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.1, "stream": 0.15 },
+        "sounds": [{ "sound": "suzu", "at": 0.6, "gain": 0.2 }],
+        "captions": {
+          "ja": "港を眺めながら、時間がゆっくり溶けていく。",
+          "en": "Watching the harbor, time slowly melted away."
+        }
+      },
+      {
+        "sceneId": "sunset-walk",
+        "observation": "岬の小道と古いベンチ。島々の間に夕日が沈み、海に金色の道が伸びている。",
+        "camera": {
+          "move": "pull-out",
+          "focus": { "x": 0.82, "y": 0.32 },
+          "speed": 0.18,
+          "reason": "夕日から景色全体へと広げ、一日の終わりを静かに見送るため。"
+        },
+        "effects": { "rays": 0.3, "motes": 0.2, "leaves": 0, "warmth": 0 },
+        "footsteps": "none",
+        "ambience": { "wind": 0.45, "stream": 0.35 },
+        "sounds": [{ "sound": "low-swell", "at": 0.45, "gain": 0.5 }],
+        "captions": {
+          "ja": "沈む夕日に、今日という日をそっと預けた。",
+          "en": "We left this day in the care of the setting sun."
+        }
+      }
+    ]
+  }
+}

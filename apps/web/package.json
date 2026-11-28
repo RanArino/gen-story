@@ -12,6 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@gen-story/domain": "workspace:*",
     "@gen-story/infrastructure": "workspace:*",
     "@gen-story/shared": "workspace:*",
     "next": "^16.0.0",

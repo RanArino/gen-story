@@ -1,9 +1,4 @@
-export const FILM_RECIPES = [
-  "quiet-cinema",
-  "memory-board",
-  "pulse-cut",
-] as const;
-export type FilmRecipe = (typeof FILM_RECIPES)[number];
+export type FilmRecipe = string;
 export const FILM_ASPECTS = ["16:9", "9:16", "1:1"] as const;
 export type FilmAspect = (typeof FILM_ASPECTS)[number];
 /** Which caption lines are burned in; chosen per export, never stored on the treatment. */
@@ -35,7 +30,34 @@ export interface FilmTreatment {
   /** Absent means 16:9. */
   outputAspect?: FilmAspect;
   sceneCaptions?: Record<string, FilmSceneCaption>;
+  /** The user's photo and caption placement for every photo; absent parts use the template's. */
+  layout?: FilmLayoutOverride;
+  /** Per-photo placement that replaces the Film layout for that photo only. */
+  sceneLayouts?: Record<string, FilmLayoutOverride>;
   chapters: FilmChapter[];
+}
+/** Photo box center and size, as fractions of the frame width and height. */
+export interface FilmPhotoBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Crop shape; the height follows it at every video size. Absent: the video's shape. */
+  crop?: FilmAspect;
+}
+/** Caption block center x and top y (frame fractions); size is a fraction of the shorter side. */
+export interface FilmCaptionPlace {
+  x: number;
+  y: number;
+  size: number;
+}
+export interface FilmFrameLayout {
+  photo: FilmPhotoBox;
+  caption: FilmCaptionPlace;
+}
+export interface FilmLayoutOverride {
+  photo?: FilmPhotoBox;
+  caption?: FilmCaptionPlace;
 }
 export interface FilmJob {
   id: string;
@@ -81,6 +103,14 @@ export const FILM_SCENE_SOUNDS = [
   "clap",
   "temple-bell",
   "low-swell",
+  "ocean-wave",
+  "light-rain",
+  "cicadas",
+  "leaf-rustle",
+  "train-pass",
+  "cafe-cup",
+  "camera-shutter",
+  "wind-chime",
 ] as const;
 export const FILM_MUSIC_INSTRUMENTS = [
   "pad",
@@ -165,7 +195,32 @@ export interface FilmDirectionConflictDto {
   mine: string | FilmSceneCaption | null;
   draft: string | FilmSceneCaption;
 }
+export interface FilmTemplateDto {
+  id: FilmRecipe;
+  revision: string;
+  offered: boolean;
+  name: { en: string; ja: string };
+  description: FilmTemplateDto["name"];
+  facts: FilmTemplateDto["name"][];
+  layout: "full-frame" | "paper-cards";
+  /** Default photo and caption placement for each output size. */
+  frame: Record<FilmAspect, FilmFrameLayout>;
+  hasFixedStyle: boolean;
+  bounds: {
+    cameraMoves: readonly FilmSceneDirectionDto["camera"]["move"][];
+    defaultMove: FilmSceneDirectionDto["camera"]["move"];
+    maxSpeed: number;
+    maxEffects: Pick<
+      FilmSceneDirectionDto["effects"],
+      "rays" | "motes" | "leaves"
+    >;
+    sounds: readonly FilmSceneDirectionDto["sounds"][number]["sound"][];
+    musicKeys: readonly FilmDirectionContentDto["music"]["key"][];
+    musicArcs: readonly FilmDirectionContentDto["music"]["arc"][];
+  };
+}
 export interface FilmDetailDto {
+  templates: FilmTemplateDto[];
   currentAssemblyFingerprint: string | null;
   treatment: FilmTreatment;
   scenes: FilmSceneDto[];

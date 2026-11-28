@@ -52,6 +52,7 @@ import {
   type UpsertSceneInput,
 } from "../../lib/api-client";
 import { StorySetupAiModal } from "./StorySetupAiModal";
+import { StylePresetGallery } from "./StylePresetGallery";
 import { TestGenerationModal } from "./TestGenerationModal";
 import { storageKeyToUrl } from "../../lib/image-url";
 import { AppShell } from "../AppShell";
@@ -279,8 +280,6 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
   } | null>(null);
 
   const sbId = storyboard?.id;
-  const systemStylePresets = stylePresets.filter((p) => p.scope === "system");
-  const userStylePresets = stylePresets.filter((p) => p.scope === "user");
   const candidatePhotos = useMemo(
     () => photos.filter((photo) => photo.usage === "candidate"),
     [photos],
@@ -1381,47 +1380,11 @@ export function StoryboardPage({ projectId }: { projectId: string }) {
                   {t("style.createCustom")}
                 </button>
               </div>
-              <div className={styles.styleGrid}>
-                <button
-                  className={`${styles.styleBtn} ${!storyboard.stylePresetId ? styles.styleBtnActive : ""}`}
-                  onClick={() => handleStyleChange(null)}
-                >
-                  {t("style.aiRecommend")}
-                </button>
-                {systemStylePresets.length > 0 && (
-                  <span className={styles.styleGroupLabel}>
-                    {t("style.systemStyles")}
-                  </span>
-                )}
-                {systemStylePresets.map((p) => (
-                  <button
-                    key={p.id}
-                    className={`${styles.styleBtnCard} ${storyboard.stylePresetId === p.id ? styles.styleBtnCardActive : ""}`}
-                    onClick={() => handleStyleChange(p.id)}
-                    title={p.description}
-                  >
-                    {p.previewImageUrl && (
-                      <img src={p.previewImageUrl} alt={p.name} />
-                    )}
-                    <span className={styles.styleBtnCardLabel}>{p.name}</span>
-                  </button>
-                ))}
-                {userStylePresets.length > 0 && (
-                  <span className={styles.styleGroupLabel}>
-                    {t("style.customStyles")}
-                  </span>
-                )}
-                {userStylePresets.map((p) => (
-                  <button
-                    key={p.id}
-                    className={`${styles.styleBtn} ${storyboard.stylePresetId === p.id ? styles.styleBtnActive : ""}`}
-                    onClick={() => handleStyleChange(p.id)}
-                    title={p.description}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
+              <StylePresetGallery
+                presets={stylePresets}
+                selectedId={storyboard.stylePresetId}
+                onSelect={handleStyleChange}
+              />
             </section>
           )}
 

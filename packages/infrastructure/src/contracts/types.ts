@@ -404,7 +404,7 @@ export interface GroupNode extends NodeBase {
 }
 export interface CinematicNode extends NodeBase {
   type: "cinematic";
-  fonts: { serif: string; latin: string };
+  fonts: { serif: string; latin: string; sans?: string };
   direction: CinematicDirection;
 }
 

@@ -1,0 +1,68 @@
+[
+  {
+    "id": "memory-board",
+    "revision": "r1",
+    "aspect": "16:9",
+    "durationMs": 19400,
+    "mp4": "/film-previews/templates/memory-board-r1-16x9-e36ac3bd1e81.mp4",
+    "poster": "/film-previews/templates/memory-board-r1-16x9-e36ac3bd1e81.jpg",
+    "snapshot": "/film-previews/templates/memory-board-r1-16x9-e36ac3bd1e81.json",
+    "directionDigest": "sha256:4532bc50acb18de82dcc7a087361d33e13cbdadd02b97ab3d299a03028e39e5e",
+    "renderFingerprint": "sha256:e36ac3bd1e81bf3e6741e0e72fa610e3c1028321baa930873d4c913117d594c5"
+  },
+  {
+    "id": "memory-board",
+    "revision": "r1",
+    "aspect": "9:16",
+    "durationMs": 19400,
+    "mp4": "/film-previews/templates/memory-board-r1-9x16-76c796331ffd.mp4",
+    "poster": "/film-previews/templates/memory-board-r1-9x16-76c796331ffd.jpg",
+    "snapshot": "/film-previews/templates/memory-board-r1-9x16-76c796331ffd.json",
+    "directionDigest": "sha256:972ddadd1673a80242b668654c71a657b5ad536b01b2e3a1256e4e840cc68747",
+    "renderFingerprint": "sha256:76c796331ffd8802bce96d0e2f7dd4c961d12499bd77197109981625c7c16b97"
+  },
+  {
+    "id": "memory-board",
+    "revision": "r1",
+    "aspect": "1:1",
+    "durationMs": 19400,
+    "mp4": "/film-previews/templates/memory-board-r1-1x1-b69162e77432.mp4",
+    "poster": "/film-previews/templates/memory-board-r1-1x1-b69162e77432.jpg",
+    "snapshot": "/film-previews/templates/memory-board-r1-1x1-b69162e77432.json",
+    "directionDigest": "sha256:2c1f85f884a1d775c5a9ce885d91626a9b3edcecfb049df4949baeec8ca36712",
+    "renderFingerprint": "sha256:b69162e77432bf2d5c8542b08d84f883b78aee0b3912b272c6cc58a2e396db56"
+  },
+  {
+    "id": "quiet-cinema",
+    "revision": "r1",
+    "aspect": "16:9",
+    "durationMs": 27600,
+    "mp4": "/film-previews/templates/quiet-cinema-r1-16x9-fa7d38eee726.mp4",
+    "poster": "/film-previews/templates/quiet-cinema-r1-16x9-fa7d38eee726.jpg",
+    "snapshot": "/film-previews/templates/quiet-cinema-r1-16x9-fa7d38eee726.json",
+    "directionDigest": "sha256:2d8f22c17950a70129b19e338ba58d6507f8b8e4ef862f0f6a36a3e3f87d1dac",
+    "renderFingerprint": "sha256:fa7d38eee7267b22d6b5c93e20224a9426330cd816540ec31ad71877b2c011d6"
+  },
+  {
+    "id": "quiet-cinema",
+    "revision": "r1",
+    "aspect": "9:16",
+    "durationMs": 27600,
+    "mp4": "/film-previews/templates/quiet-cinema-r1-9x16-1c832e4ee756.mp4",
+    "poster": "/film-previews/templates/quiet-cinema-r1-9x16-1c832e4ee756.jpg",
+    "snapshot": "/film-previews/templates/quiet-cinema-r1-9x16-1c832e4ee756.json",
+    "directionDigest": "sha256:92c79dd7a4c9427cedb1f476885cea2cd0f558de1e3a6f8e4236f719da336939",
+    "renderFingerprint": "sha256:1c832e4ee7566aeec37a3daa14e60132bb2198ce55deb344418974e75b024c58"
+  },
+  {
+    "id": "quiet-cinema",
+    "revision": "r1",
+    "aspect": "1:1",
+    "durationMs": 27600,
+    "mp4": "/film-previews/templates/quiet-cinema-r1-1x1-ee00dba08a41.mp4",
+    "poster": "/film-previews/templates/quiet-cinema-r1-1x1-ee00dba08a41.jpg",
+    "snapshot": "/film-previews/templates/quiet-cinema-r1-1x1-ee00dba08a41.json",
+    "directionDigest": "sha256:b9f9a595eca53fd7b33885e129c944e29272a434a527a3c966bfa67980cc86cf",
+    "renderFingerprint": "sha256:ee00dba08a4190e1c4e2118eaa7f33c8829ddab9c5ef08d100f1bd3f23f0f891"
+  }
+]

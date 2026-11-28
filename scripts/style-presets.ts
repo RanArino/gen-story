@@ -1,4 +1,4 @@
-// Single source of truth for the ten built-in (system-scope) style presets.
+// Single source of truth for the eleven built-in (system-scope) style presets.
 // Imported by scripts/seed.ts (to seed the style_presets table) and by
 // scripts/generate-style-previews.ts (to render preview images).
 //
@@ -94,6 +94,14 @@ export const SYSTEM_STYLE_PRESETS: SystemStylePreset[] = [
       "Hand-printed Japanese woodblock with layered pigment, fine carved lines, and textured washi.",
     prompt:
       "Render the entire scene as a finely carved, hand-printed Japanese ukiyo-e color woodblock print. Layer broad, flat blocks of ink and earthy pigment on warm washi. Show fine paper fibers, lightly worn ink, and uneven pigment transfer across the print, including the sky and large color fields. Use thin, restrained sumi outlines and small carved marks for scene-specific details such as rice stalks, grasses, roof tiles, or woven fabric. Use a limited palette of indigo, gold-ochre, muted greens, warm paper cream, and vermilion accents where they fit. Use bokashi only in open sky and build depth elsewhere through overlapping shapes and changes of ink color. Give faces and garments simple flat color and delicate linework. Include maple leaves or bands of mist only when they belong in the scene. Carry the subject, setting, composition, time of day, and emotion from the scene and its references. Use this woodblock technique when other directions describe a different rendering treatment. Represent light with printed color shapes and keep detail legible at every depth. Avoid heavy outlines, crosshatching, hard comic borders, photographic shading, lens blur, and smooth digital gradients outside the sky.",
+  },
+  {
+    id: "system-radiant-cel-cgi",
+    name: "Radiant Cel CGI",
+    description:
+      "Cel-shaded 3D animation in photoreal worlds, with radiant natural light, glowing skies, and sparkling water.",
+    prompt:
+      "Render the entire scene as a cel-shaded 3D CGI animation still. Give characters a toon shader with crisp two-tone shading, thin clean contour lines, and anime-style faces with large expressive eyes and simplified features, so they read clearly as animated characters rather than real people. Place them inside a richly detailed, photoreal 3D environment with physically accurate materials and depth. Saturate the frame with natural light: radiant low sun, sky light glowing through windows, volumetric god rays, drifting light particles, luminous halation around highlights, and subtle prismatic lens flares. Treat water, glass, and wet surfaces as a showcase wherever they appear: mirror-like reflections, refracted color, beads of droplets, ripples, and glittering points of light. Fill the sky with vivid, deep blues, warm gold-to-pink gradients, and sharply detailed, sunlit clouds. Keep the palette vivid but harmonious, shadows cool and transparent, and the mood nostalgic and bittersweet. Carry the subject, setting, composition, and time of day from the scene and its references. Avoid photographic faces, thick outlines on the environment, chibi proportions, plastic materials, and dull or muddy color.",
   },
   {
     id: "system-ai-auto",

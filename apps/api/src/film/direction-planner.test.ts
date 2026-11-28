@@ -1,3 +1,4 @@
+import { loadFilmTemplateCatalog } from "@gen-story/infrastructure/film";
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import type { FilmDirectionPlanRequest } from "@gen-story/application";
@@ -5,6 +6,7 @@ import {
   AgentFilmDirectionPlanner,
   buildFilmDirectionPrompt,
   FILM_DIRECTION_RESPONSE_JSON_SCHEMA,
+  filmDirectionResponseSchema,
 } from "./direction-planner";
 
 const request = (): FilmDirectionPlanRequest => ({
@@ -77,6 +79,33 @@ describe("Agent film direction planner", () => {
       "arc",
       "chapters",
     ]);
+  });
+  it("offers only the template vocabulary and omits fixed music fields from generation", () => {
+    const template = loadFilmTemplateCatalog().get("quiet-cinema")!;
+    const prompt = buildFilmDirectionPrompt({ ...request(), template });
+    expect(prompt).toContain("- push-in:");
+    expect(prompt).not.toContain("- climb:");
+    expect(prompt).not.toContain("- clap:");
+    const schema = JSON.stringify(filmDirectionResponseSchema(template));
+    expect(schema).toContain('"maximum":0.55');
+    expect(schema).not.toContain('"climb"');
+    expect(schema).not.toContain('"tempoBpm"');
+    expect(schema).not.toContain('"warmth"');
+    expect(schema).not.toContain('"instruments"');
+  });
+  it("gives each offered template scene-specific guidance for the travel sound choices", () => {
+    const offered = loadFilmTemplateCatalog()
+      .list()
+      .filter((template) => template.offered);
+    for (const template of offered) {
+      const prompt = buildFilmDirectionPrompt({ ...request(), template });
+      const schema = JSON.stringify(filmDirectionResponseSchema(template));
+      for (const id of ["ocean-wave", "train-pass", "cafe-cup", "light-rain"]) {
+        expect(schema).toContain(JSON.stringify(id));
+        expect(prompt).toContain(`- ${id}:`);
+      }
+      expect(prompt).toContain("or leave it empty");
+    }
   });
   it("refuses the API runtime instead of silently using a paid fallback", async () => {
     const planner = new AgentFilmDirectionPlanner(

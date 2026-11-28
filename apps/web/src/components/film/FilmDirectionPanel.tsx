@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import {
   FILM_FOOTSTEP_SURFACES,
@@ -12,6 +12,7 @@ import {
   type AiRuntimeInfoDto,
   type FilmDirectionContentDto,
   type FilmSceneDirectionDto,
+  type FilmTemplateDto,
 } from "@gen-story/shared";
 import { getAiRuntimeInfo } from "../../lib/api-client";
 import page from "./FilmPage.module.css";
@@ -108,9 +109,11 @@ export function DirectionConfirmDialog({
 
 export function MusicFields({
   value,
+  template,
   onChange,
 }: {
   value: FilmDirectionContentDto["music"];
+  template?: FilmTemplateDto;
   onChange: (music: FilmDirectionContentDto["music"]) => void;
 }) {
   const t = useTranslations("film.direction");
@@ -125,18 +128,20 @@ export function MusicFields({
           onChange={(e) => onChange({ ...value, mood: e.target.value })}
         />
       </label>
-      <label>
-        {t("tempo")}
-        <input
-          type="number"
-          min={50}
-          max={140}
-          value={value.tempoBpm}
-          onChange={(e) =>
-            onChange({ ...value, tempoBpm: Number(e.target.value) })
-          }
-        />
-      </label>
+      {!template?.hasFixedStyle && (
+        <label>
+          {t("tempo")}
+          <input
+            type="number"
+            min={50}
+            max={140}
+            value={value.tempoBpm}
+            onChange={(e) =>
+              onChange({ ...value, tempoBpm: Number(e.target.value) })
+            }
+          />
+        </label>
+      )}
       <label>
         {t("key")}
         <select
@@ -145,7 +150,7 @@ export function MusicFields({
             onChange({ ...value, key: e.target.value as typeof value.key })
           }
         >
-          {FILM_MUSIC_KEYS.map((k) => (
+          {(template?.bounds.musicKeys ?? FILM_MUSIC_KEYS).map((k) => (
             <option key={k}>{k}</option>
           ))}
         </select>
@@ -188,7 +193,7 @@ export function MusicFields({
             onChange({ ...value, arc: e.target.value as typeof value.arc })
           }
         >
-          {FILM_MUSIC_ARCS.map((a) => (
+          {(template?.bounds.musicArcs ?? FILM_MUSIC_ARCS).map((a) => (
             <option key={a} value={a}>
               {t(`arcs.${a}`)}
             </option>
@@ -213,26 +218,28 @@ export function MusicFields({
           ))}
         </select>
       </label>
-      <fieldset className={styles.chips}>
-        <legend>{t("instruments")}</legend>
-        {FILM_MUSIC_INSTRUMENTS.map((instrument) => (
-          <label key={instrument} className={styles.chip}>
-            <input
-              type="checkbox"
-              checked={value.instruments.includes(instrument)}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  instruments: e.target.checked
-                    ? [...value.instruments, instrument]
-                    : value.instruments.filter((i) => i !== instrument),
-                })
-              }
-            />
-            {t(`instrumentNames.${instrument}`)}
-          </label>
-        ))}
-      </fieldset>
+      {!template?.hasFixedStyle && (
+        <fieldset className={styles.chips}>
+          <legend>{t("instruments")}</legend>
+          {FILM_MUSIC_INSTRUMENTS.map((instrument) => (
+            <label key={instrument} className={styles.chip}>
+              <input
+                type="checkbox"
+                checked={value.instruments.includes(instrument)}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    instruments: e.target.checked
+                      ? [...value.instruments, instrument]
+                      : value.instruments.filter((i) => i !== instrument),
+                  })
+                }
+              />
+              {t(`instrumentNames.${instrument}`)}
+            </label>
+          ))}
+        </fieldset>
+      )}
     </div>
   );
 }
@@ -241,11 +248,13 @@ export function Range({
   label,
   value,
   min = 0,
+  max = 1,
   onChange,
 }: {
   label: string;
   value: number;
   min?: number;
+  max?: number;
   onChange: (value: number) => void;
 }) {
   return (
@@ -254,9 +263,16 @@ export function Range({
       <input
         type="range"
         min={min}
-        max={1}
-        step={0.05}
+        max={max}
+        step={max === 1 ? 0.05 : 0.01}
+        disabled={max === min}
         value={value}
+        // Filled part of the track; Firefox draws it natively.
+        style={
+          {
+            "--fill": `${max === min ? 0 : ((value - min) / (max - min)) * 100}%`,
+          } as CSSProperties
+        }
         onChange={(e) => onChange(Number(e.target.value))}
       />
     </label>
@@ -266,13 +282,16 @@ export function Range({
 /** Footsteps, one-shot sounds, light and ambience for one scene: revealed on demand. */
 export function SceneLightAndSound({
   value,
+  template,
   onChange,
 }: {
   value: FilmSceneDirectionDto;
+  template?: FilmTemplateDto;
   onChange: (value: FilmSceneDirectionDto) => void;
 }) {
   const t = useTranslations("film.direction");
   const [adding, setAdding] = useState("");
+  const bounds = template?.bounds;
   return (
     <details className={styles.more}>
       <summary>{t("lightAndSound")}</summary>
@@ -332,7 +351,7 @@ export function SceneLightAndSound({
             }}
           >
             <option value="">{t("addSound")}</option>
-            {FILM_SCENE_SOUNDS.map((s) => (
+            {(bounds?.sounds ?? FILM_SCENE_SOUNDS).map((s) => (
               <option key={s} value={s}>
                 {t(`soundNames.${s}`)}
               </option>
@@ -346,19 +365,22 @@ export function SceneLightAndSound({
             key={key}
             label={t(`effects.${key}`)}
             value={value.effects[key]}
+            max={bounds?.maxEffects[key]}
             onChange={(v) =>
               onChange({ ...value, effects: { ...value.effects, [key]: v } })
             }
           />
         ))}
-        <Range
-          label={t("effects.warmth")}
-          min={-1}
-          value={value.effects.warmth}
-          onChange={(warmth) =>
-            onChange({ ...value, effects: { ...value.effects, warmth } })
-          }
-        />
+        {!template?.hasFixedStyle && (
+          <Range
+            label={t("effects.warmth")}
+            min={-1}
+            value={value.effects.warmth}
+            onChange={(warmth) =>
+              onChange({ ...value, effects: { ...value.effects, warmth } })
+            }
+          />
+        )}
         {(["wind", "stream"] as const).map((key) => (
           <Range
             key={key}

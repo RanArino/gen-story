@@ -1,0 +1,125 @@
+{
+  "model": "claude-opus-5-5",
+  "inputDigest": "sha256:7868732549235c42a69187b55a01fd534222c81d4d0ecc3c1050a0c84391ac84",
+  "content": {
+    "chapterName": "海辺の一日",
+    "nameReason": "指定どおりのタイトル（LOCKED）。列車・港・夕日の小道という一日の流れにも合っています。",
+    "music": {
+      "mood": "懐かしく温かい、穏やかな旅情",
+      "key": "D",
+      "mode": "major",
+      "melody": "medium",
+      "arc": "fall",
+      "fromPrevious": "continue",
+      "instruments": ["koto-pluck"],
+      "tempoBpm": 91
+    },
+    "scenes": [
+      {
+        "sceneId": "coastal-train",
+        "observation": "低い太陽に照らされた海沿いの木造駅のホームに、赤い一両編成の列車が入ってくる。左には光る海と岬が見える。",
+        "camera": {
+          "move": "push-in",
+          "focus": {
+            "x": 0.72,
+            "y": 0.47
+          },
+          "speed": 0.3,
+          "reason": "縦長の画面では右寄りの赤い列車を主役にし、ゆっくり寄って旅の始まりを感じさせるため。"
+        },
+        "effects": {
+          "rays": 0.12,
+          "motes": 0.08,
+          "leaves": 0,
+          "warmth": 0
+        },
+        "footsteps": "none",
+        "ambience": {
+          "wind": 0.35,
+          "stream": 0.45
+        },
+        "sounds": [
+          {
+            "sound": "bird-chirp",
+            "at": 0.25,
+            "gain": 0.3
+          }
+        ],
+        "captions": {
+          "ja": "小さな列車が、海の匂いを連れてきた。",
+          "en": "A little train arrived, carrying the scent of the sea."
+        }
+      },
+      {
+        "sceneId": "harbor-cafe",
+        "observation": "陽の当たる木のテーブルにコーヒーとクロワッサン。開いた窓の外には漁船と灯籠のある港が広がる。",
+        "camera": {
+          "move": "reveal",
+          "focus": {
+            "x": 0.3,
+            "y": 0.72
+          },
+          "speed": 0.2,
+          "reason": "手前のコーヒーカップから始めて窓の外の港へ開くと、ひと休みの時間と景色の両方が伝わるため。"
+        },
+        "effects": {
+          "rays": 0.06,
+          "motes": 0.12,
+          "leaves": 0,
+          "warmth": 0
+        },
+        "footsteps": "none",
+        "ambience": {
+          "wind": 0.1,
+          "stream": 0.2
+        },
+        "sounds": [
+          {
+            "sound": "bird-chirp",
+            "at": 0.6,
+            "gain": 0.2
+          }
+        ],
+        "captions": {
+          "ja": "港を眺めながら、時間がゆっくりほどけていく。",
+          "en": "Watching the harbor, time slowly comes undone."
+        }
+      },
+      {
+        "sceneId": "sunset-walk",
+        "observation": "崖沿いの小道と古いベンチの先に、島々の向こうへ沈む夕日。海面に光の道が伸びている。",
+        "camera": {
+          "move": "pull-out",
+          "focus": {
+            "x": 0.83,
+            "y": 0.27
+          },
+          "speed": 0.2,
+          "reason": "夕日から始めてベンチと小道まで広げ、一日の終わりを静かに見渡す締めくくりにするため。"
+        },
+        "effects": {
+          "rays": 0.14,
+          "motes": 0.1,
+          "leaves": 0,
+          "warmth": 0
+        },
+        "footsteps": "gravel",
+        "ambience": {
+          "wind": 0.4,
+          "stream": 0.45
+        },
+        "sounds": [
+          {
+            "sound": "suzu",
+            "at": 0.85,
+            "gain": 0.2
+          }
+        ],
+        "captions": {
+          "ja": "沈む光に、今日をそっと預けて帰ろう。",
+          "en": "Let's leave today with the setting sun and head home."
+        }
+      }
+    ]
+  }
+}

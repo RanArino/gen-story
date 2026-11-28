@@ -1,6 +1,13 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { clampDirectionToTemplate } from "@gen-story/domain/film-template";
+import {
+  FILM_PHOTO_CROPS,
+  FULL_FRAME_LAYOUT,
+  cropPhotoBox,
+  resolveFrameLayout,
+} from "@gen-story/domain/film-layout";
+import { useLocale, useTranslations } from "next-intl";
 import {
   FILM_ASPECTS,
   FILM_CAMERA_MOVES,
@@ -8,6 +15,7 @@ import {
   type FilmDirectionConflictDto,
   type FilmDirectionContentDto,
   type FilmDirectionDto,
+  type FilmFrameLayout,
   type FilmSceneCaption,
   type FilmSceneDirectionDto,
   type FilmSubtitleMode,
@@ -29,6 +37,11 @@ import { AppShell } from "../AppShell";
 import { ErrorAlert } from "../ErrorAlert";
 import { CameraAudition } from "./CameraAudition";
 import {
+  sampleFor,
+  TemplatePicker,
+  useTemplateSamples,
+} from "./TemplatePicker";
+import {
   DirectionConfirmDialog,
   MusicFields,
   Range,
@@ -36,15 +49,21 @@ import {
   type DirectionRequest,
 } from "./FilmDirectionPanel";
 import { FilmExportDialog, subtitleLines } from "./FilmExportDialog";
-import { FilmPlayer } from "./FilmPlayer";
+import { FilmPlayer, type LayoutEditing } from "./FilmPlayer";
 import styles from "./FilmPage.module.css";
 import panel from "./FilmDirectionPanel.module.css";
 import ws from "./FilmWorkspace.module.css";
 
 const ASPECT_SHAPES = {
-  "16:9": { width: 22, height: 12 },
-  "9:16": { width: 12, height: 22 },
-  "1:1": { width: 16, height: 16 },
+  "16:9": { width: 18, height: 10 },
+  "9:16": { width: 10, height: 18 },
+  "1:1": { width: 14, height: 14 },
+} as const;
+/** Output pixels per video size, for re-cutting the photo box to a new crop. */
+const FRAME_PIXELS = {
+  "16:9": [1920, 1080],
+  "9:16": [1080, 1920],
+  "1:1": [1080, 1080],
 } as const;
 const DEFAULT_SCENE_MS = 4000;
 
@@ -54,6 +73,7 @@ type Conflict = { directionId: string; conflicts: FilmDirectionConflictDto[] };
 
 export function FilmPage({ projectId }: { projectId: string }) {
   const t = useTranslations("film");
+  const language = useLocale() === "ja" ? "ja" : "en";
   const tw = useTranslations("film.workspace");
   const td = useTranslations("film.direction");
   const [detail, setDetail] = useState<FilmDetailDto | null>(null);
@@ -75,6 +95,13 @@ export function FilmPage({ projectId }: { projectId: string }) {
   } | null>(null);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [playhead, setPlayhead] = useState(0);
+  // Layout editing on the preview: which part is selected, where edits go, the live drag value.
+  const [layoutEditing, setLayoutEditing] = useState(false);
+  const [layoutPart, setLayoutPart] = useState<"photo" | "caption" | null>(
+    null,
+  );
+  const [layoutScope, setLayoutScope] = useState<"film" | "scene">("film");
+  const [layoutDraft, setLayoutDraft] = useState<FilmFrameLayout | null>(null);
   const [organizing, setOrganizing] = useState<boolean | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [confirm, setConfirm] = useState<DirectionRequest | null>(null);
@@ -83,6 +110,8 @@ export function FilmPage({ projectId }: { projectId: string }) {
     Record<string, "mine" | "draft">
   >({});
   const [audition, setAudition] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const samples = useTemplateSamples();
   const [exporting, setExporting] = useState(false);
   const [exportScope, setExportScope] = useState<string | null>(null);
   const [requestedJobId, setRequestedJobId] = useState<string | null>(null);
@@ -169,6 +198,10 @@ export function FilmPage({ projectId }: { projectId: string }) {
       </AppShell>
     );
 
+  const template = detail.templates.find(({ id }) => id === film.recipe);
+  const bounds = template?.bounds;
+  const effectiveDirection = (content: FilmDirectionContentDto) =>
+    bounds ? clampDirectionToTemplate(content, bounds) : content;
   const hasPending = dirty || Object.keys(directionEdits).length > 0;
   const status: SaveState =
     saveState === "saving"
@@ -196,7 +229,7 @@ export function FilmPage({ projectId }: { projectId: string }) {
         revision = value.treatment.revision;
       }
       for (const [id, content] of Object.entries(directionEdits))
-        await updateFilmDirection(projectId, id, content);
+        await updateFilmDirection(projectId, id, effectiveDirection(content));
       if (Object.keys(directionEdits).length) {
         setDirectionEdits({});
         await load();
@@ -227,7 +260,10 @@ export function FilmPage({ projectId }: { projectId: string }) {
   const shownFor = (chapterId: string) => {
     const d = draftFor(chapterId) ?? appliedFor(chapterId);
     return d
-      ? { direction: d, content: directionEdits[d.id] ?? d.content! }
+      ? {
+          direction: d,
+          content: effectiveDirection(directionEdits[d.id] ?? d.content!),
+        }
       : null;
   };
   const changeDirection = (id: string, content: FilmDirectionContentDto) =>
@@ -360,6 +396,12 @@ export function FilmPage({ projectId }: { projectId: string }) {
   const chapter = film.chapters.find((c) => c.id === selected?.chapterId);
   const chapterIndex = chapter ? film.chapters.indexOf(chapter) : -1;
   const shown = chapter ? shownFor(chapter.id) : null;
+  const originalDirection =
+    shown && (directionEdits[shown.direction.id] ?? shown.direction.content);
+  const directionAdjusted =
+    originalDirection &&
+    (film.recipe !== detail.treatment.recipe ||
+      JSON.stringify(originalDirection) !== JSON.stringify(shown.content));
   const sceneId = selected?.sceneId ?? chapter?.scenes[0]?.sceneId ?? null;
   const sceneEntry = chapter?.scenes.find((s) => s.sceneId === sceneId);
   const sceneIndex = shown?.content.scenes.findIndex(
@@ -759,6 +801,9 @@ export function FilmPage({ projectId }: { projectId: string }) {
             }
           />
         </label>
+        {directionAdjusted && (
+          <p className={ws.note}>{tw("templateDirectionHint")}</p>
+        )}
         <fieldset className={ws.cameraGroup}>
           <legend>{tw("camera")}</legend>
           {camera && sceneDirection ? (
@@ -778,7 +823,7 @@ export function FilmPage({ projectId }: { projectId: string }) {
                       })
                     }
                   >
-                    {FILM_CAMERA_MOVES.map((m) => (
+                    {(bounds?.cameraMoves ?? FILM_CAMERA_MOVES).map((m) => (
                       <option key={m} value={m}>
                         {td(`moves.${m}`)}
                       </option>
@@ -790,6 +835,7 @@ export function FilmPage({ projectId }: { projectId: string }) {
                 </button>
               </div>
               <Range
+                max={bounds?.maxSpeed}
                 label={tw("strengthValue", {
                   value: Math.round(camera.speed * 100),
                 })}
@@ -845,7 +891,11 @@ export function FilmPage({ projectId }: { projectId: string }) {
           )}
         </fieldset>
         {sceneDirection && (
-          <SceneLightAndSound value={sceneDirection} onChange={changeScene} />
+          <SceneLightAndSound
+            value={sceneDirection}
+            template={template}
+            onChange={changeScene}
+          />
         )}
         <details className={ws.more}>
           <summary>{t("changeImage")}</summary>
@@ -955,6 +1005,7 @@ export function FilmPage({ projectId }: { projectId: string }) {
           <details className={ws.more}>
             <summary>{tw("sharedDirection")}</summary>
             <MusicFields
+              template={template}
               value={shown.content.music}
               onChange={(music) =>
                 changeDirection(shown.direction.id, {
@@ -996,6 +1047,140 @@ export function FilmPage({ projectId }: { projectId: string }) {
 
   const aspect = film.outputAspect ?? "16:9";
   const reducedMotion = film.reducedMotion;
+  // Template default for this size, then the Film layout, then this photo's own layout. While
+  // editing "all photos", the Film layout is shown so the edit is visible.
+  const sceneLayout = sceneId ? film.sceneLayouts?.[sceneId] : undefined;
+  const savedFrame = resolveFrameLayout(
+    template?.frame?.[aspect] ?? FULL_FRAME_LAYOUT,
+    film.layout,
+    layoutEditing && layoutScope === "film" ? undefined : sceneLayout,
+  );
+  const shownFrame = layoutDraft ?? savedFrame;
+  function commitLayout(next: FilmFrameLayout) {
+    setLayoutDraft(null);
+    const parts = (["photo", "caption"] as const).filter(
+      (part) => JSON.stringify(next[part]) !== JSON.stringify(savedFrame[part]),
+    );
+    if (!parts.length) return;
+    const change = Object.fromEntries(parts.map((part) => [part, next[part]]));
+    if (layoutScope === "scene" && sceneId)
+      edit({
+        sceneLayouts: {
+          ...film!.sceneLayouts,
+          [sceneId]: { ...sceneLayout, ...change },
+        },
+      });
+    else edit({ layout: { ...film!.layout, ...change } });
+  }
+  function startLayout() {
+    setLayoutScope(sceneLayout ? "scene" : "film");
+    setLayoutPart(null);
+    setLayoutDraft(null);
+    setLayoutEditing(true);
+  }
+  const layoutEditor: LayoutEditing | undefined = layoutEditing
+    ? {
+        selected: layoutPart,
+        onSelect: setLayoutPart,
+        onChange: setLayoutDraft,
+        onCommit: commitLayout,
+        labels: {
+          photo: tw("layoutPhoto"),
+          caption: tw("layoutCaption"),
+          resize: tw("layoutResize"),
+        },
+      }
+    : undefined;
+  const layoutBar = (
+    <div className={ws.layoutBar}>
+      <fieldset className={ws.settingGroup}>
+        <legend className={ws.kicker}>{tw("layoutScope")}</legend>
+        <div className={ws.segments}>
+          {(["film", "scene"] as const).map((scope) => (
+            <label key={scope} className={ws.segment}>
+              <input
+                type="radio"
+                name="layout-scope"
+                value={scope}
+                checked={layoutScope === scope}
+                disabled={scope === "scene" && !sceneId}
+                onChange={() => {
+                  setLayoutDraft(null);
+                  setLayoutScope(scope);
+                }}
+              />
+              {tw(scope === "film" ? "layoutScopeFilm" : "layoutScopeScene")}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset className={ws.settingGroup}>
+        <legend className={ws.kicker}>{tw("photoCrop")}</legend>
+        <div className={ws.segments}>
+          {FILM_PHOTO_CROPS.map((crop) => (
+            <label key={crop} className={ws.segment}>
+              <input
+                type="radio"
+                name="photo-crop"
+                value={crop}
+                checked={(shownFrame.photo.crop ?? aspect) === crop}
+                onChange={() => {
+                  const [w, h] = FRAME_PIXELS[aspect];
+                  const { photo, caption } = shownFrame;
+                  const next = cropPhotoBox(photo, crop, w, h);
+                  // The caption keeps its distance from the photo's lower edge.
+                  const shift =
+                    next.y + next.height / 2 - (photo.y + photo.height / 2);
+                  commitLayout({
+                    photo: next,
+                    caption: {
+                      ...caption,
+                      y:
+                        Math.round(
+                          Math.min(1, Math.max(0, caption.y + shift)) * 1000,
+                        ) / 1000,
+                    },
+                  });
+                }}
+              />
+              <span
+                className={ws.sizeShape}
+                style={ASPECT_SHAPES[crop]}
+                aria-hidden
+              />
+              {t(`aspects.${crop.replace(":", "x")}`)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <p>
+        {layoutScope === "film" && sceneLayout
+          ? tw("layoutSceneOverridden")
+          : tw("layoutHint")}
+      </p>
+      {layoutScope === "scene" ? (
+        <button
+          type="button"
+          disabled={!sceneLayout}
+          onClick={() => {
+            const rest = { ...film!.sceneLayouts };
+            delete rest[sceneId!];
+            edit({ sceneLayouts: rest });
+          }}
+        >
+          {tw("layoutResetScene")}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={!film.layout}
+          onClick={() => edit({ layout: undefined })}
+        >
+          {tw("layoutResetFilm")}
+        </button>
+      )}
+    </div>
+  );
   const previewCaption =
     sceneId && chapter
       ? subtitleLines(captionFor(sceneId, chapter.id), subtitles)
@@ -1053,49 +1238,84 @@ export function FilmPage({ projectId }: { projectId: string }) {
         </div>
         <details className={ws.settings}>
           <summary>{tw("filmSettings")}</summary>
-          <label>
-            {t("template")}
-            <select
-              aria-label={t("template")}
-              value={film.recipe}
-              onChange={(e) =>
-                edit({ recipe: e.target.value as FilmTreatment["recipe"] })
-              }
-            >
-              <option value="quiet-cinema">Quiet Cinema</option>
-              <option value="memory-board">Memory Board</option>
-              <option value="pulse-cut">Pulse Cut</option>
-            </select>
-          </label>
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={film.reducedMotion}
-              onChange={(e) => edit({ reducedMotion: e.target.checked })}
-            />
-            {t("reducedMotion")}
-          </label>
-          <fieldset className={panel.sizeOptions}>
-            <legend>{t("videoSize")}</legend>
-            {FILM_ASPECTS.map((a) => (
-              <label key={a} className={panel.sizeOption}>
+          {/* One row: what the film looks like, its frame, and its motion. */}
+          <div className={ws.settingsRow}>
+            <div className={ws.templateCurrent}>
+              <span
+                className={ws.templateThumb}
+                style={{ aspectRatio: aspect.replace(":", " / ") }}
+              >
+                {sampleFor(samples, template, aspect) && (
+                  <img
+                    src={sampleFor(samples, template, aspect)!.poster}
+                    alt=""
+                  />
+                )}
+              </span>
+              <span className={ws.templateCurrentText}>
+                <span className={ws.kicker}>{t("template")}</span>
+                <strong>
+                  {template
+                    ? template.offered
+                      ? template.name[language]
+                      : tw("previousTemplate", {
+                          name: template.name[language],
+                        })
+                    : film.recipe}
+                </strong>
+                {template?.offered && (
+                  <small>
+                    {template.facts.map((f) => f[language]).join(" · ")}
+                  </small>
+                )}
+              </span>
+              <button
+                type="button"
+                className={ws.pickerOpen}
+                onClick={() => setPicking(true)}
+              >
+                {tw("pickerOpen")}
+              </button>
+            </div>
+            <fieldset className={ws.settingGroup}>
+              <legend className={ws.kicker}>{t("videoSize")}</legend>
+              <div className={ws.segments}>
+                {FILM_ASPECTS.map((a) => (
+                  <label key={a} className={ws.segment}>
+                    <input
+                      type="radio"
+                      name="film-aspect"
+                      value={a}
+                      checked={aspect === a}
+                      onChange={() => edit({ outputAspect: a })}
+                    />
+                    <span
+                      className={ws.sizeShape}
+                      style={ASPECT_SHAPES[a]}
+                      aria-hidden
+                    />
+                    {t(`aspects.${a.replace(":", "x")}`)}
+                  </label>
+                ))}
+              </div>
+              {anyApplied && (
+                <p className={ws.note}>{tw("sizeStalesDirection")}</p>
+              )}
+            </fieldset>
+            <div className={ws.settingGroup}>
+              <span className={ws.kicker}>{tw("motionSetting")}</span>
+              <label className={ws.switchField}>
                 <input
-                  type="radio"
-                  name="film-aspect"
-                  value={a}
-                  checked={aspect === a}
-                  onChange={() => edit({ outputAspect: a })}
+                  type="checkbox"
+                  role="switch"
+                  className={ws.switch}
+                  checked={film.reducedMotion}
+                  onChange={(e) => edit({ reducedMotion: e.target.checked })}
                 />
-                <span
-                  className={panel.sizeShape}
-                  style={ASPECT_SHAPES[a]}
-                  aria-hidden
-                />
-                {t(`aspects.${a.replace(":", "x")}`)}
+                {t("reducedMotion")}
               </label>
-            ))}
-          </fieldset>
-          {anyApplied && <p className={ws.note}>{tw("sizeStalesDirection")}</p>}
+            </div>
+          </div>
         </details>
       </header>
       {error && (
@@ -1370,6 +1590,27 @@ export function FilmPage({ projectId }: { projectId: string }) {
               reducedMotion={reducedMotion}
               onEnd={nextScene}
               status={chapterStatus()}
+              layout={template?.layout}
+              frame={shownFrame}
+              editing={layoutEditor}
+              layoutBar={layoutBar}
+              layoutButton={
+                <button
+                  type="button"
+                  className={layoutEditing ? ws.primary : undefined}
+                  aria-pressed={layoutEditing}
+                  disabled={!sceneId}
+                  onClick={() =>
+                    layoutEditing ? setLayoutEditing(false) : startLayout()
+                  }
+                >
+                  {layoutEditing ? tw("layoutDone") : tw("layoutEdit")}
+                </button>
+              }
+              cardIndex={Math.max(
+                0,
+                chapter?.scenes.findIndex((s) => s.sceneId === sceneId) ?? 0,
+              )}
             />
             <button
               className={ws.mobileEdit}
@@ -1454,6 +1695,16 @@ export function FilmPage({ projectId }: { projectId: string }) {
         </div>
       )}
 
+      <TemplatePicker
+        open={picking}
+        templates={detail.templates}
+        current={film.recipe}
+        aspect={aspect}
+        reducedMotion={reducedMotion}
+        samples={samples}
+        onClose={() => setPicking(false)}
+        onChoose={(recipe) => edit({ recipe })}
+      />
       <DirectionConfirmDialog
         request={confirm}
         onCancel={() => setConfirm(null)}
@@ -1464,6 +1715,8 @@ export function FilmPage({ projectId }: { projectId: string }) {
           open={audition}
           aspect={aspect}
           current={sceneDirection.camera}
+          moves={bounds?.cameraMoves ?? FILM_CAMERA_MOVES}
+          maxSpeed={bounds?.maxSpeed ?? 1}
           onClose={() => setAudition(false)}
           onChoose={({ move, speed }) => {
             changeScene({

@@ -1,6 +1,20 @@
 # Film template examples
 
-These are archived examples of the earlier sparse template renderer. Current GUI exports use the cinematic runtime; these files are not its quality reference. Representative replacement previews are tracked separately.
+## Production samples
+
+[The production sample manifest](templates/manifest.json) lists Quiet Cinema and Memory Board at 16:9, 9:16, and 1:1. Each entry links a 720p-class fast-start MP4, its poster, and the approved direction snapshot used for that export. The template revision and snapshot digest identify the sample. Browsers load the files from the web app's public directory.
+
+From the repository root:
+
+    pnpm tsx apps/api/scripts/generate-template-previews.ts --plan
+    pnpm tsx apps/api/scripts/generate-template-previews.ts --confirm-ai
+    pnpm tsx packages/infrastructure/scripts/verify-template-previews.ts
+
+The plan prints how many bundled-photo directions are missing from the local cache. Confirm that count with the owner before passing `--confirm-ai`. A rerun with a complete cache uses `pnpm tsx apps/api/scripts/generate-template-previews.ts` and makes zero AI calls. The cache key leaves out each template's `frame` layout defaults, because the AI never sees them, so changing a default layout re-renders the samples without new AI calls. The generator runs the normal Chapter export in disposable state. It defaults to the local Claude runtime and accepts `GEN_STORY_AGENT_RUNTIME=codex`. It uses Chrome and FFmpeg/ffprobe. The verifier checks the catalog coverage, snapshot digests, codecs, dimensions, duration, loudness, and full browser playback with the API blocked.
+
+## Archived samples
+
+The original top-level MP4s were rendered with the earlier sparse template renderer in October 2026.
 
 These examples use the production Film runtime with default template settings, automatic scene durations, normal motion, the same three sample photos, and the same Japanese captions. They are examples of presentation; the sample content is not added to projects. The initial runtime uses silent shared BGM and bundled template sound effects.
 
@@ -12,7 +26,7 @@ The three photographs were created specifically for this demo with the built-in 
 2. Create one cinematic natural travel photograph, landscape 16:9. A quiet little Japanese seaside cafe table by an open window at midday. A white ceramic coffee cup and small plate with a croissant on warm wooden table in foreground, leafy plant to the side, sparkling blue sea and an old harbor visible through the window. Believable photographic textures, soft light, clear depth and coherent warm blue/gold palette. No people, text, logos, collage, borders or watermark. This is an original synthetic sample photo for a film-template demo.
 3. Create one cinematic natural travel photograph, landscape 16:9. End of a quiet Japanese seaside day, a narrow coastal path with grasses and a weathered wooden bench in foreground, tranquil blue water leading toward hazy islands, beautiful soft peach golden sunset sky. Believable photographic textures and clear foreground/midground/background, restrained blue and warm gold palette consistent with a coastal travel diary. No people, text, logos, collage, borders or watermark. This is an original synthetic sample photo for a film-template demo.
 
-Regenerate locally from the repository root:
+Regenerate the archived files locally from the repository root:
 
     pnpm tsx packages/infrastructure/scripts/generate-film-previews.ts
 

@@ -1,5 +1,14 @@
-import { camAt, frameForImage } from "./math.js";
-import type { CameraKey } from "./types.js";
+import {
+  camAt,
+  frameForImage,
+  paperCardBox,
+  paperNoteFrame,
+  photoBox,
+  type PaperNote,
+  type PaperNoteInput,
+} from "./math.js";
+import type { CameraKey, SceneFrame } from "./types.js";
+import type { FilmSceneDirection } from "@gen-story/domain";
 
 // Browser-safe: no Node, filesystem or compiler imports, so the web preview runs the same code.
 
@@ -23,11 +32,7 @@ export interface ApprovedSceneDirection {
   effects: { rays: number; motes: number; leaves: number; warmth: number };
   footsteps: "none" | "gravel" | "stone" | "stair";
   ambience: { wind: number; stream: number };
-  sounds: {
-    sound: "bird-chirp" | "suzu" | "clap" | "temple-bell" | "low-swell";
-    at: number;
-    gain: number;
-  }[];
+  sounds: FilmSceneDirection["sounds"];
 }
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
@@ -127,4 +132,84 @@ export function previewFrame(
     photo.height,
     "follow",
   );
+}
+
+/**
+ * What the painter draws for a scene with a frame layout at progress `p`: the photo box (a
+ * Memory Board card's outer edge, tilted by `rotation`), the photo filling the inside of the
+ * box (`fill`, relative to the inside's top-left corner), and for paper cards the caption note.
+ * Units are the viewport's. Walking bob, drift and the card slide are omitted.
+ */
+export function previewLayout(
+  camera: ApprovedSceneDirection["camera"],
+  p: number,
+  viewport: { width: number; height: number },
+  photo: { width: number; height: number },
+  layout: "full-frame" | "paper-cards",
+  frame: SceneFrame,
+  index: number,
+  reducedMotion = false,
+  note: PaperNoteInput | null = null,
+): {
+  box: { x: number; y: number; width: number; height: number };
+  inner: { width: number; height: number };
+  border: number;
+  rotation: number;
+  fill: { left: number; top: number; width: number; height: number };
+  /** Whether the box leaves part of the frame for the blurred backdrop (full frame only). */
+  backdrop: boolean;
+  note: PaperNote | null;
+} {
+  const { keys } = cameraForMove(camera, false);
+  const at = camAt(
+    {
+      id: "preview",
+      image: "preview",
+      t0: 0,
+      t1: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+      bob: 0,
+      camera: keys,
+    },
+    reducedMotion ? 0 : Math.min(1, Math.max(0, p)),
+  );
+  const { width: W, height: H } = viewport;
+  if (layout === "paper-cards") {
+    const card = paperCardBox(W, H, frame.photo, index);
+    return {
+      box: {
+        x: card.x,
+        y: card.y,
+        width: card.outerWidth,
+        height: card.outerHeight,
+      },
+      inner: { width: card.width, height: card.height },
+      border: card.border,
+      rotation: card.rotation,
+      fill: frameForImage(
+        card.width,
+        card.height,
+        at,
+        photo.width,
+        photo.height,
+      ),
+      backdrop: false,
+      note: paperNoteFrame(W, H, frame.caption, note, card.outerWidth),
+    };
+  }
+  const box = photoBox(W, H, frame.photo);
+  return {
+    box: { x: box.x, y: box.y, width: box.width, height: box.height },
+    inner: { width: box.width, height: box.height },
+    border: 0,
+    rotation: 0,
+    fill: frameForImage(box.width, box.height, at, photo.width, photo.height),
+    backdrop:
+      box.left > 0.5 ||
+      box.top > 0.5 ||
+      box.left + box.width < W - 0.5 ||
+      box.top + box.height < H - 0.5,
+    note: null,
+  };
 }

@@ -93,6 +93,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@gen-story/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@gen-story/infrastructure':
         specifier: workspace:*
         version: link:../../packages/infrastructure
@@ -141,6 +144,9 @@ importers:
 
   packages/infrastructure:
     dependencies:
+      '@gen-story/domain':
+        specifier: workspace:*
+        version: link:../domain
       ajv:
         specifier: 8.20.0
         version: 8.20.0

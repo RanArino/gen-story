@@ -14,8 +14,21 @@ export interface CameraKey {
   fy: number;
   z: number;
 }
+/** Photo box and caption place as frame fractions (see `@gen-story/domain` film-layout). */
+export interface SceneFrame {
+  photo: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    crop?: "16:9" | "9:16" | "1:1";
+  };
+  caption: { x: number; y: number; size: number };
+}
 export interface CinematicScene {
   framing?: "contain" | "follow";
+  /** Present on directions compiled since 2026-11-28; the photo fills this box. */
+  frame?: SceneFrame;
   id: string;
   image: string;
   t0: number;
@@ -53,11 +66,7 @@ export type SoundId =
   | "footstep"
   | "wind"
   | "stream"
-  | "bird-chirp"
-  | "suzu"
-  | "clap"
-  | "temple-bell"
-  | "low-swell";
+  | FilmSceneDirection["sounds"][number]["sound"];
 export interface CinematicScore {
   seed: number;
   duration: number;
@@ -87,6 +96,9 @@ export interface CinematicDirection {
   reducedMotion: boolean;
   /** Output profile id; absent means the original landscape-1080p30@1. */
   profile?: string;
+  layout?: "full-frame" | "paper-cards";
+  transition?: "dissolve" | "card-slide";
+  captionStyle?: { font: "serif" | "sans"; position: "lower" | "note" };
   assets: Record<
     string,
     { asset: string; sha256: string; widthPx: number; heightPx: number }
@@ -117,3 +129,4 @@ export interface CinematicDirection {
   credits: Card | null;
   score: CinematicScore;
 }
+import type { FilmSceneDirection } from "@gen-story/domain";

@@ -193,5 +193,6 @@ export type {
   FilmDirectionRepositoryPort,
   FilmDirectionPlannerPort,
   FilmDirectionPlanRequest,
+  FilmTemplateCatalogPort,
   FilmDirectionPlanChapter,
 } from "./film-direction";

@@ -1,11 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import {
-  FILM_CAMERA_MOVES,
-  type FilmAspect,
-  type FilmSceneDirectionDto,
-} from "@gen-story/shared";
+import { type FilmAspect, type FilmSceneDirectionDto } from "@gen-story/shared";
 import {
   FramedPhoto,
   usePlayback,
@@ -29,12 +25,16 @@ export function CameraAudition({
   open,
   aspect,
   current,
+  moves,
+  maxSpeed,
   onClose,
   onChoose,
 }: {
   open: boolean;
   aspect: FilmAspect;
   current: Camera;
+  moves: readonly Camera["move"][];
+  maxSpeed: number;
   onClose: () => void;
   onChoose: (camera: Pick<Camera, "move" | "speed">) => void;
 }) {
@@ -60,7 +60,7 @@ export function CameraAudition({
   }, [open]);
   const camera = (s: keyof typeof STRENGTHS): Camera => ({
     move,
-    speed: STRENGTHS[s],
+    speed: STRENGTHS[s] * maxSpeed,
     focus: SAMPLE_FOCUS,
     reason: "",
   });
@@ -80,7 +80,7 @@ export function CameraAudition({
       </div>
       <p className={styles.note}>{t("auditionHint")}</p>
       <div className={styles.moveList} role="radiogroup" aria-label={t("move")}>
-        {FILM_CAMERA_MOVES.map((m) => (
+        {moves.map((m) => (
           <label key={m} className={styles.moveOption}>
             <input
               type="radio"
@@ -200,7 +200,9 @@ export function CameraAudition({
         <button
           type="button"
           className={styles.primary}
-          onClick={() => onChoose({ move, speed: STRENGTHS[strength] })}
+          onClick={() =>
+            onChoose({ move, speed: STRENGTHS[strength] * maxSpeed })
+          }
         >
           {t("useMove", {
             move: tm(move),

@@ -61,7 +61,9 @@ export function compileCinematicFilm(
     w: w * scale,
     h: h * scale,
   });
-  const registered = ["noto-serif-jp", "cormorant-garamond"].map(
+  const fontNames = ["noto-serif-jp", "cormorant-garamond"];
+  if (direction.captionStyle?.font === "sans") fontNames.push("noto-sans-jp");
+  const registered = fontNames.map(
     (name) =>
       registry
         .records()
@@ -171,7 +173,11 @@ export function compileCinematicFilm(
     layers: [
       {
         type: "cinematic",
-        fonts: { serif: fonts[0]!.alias, latin: fonts[1]!.alias },
+        fonts: {
+          serif: fonts[0]!.alias,
+          latin: fonts[1]!.alias,
+          ...(fonts[2] && { sans: fonts[2].alias }),
+        },
         startMs: 0,
         endMs: runtimeMs,
         direction,
@@ -182,7 +188,7 @@ export function compileCinematicFilm(
         segment: 0,
         role: "caption" as const,
         text: c.text,
-        font: [fonts[1]!.alias, fonts[0]!.alias],
+        font: fonts[2] ? [fonts[2].alias] : [fonts[1]!.alias, fonts[0]!.alias],
         box: box(153.6, c.mid ? 480 : 820, 1612.8, 80),
         startMs: Math.round(c.t0 * 1000),
         endMs: Math.round(c.t1 * 1000),
@@ -191,7 +197,7 @@ export function compileCinematicFilm(
         segment: 0,
         role: "caption" as const,
         text: c.sub,
-        font: [fonts[0]!.alias],
+        font: [fonts[2]?.alias ?? fonts[0]!.alias],
         box: box(153.6, c.mid ? 550 : 900, 1612.8, 60),
         startMs: Math.round(c.t0 * 1000),
         endMs: Math.round(c.t1 * 1000),

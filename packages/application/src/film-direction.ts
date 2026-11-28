@@ -1,5 +1,9 @@
 import {
   applyApprovedDirection,
+  clampDirectionToTemplate,
+  validateDirectionTemplateBounds,
+  type FilmTemplate,
+  type FilmTemplateBounds,
   directionContentProblems,
   enforceDirectionLocks,
   isDirectionStale,
@@ -15,6 +19,11 @@ import {
   type FilmTreatment,
 } from "@gen-story/domain";
 import type { FilmRepositoryPort } from "./film";
+
+export interface FilmTemplateCatalogPort {
+  list(): readonly FilmTemplate[];
+  get(id: string): FilmTemplate | undefined;
+}
 
 export interface FilmDirectionRepositoryPort {
   list(projectId: string): Promise<FilmDirectionProposal[]>;
@@ -37,6 +46,7 @@ export interface FilmDirectionPlanChapter {
 export interface FilmDirectionPlanRequest {
   scope: "film" | "chapter";
   filmTitle: string;
+  template?: Pick<FilmTemplate, "name" | "bounds" | "fixed">;
   story: string;
   outputAspect: FilmAspect;
   chapters: FilmDirectionPlanChapter[];
@@ -86,13 +96,16 @@ export function settlePlannedChapters(
       raw.content as FilmDirectionContent,
       chapter.locks,
     );
+    const withKeptScenes = {
+      ...content,
+      scenes: content.scenes.map(
+        (scene, i) => chapter.scenes[i]!.keep ?? scene,
+      ),
+    };
     settled.set(chapter.chapterId, {
-      content: {
-        ...content,
-        scenes: content.scenes.map(
-          (scene, i) => chapter.scenes[i]!.keep ?? scene,
-        ),
-      },
+      content: request.template
+        ? clampDirectionToTemplate(withKeptScenes, request.template.bounds)
+        : withKeptScenes,
     });
   }
   return settled;
@@ -105,6 +118,7 @@ export async function updateFilmDirection(
     projectId: string;
     id: string;
     content: unknown;
+    bounds?: FilmTemplateBounds;
     sceneIds: string[];
     now: string;
   },
@@ -116,6 +130,8 @@ export async function updateFilmDirection(
   if (proposal.status !== "proposed" && proposal.status !== "approved")
     throw new Error("Only a proposed or applied AI direction can be edited.");
   validateDirectionContent(input.content, input.sceneIds);
+  if (input.bounds)
+    validateDirectionTemplateBounds(input.content, input.bounds);
   // After approval the saved treatment owns the Chapter name and captions, so a manual revision
   // of an applied direction changes only camera, light and sound and keeps the reviewed text.
   const content: FilmDirectionContent =

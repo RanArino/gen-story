@@ -196,7 +196,6 @@ export {
   selectChangeProposalChoiceOption,
 } from "./change-proposal";
 export {
-  FILM_RECIPES,
   FILM_ASPECTS,
   FILM_SUBTITLE_MODES,
   validateFilm,
@@ -250,3 +249,25 @@ export type {
   FilmDirectionResolution,
   FilmDirectionConflict,
 } from "./film-direction";
+
+export {
+  clampDirectionToTemplate,
+  validateDirectionTemplateBounds,
+} from "./film-template";
+export type { FilmTemplate, FilmTemplateBounds } from "./film-template";
+export {
+  FULL_FRAME_LAYOUT,
+  FILM_LAYOUT_LIMITS,
+  FILM_PHOTO_CROPS,
+  cropPhotoBox,
+  resolveFrameLayout,
+  layoutOverrideError,
+  frameLayoutFor,
+} from "./film-layout";
+export type {
+  FilmPhotoBox,
+  FilmPhotoCrop,
+  FilmCaptionPlace,
+  FilmFrameLayout,
+  FilmLayoutOverride,
+} from "./film-layout";

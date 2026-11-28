@@ -448,6 +448,45 @@ describe("Film artifact HTTP boundary", () => {
     const address = server.address() as { port: number };
     return { ...f, base: `http://127.0.0.1:${address.port}` };
   }
+  it("hides Pulse Cut from offered choices and preserves saved Pulse Cut exports", async () => {
+    const { base, repository, service, deps } = await serverFixture();
+    const url = `${base}/api/projects/project/film`;
+    const catalog = (await (await fetch(`${url}/recipes`)).json()) as {
+      id: string;
+      offered: boolean;
+    }[];
+    expect(
+      catalog
+        .filter(({ offered }) => offered)
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual(["memory-board", "quiet-cinema"]);
+    const draft = { ...treatment(), recipe: "pulse-cut" };
+    const put = (expectedRevision: number) =>
+      fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...draft, expectedRevision }),
+      });
+    expect((await put(0)).status).toBe(400);
+    await repository.save({ ...draft, revision: 1 }, 0);
+    expect((await put(1)).status).toBe(200);
+    const bytes = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: "#adc5bb" },
+    })
+      .png()
+      .toBuffer();
+    await deps.objectStorage.putObject({
+      key: "data/uploads/generated.png",
+      body: bytes,
+      contentType: "image/png",
+    });
+    const saved = await approveAll(service);
+    expect(saved.recipe).toBe("pulse-cut");
+    const prepared = await service.prepare(saved);
+    expect(prepared.compiled[0]!.direction.scenes[0]!.bob).toBeGreaterThan(0);
+  });
+
   it("round-trips captions through HTTP and rejects stale, foreign and oversized edits", async () => {
     const { base, repository } = await serverFixture();
     const draft = {
@@ -742,6 +781,27 @@ describe("AI film direction", () => {
     return service.direction.repository.list("project");
   };
 
+  it("clamps planned direction and rejects a manual move outside the current template", async () => {
+    const { service } = await ready();
+    await service.requestDirection("project", {
+      scope: "film",
+      regenerate: false,
+    });
+    const [proposal] = await settledList(service);
+    expect(proposal!.content!.scenes[0]!.camera).toMatchObject({
+      move: "hold",
+      speed: 0.55,
+    });
+    const invalid = structuredClone(proposal!.content!);
+    invalid.scenes[0]!.camera.move = "climb";
+    await expect(
+      service.updateDirection("project", proposal!.id, invalid),
+    ).rejects.toThrow(/outside the selected Film template/);
+    expect(
+      (await service.direction.repository.list("project"))[0]!.content,
+    ).toEqual(proposal!.content);
+  });
+
   it("reuses a direction for unchanged photos and calls the Agent again only on regenerate", async () => {
     const { service, planner } = await ready();
     const first = await service.requestDirection("project", {
@@ -756,6 +816,7 @@ describe("AI film direction", () => {
     expect(again.map((p) => p.id)).toEqual(first.map((p) => p.id));
     expect(planner.plan).toHaveBeenCalledTimes(1);
     const request = planner.plan.mock.calls[0]![0];
+    expect(request.template?.bounds.cameraMoves).not.toContain("climb");
     expect(request.chapters[0]!.locks.chapterName).toBeNull();
     expect(request.chapters[0]!.scenes[0]!.imageKey).toBe(
       "data/uploads/generated.png",

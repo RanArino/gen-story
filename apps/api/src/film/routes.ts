@@ -9,11 +9,32 @@ import type { ApiDependencies } from "../app/create-api-context";
 import type { Router } from "../http/router";
 import { getParam } from "../http/router";
 import { readJsonBody, sendJson } from "../http/json";
+import { InvalidFilmTemplateError } from "./service";
 
+// Ranges are checked by the domain (`layoutOverrideError`); this keeps the shape explicit.
+const fraction = z.number().finite();
+const layoutSchema = z
+  .object({
+    photo: z
+      .object({
+        x: fraction,
+        y: fraction,
+        width: fraction,
+        height: fraction,
+        crop: z.enum(["16:9", "9:16", "1:1"]).optional(),
+      })
+      .strict()
+      .optional(),
+    caption: z
+      .object({ x: fraction, y: fraction, size: fraction })
+      .strict()
+      .optional(),
+  })
+  .strict();
 const draftSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
   title: z.string().trim().min(1).max(200),
-  recipe: z.enum(["quiet-cinema", "memory-board", "pulse-cut"]),
+  recipe: z.string().min(1),
   reducedMotion: z.boolean(),
   outputAspect: z.enum(["16:9", "9:16", "1:1"]).optional(),
   sceneCaptions: z
@@ -22,6 +43,8 @@ const draftSchema = z.object({
       z.object({ ja: z.string().max(120), en: z.string().max(200) }),
     )
     .optional(),
+  layout: layoutSchema.optional(),
+  sceneLayouts: z.record(z.string().min(1), layoutSchema).optional(),
   chapters: z.array(
     z.object({
       settings: z
@@ -116,6 +139,12 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
           });
           return;
         }
+        if (e instanceof InvalidFilmTemplateError) {
+          sendJson(res, 400, {
+            error: { code: "invalid_template", message: e.message },
+          });
+          return;
+        }
         const message = e instanceof Error ? e.message : String(e);
         sendJson(
           res,
@@ -159,11 +188,7 @@ export function registerFilmRoutes(router: Router, deps: ApiDependencies) {
     "GET",
     `${base}/recipes`,
     guarded(async (_req, res) => {
-      sendJson(res, 200, [
-        { id: "quiet-cinema", title: "Quiet Cinema" },
-        { id: "memory-board", title: "Memory Board" },
-        { id: "pulse-cut", title: "Pulse Cut" },
-      ]);
+      sendJson(res, 200, service.listTemplates());
     }),
   );
   router.add(

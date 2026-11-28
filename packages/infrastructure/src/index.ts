@@ -1,3 +1,5 @@
+import type { FilmLayoutOverride } from "@gen-story/domain";
+import { loadFilmTemplateCatalog } from "./template-catalog.js";
 import { FilmFailure } from "./contracts/errors.js";
 import {
   cpSync,
@@ -33,7 +35,7 @@ import { Registry } from "./registry/registry.js";
 import { renderChapter } from "./render/render-chapter.js";
 import { renderConcat } from "./render/concat.js";
 
-export { digestOf, digestBytes };
+export { digestOf, digestBytes, loadFilmTemplateCatalog };
 export type { ResolvedRenderPlan, ChapterArtifact, MediaLockEntry };
 export { FilmFailure } from "./contracts/errors.js";
 export const runtimeRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -62,10 +64,15 @@ export interface RuntimeInput {
   revision: number;
   title: string;
   worldview: string;
-  recipe: RecipeName;
+  recipe: string;
   reducedMotion: boolean;
   /** Output profile id for the rendered direction; absent means landscape-1080p30@1. */
   outputProfile?: string;
+  /** Output size of the Film; absent means 16:9. */
+  outputAspect?: string;
+  /** The user's photo and caption placement (Film-wide, then per photo). */
+  layout?: FilmLayoutOverride;
+  sceneLayouts?: Record<string, FilmLayoutOverride>;
   chapters: RuntimeChapter[];
   scenes: {
     id: string;
@@ -112,13 +119,19 @@ export function initializeRuntime(directory: string): FilmRuntimePaths {
   return paths;
 }
 
-export function compileFilm(paths: FilmRuntimePaths, input: RuntimeInput) {
+export function compileFilm(
+  paths: FilmRuntimePaths,
+  input: RuntimeInput,
+  recipeId = input.recipe,
+) {
+  if (!/^[a-z0-9-]+$/.test(recipeId))
+    throw new Error("Choose a supported Film template.");
   const registry = new Registry(paths.state);
   const recipe = JSON.parse(
-    readFileSync(`${assets}recipes/${input.recipe}.r1.json`, "utf8"),
+    readFileSync(`${assets}recipes/${recipeId}.r1.json`, "utf8"),
   ) as FilmStyleRecipe;
   const treatment = JSON.parse(
-    readFileSync(`${assets}treatments/${input.recipe}.json`, "utf8"),
+    readFileSync(`${assets}treatments/${recipeId}.json`, "utf8"),
   ) as FilmTreatment;
   treatment.id = input.projectId;
   treatment.projectId = input.projectId;
