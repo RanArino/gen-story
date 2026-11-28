@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { verifyReferenceMedia } from "./verify.js";
 
-export function inspectReferenceFile(file: string, expectedSeconds: number) {
+export function measureFilmFile(file: string, expectedSeconds: number) {
   const probe = JSON.parse(
     execFileSync(
       "ffprobe",
@@ -52,6 +52,11 @@ export function inspectReferenceFile(file: string, expectedSeconds: number) {
       truePeakDb: Number(levels.input_tp),
     },
   };
-  verifyReferenceMedia(evidence);
   return { probe, evidence, loudnessLog: measured.stderr };
+}
+
+export function inspectReferenceFile(file: string, expectedSeconds: number) {
+  const measured = measureFilmFile(file, expectedSeconds);
+  verifyReferenceMedia(measured.evidence);
+  return measured;
 }

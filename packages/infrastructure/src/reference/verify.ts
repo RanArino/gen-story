@@ -18,7 +18,10 @@ export interface ReferenceMediaEvidence {
 }
 
 /** Technical integrity only; this never records a human artistic or listening verdict. */
-export function verifyReferenceMedia(evidence: ReferenceMediaEvidence): void {
+export function verifyReferenceMedia(
+  evidence: ReferenceMediaEvidence,
+  dimensions = { width: 1280, height: 720 },
+): void {
   const { video, audio, expectedSeconds, durationSeconds } = evidence;
   if (
     !Number.isFinite(durationSeconds) ||
@@ -29,8 +32,8 @@ export function verifyReferenceMedia(evidence: ReferenceMediaEvidence): void {
     );
   if (
     video.codec !== "h264" ||
-    video.width !== 1280 ||
-    video.height !== 720 ||
+    video.width !== dimensions.width ||
+    video.height !== dimensions.height ||
     video.fps !== "30/1" ||
     video.frames !== Math.round(expectedSeconds * 30)
   )
