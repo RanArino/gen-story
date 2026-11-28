@@ -227,7 +227,7 @@ export function scoreForDirection(
           sound: "clap",
           params: { gain: round(clamp(gain, 0.05, 1.5)) },
         });
-      else events.push({ t, sound: "suzu", params: { gain: round(gain) } });
+      else events.push({ t, sound: s.sound, params: { gain: round(gain) } });
     }
   });
   // Ambience beds follow each photo: keyed at scene midpoints, silent at the edges.

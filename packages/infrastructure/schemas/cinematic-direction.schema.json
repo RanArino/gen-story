@@ -1062,7 +1062,17 @@
                     "maximum": 600
                   },
                   "sound": {
-                    "const": "suzu"
+                    "enum": [
+                      "suzu",
+                      "ocean-wave",
+                      "light-rain",
+                      "cicadas",
+                      "leaf-rustle",
+                      "train-pass",
+                      "cafe-cup",
+                      "camera-shutter",
+                      "wind-chime"
+                    ]
                   },
                   "params": {
                     "type": "object",

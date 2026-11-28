@@ -53,11 +53,7 @@ export type SoundId =
   | "footstep"
   | "wind"
   | "stream"
-  | "bird-chirp"
-  | "suzu"
-  | "clap"
-  | "temple-bell"
-  | "low-swell";
+  | FilmSceneDirection["sounds"][number]["sound"];
 export interface CinematicScore {
   seed: number;
   duration: number;
@@ -117,3 +113,4 @@ export interface CinematicDirection {
   credits: Card | null;
   score: CinematicScore;
 }
+import type { FilmSceneDirection } from "@gen-story/domain";

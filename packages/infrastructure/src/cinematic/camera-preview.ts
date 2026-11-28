@@ -1,4 +1,5 @@
 import { camAt, frameForImage } from "./math.js";
+import type { FilmSceneDirection } from "@gen-story/domain";
 import type { CameraKey } from "./types.js";
 
 // Browser-safe: no Node, filesystem or compiler imports, so the web preview runs the same code.
@@ -23,11 +24,7 @@ export interface ApprovedSceneDirection {
   effects: { rays: number; motes: number; leaves: number; warmth: number };
   footsteps: "none" | "gravel" | "stone" | "stair";
   ambience: { wind: number; stream: number };
-  sounds: {
-    sound: "bird-chirp" | "suzu" | "clap" | "temple-bell" | "low-swell";
-    at: number;
-    gain: number;
-  }[];
+  sounds: FilmSceneDirection["sounds"];
 }
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));

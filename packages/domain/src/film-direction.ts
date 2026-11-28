@@ -35,6 +35,14 @@ export const FILM_SCENE_SOUNDS = [
   "clap",
   "temple-bell",
   "low-swell",
+  "ocean-wave",
+  "light-rain",
+  "cicadas",
+  "leaf-rustle",
+  "train-pass",
+  "cafe-cup",
+  "camera-shutter",
+  "wind-chime",
 ] as const;
 export type FilmSceneSound = (typeof FILM_SCENE_SOUNDS)[number];
 export const FILM_MUSIC_INSTRUMENTS = [

@@ -10,10 +10,21 @@ import suzu from "./sounds/suzu.js";
 import clap from "./sounds/clap.js";
 import bell from "./sounds/temple-bell.js";
 import swell from "./sounds/low-swell.js";
+import travel from "./sounds/travel.js";
 const sounds = Object.fromEntries(
-  [pad, koto, footstep, wind, stream, bird, suzu, clap, bell, swell].map(
-    (m) => [m.manifest.id, m],
-  ),
+  [
+    pad,
+    koto,
+    footstep,
+    wind,
+    stream,
+    bird,
+    suzu,
+    clap,
+    bell,
+    swell,
+    ...travel,
+  ].map((m) => [m.manifest.id, m]),
 );
 export async function synthesize(score) {
   const output = {};
