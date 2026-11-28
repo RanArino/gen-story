@@ -1,0 +1,120 @@
+{
+  "schema": "film.template@1",
+  "id": "quiet-cinema",
+  "revision": "r1",
+  "offered": true,
+  "recipe": "quiet-cinema",
+  "name": {
+    "en": "Quiet Cinema",
+    "ja": "Quiet Cinema"
+  },
+  "description": {
+    "en": "A slow, warm film with soft dissolves.",
+    "ja": "暖かな色合いとゆるやかな切り替え。"
+  },
+  "facts": [
+    {
+      "en": "About 9 seconds per photo",
+      "ja": "1枚 約9秒"
+    },
+    {
+      "en": "Soft dissolves",
+      "ja": "ゆっくり溶ける"
+    }
+  ],
+  "fixed": {
+    "layout": "full-frame",
+    "transitions": [
+      {
+        "kind": "dissolve",
+        "weight": 1
+      }
+    ],
+    "look": {
+      "warmWash": "#ffc17c",
+      "coolWash": "#6d8291",
+      "warm": 0.26,
+      "cool": 0.055,
+      "grain": 0.064,
+      "vignette": 0.34
+    },
+    "captions": {
+      "font": "serif",
+      "position": "lower"
+    },
+    "structure": {
+      "titleCard": true,
+      "credits": true
+    },
+    "music": {
+      "instruments": ["pad", "koto-pluck"],
+      "tempoBpm": [60, 72]
+    }
+  },
+  "bounds": {
+    "cameraMoves": ["hold", "push-in", "pull-out", "pan-left", "pan-right"],
+    "defaultMove": "hold",
+    "maxSpeed": 0.55,
+    "maxEffects": {
+      "rays": 0.35,
+      "motes": 0.4,
+      "leaves": 0
+    },
+    "sounds": [
+      "bird-chirp",
+      "suzu",
+      "low-swell",
+      "ocean-wave",
+      "light-rain",
+      "cicadas",
+      "leaf-rustle",
+      "train-pass",
+      "cafe-cup",
+      "camera-shutter",
+      "wind-chime"
+    ],
+    "musicKeys": ["C", "D", "Eb", "E", "F", "G", "A", "Bb"],
+    "musicArcs": ["steady", "rise", "fall"]
+  },
+  "frame": {
+    "16:9": {
+      "photo": {
+        "x": 0.5,
+        "y": 0.5,
+        "width": 1,
+        "height": 1
+      },
+      "caption": {
+        "x": 0.5,
+        "y": 0.76,
+        "size": 0.046
+      }
+    },
+    "9:16": {
+      "photo": {
+        "x": 0.5,
+        "y": 0.5,
+        "width": 1,
+        "height": 1
+      },
+      "caption": {
+        "x": 0.5,
+        "y": 0.76,
+        "size": 0.042
+      }
+    },
+    "1:1": {
+      "photo": {
+        "x": 0.5,
+        "y": 0.5,
+        "width": 1,
+        "height": 1
+      },
+      "caption": {
+        "x": 0.5,
+        "y": 0.76,
+        "size": 0.044
+      }
+    }
+  }
+}

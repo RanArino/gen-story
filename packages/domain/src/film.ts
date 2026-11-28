@@ -1,12 +1,7 @@
 import type { FilmLayoutOverride } from "./film-layout";
 import { layoutOverrideError } from "./film-layout";
 
-export const FILM_RECIPES = [
-  "quiet-cinema",
-  "memory-board",
-  "pulse-cut",
-] as const;
-export type FilmRecipe = (typeof FILM_RECIPES)[number];
+export type FilmRecipe = string;
 export const FILM_ASPECTS = ["16:9", "9:16", "1:1"] as const;
 export type FilmAspect = (typeof FILM_ASPECTS)[number];
 /** Which caption lines are burned in; chosen per export, never stored on the treatment. */
@@ -62,7 +57,7 @@ export function validateFilm(
   sceneIds: string[],
   stage: "draft" | "render" = "render",
 ): void {
-  if (!FILM_RECIPES.includes(treatment.recipe))
+  if (!/^[a-z0-9-]+$/.test(treatment.recipe))
     throw new Error("Choose a supported film template.");
   if (
     treatment.outputAspect !== undefined &&

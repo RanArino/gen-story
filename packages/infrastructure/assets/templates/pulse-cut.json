@@ -1,0 +1,55 @@
+{
+  "schema": "film.template@1",
+  "id": "pulse-cut",
+  "revision": "r1",
+  "offered": false,
+  "recipe": "pulse-cut",
+  "name": {
+    "en": "Pulse Cut",
+    "ja": "Pulse Cut"
+  },
+  "description": {
+    "en": "A brisk template from earlier projects.",
+    "ja": "以前のプロジェクトで使われていたテンプレート。"
+  },
+  "facts": [],
+  "fixed": null,
+  "bounds": {
+    "cameraMoves": [
+      "hold",
+      "push-in",
+      "pull-out",
+      "pan-left",
+      "pan-right",
+      "tilt-up",
+      "tilt-down",
+      "climb",
+      "walk-in",
+      "reveal"
+    ],
+    "defaultMove": "hold",
+    "maxSpeed": 1,
+    "maxEffects": {
+      "rays": 1,
+      "motes": 1,
+      "leaves": 1
+    },
+    "sounds": [
+      "bird-chirp",
+      "suzu",
+      "clap",
+      "temple-bell",
+      "low-swell",
+      "ocean-wave",
+      "light-rain",
+      "cicadas",
+      "leaf-rustle",
+      "train-pass",
+      "cafe-cup",
+      "camera-shutter",
+      "wind-chime"
+    ],
+    "musicKeys": ["C", "D", "Eb", "E", "F", "G", "A", "Bb"],
+    "musicArcs": ["steady", "rise", "fall", "swell"]
+  }
+}

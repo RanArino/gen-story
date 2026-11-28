@@ -1,0 +1,126 @@
+{
+  "schema": "film.template@1",
+  "id": "memory-board",
+  "revision": "r1",
+  "offered": true,
+  "recipe": "memory-board",
+  "name": {
+    "en": "Memory Board",
+    "ja": "Memory Board"
+  },
+  "description": {
+    "en": "Printed photos and paper notes on paper.",
+    "ja": "紙の台紙に写真とメモを重ねる。"
+  },
+  "facts": [
+    {
+      "en": "About 6 seconds per photo",
+      "ja": "1枚 約6秒"
+    },
+    {
+      "en": "Sliding photo cards",
+      "ja": "写真カードがスライド"
+    }
+  ],
+  "fixed": {
+    "layout": "paper-cards",
+    "transitions": [
+      {
+        "kind": "card-slide",
+        "weight": 1
+      }
+    ],
+    "look": {
+      "warmWash": "#ffe2a6",
+      "coolWash": "#879497",
+      "warm": 0.11,
+      "cool": 0.025,
+      "grain": 0.025,
+      "vignette": 0.08
+    },
+    "captions": {
+      "font": "sans",
+      "position": "note"
+    },
+    "structure": {
+      "titleCard": true,
+      "credits": false
+    },
+    "music": {
+      "instruments": ["koto-pluck"],
+      "tempoBpm": [84, 98]
+    }
+  },
+  "bounds": {
+    "cameraMoves": [
+      "hold",
+      "push-in",
+      "pull-out",
+      "pan-left",
+      "pan-right",
+      "reveal"
+    ],
+    "defaultMove": "hold",
+    "maxSpeed": 0.65,
+    "maxEffects": {
+      "rays": 0.18,
+      "motes": 0.25,
+      "leaves": 0.1
+    },
+    "sounds": [
+      "bird-chirp",
+      "suzu",
+      "ocean-wave",
+      "light-rain",
+      "cicadas",
+      "leaf-rustle",
+      "train-pass",
+      "cafe-cup",
+      "camera-shutter",
+      "wind-chime"
+    ],
+    "musicKeys": ["C", "D", "Eb", "E", "F", "G", "A", "Bb"],
+    "musicArcs": ["steady", "rise", "fall"]
+  },
+  "frame": {
+    "16:9": {
+      "photo": {
+        "x": 0.5,
+        "y": 0.42,
+        "width": 0.6,
+        "height": 0.6
+      },
+      "caption": {
+        "x": 0.5,
+        "y": 0.68,
+        "size": 0.037
+      }
+    },
+    "9:16": {
+      "photo": {
+        "x": 0.5,
+        "y": 0.4,
+        "width": 0.64,
+        "height": 0.64
+      },
+      "caption": {
+        "x": 0.5,
+        "y": 0.745,
+        "size": 0.037
+      }
+    },
+    "1:1": {
+      "photo": {
+        "x": 0.5,
+        "y": 0.41,
+        "width": 0.64,
+        "height": 0.64
+      },
+      "caption": {
+        "x": 0.5,
+        "y": 0.76,
+        "size": 0.037
+      }
+    }
+  }
+}
