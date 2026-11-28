@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FULL_FRAME_LAYOUT } from "@gen-story/domain/film-layout";
 import type { FilmDetailDto, FilmTreatment } from "@gen-story/shared";
 import messages from "../../i18n/messages/en.json";
 import { FilmPage } from "./FilmPage";
@@ -151,12 +152,12 @@ beforeEach(() => {
       original: { storageKey: `${title}.png` },
       images: [],
     })),
-    templates: [],
     currentAssemblyFingerprint: null,
     jobs: [],
     preflight: [],
     directions: [],
     directionInputDigests: {},
+    templates: [],
   };
   vi.mocked(getFilm).mockImplementation(async () => structuredClone(detail));
   vi.mocked(saveFilm).mockImplementation(async (treatment: FilmTreatment) => {
@@ -392,6 +393,99 @@ describe("reviewing and applying a draft in place", () => {
     expect(
       (within(inspector()).getByLabelText("Move") as HTMLSelectElement).value,
     ).toBe("reveal");
+  });
+});
+
+describe("choosing a template from samples", () => {
+  const template = (
+    id: string,
+    name: string,
+    offered = true,
+  ): FilmDetailDto["templates"][number] => ({
+    id,
+    revision: "r1",
+    offered,
+    name: { en: name, ja: name },
+    description: { en: `${name} form`, ja: `${name} form` },
+    facts: [{ en: `${name} pace`, ja: `${name} pace` }],
+    layout: id === "memory-board" ? "paper-cards" : "full-frame",
+    frame: {
+      "16:9": FULL_FRAME_LAYOUT,
+      "9:16": FULL_FRAME_LAYOUT,
+      "1:1": FULL_FRAME_LAYOUT,
+    },
+    hasFixedStyle: offered,
+    bounds: {
+      cameraMoves: ["hold", "push-in"],
+      defaultMove: "hold",
+      maxSpeed: 0.5,
+      maxEffects: { rays: 0.2, motes: 0.2, leaves: 0 },
+      sounds: ["suzu"],
+      musicKeys: ["C"],
+      musicArcs: ["steady"],
+    },
+  });
+  const sample = (id: string, aspect: string) => ({
+    id,
+    revision: "r1",
+    aspect,
+    durationMs: 19000,
+    mp4: `/film-previews/templates/${id}-${aspect.replace(":", "x")}.mp4`,
+    poster: `/film-previews/templates/${id}-${aspect.replace(":", "x")}.jpg`,
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("plays the sample at the project size and applies the chosen template", async () => {
+    withChapter({ status: "approved" });
+    detail.treatment.outputAspect = "9:16";
+    detail.templates = [
+      template("quiet-cinema", "Quiet Cinema"),
+      template("memory-board", "Memory Board"),
+      template("pulse-cut", "Pulse Cut", false),
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () =>
+          ["quiet-cinema", "memory-board"].flatMap((id) =>
+            ["16:9", "9:16", "1:1"].map((a) => sample(id, a)),
+          ),
+      })),
+    );
+    mount();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Watch samples / change" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Choose a template" });
+    expect(within(dialog).queryByLabelText(/Pulse Cut/)).toBeNull();
+    fireEvent.click(within(dialog).getByLabelText(/Memory Board/));
+    const video = await within(dialog).findByLabelText(
+      "Memory Board sample (9:16 vertical)",
+    );
+    expect(video.getAttribute("src")).toBe(
+      "/film-previews/templates/memory-board-9x16.mp4",
+    );
+    expect(video.getAttribute("preload")).toBe("none");
+    expect(video.hasAttribute("autoplay")).toBe(false);
+    // The size toggle changes the sample only, never the project.
+    fireEvent.click(within(dialog).getByLabelText("16:9 landscape"));
+    expect(
+      within(dialog)
+        .getByLabelText("Memory Board sample (16:9 landscape)")
+        .getAttribute("src"),
+    ).toBe("/film-previews/templates/memory-board-16x9.mp4");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Use this template" }),
+    );
+    expect(within(header()).getByText("Memory Board")).toBeTruthy();
+    expect(within(header()).getByRole("status").textContent).toMatch(
+      /unsaved/i,
+    );
+    expect(
+      (within(header()).getByLabelText("9:16 vertical") as HTMLInputElement)
+        .checked,
+    ).toBe(true);
   });
 });
 

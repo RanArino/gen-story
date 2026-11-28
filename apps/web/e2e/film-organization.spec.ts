@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import quiet from "../../../packages/infrastructure/assets/templates/quiet-cinema.json" with { type: "json" };
 
 // Browser-isolated API fixtures: never changes a local project, calls the AI or renders.
 test.use({ launchOptions: { executablePath: process.env.CHROME_PATH } });
@@ -58,6 +59,7 @@ async function fixture(page: Page) {
     currentAssemblyFingerprint: null,
     directions: state.directions,
     directionInputDigests: {},
+    templates: [{ ...quiet, hasFixedStyle: true, layout: quiet.fixed.layout }],
   });
   await page.route("http://localhost:4000/**", async (route) => {
     const request = route.request();
@@ -262,6 +264,24 @@ test("organize photos inside the workspace, review an AI draft in place and open
   const editor = page.getByRole("complementary", {
     name: "Selected item editor",
   });
+  const move = editor.getByRole("combobox", { name: "Move", exact: true });
+  await expect(move.locator("option")).toHaveCount(
+    quiet.bounds.cameraMoves.length,
+  );
+  expect(
+    await move
+      .locator("option")
+      .evaluateAll((options) =>
+        options.map((option) => option.getAttribute("value")),
+      ),
+  ).toEqual(quiet.bounds.cameraMoves);
+  await editor.getByRole("button", { name: "Try moves" }).click();
+  const audition = page.getByRole("dialog", { name: "Try camera moves" });
+  await expect(
+    audition.getByRole("radiogroup", { name: "Move" }).getByRole("radio"),
+  ).toHaveCount(quiet.bounds.cameraMoves.length);
+  await page.keyboard.press("Escape");
+
   await editor.getByLabel("Japanese subtitle for Train").fill("いちばん電車");
   await page
     .getByRole("button", { name: "Use this draft", exact: true })
@@ -272,6 +292,25 @@ test("organize photos inside the workspace, review an AI draft in place and open
   await expect(strip.getByText("Applied")).toBeVisible();
   expect(state.approvals).toBe(1);
   expect(state.treatment.sceneCaptions["scene-1"]?.ja).toBe("いちばん電車");
+
+  // A short, wide window caps the preview height; the frame keeps the video's
+  // ratio and the 640×480 photo keeps its own instead of being stretched.
+  await page.setViewportSize({ width: 1600, height: 640 });
+  const photo = page
+    .getByRole("region", { name: "Preview" })
+    .getByRole("img", { name: "Train" });
+  await expect(photo).toBeVisible();
+  const ratios = await photo.evaluate((img) => {
+    const box = img.getBoundingClientRect();
+    const frame = img.parentElement!.getBoundingClientRect();
+    return {
+      frame: frame.width / frame.height,
+      photo: box.width / box.height,
+    };
+  });
+  expect(ratios.frame).toBeCloseTo(16 / 9, 1);
+  expect(ratios.photo).toBeCloseTo(640 / 480, 1);
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   // Export is a compact dialog with the four subtitle modes; Escape closes it.
   await page.getByRole("button", { name: "Export…", exact: true }).click();
