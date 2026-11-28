@@ -175,10 +175,14 @@
   background: #fff;
 }
 .frame {
+  --frame-max-height: 62vh;
   position: relative;
+  container-type: inline-size;
   overflow: hidden;
-  width: 100%;
-  max-height: 62vh;
+  /* Width follows the height limit so the box keeps the video's aspect ratio; the photo is
+     placed in % of both sides, so a squashed box would stretch it. */
+  width: min(100%, calc(var(--frame-max-height) * var(--frame-ratio, 16 / 9)));
+  max-height: var(--frame-max-height);
   margin: 0 auto;
   background: #0b1220;
   border-radius: 8px;
@@ -196,6 +200,77 @@
   display: block;
   max-width: none;
 }
+/* Memory Board: the painter's paper board, tilted photo card and note label. */
+.paperFrame {
+  container-type: inline-size;
+  background: #e9dfcb;
+}
+.paperCard {
+  position: absolute;
+  box-sizing: border-box;
+  background: #fff9ee;
+  box-shadow: 0 4px 14px rgb(51 37 25 / 0.42);
+}
+/* The photo box: the photo fills it (cover), placed by the painter's layout math. */
+.photoBox {
+  position: absolute;
+  box-sizing: border-box;
+}
+.photoClip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.probe {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+/* Size and lines come from the painter's own note layout; font-size is in frame units. */
+.noteCaption {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  color: #403629;
+  font-family: "Noto Sans JP", sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Only the paper tilts, as in the export; the lines stay upright. */
+.noteCaption::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: rotate(var(--note-rotation));
+  background: #fff6cf;
+  box-shadow: 0 0.1em 0.3em rgb(64 45 22 / 0.25);
+}
+.noteCaption::after {
+  content: "";
+  position: absolute;
+  top: -0.22em;
+  left: 50%;
+  width: 1.6em;
+  height: 0.44em;
+  transform: translateX(-50%) rotate(var(--note-rotation));
+  background: rgb(176 151 101 / 0.34);
+}
+.noteCaption span,
+.noteCaption small {
+  display: block;
+}
+.noteCaption small {
+  color: #524535;
+}
 .emptyFrame {
   position: absolute;
   inset: 0;
@@ -205,25 +280,80 @@
   color: #cbd5e1;
   font-size: 13px;
 }
+/* Left = caption center, top = caption top, font-size = the layout's size (frame units). */
 .captionOverlay {
   position: absolute;
-  left: 6%;
-  right: 6%;
-  bottom: 7%;
   display: grid;
-  gap: 2px;
+  width: max-content;
+  max-width: 86%;
+  transform: translateX(-50%);
+  line-height: 1.3;
   text-align: center;
   color: #fff;
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
   pointer-events: none;
 }
 .captionOverlay span {
-  font-size: clamp(12px, 2.2vw, 22px);
   font-weight: 600;
 }
 .captionOverlay small {
-  font-size: clamp(10px, 1.5vw, 15px);
+  margin-top: 0.8em;
+  font-size: 0.58em;
   opacity: 0.92;
+}
+/* Layout editing: every placed part can be dragged; the corner handle resizes it. */
+.frame[data-editing] [data-editable] {
+  cursor: move;
+  pointer-events: auto;
+  touch-action: none;
+  outline: 2px dashed rgb(255 255 255 / 0.9);
+  outline-offset: 2px;
+}
+.paperFrame[data-editing] [data-editable] {
+  outline-color: #294f3d;
+}
+.frame[data-editing] [data-selected] {
+  outline-style: solid;
+  outline-color: #f4d35e;
+}
+.frame[data-editing] [data-editable]:focus-visible {
+  outline: 3px solid #f4d35e;
+}
+.resizeHandle {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 2px solid #294f3d;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+/* A larger touch target than the visible dot. */
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+.layoutBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f3f8f4;
+  border: 1px solid #cfe0d5;
+  font-size: 12px;
+  color: #33463b;
+}
+.layoutBar p {
+  flex: 1 1 16em;
+  margin: 0;
 }
 .transport {
   display: flex;

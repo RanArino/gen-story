@@ -93,6 +93,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@gen-story/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@gen-story/infrastructure':
         specifier: workspace:*
         version: link:../../packages/infrastructure
