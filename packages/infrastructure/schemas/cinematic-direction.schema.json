@@ -37,6 +37,17 @@
     "profile": {
       "$ref": "urn:film-spike:common#/$defs/profileId"
     },
+    "layout": { "enum": ["full-frame", "paper-cards"] },
+    "transition": { "enum": ["dissolve", "card-slide"] },
+    "captionStyle": {
+      "type": "object",
+      "required": ["font", "position"],
+      "additionalProperties": false,
+      "properties": {
+        "font": { "enum": ["serif", "sans"] },
+        "position": { "enum": ["lower", "note"] }
+      }
+    },
     "assets": {
       "type": "object",
       "minProperties": 1,
@@ -137,6 +148,39 @@
             },
             "minItems": 2,
             "maxItems": 32
+          },
+          "frame": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "photo": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "x": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "y": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "width": { "type": "number", "minimum": 0.1, "maximum": 1 },
+                  "height": { "type": "number", "minimum": 0.1, "maximum": 1 },
+                  "crop": { "enum": ["16:9", "9:16", "1:1"] }
+                },
+                "required": ["x", "y", "width", "height"]
+              },
+              "caption": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "x": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "y": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "size": {
+                    "type": "number",
+                    "minimum": 0.015,
+                    "maximum": 0.12
+                  }
+                },
+                "required": ["x", "y", "size"]
+              }
+            },
+            "required": ["photo", "caption"]
           },
           "framing": {
             "enum": ["contain", "follow"]

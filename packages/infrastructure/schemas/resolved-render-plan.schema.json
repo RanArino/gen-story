@@ -969,6 +969,10 @@
             "latin": {
               "type": "string",
               "pattern": "^fs-[0-9a-f]{12}$"
+            },
+            "sans": {
+              "type": "string",
+              "pattern": "^fs-[0-9a-f]{12}$"
             }
           }
         }

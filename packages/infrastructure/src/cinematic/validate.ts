@@ -1,3 +1,4 @@
+import { layoutOverrideError } from "@gen-story/domain";
 import { FilmFailure, fail } from "../contracts/errors.js";
 import { validateSchema } from "../contracts/schemas.js";
 import type { CinematicDirection, CurvePoint } from "./types.js";
@@ -10,6 +11,8 @@ export function validateDirection(
   const d = input as CinematicDirection;
   const invalid = (message: string): never =>
     fail("FS_SEMANTIC_INVALID", "/direction", message);
+  if (d.transition === "card-slide" && d.layout !== "paper-cards")
+    invalid("Card-slide requires a paper-card layout");
   if (d.score.duration !== d.duration || d.score.seed !== d.seed)
     invalid("Score and visual timeline must share duration and seed");
   const ordered = (points: CurvePoint[], name: string) => {
@@ -51,6 +54,8 @@ export function validateDirection(
       scene.camera.some((key, i) => i > 0 && key.p <= scene.camera[i - 1]!.p)
     )
       invalid("Camera keys must increase strictly from 0 to 1");
+    if (scene.frame && layoutOverrideError(scene.frame) !== null)
+      invalid("Scene photo or caption placement is outside the frame");
     ids.add(scene.id);
   }
   if (d.scenes.some((s, i) => i > 0 && s.t0 < d.scenes[i - 1]!.t0))

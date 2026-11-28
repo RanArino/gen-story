@@ -7,6 +7,7 @@ export const CINEMATIC_BROWSER_FILES = [
   "audio.js",
   "audio-browser.js",
   "sounds/_dsp.js",
+  "sounds/travel.js",
   ...[
     "pad",
     "koto-pluck",
