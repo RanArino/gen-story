@@ -1,0 +1,119 @@
+{
+  "model": "claude-opus-5-5",
+  "inputDigest": "sha256:72462d4eb645089dbf42676e456fee2b8bdee152e1395d3ef0f38c6be2556939",
+  "content": {
+    "chapterName": "海辺の一日",
+    "nameReason": "指定どおり固定のタイトルです。列車・港・夕陽の三枚で、一日の流れをそのまま表しています。",
+    "music": {
+      "mood": "穏やかで懐かしい、潮風の旅情",
+      "key": "D",
+      "mode": "major",
+      "melody": "medium",
+      "arc": "fall",
+      "fromPrevious": "continue",
+      "instruments": ["koto-pluck"],
+      "tempoBpm": 91
+    },
+    "scenes": [
+      {
+        "sceneId": "coastal-train",
+        "observation": "木造のホームに赤い列車が停まり、左手には低い太陽が照らす海が広がっています。",
+        "camera": {
+          "move": "push-in",
+          "focus": {
+            "x": 0.67,
+            "y": 0.47
+          },
+          "speed": 0.35,
+          "reason": "旅の始まりとして、ホームに着いた赤い列車へゆっくり近づきます。"
+        },
+        "effects": {
+          "rays": 0.12,
+          "motes": 0.08,
+          "leaves": 0,
+          "warmth": 0
+        },
+        "footsteps": "none",
+        "ambience": {
+          "wind": 0.4,
+          "stream": 0.45
+        },
+        "sounds": [
+          {
+            "sound": "bird-chirp",
+            "at": 0.3,
+            "gain": 0.25
+          }
+        ],
+        "captions": {
+          "ja": "海沿いの小さな駅から、旅が始まる。",
+          "en": "From a tiny station by the sea, the trip begins."
+        }
+      },
+      {
+        "sceneId": "harbor-cafe",
+        "observation": "窓辺のテーブルにコーヒーとクロワッサン、窓の外には漁船の浮かぶ港と灯台が見えます。",
+        "camera": {
+          "move": "reveal",
+          "focus": {
+            "x": 0.3,
+            "y": 0.74
+          },
+          "speed": 0.25,
+          "reason": "コーヒーカップの温もりから始め、窓の向こうの港へ視界を開きます。"
+        },
+        "effects": {
+          "rays": 0.1,
+          "motes": 0.12,
+          "leaves": 0,
+          "warmth": 0
+        },
+        "footsteps": "none",
+        "ambience": {
+          "wind": 0.15,
+          "stream": 0.25
+        },
+        "sounds": [
+          {
+            "sound": "bird-chirp",
+            "at": 0.65,
+            "gain": 0.15
+          }
+        ],
+        "captions": {
+          "ja": "港を眺めながら、ゆっくりと一杯。",
+          "en": "A slow cup of coffee, watching the harbor."
+        }
+      },
+      {
+        "sceneId": "sunset-walk",
+        "observation": "崖沿いの小道に古いベンチがあり、島々の向こうに夕陽が沈み、海に光の道ができています。",
+        "camera": {
+          "move": "pan-right",
+          "focus": {
+            "x": 0.8,
+            "y": 0.4
+          },
+          "speed": 0.2,
+          "reason": "小道とベンチから、海に伸びる夕陽の光へ静かに視線を移します。"
+        },
+        "effects": {
+          "rays": 0.15,
+          "motes": 0.1,
+          "leaves": 0,
+          "warmth": 0
+        },
+        "footsteps": "gravel",
+        "ambience": {
+          "wind": 0.5,
+          "stream": 0.4
+        },
+        "sounds": [],
+        "captions": {
+          "ja": "夕陽が、今日という一日を包んでいく。",
+          "en": "The setting sun wraps up the whole day."
+        }
+      }
+    ]
+  }
+}
