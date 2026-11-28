@@ -249,6 +249,8 @@
     },
     "style": {
       "aiRecommend": "AI recommend",
+      "favorites": "Favorites",
+      "favorite": "Favorite: {name}",
       "systemStyles": "System styles",
       "customStyles": "Custom styles",
       "createCustom": "Create custom style",

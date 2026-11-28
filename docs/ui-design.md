@@ -128,4 +128,6 @@ this section.
 4. For flows that have Playwright coverage (`apps/web/e2e/`), run
    `pnpm --filter @gen-story/web test:e2e` against the running app.
 5. For changes to existing screens, compare before and after screenshots of
-   the primary workflow.
+   the primary workflow. On the Storyboard, close the open AI chat drawer
+   (`chatDrawerClose`) at 1100px and below, and expand **Project settings**
+   only after the storyboard has loaded: its load effect resets that accordion.

@@ -249,6 +249,8 @@
     },
     "style": {
       "aiRecommend": "AIにおまかせ",
+      "favorites": "お気に入り",
+      "favorite": "お気に入り: {name}",
       "systemStyles": "システムスタイル",
       "customStyles": "カスタムスタイル",
       "createCustom": "カスタムスタイルを作成",

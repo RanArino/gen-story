@@ -1,7 +1,7 @@
-// Generates the ten style-preview images for the storyboard style gallery.
+// Generates the eleven style-preview images for the storyboard style gallery.
 //
 // ONE base image is generated (text-to-image), then restyled into every other
-// style via image-to-image editing — so all ten previews show the SAME person
+// style via image-to-image editing — so all eleven previews show the SAME person
 // in the SAME pose and composition, differing only by visual style. This is
 // OpenAI's recommended "character anchor" pattern (gpt-image prompting guide).
 //
@@ -10,15 +10,16 @@
 //
 // Usage (from the repository root):
 //   OPENAI_API_KEY=... pnpm tsx scripts/generate-style-previews.ts
-//     -> renders all ten previews (reusing the cached base if present)
+//     -> renders all eleven previews (reusing the cached base if present)
 //   pnpm tsx scripts/generate-style-previews.ts "Anime Movie" "Film Photo"
 //     -> regenerates only the named styles (base reused, no waste)
 //   pnpm tsx scripts/generate-style-previews.ts --fresh-base
 //     -> forces the base image to be regenerated
 //
 // OPENAI_API_KEY may also live in a repo-root .env / .env.local file.
-// Ukiyo-e restyles the shared base through the local Codex subscription.
-// With a cached base, a Ukiyo-e-only run needs just the Codex login.
+// Ukiyo-e and Radiant Cel CGI restyle the shared base through the local Codex
+// subscription. With a cached base, a run of only those needs just the Codex
+// login.
 //
 // Output: apps/web/public/style-previews/<derived-name>.jpg for each preset.
 
@@ -47,6 +48,13 @@ const OUT_DIR = join(REPO_ROOT, "apps/web/public/style-previews");
 // restyled from it. Cached so re-runs reuse it instead of paying again.
 const BASE_PRESET_ID = "system-cinematic-photoreal";
 const BASE_CACHE_PATH = join(REPO_ROOT, "data/style-preview-base.png");
+
+// Presets whose approved previews were restyled by Codex rather than the
+// OpenAI API.
+const CODEX_PREVIEW_PRESET_IDS = new Set([
+  UKIYO_E_STYLE_PRESET_ID,
+  "system-radiant-cel-cgi",
+]);
 
 // Load env vars the same way the API server does, so the key can live in a
 // repo-root .env / .env.local file. Inline (OPENAI_API_KEY=... pnpm tsx ...)
@@ -154,7 +162,7 @@ async function main(): Promise<void> {
   const reuseBase = !freshBase && (await fileExists(BASE_CACHE_PATH));
   const needsOpenAi =
     !reuseBase ||
-    targets.some((preset) => preset.id !== UKIYO_E_STYLE_PRESET_ID);
+    targets.some((preset) => !CODEX_PREVIEW_PRESET_IDS.has(preset.id));
   const apiKey = process.env.OPENAI_API_KEY ?? "";
   if (needsOpenAi && !apiKey) {
     console.error(
@@ -197,7 +205,7 @@ async function main(): Promise<void> {
 
     let fullImage = baseImage;
     const prompt = buildRestylePrompt(previewStyleText(preset));
-    if (preset.id === UKIYO_E_STYLE_PRESET_ID) {
+    if (CODEX_PREVIEW_PRESET_IDS.has(preset.id)) {
       fullImage = Buffer.from(
         await runCodexImageGeneration({
           prompt,
