@@ -110,15 +110,164 @@
 }
 .settings[open] {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px 16px 12px;
   border: 1px solid #e5e9f0;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #fff;
 }
-.settings label {
+/* Template, video size and motion side by side; groups wrap as whole units. */
+.settingsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 32px;
+}
+.settingGroup {
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.settingGroup legend {
+  float: left;
+  padding: 0;
+}
+.templateCurrent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.templateThumb {
+  display: block;
+  flex: none;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #e9dfcb;
+  box-shadow: 0 1px 3px rgb(51 37 25 / 0.25);
+}
+.templateThumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.templateCurrentText {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.templateCurrentText strong {
+  font-size: 14px;
+  color: #152033;
+}
+.templateCurrentText small {
+  color: #5a6a7e;
+}
+.topBar .pickerOpen {
+  flex: none;
+  border-color: #cfe0d5;
+  background: #f3f8f4;
+  color: #294f3d;
+  font-weight: 700;
+}
+.topBar .pickerOpen:hover {
+  border-color: #91b69e;
+  background: #eaf3ed;
+}
+/* Segmented control: one choice, every option visible. */
+.segments {
+  display: inline-flex;
+  justify-self: start;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #eef2ef;
+}
+.segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: #536b5c;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.segment:hover {
+  color: #243b30;
+}
+.segment:has(input:checked) {
+  background: #fff;
+  color: #243b30;
+  font-weight: 700;
+  box-shadow:
+    0 1px 2px rgb(36 59 48 / 0.16),
+    0 0 0 1px #dce3df;
+}
+.segment:has(input:focus-visible) {
+  outline: 3px solid #91b69e;
+  outline-offset: 1px;
+}
+.sizeShape {
+  display: inline-block;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+/* Binary setting: a switch, not a checkbox. */
+.switchField {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  /* As tall as the size options so both controls share a line. */
+  min-height: 36px;
+  color: #243b30;
+  font-size: 13px;
+  cursor: pointer;
+}
+.switch {
+  appearance: none;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background-color: #7d8f84;
+  background-image: radial-gradient(circle, #fff 0 7px, transparent 7.5px);
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+  background-position: left 2px center;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    background-position 0.15s;
+}
+.switch:checked {
+  background-color: #294f3d;
+  background-position: right 2px center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .segment,
+  .switch {
+    transition: none;
+  }
 }
 .errorRow {
   margin-bottom: 12px;
@@ -686,6 +835,113 @@
   display: grid;
   gap: 12px;
 }
+.audition.templatePicker {
+  width: min(980px, calc(100vw - 24px));
+}
+.pickerBody {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.8fr) minmax(0, 1.4fr);
+  gap: 16px;
+  align-items: start;
+  min-height: 0;
+}
+.templateList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  max-height: 64vh;
+  overflow: auto;
+  padding: 3px;
+}
+.templateOption {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 8px;
+  border: 1px solid #dce3df;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.templateOption input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.templateOption:has(input:checked) {
+  border-color: #294f3d;
+  box-shadow: 0 0 0 2px #294f3d;
+}
+.templateOption:has(input:focus-visible) {
+  outline: 3px solid #91b69e;
+  outline-offset: 2px;
+}
+.templatePoster {
+  display: grid;
+  place-items: center;
+  max-height: 180px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #e5e9f0;
+  color: #5a6a7e;
+}
+.templatePoster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.templateName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #152033;
+}
+.inUse {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef5f0;
+  color: #294f3d;
+  font-size: 11px;
+}
+.templateDescription {
+  color: #5a6a7e;
+  line-height: 1.5;
+}
+.templatePreview {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.templateVideo {
+  display: block;
+  width: 100%;
+  max-height: 58vh;
+  margin: 0 auto;
+  background: #0b1220;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.templateFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.templateFacts li {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12px;
+}
 .dialogActions {
   display: flex;
   justify-content: flex-end;
@@ -749,6 +1005,38 @@
 }
 
 @media (max-width: 760px) {
+  .audition.templatePicker {
+    box-sizing: border-box;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    padding: 14px;
+    align-content: start;
+    overflow: auto;
+  }
+  .pickerBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .templatePreview {
+    order: -1;
+  }
+  .templateVideo {
+    max-height: 46dvh;
+  }
+  .templateList {
+    display: flex;
+    max-height: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .templateOption {
+    flex: 0 0 150px;
+    scroll-snap-align: start;
+  }
+
   .topBar {
     align-items: stretch;
   }
@@ -780,6 +1068,6 @@
     margin: 0 0 10px auto;
   }
   .frame {
-    max-height: 46vh;
+    --frame-max-height: 46vh;
   }
 }
