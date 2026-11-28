@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { loadFilmTemplateCatalog } from "../template-catalog.js";
 import { digestOf } from "../contracts/canonical.js";
 import type { ResolvedRenderPlan } from "../contracts/types.js";
 import type { RuntimeChapter, RuntimeInput } from "../index.js";
@@ -9,9 +10,15 @@ import {
   type ApprovedChapterDirection,
   type ApprovedSceneDirection,
 } from "./agent-direction.js";
-import { camAt, frameForImage } from "./math.js";
+import {
+  camAt,
+  frameForImage,
+  paperCardBox,
+  paperNoteFrame,
+  photoBox,
+} from "./math.js";
 import { validateDirection } from "./validate.js";
-import { previewFrame } from "./camera-preview.js";
+import { previewFrame, previewLayout } from "./camera-preview.js";
 
 const scene = (
   sceneId: string,
@@ -214,6 +221,110 @@ describe("approved Agent direction", () => {
     expect(score.mix.buses.foley).toBe(1);
     expect(score.events.map((e) => e.i)).toEqual(score.events.map((_, i) => i));
   });
+  it("compiles travel cues to their own sound IDs and timings across Film templates", () => {
+    const atmospheres = [
+      "ocean-wave",
+      "light-rain",
+      "cicadas",
+      "leaf-rustle",
+    ] as const;
+    const details = [
+      "train-pass",
+      "cafe-cup",
+      "camera-shutter",
+      "wind-chime",
+    ] as const;
+    const proposal = approved();
+    proposal.scenes[0]!.sounds = atmospheres.map((sound) => ({
+      sound,
+      at: 0.1,
+      gain: 0.3,
+    }));
+    proposal.scenes[1]!.sounds = details.map((sound) => ({
+      sound,
+      at: 0.25,
+      gain: 0.4,
+    }));
+    for (const template of loadFilmTemplateCatalog().list()) {
+      const { direction } = directApprovedChapter(
+        input,
+        chapter,
+        timingPlan,
+        proposal,
+        template,
+      );
+      validateDirection(direction);
+      for (const [i, scene] of proposal.scenes.entries()) {
+        const { t0, t1 } = direction.scenes[i]!;
+        for (const { sound, at, gain } of scene.sounds) {
+          const event = direction.score.events.find(
+            (entry) => entry.sound === sound,
+          );
+          expect(event?.params).toEqual({ gain });
+          expect(event?.t).toBeCloseTo(t0 + at * (t1 - t0), 3);
+        }
+      }
+    }
+  });
+  it("applies distinct catalog forms and bounds to the same approved direction", () => {
+    const catalog = loadFilmTemplateCatalog();
+    const proposal = approved({
+      instruments: ["low-swell"],
+      tempoBpm: 130,
+      fromPrevious: "lift",
+    });
+    const quiet = directApprovedChapter(
+      input,
+      chapter,
+      timingPlan,
+      proposal,
+      catalog.get("quiet-cinema")!,
+    );
+    const memory = directApprovedChapter(
+      input,
+      chapter,
+      timingPlan,
+      proposal,
+      catalog.get("memory-board")!,
+    );
+    expect(quiet.direction).toMatchObject({
+      layout: "full-frame",
+      transition: "dissolve",
+      captionStyle: { font: "serif", position: "lower" },
+      credits: { name: chapter.title },
+    });
+    expect(memory.direction).toMatchObject({
+      layout: "paper-cards",
+      transition: "card-slide",
+      captionStyle: { font: "sans", position: "note" },
+      credits: null,
+    });
+    expect(quiet.direction.params.warm).not.toEqual(
+      memory.direction.params.warm,
+    );
+    expect(quiet.direction.options.grain).not.toBe(
+      memory.direction.options.grain,
+    );
+    expect(
+      quiet.direction.score.events.some(({ sound }) => sound === "pad"),
+    ).toBe(true);
+    expect(
+      memory.direction.score.events.some(({ sound }) => sound === "pad"),
+    ).toBe(false);
+    expect(
+      quiet.direction.score.events.some(({ sound }) => sound === "low-swell"),
+    ).toBe(false);
+    expect(
+      memory.direction.score.events.some(({ sound }) => sound === "low-swell"),
+    ).toBe(false);
+    const { keys } = cameraForMove(
+      { ...proposal.scenes[0]!.camera, move: "hold", speed: 0.55 },
+      false,
+    );
+    expect(quiet.direction.scenes[0]!.camera).toEqual(keys);
+    expect(quiet.direction.scenes[0]!.bob).toBe(0);
+    expect(quiet.fingerprint).not.toBe(memory.fingerprint);
+  });
   it("materializes a valid portrait direction with follow framing and the reviewed copy", () => {
     const { direction, fingerprint } = directApprovedChapter(
       input,
@@ -286,6 +397,118 @@ describe("approved Agent direction", () => {
         height: 1200,
       }),
     );
+  });
+  it("fills a photo box with the video's shape and previews what the painter draws", () => {
+    const note = {
+      text: "実りの色に背を押され、旅がはじまる",
+      sub: "Pushed gently by the color of harvest, the journey begins.",
+      measure: (text: string, size: number) => text.length * size * 0.6,
+    };
+    const views = {
+      "16:9": { width: 1920, height: 1080 },
+      "9:16": { width: 1080, height: 1920 },
+      "1:1": { width: 1080, height: 1080 },
+    } as const;
+    for (const id of ["memory-board", "quiet-cinema"])
+      for (const aspect of ["16:9", "9:16", "1:1"] as const) {
+        const template = loadFilmTemplateCatalog().get(id)!;
+        const proposal = approved();
+        const { direction } = directApprovedChapter(
+          { ...input, outputAspect: aspect },
+          chapter,
+          timingPlan,
+          proposal,
+          template,
+        );
+        const view = views[aspect];
+        const rendered = direction.scenes[1]!;
+        const frame = rendered.frame!;
+        expect(frame).toEqual(template.frame![aspect]);
+        const paper = direction.layout === "paper-cards";
+        // A square photo no longer makes a square: the box keeps the video's shape.
+        const outer = paper
+          ? paperCardBox(view.width, view.height, frame.photo, 1)
+          : null;
+        const box = photoBox(view.width, view.height, frame.photo);
+        expect(box.width / box.height).toBeCloseTo(view.width / view.height, 6);
+        for (const p of [0, 0.5, 1]) {
+          const at = camAt(
+            rendered,
+            rendered.t0 + p * (rendered.t1 - rendered.t0),
+          );
+          const inner = outer ?? box;
+          const preview = previewLayout(
+            proposal.scenes[1]!.camera,
+            p,
+            view,
+            { width: 1200, height: 1200 },
+            paper ? "paper-cards" : "full-frame",
+            frame,
+            1,
+            false,
+            note,
+          );
+          const fill = frameForImage(inner.width, inner.height, at, 1200, 1200);
+          for (const key of ["left", "top", "width", "height"] as const)
+            expect(preview.fill[key]).toBeCloseTo(fill[key], 6);
+          expect(preview.box.x).toBeCloseTo(box.x, 6);
+          expect(preview.box.y).toBeCloseTo(box.y, 6);
+          expect(preview.rotation).toBe(outer?.rotation ?? 0);
+          expect(preview.note).toEqual(
+            paper
+              ? paperNoteFrame(
+                  view.width,
+                  view.height,
+                  frame.caption,
+                  note,
+                  outer!.outerWidth,
+                )
+              : null,
+          );
+        }
+      }
+  });
+  it("keeps a chosen photo crop's shape at every video size", () => {
+    const photo = {
+      x: 0.5,
+      y: 0.4,
+      width: 0.6,
+      height: 0.6,
+      crop: "1:1" as const,
+    };
+    for (const [W, H] of [
+      [1920, 1080],
+      [1080, 1920],
+      [1080, 1080],
+    ] as const) {
+      const box = photoBox(W, H, photo);
+      expect(box.width).toBeCloseTo(box.height, 6);
+      expect(box.height).toBeLessThanOrEqual(H);
+      const card = paperCardBox(W, H, photo, 0);
+      expect(card.outerWidth).toBeCloseTo(card.outerHeight, 6);
+    }
+  });
+  it("uses the user's Film layout, then the photo's own, over the template's", () => {
+    const template = loadFilmTemplateCatalog().get("memory-board")!;
+    const caption = { x: 0.3, y: 0.1, size: 0.05 };
+    const photo = { x: 0.6, y: 0.55, width: 0.5, height: 0.7 };
+    const { direction } = directApprovedChapter(
+      {
+        ...input,
+        layout: { caption },
+        sceneLayouts: { [windows[1]!.id]: { photo } },
+      },
+      chapter,
+      timingPlan,
+      approved(),
+      template,
+    );
+    expect(direction.scenes[0]!.frame).toEqual({
+      photo: template.frame!["16:9"]!.photo,
+      caption,
+    });
+    expect(direction.scenes[1]!.frame).toEqual({ photo, caption });
+    expect(() => validateDirection(direction)).not.toThrow();
   });
   it("refuses a direction made for different photos", () => {
     expect(() =>

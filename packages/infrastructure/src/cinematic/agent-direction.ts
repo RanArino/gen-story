@@ -1,3 +1,9 @@
+import {
+  clampDirectionToTemplate,
+  frameLayoutFor,
+  resolveFrameLayout,
+  type FilmTemplate,
+} from "@gen-story/domain";
 import type { ResolvedRenderPlan } from "../contracts/types.js";
 import type { RuntimeChapter, RuntimeInput } from "../index.js";
 import { rngFor } from "./math.js";
@@ -90,6 +96,7 @@ export function scoreForDirection(
   duration: number,
   seed: number,
   sfxLevel: number,
+  fixedInstrumentation = false,
 ): { score: CinematicScore; steps: CinematicDirection["steps"] } {
   const music = approved.music;
   const rng = rngFor(seed, 31);
@@ -177,7 +184,7 @@ export function scoreForDirection(
     swell(Math.min(0.6, duration / 4), 0.7);
     if (music.arc !== "steady" && duration > 8)
       swell(duration * (music.arc === "fall" ? 0.25 : 0.6), 0.6);
-  } else if (music.fromPrevious === "lift")
+  } else if (!fixedInstrumentation && music.fromPrevious === "lift")
     swell(Math.min(0.6, duration / 4), 0.5);
 
   const steps: CinematicDirection["steps"] = [];
@@ -334,6 +341,7 @@ export function directApprovedChapter(
   chapter: RuntimeChapter,
   timingPlan: ResolvedRenderPlan,
   approved: ApprovedChapterDirection,
+  template?: FilmTemplate,
 ): { direction: CinematicDirection; fingerprint: string } {
   const { duration, seed, assets, windows } = chapterTimeline(
     input,
@@ -347,15 +355,30 @@ export function directApprovedChapter(
     throw new Error(
       "The approved direction no longer matches this Chapter's photos. Ask the AI for a new direction.",
     );
+  const effective = template
+    ? clampDirectionToTemplate(approved, template.bounds)
+    : approved;
+  const fixed = template?.fixed;
+  const fixedScore = fixed?.music;
   const { score, steps } = scoreForDirection(
-    approved,
+    fixedScore
+      ? {
+          ...effective,
+          music: {
+            ...effective.music,
+            instruments: fixedScore.instruments,
+            tempoBpm: (fixedScore.tempoBpm[0] + fixedScore.tempoBpm[1]) / 2,
+          },
+        }
+      : effective,
     windows,
     duration,
     seed,
     chapter.settings?.sfxLevel ?? 1,
+    Boolean(fixedScore),
   );
   const scenes: CinematicScene[] = windows.map((w, i) => {
-    const scene = approved.scenes[i]!;
+    const scene = effective.scenes[i]!;
     const { keys, bob } = cameraForMove(
       scene.camera,
       scene.footsteps !== "none",
@@ -364,6 +387,14 @@ export function directApprovedChapter(
       id: w.id,
       image: w.image,
       framing: "follow",
+      // The photo fills this box; template default, then the user's Film and photo layout.
+      ...(template && {
+        frame: resolveFrameLayout(
+          frameLayoutFor(template.frame, input.outputAspect ?? "16:9"),
+          input.layout,
+          input.sceneLayouts?.[w.id],
+        ),
+      }),
       t0: w.t0,
       t1: w.t1,
       fadeIn: w.fadeIn,
@@ -372,7 +403,15 @@ export function directApprovedChapter(
       camera: keys,
     };
   });
-  const leaves = approved.scenes.some((s) => s.effects.leaves > 0);
+  const leaves = effective.scenes.some((s) => s.effects.leaves > 0);
+  const copy = chapterCopy(input, chapter, scenes);
+  const params = lookCurves(effective, windows, duration);
+  if (fixed) {
+    params.warm = [[0, fixed.look.warm]];
+    params.cool = [[0, fixed.look.cool]];
+    params.vignette = [[0, fixed.look.vignette]];
+  }
+  const creditsStart = Math.max(scenes.at(-1)!.t0, duration - 1.5);
   const direction: CinematicDirection = {
     schema: "film.cinematic-direction@1",
     projectId: input.projectId,
@@ -385,22 +424,39 @@ export function directApprovedChapter(
     profile: input.outputProfile ?? "landscape-1080p30@1",
     assets,
     scenes,
-    params: lookCurves(approved, windows, duration),
+    params,
+    ...(fixed && {
+      layout: fixed.layout,
+      transition: fixed.transitions[0].kind,
+      captionStyle: fixed.captions,
+    }),
     options: {
       rays: 9,
       motes: 72,
       leaves: leaves ? 18 : 0,
       leafColors: ["#9bb84f", "#c3cc62", "#e1b64e", "#7ea23e", "#d98f3e"],
       light: [255, 236, 190],
-      coolWash: "#5f7b94",
-      warmWash: "#ffbf70",
-      grain: 0.06,
-      transitionGlow: 0.12,
+      coolWash: fixed?.look.coolWash ?? "#5f7b94",
+      warmWash: fixed?.look.warmWash ?? "#ffbf70",
+      grain: fixed?.look.grain ?? 0.06,
+      transitionGlow: fixed?.transitions[0].kind === "card-slide" ? 0 : 0.12,
     },
     steps,
-    ...chapterCopy(input, chapter, scenes),
+    ...copy,
+    titleCard: fixed?.structure.titleCard === false ? null : copy.titleCard,
     slates: [],
-    credits: null,
+    credits: fixed?.structure.credits
+      ? {
+          display: "",
+          name: chapter.title,
+          show: {
+            in: creditsStart,
+            fadeIn: 0.5,
+            out: duration - 0.35,
+            fadeOut: 0.35,
+          },
+        }
+      : null,
     score,
   };
   return sealDirection(direction, timingPlan);
